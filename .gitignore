@@ -1,0 +1,114 @@
+# ==================================================
+# MONOLITHE - GLOBAL GITIGNORE
+# ==================================================
+
+# ------------------------------
+# Secrets / environment
+# ------------------------------
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+secrets/
+secret/
+
+**/application-local.properties
+**/application-secrets.properties
+**/application-local.yml
+**/application-secrets.yml
+
+
+# ------------------------------
+# Java / Maven / Spring Boot
+# ------------------------------
+**/target/
+**/build/
+
+*.class
+*.jar
+*.war
+
+# Maven Wrapper JAR must be versioned
+!**/.mvn/wrapper/maven-wrapper.jar
+
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log
+**/logs/
+
+
+# ------------------------------
+# IntelliJ IDEA
+# ------------------------------
+**/.idea/
+*.iws
+*.iml
+*.ipr
+
+
+# ------------------------------
+# VS Code / Antigravity
+# ------------------------------
+**/.vscode/
+
+
+# ------------------------------
+# STS / Eclipse
+# ------------------------------
+**/.apt_generated/
+**/.classpath
+**/.factorypath
+**/.project
+**/.settings/
+**/.springBeans
+**/.sts4-cache/
+
+
+# ------------------------------
+# NetBeans
+# ------------------------------
+**/nbproject/private/
+**/nbbuild/
+**/dist/
+**/nbdist/
+**/.nb-gradle/
+
+
+# ------------------------------
+# Node / React
+# ------------------------------
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ------------------------------
+# Operating systems
+# ------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+
+# ------------------------------
+# Temporary files
+# ------------------------------
+*.tmp
+*.temp
+*.swp
+*.bak
