@@ -26,219 +26,232 @@ import java.util.HexFormat;
 @RequiredArgsConstructor
 public class PasswordResetService {
 
-    private static final int TOKEN_BYTES = 32;
+        private static final int TOKEN_BYTES = 32;
 
-    private final SecureRandom secureRandom = new SecureRandom();
+        private final SecureRandom secureRandom = new SecureRandom();
 
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final PasswordPolicyService passwordPolicyService;
-    private final RefreshTokenService refreshTokenService;
-    private final PersonContactRepository personContactRepository;
-    private final EmailService emailService;
+        private final PasswordResetTokenRepository passwordResetTokenRepository;
+        private final UserRepository userRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final PasswordPolicyService passwordPolicyService;
+        private final RefreshTokenService refreshTokenService;
+        private final PersonContactRepository personContactRepository;
+        private final EmailService emailService;
+        private final AuditService auditService;
 
-    @Value("${security.auth.password-reset-expiration}")
-    private long passwordResetExpiration;
+        @Value("${security.auth.password-reset-expiration}")
+        private long passwordResetExpiration;
 
-    @Transactional
-    public String crearTokenRecuperacion(
-            Long idUsuario,
-            String ipSolicitud,
-            String userAgent) {
+        @Transactional
+        public String crearTokenRecuperacion(
+                        Long idUsuario,
+                        String ipSolicitud,
+                        String userAgent) {
 
-        User usuario = userRepository.findById(idUsuario)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Usuario no encontrado"));
+                User usuario = userRepository.findById(idUsuario)
+                                .orElseThrow(() -> new IllegalStateException(
+                                                "Usuario no encontrado"));
 
-        LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now();
 
-        /*
-         * Invalidamos tokens anteriores que todavía
-         * no habían sido utilizados.
-         */
-        var tokensAnteriores = passwordResetTokenRepository
-                .findByUsuarioIdUsuarioAndFechaUsoIsNull(
-                        idUsuario);
+                /*
+                 * Invalidamos tokens anteriores que todavía
+                 * no habían sido utilizados.
+                 */
+                var tokensAnteriores = passwordResetTokenRepository
+                                .findByUsuarioIdUsuarioAndFechaUsoIsNull(
+                                                idUsuario);
 
-        tokensAnteriores.forEach(token -> token.setFechaUso(ahora));
+                tokensAnteriores.forEach(token -> token.setFechaUso(ahora));
 
-        passwordResetTokenRepository.saveAll(
-                tokensAnteriores);
+                passwordResetTokenRepository.saveAll(
+                                tokensAnteriores);
 
-        String tokenReal = generarTokenSeguro();
+                String tokenReal = generarTokenSeguro();
 
-        String tokenHash = calcularSha256(tokenReal);
+                String tokenHash = calcularSha256(tokenReal);
 
-        PasswordResetToken token = new PasswordResetToken();
+                PasswordResetToken token = new PasswordResetToken();
 
-        token.setUsuario(usuario);
-        token.setTokenHash(tokenHash);
+                token.setUsuario(usuario);
+                token.setTokenHash(tokenHash);
 
-        token.setFechaExpiracion(
-                ahora.plusSeconds(
-                        passwordResetExpiration));
+                token.setFechaExpiracion(
+                                ahora.plusSeconds(
+                                                passwordResetExpiration));
 
-        token.setIpSolicitud(
-                limitarTexto(ipSolicitud, 45));
+                token.setIpSolicitud(
+                                limitarTexto(ipSolicitud, 45));
 
-        token.setUserAgent(
-                limitarTexto(userAgent, 500));
+                token.setUserAgent(
+                                limitarTexto(userAgent, 500));
 
-        passwordResetTokenRepository.save(token);
+                passwordResetTokenRepository.save(token);
 
-        /*
-         * Solo devolvemos el token real una vez.
-         * La BD conserva únicamente su SHA-256.
-         */
-        return tokenReal;
-    }
-
-    public String calcularSha256(String token) {
-
-        try {
-
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-
-            byte[] hash = digest.digest(
-                    token.getBytes(StandardCharsets.UTF_8));
-
-            return HexFormat.of()
-                    .formatHex(hash);
-
-        } catch (NoSuchAlgorithmException e) {
-
-            throw new IllegalStateException(
-                    "No fue posible calcular SHA-256",
-                    e);
-        }
-    }
-
-    private String generarTokenSeguro() {
-
-        byte[] bytes = new byte[TOKEN_BYTES];
-
-        secureRandom.nextBytes(bytes);
-
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(bytes);
-    }
-
-    private String limitarTexto(
-            String texto,
-            int longitudMaxima) {
-
-        if (texto == null) {
-            return null;
+                /*
+                 * Solo devolvemos el token real una vez.
+                 * La BD conserva únicamente su SHA-256.
+                 */
+                return tokenReal;
         }
 
-        return texto.length() <= longitudMaxima
-                ? texto
-                : texto.substring(0, longitudMaxima);
-    }
+        public String calcularSha256(String token) {
 
-    @Transactional
-    public void restablecerContrasena(
-            String tokenReal,
-            String nuevaContrasena,
-            String confirmarContrasena) {
+                try {
 
-        if (!nuevaContrasena.equals(confirmarContrasena)) {
-            throw new IllegalArgumentException(
-                    "La nueva contraseña y su confirmación no coinciden");
+                        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+
+                        byte[] hash = digest.digest(
+                                        token.getBytes(StandardCharsets.UTF_8));
+
+                        return HexFormat.of()
+                                        .formatHex(hash);
+
+                } catch (NoSuchAlgorithmException e) {
+
+                        throw new IllegalStateException(
+                                        "No fue posible calcular SHA-256",
+                                        e);
+                }
         }
 
-        String tokenHash = calcularSha256(tokenReal);
+        private String generarTokenSeguro() {
 
-        PasswordResetToken token = passwordResetTokenRepository
-                .findByTokenHashAndFechaUsoIsNull(tokenHash)
-                .orElseThrow(() -> new InvalidTokenException(
-                        "Token de recuperación inválido o ya utilizado"));
+                byte[] bytes = new byte[TOKEN_BYTES];
 
-        LocalDateTime ahora = LocalDateTime.now();
+                secureRandom.nextBytes(bytes);
 
-        if (!token.getFechaExpiracion().isAfter(ahora)) {
-            throw new InvalidTokenException(
-                    "El token de recuperación ha expirado");
+                return Base64.getUrlEncoder()
+                                .withoutPadding()
+                                .encodeToString(bytes);
         }
 
-        User usuario = token.getUsuario();
+        private String limitarTexto(
+                        String texto,
+                        int longitudMaxima) {
 
-        passwordPolicyService.validar(
-                nuevaContrasena);
+                if (texto == null) {
+                        return null;
+                }
 
-        if (passwordEncoder.matches(
-                nuevaContrasena,
-                usuario.getPasswordHash())) {
-
-            throw new IllegalArgumentException(
-                    "La nueva contraseña debe ser diferente a la contraseña anterior");
+                return texto.length() <= longitudMaxima
+                                ? texto
+                                : texto.substring(0, longitudMaxima);
         }
 
-        usuario.setPasswordHash(
-                passwordEncoder.encode(
-                        nuevaContrasena));
+        @Transactional
+        public Long restablecerContrasena(
+                        String tokenReal,
+                        String nuevaContrasena,
+                        String confirmarContrasena) {
 
-        usuario.setRequiereCambioPassword(false);
-        usuario.setPasswordActualizadoEn(ahora);
+                if (!nuevaContrasena.equals(confirmarContrasena)) {
+                        throw new IllegalArgumentException(
+                                        "La nueva contraseña y su confirmación no coinciden");
+                }
 
-        /*
-         * Si el bloqueo provenía de intentos fallidos,
-         * recuperamos también el acceso normal.
-         */
-        usuario.setIntentosFallidos(0);
-        usuario.setBloqueadoHasta(null);
+                String tokenHash = calcularSha256(tokenReal);
 
-        userRepository.save(usuario);
+                PasswordResetToken token = passwordResetTokenRepository
+                                .findByTokenHashAndFechaUsoIsNull(tokenHash)
+                                .orElseThrow(() -> new InvalidTokenException(
+                                                "Token de recuperación inválido o ya utilizado"));
 
-        /*
-         * El token queda consumido y no puede volver
-         * a utilizarse.
-         */
-        token.setFechaUso(ahora);
+                LocalDateTime ahora = LocalDateTime.now();
 
-        passwordResetTokenRepository.save(token);
+                if (!token.getFechaExpiracion().isAfter(ahora)) {
+                        throw new InvalidTokenException(
+                                        "El token de recuperación ha expirado");
+                }
 
-        /*
-         * Una recuperación de contraseña invalida
-         * todas las sesiones existentes.
-         */
-        refreshTokenService.revocarTodasLasSesiones(
-                usuario.getIdUsuario(),
-                "RECUPERACION_PASSWORD");
-    }
+                User usuario = token.getUsuario();
 
-    @Transactional
-    public void solicitarRecuperacion(
-            String usuarioLogin,
-            String ipSolicitud,
-            String userAgent) {
+                passwordPolicyService.validar(
+                                nuevaContrasena);
 
-        User usuario = userRepository
-                .findByUsuarioLogin(usuarioLogin)
-                .orElse(null);
+                if (passwordEncoder.matches(
+                                nuevaContrasena,
+                                usuario.getPasswordHash())) {
 
-        if (usuario == null) {
-            return;
+                        throw new IllegalArgumentException(
+                                        "La nueva contraseña debe ser diferente a la contraseña anterior");
+                }
+
+                usuario.setPasswordHash(
+                                passwordEncoder.encode(
+                                                nuevaContrasena));
+
+                usuario.setRequiereCambioPassword(false);
+                usuario.setPasswordActualizadoEn(ahora);
+
+                /*
+                 * Si el bloqueo provenía de intentos fallidos,
+                 * recuperamos también el acceso normal.
+                 */
+                usuario.setIntentosFallidos(0);
+                usuario.setBloqueadoHasta(null);
+
+                userRepository.save(usuario);
+
+                /*
+                 * El token queda consumido y no puede volver
+                 * a utilizarse.
+                 */
+                token.setFechaUso(ahora);
+
+                passwordResetTokenRepository.save(token);
+
+                /*
+                 * Una recuperación de contraseña invalida
+                 * todas las sesiones existentes.
+                 */
+                refreshTokenService.revocarTodasLasSesiones(
+                                usuario.getIdUsuario(),
+                                "RECUPERACION_PASSWORD");
+
+                return usuario.getIdUsuario();
         }
 
-        String correo = personContactRepository
-                .buscarEmailPrincipalVerificado(
-                        usuario.getIdPersona())
-                .orElse(null);
+        @Transactional
+        public void solicitarRecuperacion(
+                        String usuarioLogin,
+                        String ipSolicitud,
+                        String userAgent) {
 
-        if (correo == null) {
-            return;
+                User usuario = userRepository
+                                .findByUsuarioLogin(usuarioLogin)
+                                .orElse(null);
+
+                if (usuario == null) {
+                        return;
+                }
+
+                String correo = personContactRepository
+                                .buscarEmailPrincipalVerificado(
+                                                usuario.getIdPersona())
+                                .orElse(null);
+
+                if (correo == null) {
+                        return;
+                }
+
+                String tokenRecuperacion = crearTokenRecuperacion(
+                                usuario.getIdUsuario(),
+                                ipSolicitud,
+                                userAgent);
+
+                emailService.enviarRecuperacionContrasena(
+                                correo,
+                                tokenRecuperacion);
+
+                auditService.registrar(
+                                usuario.getIdUsuario(),
+                                "RECUPERACION_SOLICITADA",
+                                "EXITOSO",
+                                "Se solicitó recuperación de contraseña",
+                                ipSolicitud,
+                                userAgent,
+                                "POST",
+                                "/api/auth/forgot-password");
         }
-
-        String tokenRecuperacion = crearTokenRecuperacion(
-                usuario.getIdUsuario(),
-                ipSolicitud,
-                userAgent);
-
-        emailService.enviarRecuperacionContrasena(
-                correo,
-                tokenRecuperacion);
-    }
 }

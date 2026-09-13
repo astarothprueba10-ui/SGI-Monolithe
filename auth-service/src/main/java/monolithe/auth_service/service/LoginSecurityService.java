@@ -13,72 +13,74 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class LoginSecurityService {
 
-    private final UserRepository userRepository;
+        private final UserRepository userRepository;
 
-    @Value("${security.auth.max-failed-attempts}")
-    private int maxFailedAttempts;
+        @Value("${security.auth.max-failed-attempts}")
+        private int maxFailedAttempts;
 
-    @Value("${security.auth.lock-duration}")
-    private long lockDuration;
+        @Value("${security.auth.lock-duration}")
+        private long lockDuration;
 
-    @Transactional
-    public void registrarIntentoFallido(String usuarioLogin) {
+        @Transactional
+        public Long registrarIntentoFallido(String usuarioLogin) {
 
-        userRepository.findByUsuarioLogin(usuarioLogin)
-                .ifPresent(usuario -> {
+                User usuario = userRepository.findByUsuarioLogin(usuarioLogin)
+                                .orElse(null);
 
-                    LocalDateTime ahora = LocalDateTime.now();
+                if (usuario == null) {
+                        return null;
+                }
 
-                    int intentosActuales =
-                            usuario.getIntentosFallidos() != null
-                                    ? usuario.getIntentosFallidos()
-                                    : 0;
+                LocalDateTime ahora = LocalDateTime.now();
 
-                    /*
-                     * Si existía un bloqueo anterior pero ya venció,
-                     * comienza un nuevo ciclo de intentos.
-                     */
-                    if (usuario.getBloqueadoHasta() != null
-                            && !usuario.getBloqueadoHasta().isAfter(ahora)) {
+                int intentosActuales = usuario.getIntentosFallidos() != null
+                                ? usuario.getIntentosFallidos()
+                                : 0;
+
+                /*
+                 * Si existía un bloqueo anterior pero ya venció,
+                 * comienza un nuevo ciclo de intentos.
+                 */
+                if (usuario.getBloqueadoHasta() != null
+                                && !usuario.getBloqueadoHasta().isAfter(ahora)) {
 
                         intentosActuales = 0;
                         usuario.setBloqueadoHasta(null);
-                    }
+                }
 
-                    int nuevosIntentos =
-                            intentosActuales + 1;
+                int nuevosIntentos = intentosActuales + 1;
 
-                    usuario.setIntentosFallidos(
-                            nuevosIntentos
-                    );
+                usuario.setIntentosFallidos(nuevosIntentos);
 
-                    if (nuevosIntentos >= maxFailedAttempts) {
+                boolean bloqueadoAhora = false;
+
+                if (nuevosIntentos >= maxFailedAttempts) {
 
                         usuario.setBloqueadoHasta(
-                                ahora.plusSeconds(lockDuration)
-                        );
-                    }
+                                        ahora.plusSeconds(lockDuration));
 
-                    userRepository.save(usuario);
-                });
-    }
+                        bloqueadoAhora = true;
+                }
 
-    @Transactional
-    public void registrarAccesoExitoso(Long idUsuario) {
+                userRepository.save(usuario);
 
-        User usuario = userRepository.findById(idUsuario)
-                .orElseThrow(() ->
-                        new IllegalStateException(
-                                "Usuario no encontrado"
-                        )
-                );
+                return bloqueadoAhora
+                                ? usuario.getIdUsuario()
+                                : null;
+        }
 
-        usuario.setIntentosFallidos(0);
-        usuario.setBloqueadoHasta(null);
-        usuario.setUltimoAcceso(
-                LocalDateTime.now()
-        );
+        @Transactional
+        public void registrarAccesoExitoso(Long idUsuario) {
 
-        userRepository.save(usuario);
-    }
+                User usuario = userRepository.findById(idUsuario)
+                                .orElseThrow(() -> new IllegalStateException(
+                                                "Usuario no encontrado"));
+
+                usuario.setIntentosFallidos(0);
+                usuario.setBloqueadoHasta(null);
+                usuario.setUltimoAcceso(
+                                LocalDateTime.now());
+
+                userRepository.save(usuario);
+        }
 }

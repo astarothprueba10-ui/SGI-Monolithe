@@ -20,6 +20,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,155 +29,228 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-        private final AuthenticationManager authenticationManager;
-        private final JwtService jwtService;
-        private final RefreshTokenService refreshTokenService;
-        private final CustomUserDetailsService customUserDetailsService;
-        private final LoginSecurityService loginSecurityService;
-        private final UserRepository userRepository;
-        private final PasswordEncoder passwordEncoder;
-        private final PasswordPolicyService passwordPolicyService;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
+    private final CustomUserDetailsService customUserDetailsService;
+    private final LoginSecurityService loginSecurityService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicyService passwordPolicyService;
+    private final AuditService auditService;
 
-        @Value("${security.jwt.access-token-expiration}")
-        private long accessTokenExpiration;
+    @Value("${security.jwt.access-token-expiration}")
+    private long accessTokenExpiration;
 
-        public LoginResponse autenticar(
-                        LoginRequest solicitud,
-                        String ipOrigen,
-                        String userAgent) {
+    public LoginResponse autenticar(
+            LoginRequest solicitud,
+            String ipOrigen,
+            String userAgent) {
 
-                Authentication authentication;
+        Authentication authentication;
 
-                try {
+        try {
 
-                        authentication = authenticationManager.authenticate(
-                                        new UsernamePasswordAuthenticationToken(
-                                                        solicitud.getUsuario(),
-                                                        solicitud.getContrasena()));
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            solicitud.getUsuario(),
+                            solicitud.getContrasena()));
 
-                } catch (BadCredentialsException e) {
+        } catch (LockedException e) {
 
-                        loginSecurityService.registrarIntentoFallido(
-                                        solicitud.getUsuario());
+            User usuarioBloqueado = userRepository
+                    .findByUsuarioLogin(solicitud.getUsuario())
+                    .orElse(null);
 
-                        throw e;
-                }
+            Long idUsuario = usuarioBloqueado != null
+                    ? usuarioBloqueado.getIdUsuario()
+                    : null;
 
-                UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+            auditService.registrar(
+                    idUsuario,
+                    "LOGIN_DENEGADO",
+                    "DENEGADO",
+                    "Inicio de sesión denegado porque la cuenta está bloqueada temporalmente",
+                    ipOrigen,
+                    userAgent,
+                    "POST",
+                    "/api/auth/login");
 
-                loginSecurityService.registrarAccesoExitoso(
-                                principal.getIdUsuario());
+            throw e;
 
-                String accessToken = jwtService.generarAccessToken(principal);
+        } catch (BadCredentialsException e) {
+            User usuarioIntentado = userRepository
+                    .findByUsuarioLogin(solicitud.getUsuario())
+                    .orElse(null);
 
-                String refreshToken = refreshTokenService.crearSesion(
-                                principal.getIdUsuario(),
-                                ipOrigen,
-                                userAgent);
+            Long idUsuarioIntentado = usuarioIntentado != null
+                    ? usuarioIntentado.getIdUsuario()
+                    : null;
 
-                List<String> autoridades = principal.getAuthorities()
-                                .stream()
-                                .map(authority -> authority.getAuthority())
-                                .toList();
+            Long idUsuarioBloqueado = loginSecurityService.registrarIntentoFallido(
+                    solicitud.getUsuario());
 
-                return new LoginResponse(
-                                principal.getIdUsuario(),
-                                principal.getUsername(),
-                                autoridades,
-                                principal.isRequiereCambioPassword(),
-                                accessToken,
-                                refreshToken,
-                                "Bearer",
-                                accessTokenExpiration,
-                                "Autenticación exitosa");
+            auditService.registrar(
+                    idUsuarioIntentado,
+                    "LOGIN_FALLIDO",
+                    "FALLIDO",
+                    "Intento de inicio de sesión con credenciales inválidas para el usuario: "
+                            + solicitud.getUsuario(),
+                    ipOrigen,
+                    userAgent,
+                    "POST",
+                    "/api/auth/login");
+
+            if (idUsuarioBloqueado != null) {
+
+                auditService.registrar(
+                        idUsuarioBloqueado,
+                        "USUARIO_BLOQUEADO",
+                        "EXITOSO",
+                        "El usuario fue bloqueado temporalmente por exceder los intentos fallidos de inicio de sesión",
+                        ipOrigen,
+                        userAgent,
+                        "POST",
+                        "/api/auth/login");
+            }
+
+            throw e;
         }
 
-        public RefreshTokenResponse renovarToken(
-                        RefreshTokenRequest solicitud,
-                        String ipOrigen,
-                        String userAgent) {
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
-                RefreshTokenRotation rotacion = refreshTokenService.rotarRefreshToken(
-                                solicitud.getRefreshToken(),
-                                ipOrigen,
-                                userAgent);
+        loginSecurityService.registrarAccesoExitoso(
+                principal.getIdUsuario());
 
-                UserPrincipal principal = (UserPrincipal) customUserDetailsService
-                                .loadUserByUsername(
-                                                rotacion.usuarioLogin());
+        String accessToken = jwtService.generarAccessToken(principal);
 
-                String nuevoAccessToken = jwtService.generarAccessToken(principal);
+        String refreshToken = refreshTokenService.crearSesion(
+                principal.getIdUsuario(),
+                ipOrigen,
+                userAgent);
 
-                return new RefreshTokenResponse(
-                                nuevoAccessToken,
-                                rotacion.refreshToken(),
-                                "Bearer",
-                                accessTokenExpiration,
-                                "Token renovado correctamente");
+        auditService.registrar(
+                principal.getIdUsuario(),
+                "LOGIN_EXITOSO",
+                "EXITOSO",
+                "Inicio de sesión exitoso",
+                ipOrigen,
+                userAgent,
+                "POST",
+                "/api/auth/login");
+
+        List<String> autoridades = principal.getAuthorities()
+                .stream()
+                .map(authority -> authority.getAuthority())
+                .toList();
+
+        return new LoginResponse(
+                principal.getIdUsuario(),
+                principal.getUsername(),
+                autoridades,
+                principal.isRequiereCambioPassword(),
+                accessToken,
+                refreshToken,
+                "Bearer",
+                accessTokenExpiration,
+                "Autenticación exitosa");
+    }
+
+    public RefreshTokenResponse renovarToken(
+            RefreshTokenRequest solicitud,
+            String ipOrigen,
+            String userAgent) {
+
+        RefreshTokenRotation rotacion = refreshTokenService.rotarRefreshToken(
+                solicitud.getRefreshToken(),
+                ipOrigen,
+                userAgent);
+
+        UserPrincipal principal = (UserPrincipal) customUserDetailsService
+                .loadUserByUsername(
+                        rotacion.usuarioLogin());
+
+        String nuevoAccessToken = jwtService.generarAccessToken(principal);
+
+        auditService.registrar(
+                rotacion.idUsuario(),
+                "REFRESH_TOKEN_ROTADO",
+                "EXITOSO",
+                "Se renovó la sesión mediante refresh token",
+                ipOrigen,
+                userAgent,
+                "POST",
+                "/api/auth/refresh");
+        return new RefreshTokenResponse(
+                nuevoAccessToken,
+                rotacion.refreshToken(),
+                "Bearer",
+                accessTokenExpiration,
+                "Token renovado correctamente");
+    }
+
+    public Long cerrarSesion(
+            RefreshTokenRequest solicitud) {
+
+        return refreshTokenService.revocarSesion(
+                solicitud.getRefreshToken());
+    }
+
+    @Transactional
+    public void cambiarContrasena(
+            Long idUsuario,
+            ChangePasswordRequest solicitud) {
+
+        User usuario = userRepository.findById(idUsuario)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Usuario no encontrado"));
+
+        if (!passwordEncoder.matches(
+                solicitud.getContrasenaActual(),
+                usuario.getPasswordHash())) {
+
+            throw new IllegalArgumentException(
+                    "La contraseña actual es incorrecta");
         }
 
-        public void cerrarSesion(
-                        RefreshTokenRequest solicitud) {
+        if (!solicitud.getNuevaContrasena()
+                .equals(solicitud.getConfirmarContrasena())) {
 
-                refreshTokenService.revocarSesion(
-                                solicitud.getRefreshToken());
+            throw new IllegalArgumentException(
+                    "La nueva contraseña y su confirmación no coinciden");
         }
 
-        @Transactional
-        public void cambiarContrasena(
-                        Long idUsuario,
-                        ChangePasswordRequest solicitud) {
+        if (passwordEncoder.matches(
+                solicitud.getNuevaContrasena(),
+                usuario.getPasswordHash())) {
 
-                User usuario = userRepository.findById(idUsuario)
-                                .orElseThrow(() -> new IllegalStateException(
-                                                "Usuario no encontrado"));
-
-                if (!passwordEncoder.matches(
-                                solicitud.getContrasenaActual(),
-                                usuario.getPasswordHash())) {
-
-                        throw new IllegalArgumentException(
-                                        "La contraseña actual es incorrecta");
-                }
-
-                if (!solicitud.getNuevaContrasena()
-                                .equals(solicitud.getConfirmarContrasena())) {
-
-                        throw new IllegalArgumentException(
-                                        "La nueva contraseña y su confirmación no coinciden");
-                }
-
-                if (passwordEncoder.matches(
-                                solicitud.getNuevaContrasena(),
-                                usuario.getPasswordHash())) {
-
-                        throw new IllegalArgumentException(
-                                        "La nueva contraseña debe ser diferente a la contraseña actual");
-                }
-
-                passwordPolicyService.validar(
-                                solicitud.getNuevaContrasena());
-
-                usuario.setPasswordHash(
-                                passwordEncoder.encode(
-                                                solicitud.getNuevaContrasena()));
-
-                usuario.setRequiereCambioPassword(false);
-                usuario.setPasswordActualizadoEn(
-                                LocalDateTime.now());
-
-                userRepository.save(usuario);
-
-                refreshTokenService.revocarTodasLasSesiones(
-                                idUsuario,
-                                "CAMBIO_PASSWORD");
+            throw new IllegalArgumentException(
+                    "La nueva contraseña debe ser diferente a la contraseña actual");
         }
 
-        public void cerrarTodasLasSesiones(
-                        Long idUsuario) {
+        passwordPolicyService.validar(
+                solicitud.getNuevaContrasena());
 
-                refreshTokenService.revocarTodasLasSesiones(
-                                idUsuario,
-                                "LOGOUT_TODAS_SESIONES");
-        }
+        usuario.setPasswordHash(
+                passwordEncoder.encode(
+                        solicitud.getNuevaContrasena()));
+
+        usuario.setRequiereCambioPassword(false);
+        usuario.setPasswordActualizadoEn(
+                LocalDateTime.now());
+
+        userRepository.save(usuario);
+
+        refreshTokenService.revocarTodasLasSesiones(
+                idUsuario,
+                "CAMBIO_PASSWORD");
+    }
+
+    public void cerrarTodasLasSesiones(
+            Long idUsuario) {
+
+        refreshTokenService.revocarTodasLasSesiones(
+                idUsuario,
+                "LOGOUT_TODAS_SESIONES");
+    }
 }

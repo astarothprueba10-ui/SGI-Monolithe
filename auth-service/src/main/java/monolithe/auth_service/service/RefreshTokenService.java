@@ -199,23 +199,28 @@ public class RefreshTokenService {
         }
 
         @Transactional
-        public void revocarSesion(String refreshToken) {
+        public Long revocarSesion(String refreshToken) {
 
                 String refreshTokenHash = calcularSha256(refreshToken);
 
-                sessionRepository
+                Session sesion = sessionRepository
                                 .findByRefreshTokenHashAndFechaRevocacionIsNull(
                                                 refreshTokenHash)
-                                .ifPresent(sesion -> {
+                                .orElse(null);
 
-                                        LocalDateTime ahora = LocalDateTime.now();
+                if (sesion == null) {
+                        return null;
+                }
 
-                                        sesion.setUltimaActividad(ahora);
-                                        sesion.setFechaRevocacion(ahora);
-                                        sesion.setMotivoRevocacion("LOGOUT");
+                LocalDateTime ahora = LocalDateTime.now();
 
-                                        sessionRepository.save(sesion);
-                                });
+                sesion.setUltimaActividad(ahora);
+                sesion.setFechaRevocacion(ahora);
+                sesion.setMotivoRevocacion("LOGOUT");
+
+                sessionRepository.save(sesion);
+
+                return sesion.getUsuario().getIdUsuario();
         }
 
         @Transactional
