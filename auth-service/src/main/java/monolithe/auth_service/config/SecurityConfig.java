@@ -41,7 +41,8 @@ public class SecurityConfig {
                         RestAccessDeniedHandler restAccessDeniedHandler) throws Exception {
 
                 http
-                                .cors(cors -> {})
+                                .cors(cors -> {
+                                })
 
                                 .csrf(csrf -> csrf.disable())
 
@@ -152,7 +153,7 @@ public class SecurityConfig {
 
                 configuration.setAllowedOrigins(
                                 Arrays.stream(allowedOrigins.split(","))
-                                                .map(String::trim)
+                                                .map(origin -> origin.trim())
                                                 .filter(origin -> !origin.isBlank())
                                                 .toList());
 
