@@ -98,7 +98,9 @@ public class AuthController {
 
                 authenticationService.cambiarContrasena(
                                 idUsuario,
-                                solicitud);
+                                solicitud,
+                                request.getRemoteAddr(),
+                                request.getHeader("User-Agent"));
 
                 auditService.registrar(
                                 idUsuario,
