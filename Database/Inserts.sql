@@ -1169,3 +1169,121 @@ VALUES
     'Cuenta asociada a un medio de pago digital',
     3
 );
+
+-- INSERTAR PERMISOS --
+INSERT INTO seg_permisos (
+    codigo,
+    modulo,
+    recurso,
+    accion,
+    nombre,
+    descripcion,
+    activo
+)
+VALUES
+(
+    'SEGURIDAD_USUARIO_VER',
+    'SEGURIDAD',
+    'USUARIO',
+    'VER',
+    'Ver usuarios',
+    'Permite consultar usuarios del sistema',
+    1
+),
+(
+    'SEGURIDAD_USUARIO_CREAR',
+    'SEGURIDAD',
+    'USUARIO',
+    'CREAR',
+    'Crear usuarios',
+    'Permite registrar nuevos usuarios',
+    1
+),
+(
+    'SEGURIDAD_USUARIO_EDITAR',
+    'SEGURIDAD',
+    'USUARIO',
+    'EDITAR',
+    'Editar usuarios',
+    'Permite modificar información y configuración de usuarios',
+    1
+),
+(
+    'SEGURIDAD_ROL_VER',
+    'SEGURIDAD',
+    'ROL',
+    'VER',
+    'Ver roles',
+    'Permite consultar los roles disponibles',
+    1
+),
+(
+    'SEGURIDAD_ROL_GESTIONAR',
+    'SEGURIDAD',
+    'ROL',
+    'GESTIONAR',
+    'Gestionar roles',
+    'Permite crear, editar y asignar roles',
+    1
+),
+(
+    'SEGURIDAD_PERMISO_VER',
+    'SEGURIDAD',
+    'PERMISO',
+    'VER',
+    'Ver permisos',
+    'Permite consultar permisos del sistema',
+    1
+),
+(
+    'SEGURIDAD_PERMISO_GESTIONAR',
+    'SEGURIDAD',
+    'PERMISO',
+    'GESTIONAR',
+    'Gestionar permisos',
+    'Permite asignar y administrar permisos de los roles',
+    1
+),
+(
+    'SEGURIDAD_AUDITORIA_VER',
+    'SEGURIDAD',
+    'AUDITORIA',
+    'VER',
+    'Ver auditoría',
+    'Permite consultar eventos de auditoría y seguridad',
+    1
+);
+
+-- INSERTAR ROLES A LOS PERMISOS 
+INSERT INTO seg_roles_permisos (
+    id_rol,
+    id_permiso,
+    asignado_por,
+    activo
+)
+SELECT
+    r.id_rol,
+    p.id_permiso,
+    1,
+    1
+FROM seg_roles r
+JOIN seg_permisos p
+    ON p.codigo IN (
+        'SEGURIDAD_USUARIO_VER',
+        'SEGURIDAD_USUARIO_CREAR',
+        'SEGURIDAD_USUARIO_EDITAR',
+        'SEGURIDAD_ROL_VER',
+        'SEGURIDAD_ROL_GESTIONAR',
+        'SEGURIDAD_PERMISO_VER',
+        'SEGURIDAD_PERMISO_GESTIONAR',
+        'SEGURIDAD_AUDITORIA_VER'
+    )
+WHERE r.codigo = 'ADMINISTRADOR'
+  AND r.activo = 1
+  AND p.activo = 1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM seg_roles_permisos rp
+      WHERE rp.id_rol = r.id_rol
+        AND rp.id_permiso = p.id_permiso
+  );
