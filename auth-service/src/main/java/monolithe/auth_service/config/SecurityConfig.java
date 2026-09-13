@@ -18,120 +18,173 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter,
-            RestAuthenticationEntryPoint restAuthenticationEntryPoint,
-            RestAccessDeniedHandler restAccessDeniedHandler) throws Exception {
+        @Value("${security.cors.allowed-origins}")
+        private String allowedOrigins;
 
-        http
-                .csrf(csrf -> csrf.disable())
+        @Bean
+        public SecurityFilterChain securityFilterChain(
+                        HttpSecurity http,
+                        JwtAuthenticationConverter jwtAuthenticationConverter,
+                        RestAuthenticationEntryPoint restAuthenticationEntryPoint,
+                        RestAccessDeniedHandler restAccessDeniedHandler) throws Exception {
 
-                .formLogin(form -> form.disable())
+                http
+                                .cors(cors -> {})
 
-                .httpBasic(basic -> basic.disable())
+                                .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .formLogin(form -> form.disable())
 
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(restAuthenticationEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler))
+                                .httpBasic(basic -> basic.disable())
 
-                .authorizeHttpRequests(auth -> auth
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                        // Rutas públicas
-                        .requestMatchers(
-                                "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/auth/logout",
-                                "/api/auth/forgot-password",
-                                "/api/auth/reset-password",
-                                "/actuator/health",
-                                "/actuator/info")
-                        .permitAll()
+                                .exceptionHandling(exception -> exception
+                                                .authenticationEntryPoint(restAuthenticationEntryPoint)
+                                                .accessDeniedHandler(restAccessDeniedHandler))
 
-                        .requestMatchers("/api/auth/change-password")
-                        .authenticated()
+                                .authorizeHttpRequests(auth -> auth
 
-                        .anyRequest()
-                        .access((authentication, context) -> {
+                                                // Rutas públicas
+                                                .requestMatchers(
+                                                                "/api/auth/login",
+                                                                "/api/auth/refresh",
+                                                                "/api/auth/logout",
+                                                                "/api/auth/forgot-password",
+                                                                "/api/auth/reset-password",
+                                                                "/actuator/health",
+                                                                "/actuator/info")
+                                                .permitAll()
 
-                            var authActual = authentication.get();
+                                                .requestMatchers("/api/auth/change-password")
+                                                .authenticated()
 
-                            if (!authActual.isAuthenticated()) {
-                                return new AuthorizationDecision(false);
-                            }
+                                                .anyRequest()
+                                                .access((authentication, context) -> {
 
-                            if (authActual instanceof JwtAuthenticationToken jwtAuthentication) {
+                                                        var authActual = authentication.get();
 
-                                Boolean requiereCambioPassword =
-                                        jwtAuthentication
-                                                .getToken()
-                                                .getClaim("password_change_required");
+                                                        if (!authActual.isAuthenticated()) {
+                                                                return new AuthorizationDecision(false);
+                                                        }
 
-                                return new AuthorizationDecision(
-                                        !Boolean.TRUE.equals(requiereCambioPassword));
-                            }
+                                                        if (authActual instanceof JwtAuthenticationToken jwtAuthentication) {
 
-                            return new AuthorizationDecision(false);
-                        }))
+                                                                Boolean requiereCambioPassword = jwtAuthentication
+                                                                                .getToken()
+                                                                                .getClaim("password_change_required");
 
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationEntryPoint(restAuthenticationEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler)
-                        .jwt(jwt -> jwt
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                                                                return new AuthorizationDecision(
+                                                                                !Boolean.TRUE.equals(
+                                                                                                requiereCambioPassword));
+                                                        }
 
-        return http.build();
-    }
+                                                        return new AuthorizationDecision(false);
+                                                }))
 
-    @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+                                .oauth2ResourceServer(oauth2 -> oauth2
+                                                .authenticationEntryPoint(restAuthenticationEntryPoint)
+                                                .accessDeniedHandler(restAccessDeniedHandler)
+                                                .jwt(jwt -> jwt
+                                                                .jwtAuthenticationConverter(
+                                                                                jwtAuthenticationConverter)));
 
-        JwtGrantedAuthoritiesConverter authoritiesConverter =
-                new JwtGrantedAuthoritiesConverter();
+                return http.build();
+        }
 
-        authoritiesConverter.setAuthoritiesClaimName("authorities");
+        @Bean
+        public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
-        /*
-         * No agregamos prefijo porque el JWT ya contiene:
-         * ROLE_ADMINISTRADOR
-         * ROLE_GERENCIA
-         * etc.
-         */
-        authoritiesConverter.setAuthorityPrefix("");
+                JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
-        JwtAuthenticationConverter jwtAuthenticationConverter =
-                new JwtAuthenticationConverter();
+                authoritiesConverter.setAuthoritiesClaimName("authorities");
 
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(
-                authoritiesConverter);
+                /*
+                 * No agregamos prefijo porque el JWT ya contiene:
+                 * ROLE_ADMINISTRADOR
+                 * ROLE_GERENCIA
+                 * etc.
+                 */
+                authoritiesConverter.setAuthorityPrefix("");
 
-        return jwtAuthenticationConverter;
-    }
+                JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+                jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(
+                                authoritiesConverter);
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            CustomUserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder) {
+                return jwtAuthenticationConverter;
+        }
 
-        DaoAuthenticationProvider authenticationProvider =
-                new DaoAuthenticationProvider(userDetailsService);
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
-        authenticationProvider.setPasswordEncoder(passwordEncoder);
+        @Bean
+        public AuthenticationManager authenticationManager(
+                        CustomUserDetailsService userDetailsService,
+                        PasswordEncoder passwordEncoder) {
 
-        return new ProviderManager(authenticationProvider);
-    }
+                DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider(userDetailsService);
+
+                authenticationProvider.setPasswordEncoder(passwordEncoder);
+
+                return new ProviderManager(authenticationProvider);
+        }
+
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
+
+                CorsConfiguration configuration = new CorsConfiguration();
+
+                configuration.setAllowedOrigins(
+                                Arrays.stream(allowedOrigins.split(","))
+                                                .map(String::trim)
+                                                .filter(origin -> !origin.isBlank())
+                                                .toList());
+
+                configuration.setAllowedMethods(
+                                List.of(
+                                                "GET",
+                                                "POST",
+                                                "PUT",
+                                                "PATCH",
+                                                "DELETE",
+                                                "OPTIONS"));
+
+                configuration.setAllowedHeaders(
+                                List.of(
+                                                "Authorization",
+                                                "Content-Type",
+                                                "Accept"));
+
+                configuration.setExposedHeaders(
+                                List.of(
+                                                "Authorization"));
+
+                configuration.setAllowCredentials(true);
+
+                configuration.setMaxAge(3600L);
+
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+                source.registerCorsConfiguration(
+                                "/**",
+                                configuration);
+
+                return source;
+        }
 }
