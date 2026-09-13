@@ -12,6 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import monolithe.auth_service.exception.InvalidTokenException;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -151,13 +153,13 @@ public class PasswordResetService {
 
         PasswordResetToken token = passwordResetTokenRepository
                 .findByTokenHashAndFechaUsoIsNull(tokenHash)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new InvalidTokenException(
                         "Token de recuperación inválido o ya utilizado"));
 
         LocalDateTime ahora = LocalDateTime.now();
 
         if (!token.getFechaExpiracion().isAfter(ahora)) {
-            throw new IllegalArgumentException(
+            throw new InvalidTokenException(
                     "El token de recuperación ha expirado");
         }
 

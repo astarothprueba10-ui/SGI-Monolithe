@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import monolithe.auth_service.dto.ApiErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -41,6 +42,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidToken(
+        InvalidTokenException exception,
+        HttpServletRequest request
+    ){
+
+    return construirRespuesta(
+            HttpStatus.UNAUTHORIZED,
+            exception.getMessage(),
+            request
+    );
+}
+   
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
             IllegalArgumentException exception,
@@ -48,8 +63,21 @@ public class GlobalExceptionHandler {
     ) {
 
         return construirRespuesta(
-                HttpStatus.UNAUTHORIZED,
+                HttpStatus.BAD_REQUEST,
                 exception.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(MailException.class)
+    public ResponseEntity<ApiErrorResponse> handleMailException(
+            MailException exception,
+            HttpServletRequest request
+    ) {
+
+        return construirRespuesta(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "El servicio de correo no está disponible temporalmente",
                 request
         );
     }
@@ -92,4 +120,4 @@ public class GlobalExceptionHandler {
                 .status(status)
                 .body(error);
     }
-} 
+}

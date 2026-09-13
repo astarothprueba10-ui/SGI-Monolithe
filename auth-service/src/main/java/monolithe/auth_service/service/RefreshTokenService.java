@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import monolithe.auth_service.exception.InvalidTokenException;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -59,13 +61,13 @@ public class RefreshTokenService {
                 Session sesionActual = sessionRepository
                                 .findByRefreshTokenHashAndFechaRevocacionIsNull(
                                                 refreshTokenHash)
-                                .orElseThrow(() -> new IllegalArgumentException(
+                                .orElseThrow(() -> new InvalidTokenException(
                                                 "Refresh token inválido"));
 
                 LocalDateTime ahora = LocalDateTime.now();
 
                 if (!sesionActual.getFechaExpiracion().isAfter(ahora)) {
-                        throw new IllegalArgumentException(
+                        throw new InvalidTokenException(
                                         "Refresh token expirado");
                 }
 
@@ -148,7 +150,7 @@ public class RefreshTokenService {
                         LocalDateTime ahora) {
 
                 if (usuario.getEstadoUsuario() == null) {
-                        throw new IllegalStateException(
+                        throw new IllegalArgumentException(
                                         "El usuario no tiene un estado válido");
                 }
 
