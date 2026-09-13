@@ -43,6 +43,7 @@ public class JwtService {
                 .id(UUID.randomUUID().toString())
                 .claim("username", principal.getUsername())
                 .claim("authorities", autoridades)
+                .claim("password_change_required", principal.isRequiereCambioPassword())
                 .build();
 
         JwsHeader header = JwsHeader
