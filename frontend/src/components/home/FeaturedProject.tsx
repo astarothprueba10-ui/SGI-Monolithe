@@ -1,4 +1,3 @@
-import React from 'react';
 import { CalendarClockIcon, CarIcon, MapPinIcon, MaximizeIcon, WalletIcon } from 'lucide-react';
 import { LinkButton } from '../ui/Button';
 import { Badge, SectionHeading } from '../ui/Primitives';
@@ -18,9 +17,7 @@ export function FeaturedProject() {
         <SectionHeading
           eyebrow="Proyecto destacado"
           title="Conoce nuestro proyecto"
-          description="Un condominio campestre cerrado en Picsi, diseñado para familias que quieren espacio, naturaleza y una inversión segura." />
-        
-
+          description="Un proyecto campestre en Picsi con lotes desde 450 m², alternativas de financiamiento y lotes independizados e inscritos en SUNARP." />
         <div className="mt-12 grid gap-10 lg:grid-cols-[1.15fr_1fr] lg:items-center">
           <div className="relative">
             <img

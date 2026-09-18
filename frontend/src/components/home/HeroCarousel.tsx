@@ -1,28 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { LinkButton } from '../ui/Button';
 import { IMAGES } from '../../data/projects';
 import { cn } from '../../utils/cn';
 
 const slides = [
-{
-  image: IMAGES.heroAerial,
-  eyebrow: 'Preventa · Picsi, Chiclayo',
-  title: 'Invierte hoy en el lugar donde construirás tu futuro',
-  text: 'Terrenos pensados para vivir, invertir y crecer.'
-},
-{
-  image: IMAGES.heroAvenue,
-  eyebrow: 'Condominio Campestre Los Cocos',
-  title: 'Lotes campestres desde 450 m² a 30 minutos de Chiclayo',
-  text: 'Áreas verdes, servicios y seguridad dentro de un condominio cerrado.'
-},
-{
-  image: IMAGES.heroHouse,
-  eyebrow: 'Financiamiento directo',
-  title: 'Tu lote propio con una inicial desde S/ 8,000',
-  text: 'Saldo financiado hasta en 36 meses, sin bancos de por medio.'
-}];
+  {
+    image: IMAGES.heroAerial,
+    eyebrow: 'Preventa · Picsi, Chiclayo',
+    title: 'Invierte hoy en el lugar donde construirás tu futuro',
+    text: 'Lotes campestres pensados para vivir, invertir y crecer.'
+  },
+  {
+    image: IMAGES.heroAvenue,
+    eyebrow: 'Condominio Campestre Los Cocos',
+    title: 'Lotes campestres desde 450 m² a aproximadamente 30 minutos de Chiclayo',
+    text: 'Un proyecto con áreas recreativas, servicios y espacios comunes en un entorno campestre.'
+  },
+  {
+    image: IMAGES.heroHouse,
+    eyebrow: 'Financiamiento directo',
+    title: 'Tu lote propio con una inicial desde S/ 8,000',
+    text: 'Financiamiento directo con MONOLITHE de hasta 36 meses.'
+  }
+];
 
 
 export function HeroCarousel() {
@@ -39,21 +40,21 @@ export function HeroCarousel() {
   return (
     <section className="relative isolate min-h-[560px] overflow-hidden bg-night lg:min-h-[680px]">
       {slides.map((s, i) =>
-      <img
-        key={s.image}
-        src={s.image}
-        alt={i === index ? s.title : ''}
-        aria-hidden={i !== index}
-        className={cn(
-          'absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out',
-          i === index ? 'opacity-100' : 'opacity-0'
-        )} />
+        <img
+          key={s.image}
+          src={s.image}
+          alt={i === index ? s.title : ''}
+          aria-hidden={i !== index}
+          className={cn(
+            'absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out',
+            i === index ? 'opacity-100' : 'opacity-0'
+          )} />
 
       )}
       <div
         className="absolute inset-0 bg-night/70"
         aria-hidden="true" />
-      
+
 
       <div className="shell relative flex min-h-[560px] flex-col justify-center py-20 lg:min-h-[680px]">
         <div key={index} className="max-w-2xl">
@@ -74,7 +75,7 @@ export function HeroCarousel() {
               size="lg"
               variant="secondary"
               className="border-white/35 bg-transparent text-white hover:border-white hover:bg-white hover:text-night">
-              
+
               Solicitar información
             </LinkButton>
           </div>
@@ -83,16 +84,16 @@ export function HeroCarousel() {
         <div className="mt-14 flex items-center gap-5">
           <div className="flex gap-2" role="tablist" aria-label="Diapositivas del hero">
             {slides.map((s, i) =>
-            <button
-              key={s.image}
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`Ir a la diapositiva ${i + 1}`}
-              onClick={() => setIndex(i)}
-              className={cn(
-                'h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out',
-                i === index ? 'w-10 bg-gold' : 'w-5 bg-white/35 hover:bg-white/60'
-              )} />
+              <button
+                key={s.image}
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`Ir a la diapositiva ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={cn(
+                  'h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out',
+                  i === index ? 'w-10 bg-gold' : 'w-5 bg-white/35 hover:bg-white/60'
+                )} />
 
             )}
           </div>
@@ -102,7 +103,7 @@ export function HeroCarousel() {
               onClick={() => go(-1)}
               aria-label="Diapositiva anterior"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 text-white transition-colors duration-150 ease-out hover:border-gold hover:text-gold">
-              
+
               <ChevronLeftIcon className="h-4 w-4" />
             </button>
             <button
@@ -110,7 +111,7 @@ export function HeroCarousel() {
               onClick={() => go(1)}
               aria-label="Siguiente diapositiva"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 text-white transition-colors duration-150 ease-out hover:border-gold hover:text-gold">
-              
+
               <ChevronRightIcon className="h-4 w-4" />
             </button>
           </div>

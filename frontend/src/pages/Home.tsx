@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRightIcon, MessageCircleIcon, PhoneIcon } from 'lucide-react';
 import { HeroCarousel } from '../components/home/HeroCarousel';
 import { FeaturedProject } from '../components/home/FeaturedProject';
@@ -22,7 +21,7 @@ export function Home() {
             <SectionHeading
               eyebrow="Beneficios"
               title="Todo lo que encuentras dentro del condominio"
-              description="Servicios, áreas comunes y seguridad pensados para que puedas construir y vivir desde el primer día." />
+              description="Servicios, áreas recreativas y espacios comunes contemplados dentro del proyecto para complementar tu inversión." />
             
             <LinkButton to="/beneficios" variant="secondary" className="shrink-0">
               Ver todos los beneficios
@@ -63,7 +62,7 @@ export function Home() {
               light
               eyebrow="Inversión"
               title="Una inversión pensada para tu futuro"
-              description="La tierra en zonas de expansión de Lambayeque mantiene una plusvalía sostenida. En Los Cocos aseguras hoy un precio de preventa con financiamiento directo de MONOLITHE." />
+              description="Los Cocos ofrece lotes campestres desde 450 m² con precio de preventa y alternativas de financiamiento directo con MONOLITHE de hasta 36 meses." />
             
             <LinkButton to="/proyectos/condominio-campestre-los-cocos" size="lg" className="mt-9">
               Conoce nuestras facilidades de pago
@@ -122,7 +121,7 @@ export function Home() {
             <SectionHeading
               eyebrow="Contacto rápido"
               title="Déjanos tus datos y te enviamos la información completa"
-              description="Recibirás el brochure del proyecto, el plano de lotes disponibles y el cronograma de pagos personalizado." />
+              description="Un asesor podrá brindarte información sobre el proyecto, disponibilidad de lotes, precios, visitas al terreno y alternativas de financiamiento." />
             
             <div className="mt-8 space-y-3">
               <AnchorButton
