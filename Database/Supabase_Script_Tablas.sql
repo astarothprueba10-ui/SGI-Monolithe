@@ -5,7 +5,7 @@
 -- Conversion aplicada:
 --   AUTO_INCREMENT a columnas IDENTITY
 --   tipos UNSIGNED al equivalente PostgreSQL
---   DATETIME(6) a TIMESTAMP(6), compatible con LocalDateTime
+--   TIMESTAMP(6) a TIMESTAMP(6), compatible con LocalDateTime
 --   actualizacion automatica de fecha_actualizacion mediante triggers
 --   indices MySQL inline a sentencias CREATE INDEX
 --   CONCAT de columnas generadas a concatenacion PostgreSQL
@@ -48,10 +48,10 @@ CREATE TABLE estado (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_estado
@@ -74,10 +74,10 @@ CREATE TABLE tipo_lote (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_lote
@@ -98,10 +98,10 @@ CREATE TABLE moneda (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_moneda
@@ -130,10 +130,10 @@ CREATE TABLE tipo_documento (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_documento
@@ -163,10 +163,10 @@ CREATE TABLE tipo_tarifa (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_tarifa
@@ -189,10 +189,10 @@ CREATE TABLE tipo_ajuste_precio (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_ajuste_precio
@@ -213,10 +213,10 @@ CREATE TABLE tipo_contacto (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_contacto
@@ -239,10 +239,10 @@ CREATE TABLE origen_prospecto (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_origen_prospecto
@@ -263,10 +263,10 @@ CREATE TABLE tipo_seguimiento (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_seguimiento
@@ -287,10 +287,10 @@ CREATE TABLE tipo_consentimiento (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_consentimiento
@@ -313,10 +313,10 @@ CREATE TABLE tipo_contrato (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_contrato
@@ -341,10 +341,10 @@ CREATE TABLE modalidad_venta (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_modalidad_venta
@@ -371,10 +371,10 @@ CREATE TABLE metodo_pago (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_metodo_pago
@@ -397,10 +397,10 @@ CREATE TABLE tipo_aplicacion_pago (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_aplicacion_pago
@@ -423,10 +423,10 @@ CREATE TABLE tipo_asesor (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_asesor
@@ -449,10 +449,10 @@ CREATE TABLE tipo_calculo_comision (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_calculo_comision
@@ -475,10 +475,10 @@ CREATE TABLE tipo_seccion (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_seccion
@@ -501,10 +501,10 @@ CREATE TABLE tipo_multimedia (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_multimedia
@@ -527,10 +527,10 @@ CREATE TABLE uso_multimedia (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_uso_multimedia
@@ -555,10 +555,10 @@ CREATE TABLE tipo_notificacion (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_notificacion
@@ -581,10 +581,10 @@ CREATE TABLE canal_notificacion (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_canal_notificacion
@@ -607,10 +607,10 @@ CREATE TABLE tipo_movimiento (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_movimiento
@@ -633,10 +633,10 @@ CREATE TABLE tipo_cuenta (
 
     orden SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tipo_cuenta
@@ -659,10 +659,10 @@ CREATE TABLE persona (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_persona
@@ -700,10 +700,10 @@ CREATE TABLE documento_identidad (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_documento
@@ -760,10 +760,10 @@ CREATE TABLE contacto (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_contacto
@@ -821,10 +821,10 @@ CREATE TABLE direccion (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_direccion
@@ -854,16 +854,16 @@ CREATE TABLE usuario (
 
     intentos_fallidos SMALLINT NOT NULL DEFAULT 0,
 
-    bloqueado_hasta DATETIME(6),
+    bloqueado_hasta TIMESTAMP(6),
 
-    ultimo_acceso DATETIME(6),
+    ultimo_acceso TIMESTAMP(6),
 
-    fecha_cambio_clave DATETIME(6),
+    fecha_cambio_clave TIMESTAMP(6),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_usuario
@@ -899,10 +899,10 @@ CREATE TABLE rol (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_rol
@@ -929,10 +929,10 @@ CREATE TABLE permiso (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_permiso
@@ -954,10 +954,10 @@ CREATE TABLE asignacion_rol (
 
     id_usuario_asigna BIGINT,
 
-    fecha_asignacion DATETIME(6) NOT NULL
+    fecha_asignacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_revocacion DATETIME(6),
+    fecha_revocacion TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -1014,7 +1014,7 @@ CREATE TABLE asignacion_permiso (
 
     id_usuario_asigna BIGINT,
 
-    fecha_asignacion DATETIME(6) NOT NULL
+    fecha_asignacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -1048,12 +1048,12 @@ CREATE TABLE token_recuperacion (
 
     hash_token CHAR(64) NOT NULL,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_expiracion DATETIME(6) NOT NULL,
+    fecha_expiracion TIMESTAMP(6) NOT NULL,
 
-    fecha_uso DATETIME(6),
+    fecha_uso TIMESTAMP(6),
 
     ip_solicitud VARCHAR(45),
 
@@ -1096,14 +1096,14 @@ CREATE TABLE sesion (
 
     agente_usuario VARCHAR(500),
 
-    fecha_inicio DATETIME(6) NOT NULL
+    fecha_inicio TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    ultima_actividad DATETIME(6),
+    ultima_actividad TIMESTAMP(6),
 
-    fecha_expiracion DATETIME(6) NOT NULL,
+    fecha_expiracion TIMESTAMP(6) NOT NULL,
 
-    fecha_revocacion DATETIME(6),
+    fecha_revocacion TIMESTAMP(6),
 
     motivo_revocacion VARCHAR(255),
 
@@ -1174,10 +1174,10 @@ CREATE TABLE proyecto (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_proyecto
@@ -1238,10 +1238,10 @@ CREATE TABLE etapa (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_etapa
@@ -1293,10 +1293,10 @@ CREATE TABLE manzana (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_manzana
@@ -1337,10 +1337,10 @@ CREATE TABLE zona (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_zona
@@ -1380,10 +1380,10 @@ CREATE TABLE etapa_comercial (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_etapa_comercial
@@ -1426,10 +1426,10 @@ CREATE TABLE tarifa (
 
     valor DECIMAL(14,4) NOT NULL,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     observacion VARCHAR(255),
 
@@ -1445,10 +1445,10 @@ CREATE TABLE tarifa (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_tarifa
@@ -1503,10 +1503,10 @@ CREATE TABLE ajuste_precio (
 
     valor DECIMAL(14,4) NOT NULL DEFAULT 0,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     observacion VARCHAR(255),
 
@@ -1522,10 +1522,10 @@ CREATE TABLE ajuste_precio (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_ajuste_precio
@@ -1595,10 +1595,10 @@ CREATE TABLE lote (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_lote
@@ -1684,10 +1684,10 @@ CREATE TABLE precio_lote (
 
     precio DECIMAL(14,2) NOT NULL,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     observacion VARCHAR(255),
 
@@ -1703,10 +1703,10 @@ CREATE TABLE precio_lote (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_precio_lote
@@ -1785,7 +1785,7 @@ CREATE TABLE historial_lote (
 
     motivo VARCHAR(255),
 
-    fecha_cambio DATETIME(6) NOT NULL
+    fecha_cambio TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_historial_lote
@@ -1854,10 +1854,10 @@ CREATE TABLE plano_interactivo (
 
     vigente BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     observacion VARCHAR(500),
 
@@ -1881,10 +1881,10 @@ CREATE TABLE plano_interactivo (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_plano_interactivo
@@ -1980,10 +1980,10 @@ CREATE TABLE geometria_lote (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_geometria_lote
@@ -2060,17 +2060,17 @@ CREATE TABLE interes_comercial (
 
     comentario TEXT,
 
-    fecha_interes DATETIME(6) NOT NULL
+    fecha_interes TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_conversion DATETIME(6),
+    fecha_conversion TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_interes_comercial
@@ -2175,7 +2175,7 @@ CREATE TABLE seguimiento (
 
     id_usuario BIGINT,
 
-    fecha_seguimiento DATETIME(6) NOT NULL
+    fecha_seguimiento TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     asunto VARCHAR(150),
@@ -2186,9 +2186,9 @@ CREATE TABLE seguimiento (
 
     requiere_seguimiento BOOLEAN NOT NULL DEFAULT FALSE,
 
-    fecha_proximo DATETIME(6),
+    fecha_proximo TIMESTAMP(6),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_seguimiento
@@ -2242,12 +2242,12 @@ CREATE TABLE consentimiento (
 
     origen VARCHAR(50),
 
-    fecha_consentimiento DATETIME(6) NOT NULL
+    fecha_consentimiento TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_revocacion DATETIME(6),
+    fecha_revocacion TIMESTAMP(6),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_consentimiento
@@ -2286,17 +2286,17 @@ CREATE TABLE reserva (
 
     codigo VARCHAR(30) NOT NULL,
 
-    fecha_reserva DATETIME(6) NOT NULL
+    fecha_reserva TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_vencimiento DATETIME(6) NOT NULL,
+    fecha_vencimiento TIMESTAMP(6) NOT NULL,
 
     observacion TEXT,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_reserva
@@ -2343,10 +2343,10 @@ CREATE TABLE detalle_reserva (
 
     monto_reserva DECIMAL(14,2) NOT NULL DEFAULT 0,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_detalle_reserva
@@ -2387,15 +2387,15 @@ CREATE TABLE venta (
 
     codigo VARCHAR(30) NOT NULL,
 
-    fecha_venta DATETIME(6) NOT NULL
+    fecha_venta TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     observacion TEXT,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_venta
@@ -2467,10 +2467,10 @@ CREATE TABLE detalle_venta (
 
     precio_venta DECIMAL(14,2) NOT NULL,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_detalle_venta
@@ -2546,7 +2546,7 @@ CREATE TABLE participacion_venta (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_participacion_venta
@@ -2600,10 +2600,10 @@ CREATE TABLE contrato (
 
     observacion TEXT,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_contrato
@@ -2679,13 +2679,13 @@ CREATE TABLE documento_contractual (
 
     visible_cliente BOOLEAN NOT NULL DEFAULT FALSE,
 
-    fecha_emision DATETIME(6),
+    fecha_emision TIMESTAMP(6),
 
-    fecha_publicacion DATETIME(6),
+    fecha_publicacion TIMESTAMP(6),
 
     observacion VARCHAR(500),
 
-    fecha_carga DATETIME(6) NOT NULL
+    fecha_carga TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     id_contrato_vigente BIGINT
@@ -2697,10 +2697,10 @@ CREATE TABLE documento_contractual (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_documento_contract
@@ -2824,14 +2824,14 @@ CREATE TABLE plan_pago (
      END
      ) STORED,
 
-    fecha_cierre DATETIME(6),
+    fecha_cierre TIMESTAMP(6),
 
     motivo_cierre VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_plan_pago
@@ -2962,14 +2962,14 @@ CREATE TABLE cuota (
 
     monto DECIMAL(14,2) NOT NULL,
 
-    fecha_pago DATETIME(6),
+    fecha_pago TIMESTAMP(6),
 
     observacion VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_cuota
@@ -3048,22 +3048,22 @@ CREATE TABLE pago (
 
     monto DECIMAL(14,2) NOT NULL,
 
-    fecha_operacion DATETIME(6) NOT NULL,
+    fecha_operacion TIMESTAMP(6) NOT NULL,
 
     numero_operacion VARCHAR(100),
 
     observacion VARCHAR(500),
 
-    fecha_confirmacion DATETIME(6),
+    fecha_confirmacion TIMESTAMP(6),
 
-    fecha_anulacion DATETIME(6),
+    fecha_anulacion TIMESTAMP(6),
 
     motivo_anulacion VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_pago
@@ -3222,21 +3222,21 @@ CREATE TABLE aplicacion_pago (
 
     monto DECIMAL(14,2) NOT NULL,
 
-    fecha_aplicacion DATETIME(6) NOT NULL
+    fecha_aplicacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     observacion VARCHAR(255),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_anulacion DATETIME(6),
+    fecha_anulacion TIMESTAMP(6),
 
     motivo_anulacion VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_aplicacion_pago
@@ -3333,10 +3333,10 @@ CREATE TABLE voucher (
 
     hash_archivo CHAR(64),
 
-    fecha_carga DATETIME(6) NOT NULL
+    fecha_carga TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_validacion DATETIME(6),
+    fecha_validacion TIMESTAMP(6),
 
     motivo_rechazo VARCHAR(255),
 
@@ -3344,10 +3344,10 @@ CREATE TABLE voucher (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_voucher
@@ -3429,12 +3429,12 @@ CREATE TABLE historial_plan (
 
     id_usuario BIGINT,
 
-    fecha_cambio DATETIME(6) NOT NULL
+    fecha_cambio TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     motivo VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_historial_plan
@@ -3480,10 +3480,10 @@ CREATE TABLE asignacion_interes (
 
     id_usuario_cierra BIGINT,
 
-    fecha_asignacion DATETIME(6) NOT NULL
+    fecha_asignacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_fin DATETIME(6),
+    fecha_fin TIMESTAMP(6),
 
     motivo_asignacion VARCHAR(255),
 
@@ -3498,10 +3498,10 @@ CREATE TABLE asignacion_interes (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_asignacion_interes
@@ -3573,7 +3573,7 @@ CREATE TABLE asignacion_venta (
 
     participacion DECIMAL(5,2) NOT NULL,
 
-    fecha_asignacion DATETIME(6) NOT NULL
+    fecha_asignacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     id_venta_principal BIGINT
@@ -3585,10 +3585,10 @@ CREATE TABLE asignacion_venta (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_asignacion_venta
@@ -3653,10 +3653,10 @@ CREATE TABLE regla_comision (
 
     prioridad SMALLINT NOT NULL DEFAULT 100,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -3670,10 +3670,10 @@ CREATE TABLE regla_comision (
      END
      ) STORED,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_regla_comision
@@ -3756,23 +3756,23 @@ CREATE TABLE comision (
 
     monto_final DECIMAL(14,2) NOT NULL,
 
-    fecha_generacion DATETIME(6) NOT NULL
+    fecha_generacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_aprobacion DATETIME(6),
+    fecha_aprobacion TIMESTAMP(6),
 
-    fecha_pago DATETIME(6),
+    fecha_pago TIMESTAMP(6),
 
-    fecha_anulacion DATETIME(6),
+    fecha_anulacion TIMESTAMP(6),
 
     motivo_anulacion VARCHAR(255),
 
     observacion VARCHAR(500),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_comision
@@ -3941,14 +3941,14 @@ CREATE TABLE pagina (
 
     mostrar_menu BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_publicacion DATETIME(6),
+    fecha_publicacion TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_pagina
@@ -4017,16 +4017,16 @@ CREATE TABLE seccion (
 
     visible BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_desde DATETIME(6),
+    fecha_desde TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_seccion
@@ -4086,16 +4086,16 @@ CREATE TABLE elemento_seccion (
 
     visible BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_desde DATETIME(6),
+    fecha_desde TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_elemento_seccion
@@ -4172,10 +4172,10 @@ CREATE TABLE multimedia (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_multimedia
@@ -4266,16 +4266,16 @@ CREATE TABLE vinculo_multimedia (
 
     visible BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_desde DATETIME(6),
+    fecha_desde TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_vinculo_multimedia
@@ -4376,10 +4376,10 @@ CREATE TABLE ficha_proyecto (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_ficha_proyecto
@@ -4455,19 +4455,19 @@ CREATE TABLE consulta_web (
 
     utm_campana VARCHAR(150),
 
-    fecha_recepcion DATETIME(6) NOT NULL
+    fecha_recepcion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_atencion DATETIME(6),
+    fecha_atencion TIMESTAMP(6),
 
-    fecha_cierre DATETIME(6),
+    fecha_cierre TIMESTAMP(6),
 
     motivo_cierre VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_consulta_web
@@ -4585,19 +4585,19 @@ CREATE TABLE notificacion (
 
     clave_deduplicacion VARCHAR(150),
 
-    fecha_generacion DATETIME(6) NOT NULL
+    fecha_generacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_lectura DATETIME(6),
+    fecha_lectura TIMESTAMP(6),
 
-    fecha_expiracion DATETIME(6),
+    fecha_expiracion TIMESTAMP(6),
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_notificacion
@@ -4668,22 +4668,22 @@ CREATE TABLE envio_notificacion (
 
     destinatario VARCHAR(255),
 
-    fecha_programada DATETIME(6),
+    fecha_programada TIMESTAMP(6),
 
     num_intentos SMALLINT NOT NULL DEFAULT 0,
 
-    fecha_ultimo_intento DATETIME(6),
+    fecha_ultimo_intento TIMESTAMP(6),
 
-    fecha_envio DATETIME(6),
+    fecha_envio TIMESTAMP(6),
 
     codigo_proveedor VARCHAR(150),
 
     ultimo_error VARCHAR(1000),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_envio_notif
@@ -4779,10 +4779,10 @@ CREATE TABLE plantilla (
 
     version SMALLINT NOT NULL DEFAULT 1,
 
-    fecha_desde DATETIME(6) NOT NULL
+    fecha_desde TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_hasta DATETIME(6),
+    fecha_hasta TIMESTAMP(6),
 
     vigente BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -4799,10 +4799,10 @@ CREATE TABLE plantilla (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_plantilla
@@ -4880,13 +4880,13 @@ CREATE TABLE preferencia (
 
     habilitado BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_modificacion DATETIME(6) NOT NULL
+    fecha_modificacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_preferencia
@@ -4937,10 +4937,10 @@ CREATE TABLE categoria_financiera (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_categoria_fin
@@ -5005,10 +5005,10 @@ CREATE TABLE cuenta_financiera (
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_cuenta_fin
@@ -5075,7 +5075,7 @@ CREATE TABLE movimiento (
 
     monto DECIMAL(14,2) NOT NULL,
 
-    fecha_movimiento DATETIME(6) NOT NULL,
+    fecha_movimiento TIMESTAMP(6) NOT NULL,
 
     numero_operacion VARCHAR(100),
 
@@ -5083,16 +5083,16 @@ CREATE TABLE movimiento (
 
     descripcion VARCHAR(500),
 
-    fecha_confirmacion DATETIME(6),
+    fecha_confirmacion TIMESTAMP(6),
 
-    fecha_anulacion DATETIME(6),
+    fecha_anulacion TIMESTAMP(6),
 
     motivo_anulacion VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_movimiento
@@ -5232,7 +5232,7 @@ CREATE TABLE transferencia (
 
     tipo_cambio DECIMAL(14,6),
 
-    fecha_transferencia DATETIME(6) NOT NULL,
+    fecha_transferencia TIMESTAMP(6) NOT NULL,
 
     numero_operacion VARCHAR(100),
 
@@ -5240,16 +5240,16 @@ CREATE TABLE transferencia (
 
     observacion VARCHAR(500),
 
-    fecha_confirmacion DATETIME(6),
+    fecha_confirmacion TIMESTAMP(6),
 
-    fecha_anulacion DATETIME(6),
+    fecha_anulacion TIMESTAMP(6),
 
     motivo_anulacion VARCHAR(255),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_transferencia
@@ -5367,14 +5367,14 @@ CREATE TABLE saldo_inicial (
 
     monto DECIMAL(14,2) NOT NULL,
 
-    fecha_saldo DATETIME(6) NOT NULL,
+    fecha_saldo TIMESTAMP(6) NOT NULL,
 
     observacion VARCHAR(500),
 
-    fecha_creacion DATETIME(6) NOT NULL
+    fecha_creacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
-    fecha_actualizacion DATETIME(6) NOT NULL
+    fecha_actualizacion TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_saldo_inicial
@@ -5428,7 +5428,7 @@ CREATE TABLE evento_auditoria (
 
     datos_contexto JSON,
 
-    fecha_evento DATETIME(6) NOT NULL
+    fecha_evento TIMESTAMP(6) NOT NULL
      DEFAULT CURRENT_TIMESTAMP(6),
 
     CONSTRAINT pk_evento_auditoria
