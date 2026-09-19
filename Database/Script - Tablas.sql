@@ -4301,88 +4301,17 @@ CREATE TABLE pago (
   
   -- ----------- 8. ASESORES Y COMISIONES (comercial) -----------
   
-  -- TABLA COM_ ASESORES 
   -- =====================================================
--- 08. COMERCIAL / ASESORES Y COMISIONES
--- =====================================================
+  -- 08. COMERCIAL / ASIGNACIONES Y COMISIONES
+  -- =====================================================
 
--- 08.01 COM_ASESORES
-CREATE TABLE asesor (
-    id_asesor BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    id_persona BIGINT UNSIGNED NOT NULL,
-    id_tipo_asesor SMALLINT UNSIGNED NOT NULL,
-    id_estado_asesor SMALLINT UNSIGNED NOT NULL,
-    id_usuario BIGINT UNSIGNED,
-
-    codigo VARCHAR(30) NOT NULL,
-
-    fecha_inicio DATE NOT NULL,
-    fecha_fin DATE,
-
-    observacion VARCHAR(500),
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_asesor
-        PRIMARY KEY (id_asesor),
-
-    CONSTRAINT unq_asesor_persona
-        UNIQUE (id_persona),
-
-    CONSTRAINT unq_asesor_codigo
-        UNIQUE (codigo),
-
-    CONSTRAINT fk_asesor_persona
-        FOREIGN KEY (id_persona)
-        REFERENCES persona(id_persona)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_asesor_tipo
-        FOREIGN KEY (id_tipo_asesor)
-        REFERENCES tipo_asesor(id_tipo_asesor)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_asesor_estado
-        FOREIGN KEY (id_estado_asesor)
-        REFERENCES estado_asesor(id_estado_asesor)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_asesor_usuario
-        FOREIGN KEY (id_usuario)
-        REFERENCES usuario(id_usuario)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT chk_asesor_fecha
-        CHECK (
-            fecha_fin IS NULL
-            OR fecha_fin >= fecha_inicio
-        ),
-
-    INDEX idx_asesor_estado (
-        id_estado_asesor
-    ),
-
-    INDEX idx_asesor_tipo_estado (
-        id_tipo_asesor,
-        id_estado_asesor
-    )
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-  -- TABLA COM_ASIGNACIONES_PROSPECTO
-  CREATE TABLE asignacion_prospecto (
+  -- TABLA COM_ASIGNACIONES_INTERES
+  CREATE TABLE asignacion_interes (
     id_asignacion BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_interes BIGINT UNSIGNED NOT NULL,
-    id_asesor BIGINT UNSIGNED NOT NULL,
+    id_persona_asesor BIGINT UNSIGNED NOT NULL,
+    id_tipo_asesor SMALLINT UNSIGNED NOT NULL,
 
     id_usuario_asigna BIGINT UNSIGNED,
     id_usuario_cierra BIGINT UNSIGNED,
@@ -4411,39 +4340,44 @@ CREATE TABLE asesor (
         DEFAULT CURRENT_TIMESTAMP(6)
         ON UPDATE CURRENT_TIMESTAMP(6),
 
-    CONSTRAINT pk_asignacion_prosp
+    CONSTRAINT pk_asignacion_interes
         PRIMARY KEY (id_asignacion),
 
     CONSTRAINT unq_asig_interes_vig
         UNIQUE (interes_vigente),
 
-    CONSTRAINT fk_asig_prosp_interes
+    CONSTRAINT fk_asig_interes_interes
         FOREIGN KEY (id_interes)
         REFERENCES interes_comercial(id_interes)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_asig_prosp_asesor
-        FOREIGN KEY (id_asesor)
-        REFERENCES asesor(id_asesor)
+    CONSTRAINT fk_asig_interes_persona_asesor
+        FOREIGN KEY (id_persona_asesor)
+        REFERENCES persona(id_persona)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_asig_prosp_asigna
+    CONSTRAINT fk_asig_interes_tipo_asesor
+        FOREIGN KEY (id_tipo_asesor)
+        REFERENCES tipo_asesor(id_tipo_asesor)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_asig_interes_asigna
         FOREIGN KEY (id_usuario_asigna)
         REFERENCES usuario(id_usuario)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_asig_prosp_cierra
+    CONSTRAINT fk_asig_interes_cierra
         FOREIGN KEY (id_usuario_cierra)
         REFERENCES usuario(id_usuario)
         ON DELETE RESTRICT,
 
-    CONSTRAINT chk_asig_prosp_fecha
+    CONSTRAINT chk_asig_interes_fecha
         CHECK (
             fecha_fin IS NULL
             OR fecha_fin >= fecha_asignacion
         ),
 
-    CONSTRAINT chk_asig_prosp_cierre
+    CONSTRAINT chk_asig_interes_cierre
         CHECK (
             (
                 fecha_fin IS NULL
@@ -4464,9 +4398,13 @@ CREATE TABLE asesor (
         fecha_asignacion
     ),
 
-    INDEX idx_asig_asesor_fecha (
-        id_asesor,
+    INDEX idx_asig_interes_asesor_fecha (
+        id_persona_asesor,
         fecha_asignacion
+    ),
+
+    INDEX idx_asig_interes_tipo (
+        id_tipo_asesor
     )
 
 ) ENGINE=InnoDB
@@ -4478,7 +4416,8 @@ CREATE TABLE asesor (
     id_asignacion BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_venta BIGINT UNSIGNED NOT NULL,
-    id_asesor BIGINT UNSIGNED NOT NULL,
+    id_persona_asesor BIGINT UNSIGNED NOT NULL,
+    id_tipo_asesor SMALLINT UNSIGNED NOT NULL,
     id_usuario BIGINT UNSIGNED,
 
     principal BOOLEAN NOT NULL DEFAULT FALSE,
@@ -4510,7 +4449,7 @@ CREATE TABLE asesor (
     CONSTRAINT unq_asig_venta_asesor
         UNIQUE (
             id_venta,
-            id_asesor
+            id_persona_asesor
         ),
 
     CONSTRAINT unq_asig_venta_princ
@@ -4521,9 +4460,14 @@ CREATE TABLE asesor (
         REFERENCES venta(id_venta)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_asig_venta_asesor
-        FOREIGN KEY (id_asesor)
-        REFERENCES asesor(id_asesor)
+    CONSTRAINT fk_asig_venta_persona_asesor
+        FOREIGN KEY (id_persona_asesor)
+        REFERENCES persona(id_persona)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_asig_venta_tipo_asesor
+        FOREIGN KEY (id_tipo_asesor)
+        REFERENCES tipo_asesor(id_tipo_asesor)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_asig_venta_usuario
@@ -4538,8 +4482,12 @@ CREATE TABLE asesor (
         ),
 
     INDEX idx_asig_venta_asesor (
-        id_asesor,
+        id_persona_asesor,
         fecha_asignacion
+    ),
+
+    INDEX idx_asig_venta_tipo (
+        id_tipo_asesor
     )
 
 ) ENGINE=InnoDB
