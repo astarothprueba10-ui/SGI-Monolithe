@@ -2480,7 +2480,6 @@ CREATE TABLE precio_lote (
   CREATE TABLE reserva (
     id_reserva BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_lote BIGINT UNSIGNED NOT NULL,
     id_persona BIGINT UNSIGNED NOT NULL,
     id_estado SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
@@ -2492,8 +2491,6 @@ CREATE TABLE precio_lote (
         DEFAULT CURRENT_TIMESTAMP(6),
 
     fecha_vencimiento DATETIME(6) NOT NULL,
-
-    monto_reserva DECIMAL(14,2) NOT NULL DEFAULT 0,
 
     observacion TEXT,
 
@@ -2510,16 +2507,8 @@ CREATE TABLE precio_lote (
     CONSTRAINT unq_reserva_codigo
         UNIQUE (codigo),
 
-    CONSTRAINT unq_reserva_lote
-        UNIQUE (id_reserva, id_lote),
-
     CONSTRAINT unq_reserva_moneda
         UNIQUE (id_reserva, id_moneda),
-
-    CONSTRAINT fk_reserva_lote
-        FOREIGN KEY (id_lote)
-        REFERENCES lote(id_lote)
-        ON DELETE RESTRICT,
 
     CONSTRAINT fk_reserva_persona
         FOREIGN KEY (id_persona)
@@ -2541,20 +2530,10 @@ CREATE TABLE precio_lote (
         REFERENCES usuario(id_usuario)
         ON DELETE RESTRICT,
 
-    CONSTRAINT chk_reserva_monto
-        CHECK (
-            monto_reserva >= 0
-        ),
-
     CONSTRAINT chk_reserva_fecha
         CHECK (
             fecha_vencimiento > fecha_reserva
         ),
-
-    INDEX idx_reserva_lote_estado (
-        id_lote,
-        id_estado
-    ),
 
     INDEX idx_reserva_persona (
         id_persona
@@ -2571,12 +2550,57 @@ CREATE TABLE precio_lote (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci;
+
+  -- TABLA VEN_DETALLE_RESERVA
+  CREATE TABLE detalle_reserva (
+    id_detalle_reserva BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
+
+    id_reserva BIGINT UNSIGNED NOT NULL,
+    id_lote BIGINT UNSIGNED NOT NULL,
+
+    monto_reserva DECIMAL(14,2) NOT NULL DEFAULT 0,
+
+    fecha_creacion DATETIME(6) NOT NULL
+        DEFAULT CURRENT_TIMESTAMP(6),
+
+    fecha_actualizacion DATETIME(6) NOT NULL
+        DEFAULT CURRENT_TIMESTAMP(6)
+        ON UPDATE CURRENT_TIMESTAMP(6),
+
+    CONSTRAINT pk_detalle_reserva
+        PRIMARY KEY (id_detalle_reserva),
+
+    CONSTRAINT unq_det_reserva_lote
+        UNIQUE (id_reserva, id_lote),
+
+    CONSTRAINT unq_det_reserva_id_lote
+        UNIQUE (id_detalle_reserva, id_lote),
+
+    CONSTRAINT fk_det_reserva_reserva
+        FOREIGN KEY (id_reserva)
+        REFERENCES reserva(id_reserva)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_det_reserva_lote
+        FOREIGN KEY (id_lote)
+        REFERENCES lote(id_lote)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_det_reserva_monto
+        CHECK (monto_reserva >= 0),
+
+    INDEX idx_det_reserva_lote (
+        id_lote
+    )
+
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
   
   -- TABLA VEN_VENTAS 
- CREATE TABLE venta (
+  CREATE TABLE venta (
     id_venta BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_lote BIGINT UNSIGNED NOT NULL,
     id_reserva BIGINT UNSIGNED,
     id_estado SMALLINT UNSIGNED NOT NULL,
     id_modalidad_venta SMALLINT UNSIGNED NOT NULL,
@@ -2587,10 +2611,6 @@ CREATE TABLE precio_lote (
 
     fecha_venta DATETIME(6) NOT NULL
         DEFAULT CURRENT_TIMESTAMP(6),
-
-    precio_lista DECIMAL(14,2),
-    descuento DECIMAL(14,2) NOT NULL DEFAULT 0,
-    precio_venta DECIMAL(14,2) NOT NULL,
 
     observacion TEXT,
 
@@ -2623,22 +2643,6 @@ CREATE TABLE precio_lote (
             id_moneda
         ),
 
-    CONSTRAINT fk_venta_lote
-        FOREIGN KEY (id_lote)
-        REFERENCES lote(id_lote)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_venta_res_lote
-        FOREIGN KEY (
-            id_reserva,
-            id_lote
-        )
-        REFERENCES reserva(
-            id_reserva,
-            id_lote
-        )
-        ON DELETE RESTRICT,
-
     CONSTRAINT fk_venta_res_moneda
         FOREIGN KEY (
             id_reserva,
@@ -2670,37 +2674,6 @@ CREATE TABLE precio_lote (
         REFERENCES usuario(id_usuario)
         ON DELETE RESTRICT,
 
-    CONSTRAINT chk_venta_precio_lista
-        CHECK (
-            precio_lista IS NULL
-            OR precio_lista >= 0
-        ),
-
-    CONSTRAINT chk_venta_descuento
-        CHECK (
-            descuento >= 0
-        ),
-
-    CONSTRAINT chk_venta_desc_lista
-        CHECK (
-            precio_lista IS NULL
-            OR descuento <= precio_lista
-        ),
-
-    CONSTRAINT chk_venta_precio
-        CHECK (
-            precio_venta > 0
-        ),
-
-    INDEX idx_venta_lote (
-        id_lote
-    ),
-
-    INDEX idx_venta_res_lote (
-        id_reserva,
-        id_lote
-    ),
-
     INDEX idx_venta_res_moneda (
         id_reserva,
         id_moneda
@@ -2716,6 +2689,86 @@ CREATE TABLE precio_lote (
 
     INDEX idx_venta_fecha (
         fecha_venta
+    )
+
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_0900_ai_ci;
+
+  -- TABLA VEN_DETALLE_VENTA
+  CREATE TABLE detalle_venta (
+    id_detalle_venta BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
+
+    id_venta BIGINT UNSIGNED NOT NULL,
+    id_lote BIGINT UNSIGNED NOT NULL,
+
+    id_detalle_reserva BIGINT UNSIGNED NULL,
+
+    precio_lista DECIMAL(14,2),
+    descuento DECIMAL(14,2) NOT NULL DEFAULT 0,
+    precio_venta DECIMAL(14,2) NOT NULL,
+
+    fecha_creacion DATETIME(6) NOT NULL
+        DEFAULT CURRENT_TIMESTAMP(6),
+
+    fecha_actualizacion DATETIME(6) NOT NULL
+        DEFAULT CURRENT_TIMESTAMP(6)
+        ON UPDATE CURRENT_TIMESTAMP(6),
+
+    CONSTRAINT pk_detalle_venta
+        PRIMARY KEY (id_detalle_venta),
+
+    CONSTRAINT unq_det_venta_lote
+        UNIQUE (id_venta, id_lote),
+
+    CONSTRAINT unq_det_venta_det_reserva
+        UNIQUE (id_detalle_reserva),
+
+    CONSTRAINT fk_det_venta_venta
+        FOREIGN KEY (id_venta)
+        REFERENCES venta(id_venta)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_det_venta_lote
+        FOREIGN KEY (id_lote)
+        REFERENCES lote(id_lote)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_det_venta_det_reserva
+        FOREIGN KEY (
+            id_detalle_reserva,
+            id_lote
+        )
+        REFERENCES detalle_reserva(
+            id_detalle_reserva,
+            id_lote
+        )
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_det_venta_precio_lista
+        CHECK (
+            precio_lista IS NULL
+            OR precio_lista >= 0
+        ),
+
+    CONSTRAINT chk_det_venta_descuento
+        CHECK (
+            descuento >= 0
+        ),
+
+    CONSTRAINT chk_det_venta_desc_lista
+        CHECK (
+            precio_lista IS NULL
+            OR descuento <= precio_lista
+        ),
+
+    CONSTRAINT chk_det_venta_precio
+        CHECK (
+            precio_venta > 0
+        ),
+
+    INDEX idx_det_venta_lote (
+        id_lote
     )
 
 ) ENGINE=InnoDB
