@@ -2718,85 +2718,17 @@ CREATE TABLE precio_lote (
   
 
 -- ------- 5. CRM -----------------------------------
-  -- TABLA CRM_PROSPECTOS
-  CREATE TABLE prospecto (
-    id_prospecto BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    id_persona BIGINT UNSIGNED NOT NULL,
-    id_estado_prospecto SMALLINT UNSIGNED NOT NULL,
-    id_origen_prospecto SMALLINT UNSIGNED NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-
-    fecha_registro DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_conversion DATETIME(6),
-
-    observacion TEXT,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_prospecto
-        PRIMARY KEY (id_prospecto),
-
-    CONSTRAINT unq_prospecto_codigo
-        UNIQUE (codigo),
-
-    CONSTRAINT unq_prospecto_persona
-        UNIQUE (id_persona),
-
-    CONSTRAINT fk_prospecto_persona
-        FOREIGN KEY (id_persona)
-        REFERENCES persona(id_persona)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_prospecto_estado
-        FOREIGN KEY (id_estado_prospecto)
-        REFERENCES estado_prospecto(id_estado_prospecto)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_prospecto_origen
-        FOREIGN KEY (id_origen_prospecto)
-        REFERENCES origen_prospecto(id_origen_prospecto)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT chk_prospecto_conversion
-        CHECK (
-            fecha_conversion IS NULL
-            OR fecha_conversion >= fecha_registro
-        ),
-
-    INDEX idx_prospecto_estado (
-        id_estado_prospecto
-    ),
-
-    INDEX idx_prospecto_origen (
-        id_origen_prospecto
-    ),
-
-    INDEX idx_prospecto_fecha (
-        fecha_registro
-    )
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-  -- TABLA CRM_PROSECTOS_INTERESES 
+  -- TABLA CRM_INTERES_COMERCIAL
   CREATE TABLE interes_comercial (
     id_interes BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_prospecto BIGINT UNSIGNED NOT NULL,
+    id_persona BIGINT UNSIGNED NOT NULL,
     id_proyecto BIGINT UNSIGNED NOT NULL,
+    id_estado_prospecto SMALLINT UNSIGNED NOT NULL,
+    id_origen_prospecto SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED,
+
+    codigo VARCHAR(30) NOT NULL,
 
     area_minima DECIMAL(12,2),
     area_maxima DECIMAL(12,2),
@@ -2811,6 +2743,8 @@ CREATE TABLE precio_lote (
     fecha_interes DATETIME(6) NOT NULL
         DEFAULT CURRENT_TIMESTAMP(6),
 
+    fecha_conversion DATETIME(6),
+
     activo BOOLEAN NOT NULL DEFAULT TRUE,
 
     fecha_creacion DATETIME(6) NOT NULL
@@ -2823,14 +2757,27 @@ CREATE TABLE precio_lote (
     CONSTRAINT pk_interes_comercial
         PRIMARY KEY (id_interes),
 
-    CONSTRAINT fk_interes_prospecto
-        FOREIGN KEY (id_prospecto)
-        REFERENCES prospecto(id_prospecto)
+    CONSTRAINT unq_interes_codigo
+        UNIQUE (codigo),
+
+    CONSTRAINT fk_interes_persona
+        FOREIGN KEY (id_persona)
+        REFERENCES persona(id_persona)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_interes_proyecto
         FOREIGN KEY (id_proyecto)
         REFERENCES proyecto(id_proyecto)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_interes_estado
+        FOREIGN KEY (id_estado_prospecto)
+        REFERENCES estado_prospecto(id_estado_prospecto)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_interes_origen
+        FOREIGN KEY (id_origen_prospecto)
+        REFERENCES origen_prospecto(id_origen_prospecto)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_interes_moneda
@@ -2893,11 +2840,23 @@ CREATE TABLE precio_lote (
             )
         ),
 
-    INDEX idx_interes_prospecto (id_prospecto),
+    CONSTRAINT chk_interes_conversion
+        CHECK (
+            fecha_conversion IS NULL
+            OR fecha_conversion >= fecha_interes
+        ),
+
+    INDEX idx_interes_persona (id_persona),
+
+    INDEX idx_interes_estado (id_estado_prospecto),
+
+    INDEX idx_interes_origen (id_origen_prospecto),
 
     INDEX idx_interes_proyecto (id_proyecto),
 
-    INDEX idx_interes_moneda (id_moneda)
+    INDEX idx_interes_moneda (id_moneda),
+
+    INDEX idx_interes_fecha (fecha_interes)
 
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
@@ -2907,7 +2866,7 @@ CREATE TABLE precio_lote (
   CREATE TABLE seguimiento (
     id_seguimiento BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_prospecto BIGINT UNSIGNED NOT NULL,
+    id_interes BIGINT UNSIGNED NOT NULL,
     id_tipo_seguimiento SMALLINT UNSIGNED NOT NULL,
     id_usuario BIGINT UNSIGNED,
 
@@ -2928,9 +2887,9 @@ CREATE TABLE precio_lote (
     CONSTRAINT pk_seguimiento
         PRIMARY KEY (id_seguimiento),
 
-    CONSTRAINT fk_seguimiento_prosp
-        FOREIGN KEY (id_prospecto)
-        REFERENCES prospecto(id_prospecto)
+    CONSTRAINT fk_seguimiento_interes
+        FOREIGN KEY (id_interes)
+        REFERENCES interes_comercial(id_interes)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_seguimiento_tipo
@@ -2962,57 +2921,13 @@ CREATE TABLE precio_lote (
             )
         ),
 
-    INDEX idx_seguimiento_prosp (
-        id_prospecto,
+    INDEX idx_seguimiento_interes (
+        id_interes,
         fecha_seguimiento
     ),
 
     INDEX idx_seguimiento_proximo (
         fecha_proximo
-    )
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-  -- TABLA CRM_CLIENTES
-  CREATE TABLE cliente (
-    id_cliente BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    id_persona BIGINT UNSIGNED NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-
-    fecha_alta DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    observacion TEXT,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_cliente
-        PRIMARY KEY (id_cliente),
-
-    CONSTRAINT unq_cliente_codigo
-        UNIQUE (codigo),
-
-    CONSTRAINT unq_cliente_persona
-        UNIQUE (id_persona),
-
-    CONSTRAINT fk_cliente_persona
-        FOREIGN KEY (id_persona)
-        REFERENCES persona(id_persona)
-        ON DELETE RESTRICT,
-
-    INDEX idx_cliente_alta (
-        fecha_alta
     )
 
 ) ENGINE=InnoDB
@@ -3317,12 +3232,12 @@ CREATE TABLE precio_lote (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci;
   
-  -- TABLA VEN_VENTAS_CLIENTES 
+  -- TABLA PARTICIPACION_VENTA
   CREATE TABLE participacion_venta (
     id_participacion BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_venta BIGINT UNSIGNED NOT NULL,
-    id_cliente BIGINT UNSIGNED NOT NULL,
+    id_persona BIGINT UNSIGNED NOT NULL,
 
     titular BOOLEAN NOT NULL DEFAULT FALSE,
 
@@ -3343,8 +3258,8 @@ CREATE TABLE precio_lote (
     CONSTRAINT pk_participacion_venta
         PRIMARY KEY (id_participacion),
 
-    CONSTRAINT unq_part_venta_cliente
-        UNIQUE (id_venta, id_cliente),
+    CONSTRAINT unq_part_venta_persona
+        UNIQUE (id_venta, id_persona),
 
     CONSTRAINT unq_part_venta_titular
         UNIQUE (id_venta_titular),
@@ -3354,9 +3269,9 @@ CREATE TABLE precio_lote (
         REFERENCES venta(id_venta)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_part_cliente
-        FOREIGN KEY (id_cliente)
-        REFERENCES cliente(id_cliente)
+    CONSTRAINT fk_part_persona
+        FOREIGN KEY (id_persona)
+        REFERENCES persona(id_persona)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_part_porcentaje
@@ -3365,8 +3280,8 @@ CREATE TABLE precio_lote (
             AND participacion <= 100
         ),
 
-    INDEX idx_part_cliente (
-        id_cliente
+    INDEX idx_part_persona (
+        id_persona
     )
 
 ) ENGINE=InnoDB
@@ -4466,7 +4381,7 @@ CREATE TABLE asesor (
   CREATE TABLE asignacion_prospecto (
     id_asignacion BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_prospecto BIGINT UNSIGNED NOT NULL,
+    id_interes BIGINT UNSIGNED NOT NULL,
     id_asesor BIGINT UNSIGNED NOT NULL,
 
     id_usuario_asigna BIGINT UNSIGNED,
@@ -4480,11 +4395,11 @@ CREATE TABLE asesor (
     motivo_asignacion VARCHAR(255),
     motivo_cierre VARCHAR(255),
 
-    prospecto_vigente BIGINT UNSIGNED
+    interes_vigente BIGINT UNSIGNED
         GENERATED ALWAYS AS (
             CASE
                 WHEN fecha_fin IS NULL
-                THEN id_prospecto
+                THEN id_interes
                 ELSE NULL
             END
         ) STORED,
@@ -4499,12 +4414,12 @@ CREATE TABLE asesor (
     CONSTRAINT pk_asignacion_prosp
         PRIMARY KEY (id_asignacion),
 
-    CONSTRAINT unq_asig_prosp_vig
-        UNIQUE (prospecto_vigente),
+    CONSTRAINT unq_asig_interes_vig
+        UNIQUE (interes_vigente),
 
-    CONSTRAINT fk_asig_prosp_prosp
-        FOREIGN KEY (id_prospecto)
-        REFERENCES prospecto(id_prospecto)
+    CONSTRAINT fk_asig_prosp_interes
+        FOREIGN KEY (id_interes)
+        REFERENCES interes_comercial(id_interes)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_asig_prosp_asesor
@@ -4544,8 +4459,8 @@ CREATE TABLE asesor (
             )
         ),
 
-    INDEX idx_asig_prosp_fecha (
-        id_prospecto,
+    INDEX idx_asig_interes_fecha (
+        id_interes,
         fecha_asignacion
     ),
 
@@ -5549,7 +5464,7 @@ CREATE TABLE seccion (
 
     id_pagina BIGINT UNSIGNED,
     id_proyecto BIGINT UNSIGNED,
-    id_prospecto BIGINT UNSIGNED,
+    id_persona BIGINT UNSIGNED,
     id_usuario_atiende BIGINT UNSIGNED,
 
     codigo VARCHAR(40) NOT NULL,
@@ -5603,9 +5518,9 @@ CREATE TABLE seccion (
         REFERENCES proyecto(id_proyecto)
         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_consulta_prospecto
-        FOREIGN KEY (id_prospecto)
-        REFERENCES prospecto(id_prospecto)
+    CONSTRAINT fk_consulta_persona
+        FOREIGN KEY (id_persona)
+        REFERENCES persona(id_persona)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_consulta_usuario
@@ -5679,8 +5594,8 @@ CREATE TABLE seccion (
         id_proyecto
     ),
 
-    INDEX idx_consulta_prospecto (
-        id_prospecto
+    INDEX idx_consulta_persona (
+        id_persona
     ),
 
     INDEX idx_consulta_fecha (
