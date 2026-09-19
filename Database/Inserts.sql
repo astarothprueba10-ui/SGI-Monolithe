@@ -1,116 +1,146 @@
 -- INSERTS
 
--- INSERTAMOS CFG_ESTADOS_PROYECTO
-INSERT INTO cfg_estados_proyecto
-(codigo, nombre, descripcion, orden)
-VALUES
-('PLANIFICACION', 'Planificación',
- 'Proyecto en fase de planificación', 1),
 
-('PREVENTA', 'Preventa',
- 'Proyecto habilitado para ventas anticipadas', 2),
-
-('ACTIVO', 'Activo',
- 'Proyecto actualmente en ejecución y comercialización', 3),
-
-('FINALIZADO', 'Finalizado',
- 'Proyecto concluido', 4),
-
-('SUSPENDIDO', 'Suspendido',
- 'Proyecto temporalmente suspendido', 5),
-
-('CANCELADO', 'Cancelado',
- 'Proyecto cancelado', 6);
- 
- -- INSERT CFG_ESTADOS_ETAPA 
- INSERT INTO cfg_estados_etapa
-(codigo, nombre, descripcion, orden)
-VALUES
-('PLANIFICADA', 'Planificada',
- 'Etapa definida pero todavía no iniciada', 1),
-
-('ACTIVA', 'Activa',
- 'Etapa actualmente activa', 2),
-
-('FINALIZADA', 'Finalizada',
- 'Etapa concluida', 3),
-
-('SUSPENDIDA', 'Suspendida',
- 'Etapa temporalmente suspendida', 4),
-
-('CANCELADA', 'Cancelada',
- 'Etapa cancelada', 5);
- 
- -- INSERT CFG_ESTADOS_MANZANA
- INSERT INTO cfg_estados_manzana
-(codigo, nombre, descripcion, orden)
-VALUES
-('PLANIFICADA', 'Planificada',
- 'Manzana definida dentro del proyecto', 1),
-
-('ACTIVA', 'Activa',
- 'Manzana habilitada', 2),
-
-('INACTIVA', 'Inactiva',
- 'Manzana temporalmente inhabilitada', 3),
-
-('CERRADA', 'Cerrada',
- 'Manzana sin operaciones disponibles', 4);
- 
- -- INSERT CFG_ESTADOS_LOTES
- INSERT INTO cfg_estados_lote
-(
+-- =====================================================
+-- CATALOGO UNIFICADO DE ESTADOS
+-- =====================================================
+INSERT INTO estado (
+    entidad,
     codigo,
     nombre,
     descripcion,
+    es_final,
     permite_reserva,
     permite_venta,
+    permite_acceso,
+    visible_publico,
+    activo,
     orden
 )
 VALUES
-(
-    'DISPONIBLE',
-    'Disponible',
-    'Lote disponible para comercialización',
-    TRUE,
-    TRUE,
-    1
-),
-(
-    'RESERVADO',
-    'Reservado',
-    'Lote reservado temporalmente por un cliente',
-    FALSE,
-    FALSE,
-    2
-),
-(
-    'VENDIDO',
-    'Vendido',
-    'Lote asociado a una venta confirmada',
-    FALSE,
-    FALSE,
-    3
-),
-(
-    'BLOQUEADO',
-    'Bloqueado',
-    'Lote bloqueado administrativamente',
-    FALSE,
-    FALSE,
-    4
-),
-(
-    'NO_DISPONIBLE',
-    'No disponible',
-    'Lote fuera de comercialización',
-    FALSE,
-    FALSE,
-    5
-);
 
--- INSERTAR TIPOS DE DOCUMENTOS 
-INSERT INTO cfg_tipos_documento
+-- PROYECTO
+('PROYECTO', 'PLANIFICACION', 'Planificación', 'Proyecto en fase de planificación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('PROYECTO', 'PREVENTA', 'Preventa', 'Proyecto habilitado para ventas anticipadas', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('PROYECTO', 'ACTIVO', 'Activo', 'Proyecto actualmente en ejecución y comercialización', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('PROYECTO', 'FINALIZADO', 'Finalizado', 'Proyecto concluido', FALSE, NULL, NULL, NULL, NULL, TRUE, 4),
+('PROYECTO', 'SUSPENDIDO', 'Suspendido', 'Proyecto temporalmente suspendido', FALSE, NULL, NULL, NULL, NULL, TRUE, 5),
+('PROYECTO', 'CANCELADO', 'Cancelado', 'Proyecto cancelado', FALSE, NULL, NULL, NULL, NULL, TRUE, 6),
+
+-- ETAPA
+('ETAPA', 'PLANIFICADA', 'Planificada', 'Etapa definida pero todavía no iniciada', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('ETAPA', 'ACTIVA', 'Activa', 'Etapa actualmente activa', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('ETAPA', 'FINALIZADA', 'Finalizada', 'Etapa concluida', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('ETAPA', 'SUSPENDIDA', 'Suspendida', 'Etapa temporalmente suspendida', FALSE, NULL, NULL, NULL, NULL, TRUE, 4),
+('ETAPA', 'CANCELADA', 'Cancelada', 'Etapa cancelada', FALSE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- MANZANA
+('MANZANA', 'PLANIFICADA', 'Planificada', 'Manzana definida dentro del proyecto', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('MANZANA', 'ACTIVA', 'Activa', 'Manzana habilitada', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('MANZANA', 'INACTIVA', 'Inactiva', 'Manzana temporalmente inhabilitada', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('MANZANA', 'CERRADA', 'Cerrada', 'Manzana sin operaciones disponibles', FALSE, NULL, NULL, NULL, NULL, TRUE, 4),
+
+-- LOTE
+('LOTE', 'DISPONIBLE', 'Disponible', 'Lote disponible para comercialización', FALSE, TRUE, TRUE, NULL, NULL, TRUE, 1),
+('LOTE', 'RESERVADO', 'Reservado', 'Lote reservado temporalmente por un cliente', FALSE, FALSE, FALSE, NULL, NULL, TRUE, 2),
+('LOTE', 'VENDIDO', 'Vendido', 'Lote asociado a una venta confirmada', FALSE, FALSE, FALSE, NULL, NULL, TRUE, 3),
+('LOTE', 'BLOQUEADO', 'Bloqueado', 'Lote bloqueado administrativamente', FALSE, FALSE, FALSE, NULL, NULL, TRUE, 4),
+('LOTE', 'NO_DISPONIBLE', 'No disponible', 'Lote fuera de comercialización', FALSE, FALSE, FALSE, NULL, NULL, TRUE, 5),
+
+-- INTERES_COMERCIAL
+('INTERES_COMERCIAL', 'NUEVO', 'Nuevo', 'Prospecto recién registrado', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('INTERES_COMERCIAL', 'CONTACTADO', 'Contactado', 'Se realizó el primer contacto', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('INTERES_COMERCIAL', 'EN_SEGUIMIENTO', 'En seguimiento', 'Prospecto actualmente atendido por el equipo comercial', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('INTERES_COMERCIAL', 'INTERESADO', 'Interesado', 'Ha manifestado intención clara de compra', FALSE, NULL, NULL, NULL, NULL, TRUE, 4),
+('INTERES_COMERCIAL', 'NEGOCIACION', 'En negociación', 'Se encuentra evaluando condiciones comerciales', FALSE, NULL, NULL, NULL, NULL, TRUE, 5),
+('INTERES_COMERCIAL', 'CONVERTIDO', 'Convertido', 'El prospecto se convirtió en cliente', TRUE, NULL, NULL, NULL, NULL, TRUE, 6),
+('INTERES_COMERCIAL', 'NO_INTERESADO', 'No interesado', 'No desea continuar con el proceso comercial', TRUE, NULL, NULL, NULL, NULL, TRUE, 7),
+('INTERES_COMERCIAL', 'DESCARTADO', 'Descartado', 'Prospecto descartado por criterios comerciales', TRUE, NULL, NULL, NULL, NULL, TRUE, 8),
+
+-- RESERVA
+('RESERVA', 'PENDIENTE', 'Pendiente', 'Reserva registrada pendiente de confirmación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('RESERVA', 'VIGENTE', 'Vigente', 'Reserva actualmente vigente', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('RESERVA', 'CONVERTIDA', 'Convertida', 'Reserva convertida en venta', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+('RESERVA', 'VENCIDA', 'Vencida', 'Reserva vencida por expiración del plazo', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+('RESERVA', 'CANCELADA', 'Cancelada', 'Reserva cancelada', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- VENTA
+('VENTA', 'PENDIENTE', 'Pendiente', 'Venta iniciada pero todavía no confirmada', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('VENTA', 'CONFIRMADA', 'Confirmada', 'Venta comercialmente confirmada', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('VENTA', 'CONTRATADA', 'Contratada', 'Venta asociada a contrato formalizado', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('VENTA', 'COMPLETADA', 'Completada', 'Venta totalmente finalizada', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+('VENTA', 'ANULADA', 'Anulada', 'Venta anulada', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- CONTRATO
+('CONTRATO', 'BORRADOR', 'Borrador', 'Contrato en preparación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('CONTRATO', 'PENDIENTE_FIRMA', 'Pendiente de firma', 'Contrato preparado pendiente de firma', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('CONTRATO', 'VIGENTE', 'Vigente', 'Contrato formalizado y vigente', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('CONTRATO', 'FINALIZADO', 'Finalizado', 'Contrato concluido', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+('CONTRATO', 'RESUELTO', 'Resuelto', 'Contrato resuelto anticipadamente', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+('CONTRATO', 'ANULADO', 'Anulado', 'Contrato anulado', TRUE, NULL, NULL, NULL, NULL, TRUE, 6),
+
+-- USUARIO
+('USUARIO', 'ACTIVO', 'Activo', 'Usuario habilitado para acceder al sistema', FALSE, NULL, NULL, TRUE, NULL, TRUE, 1),
+('USUARIO', 'BLOQUEADO', 'Bloqueado', 'Usuario bloqueado por motivos de seguridad', FALSE, NULL, NULL, FALSE, NULL, TRUE, 2),
+('USUARIO', 'SUSPENDIDO', 'Suspendido', 'Usuario temporalmente suspendido', FALSE, NULL, NULL, FALSE, NULL, TRUE, 3),
+('USUARIO', 'INACTIVO', 'Inactivo', 'Usuario sin acceso al sistema', FALSE, NULL, NULL, FALSE, NULL, TRUE, 4),
+
+-- PLAN_PAGO
+('PLAN_PAGO', 'PENDIENTE', 'Pendiente', 'Plan creado pendiente de activación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('PLAN_PAGO', 'ACTIVO', 'Activo', 'Plan de financiamiento actualmente vigente', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('PLAN_PAGO', 'COMPLETADO', 'Completado', 'Todas las obligaciones del plan han sido pagadas', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+('PLAN_PAGO', 'RESUELTO', 'Resuelto', 'Plan terminado por aplicación de una condición contractual', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+('PLAN_PAGO', 'ANULADO', 'Anulado', 'Plan anulado administrativamente', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- CUOTA
+('CUOTA', 'PENDIENTE', 'Pendiente', 'Cuota aún no vencida y sin pago completo', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('CUOTA', 'PARCIAL', 'Pago parcial', 'Cuota con uno o más abonos pero aún con importe pendiente', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('CUOTA', 'PAGADA', 'Pagada', 'Cuota pagada completamente', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+('CUOTA', 'VENCIDA', 'Vencida', 'Cuota cuya fecha de vencimiento transcurrió sin pago completo', FALSE, NULL, NULL, NULL, NULL, TRUE, 4),
+('CUOTA', 'ANULADA', 'Anulada', 'Cuota anulada por una modificación válida del plan', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- VOUCHER
+('VOUCHER', 'PENDIENTE', 'Pendiente de validación', 'Voucher recibido pendiente de revisión por cobranzas o finanzas', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('VOUCHER', 'APROBADO', 'Aprobado', 'Voucher validado correctamente', TRUE, NULL, NULL, NULL, NULL, TRUE, 2),
+('VOUCHER', 'RECHAZADO', 'Rechazado', 'Voucher rechazado durante la validación', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+
+-- PAGO
+('PAGO', 'REGISTRADO', 'Registrado', 'Pago registrado en el sistema', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('PAGO', 'CONFIRMADO', 'Confirmado', 'Pago validado y confirmado', TRUE, NULL, NULL, NULL, NULL, TRUE, 2),
+('PAGO', 'ANULADO', 'Anulado', 'Pago anulado mediante una operación autorizada', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+
+-- COMISION
+('COMISION', 'PENDIENTE', 'Pendiente', 'Comisión generada pendiente de revisión o aprobación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('COMISION', 'APROBADA', 'Aprobada', 'Comisión revisada y aprobada para su posterior pago', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('COMISION', 'PAGADA', 'Pagada', 'Comisión cuyo pago al asesor ya fue realizado', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+('COMISION', 'ANULADA', 'Anulada', 'Comisión anulada mediante una operación autorizada', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+
+-- PUBLICACION
+('PUBLICACION', 'BORRADOR', 'Borrador', 'Contenido en edición y no visible públicamente', FALSE, NULL, NULL, NULL, FALSE, TRUE, 1),
+('PUBLICACION', 'PUBLICADO', 'Publicado', 'Contenido disponible públicamente', FALSE, NULL, NULL, NULL, TRUE, TRUE, 2),
+('PUBLICACION', 'ARCHIVADO', 'Archivado', 'Contenido retirado de publicación pero conservado históricamente', FALSE, NULL, NULL, NULL, FALSE, TRUE, 3),
+
+-- CONSULTA_WEB
+('CONSULTA_WEB', 'NUEVA', 'Nueva', 'Consulta recibida pendiente de atención', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('CONSULTA_WEB', 'EN_ATENCION', 'En atención', 'Consulta actualmente atendida por el equipo comercial', FALSE, NULL, NULL, NULL, NULL, TRUE, 2),
+('CONSULTA_WEB', 'CONVERTIDA', 'Convertida', 'Consulta convertida en prospecto del CRM', TRUE, NULL, NULL, NULL, NULL, TRUE, 3),
+('CONSULTA_WEB', 'DESCARTADA', 'Descartada', 'Consulta descartada por no corresponder a una oportunidad comercial válida', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+('CONSULTA_WEB', 'CERRADA', 'Cerrada', 'Consulta atendida y cerrada sin conversión comercial', TRUE, NULL, NULL, NULL, NULL, TRUE, 5),
+
+-- ENVIO
+('ENVIO', 'PENDIENTE', 'Pendiente', 'Envío pendiente de procesamiento', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('ENVIO', 'ENVIADO', 'Enviado', 'Notificación enviada correctamente', TRUE, NULL, NULL, NULL, NULL, TRUE, 2),
+('ENVIO', 'FALLIDO', 'Fallido', 'El envío no pudo completarse correctamente', FALSE, NULL, NULL, NULL, NULL, TRUE, 3),
+('ENVIO', 'CANCELADO', 'Cancelado', 'Envío cancelado antes de completarse', TRUE, NULL, NULL, NULL, NULL, TRUE, 4),
+
+-- MOVIMIENTO
+('MOVIMIENTO', 'PENDIENTE', 'Pendiente', 'Movimiento registrado pendiente de confirmación', FALSE, NULL, NULL, NULL, NULL, TRUE, 1),
+('MOVIMIENTO', 'CONFIRMADO', 'Confirmado', 'Movimiento financiero confirmado', TRUE, NULL, NULL, NULL, NULL, TRUE, 2),
+('MOVIMIENTO', 'ANULADO', 'Anulado', 'Movimiento financiero anulado conservando su trazabilidad', TRUE, NULL, NULL, NULL, NULL, TRUE, 3)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+-- INSERTAR TIPOS DE DOCUMENTO
+INSERT INTO tipo_documento
 (
     codigo,
     nombre,
@@ -124,47 +154,21 @@ VALUES
 ('DNI', 'DNI', 'Documento Nacional de Identidad', 8, 8, TRUE, 1),
 ('CE', 'Carné de extranjería', 'Carné de extranjería', 8, 12, FALSE, 2),
 ('PASAPORTE', 'Pasaporte', 'Documento de viaje internacional', 6, 20, FALSE, 3),
-('RUC', 'RUC', 'Registro Único de Contribuyentes', 11, 11, TRUE, 4);
+('RUC', 'RUC', 'Registro Único de Contribuyentes', 11, 11, TRUE, 4)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONTACTO 
-INSERT INTO cfg_tipos_contacto
+-- INSERTAR TIPOS DE CONTACTO
+INSERT INTO tipo_contacto
 (codigo, nombre, orden)
 VALUES
 ('EMAIL', 'Correo electrónico', 1),
 ('CELULAR', 'Celular', 2),
 ('TELEFONO', 'Teléfono', 3),
-('WHATSAPP', 'WhatsApp', 4);
+('WHATSAPP', 'WhatsApp', 4)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE PROSPECTOS 
-INSERT INTO cfg_estados_prospecto
-(codigo, nombre, descripcion, es_estado_final, orden)
-VALUES
-('NUEVO', 'Nuevo',
- 'Prospecto recién registrado', FALSE, 1),
-
-('CONTACTADO', 'Contactado',
- 'Se realizó el primer contacto', FALSE, 2),
-
-('EN_SEGUIMIENTO', 'En seguimiento',
- 'Prospecto actualmente atendido por el equipo comercial', FALSE, 3),
-
-('INTERESADO', 'Interesado',
- 'Ha manifestado intención clara de compra', FALSE, 4),
-
-('NEGOCIACION', 'En negociación',
- 'Se encuentra evaluando condiciones comerciales', FALSE, 5),
-
-('CONVERTIDO', 'Convertido',
- 'El prospecto se convirtió en cliente', TRUE, 6),
-
-('NO_INTERESADO', 'No interesado',
- 'No desea continuar con el proceso comercial', TRUE, 7),
-
-('DESCARTADO', 'Descartado',
- 'Prospecto descartado por criterios comerciales', TRUE, 8);
- 
- -- INSERTAR ORIGENES PROSPECTOS
- INSERT INTO cfg_origenes_prospecto
+-- INSERTAR ORIGENES DE PROSPECTO
+INSERT INTO origen_prospecto
 (codigo, nombre, orden)
 VALUES
 ('WEB', 'Página web', 1),
@@ -176,11 +180,11 @@ VALUES
 ('FERIA', 'Feria o evento', 7),
 ('VISITA_OFICINA', 'Visita a oficina', 8),
 ('LLAMADA', 'Llamada telefónica', 9),
-('OTRO', 'Otro', 10);
+('OTRO', 'Otro', 10)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
-  
-  -- CFG_TIPOS_SEGUIMIENTO
-  INSERT INTO cfg_tipos_seguimiento
+-- INSERTAR TIPOS DE SEGUIMIENTO
+INSERT INTO tipo_seguimiento
 (codigo, nombre, orden)
 VALUES
 ('LLAMADA', 'Llamada', 1),
@@ -189,10 +193,11 @@ VALUES
 ('REUNION', 'Reunión', 4),
 ('VISITA_PROYECTO', 'Visita al proyecto', 5),
 ('VISITA_OFICINA', 'Visita a oficina', 6),
-('OTRO', 'Otro', 7);
+('OTRO', 'Otro', 7)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONSENTIMIENTOS 
-INSERT INTO cfg_tipos_consentimiento
+-- INSERTAR TIPOS DE CONSENTIMIENTO
+INSERT INTO tipo_consentimiento
 (codigo, nombre, descripcion)
 VALUES
 (
@@ -204,110 +209,19 @@ VALUES
     'COMUNICACIONES_COMERCIALES',
     'Comunicaciones comerciales',
     'Consentimiento para recibir información comercial'
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR MONEDAS 
-INSERT INTO cfg_monedas
+-- INSERTAR MONEDAS
+INSERT INTO moneda
 (codigo, nombre, simbolo)
 VALUES
 ('PEN', 'Sol peruano', 'S/'),
-('USD', 'Dólar estadounidense', '$');
+('USD', 'Dólar estadounidense', '$')
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE RESERVA 
-INSERT INTO cfg_estados_reserva
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-('PENDIENTE', 'Pendiente',
- 'Reserva registrada pendiente de confirmación', FALSE, 1),
-
-('VIGENTE', 'Vigente',
- 'Reserva actualmente vigente', FALSE, 2),
-
-('CONVERTIDA', 'Convertida',
- 'Reserva convertida en venta', TRUE, 3),
-
-('VENCIDA', 'Vencida',
- 'Reserva vencida por expiración del plazo', TRUE, 4),
-
-('CANCELADA', 'Cancelada',
- 'Reserva cancelada', TRUE, 5);
- 
- -- INSERTAR ESTADOS DE VENTA 
- INSERT INTO cfg_estados_venta
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-('PENDIENTE', 'Pendiente',
- 'Venta iniciada pero todavía no confirmada', FALSE, 1),
-
-('CONFIRMADA', 'Confirmada',
- 'Venta comercialmente confirmada', FALSE, 2),
-
-('CONTRATADA', 'Contratada',
- 'Venta asociada a contrato formalizado', FALSE, 3),
-
-('COMPLETADA', 'Completada',
- 'Venta totalmente finalizada', TRUE, 4),
-
-('ANULADA', 'Anulada',
- 'Venta anulada', TRUE, 5);
- 
- -- INSERTAR ESTADOS DE PREPARACION 
- INSERT INTO cfg_estados_contrato
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-('BORRADOR', 'Borrador',
- 'Contrato en preparación', FALSE, 1),
-
-('PENDIENTE_FIRMA', 'Pendiente de firma',
- 'Contrato preparado pendiente de firma', FALSE, 2),
-
-('VIGENTE', 'Vigente',
- 'Contrato formalizado y vigente', FALSE, 3),
-
-('FINALIZADO', 'Finalizado',
- 'Contrato concluido', TRUE, 4),
-
-('RESUELTO', 'Resuelto',
- 'Contrato resuelto anticipadamente', TRUE, 5),
-
-('ANULADO', 'Anulado',
- 'Contrato anulado', TRUE, 6);
- 
- -- INSERTAR ESTADOS DE USUARIOS 
- INSERT INTO cfg_estados_usuario
-(codigo, nombre, descripcion, permite_acceso, orden)
-VALUES
-(
-    'ACTIVO',
-    'Activo',
-    'Usuario habilitado para acceder al sistema',
-    TRUE,
-    1
-),
-(
-    'BLOQUEADO',
-    'Bloqueado',
-    'Usuario bloqueado por motivos de seguridad',
-    FALSE,
-    2
-),
-(
-    'SUSPENDIDO',
-    'Suspendido',
-    'Usuario temporalmente suspendido',
-    FALSE,
-    3
-),
-(
-    'INACTIVO',
-    'Inactivo',
-    'Usuario sin acceso al sistema',
-    FALSE,
-    4
-);
-
--- INSERTAR ROLES INICIALES 
-INSERT INTO seg_roles
+-- INSERTAR ROLES INICIALES
+INSERT INTO rol
 (codigo, nombre, descripcion, es_sistema)
 VALUES
 (
@@ -345,10 +259,11 @@ VALUES
     'Cliente',
     'Acceso al portal de autogestión del comprador',
     TRUE
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE TARIFAS 
-INSERT INTO cfg_tipos_tarifa
+-- INSERTAR TIPOS DE TARIFA
+INSERT INTO tipo_tarifa
 (codigo, nombre, descripcion, orden)
 VALUES
 (
@@ -362,10 +277,11 @@ VALUES
     'Monto fijo',
     'La tarifa representa directamente el precio base del lote',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE AJUSTES DE PRECIO 
-INSERT INTO cfg_tipos_ajuste_precio
+-- INSERTAR TIPOS DE AJUSTE DE PRECIO
+INSERT INTO tipo_ajuste_precio
 (codigo, nombre, descripcion, orden)
 VALUES
 (
@@ -379,10 +295,11 @@ VALUES
     'Monto fijo',
     'El ajuste corresponde a un importe monetario fijo',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR MODALIDADES DE VENTA --
-INSERT INTO cfg_modalidades_venta
+-- INSERTAR MODALIDADES DE VENTA
+INSERT INTO modalidad_venta
 (
     codigo,
     nombre,
@@ -404,10 +321,11 @@ VALUES
     'Venta que genera un plan de financiamiento y cronograma de cuotas',
     TRUE,
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONTRATOS
-INSERT INTO cfg_tipos_contrato
+-- INSERTAR TIPOS DE CONTRATO
+INSERT INTO tipo_contrato
 (
     codigo,
     nombre,
@@ -426,90 +344,11 @@ VALUES
     'Contrato de compraventa',
     'Contrato formal de compraventa asociado a la operación inmobiliaria',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE PLAN DE PAGO --
-INSERT INTO cfg_estados_plan_pago
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente',
-    'Plan creado pendiente de activación',
-    FALSE,
-    1
-),
-(
-    'ACTIVO',
-    'Activo',
-    'Plan de financiamiento actualmente vigente',
-    FALSE,
-    2
-),
-(
-    'COMPLETADO',
-    'Completado',
-    'Todas las obligaciones del plan han sido pagadas',
-    TRUE,
-    3
-),
-(
-    'RESUELTO',
-    'Resuelto',
-    'Plan terminado por aplicación de una condición contractual',
-    TRUE,
-    4
-),
-(
-    'ANULADO',
-    'Anulado',
-    'Plan anulado administrativamente',
-    TRUE,
-    5
-);
-
--- INSERTAR CFG_ESTADOS_CUOTA --
-INSERT INTO cfg_estados_cuota
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente',
-    'Cuota aún no vencida y sin pago completo',
-    FALSE,
-    1
-),
-(
-    'PARCIAL',
-    'Pago parcial',
-    'Cuota con uno o más abonos pero aún con importe pendiente',
-    FALSE,
-    2
-),
-(
-    'PAGADA',
-    'Pagada',
-    'Cuota pagada completamente',
-    TRUE,
-    3
-),
-(
-    'VENCIDA',
-    'Vencida',
-    'Cuota cuya fecha de vencimiento transcurrió sin pago completo',
-    FALSE,
-    4
-),
-(
-    'ANULADA',
-    'Anulada',
-    'Cuota anulada por una modificación válida del plan',
-    TRUE,
-    5
-);
-
--- INSERTAR METODOS DE PAGO 
-INSERT INTO cfg_metodos_pago
+-- INSERTAR METODOS DE PAGO
+INSERT INTO metodo_pago
 (
     codigo,
     nombre,
@@ -558,62 +397,11 @@ VALUES
     FALSE,
     FALSE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE VOUCHER 
-INSERT INTO cfg_estados_voucher
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente de validación',
-    'Voucher recibido pendiente de revisión por cobranzas o finanzas',
-    FALSE,
-    1
-),
-(
-    'APROBADO',
-    'Aprobado',
-    'Voucher validado correctamente',
-    TRUE,
-    2
-),
-(
-    'RECHAZADO',
-    'Rechazado',
-    'Voucher rechazado durante la validación',
-    TRUE,
-    3
-);
-
--- INSERTAR ESTADOS DE PAGO 
-INSERT INTO cfg_estados_pago
-(codigo, nombre, descripcion, es_final, orden)
-VALUES
-(
-    'REGISTRADO',
-    'Registrado',
-    'Pago registrado en el sistema',
-    FALSE,
-    1
-),
-(
-    'CONFIRMADO',
-    'Confirmado',
-    'Pago validado y confirmado',
-    TRUE,
-    2
-),
-(
-    'ANULADO',
-    'Anulado',
-    'Pago anulado mediante una operación autorizada',
-    TRUE,
-    3
-);
-
--- INSERTAR TIPOS DE APLICACION DE PAGO 
-INSERT INTO cfg_tipos_aplicacion_pago
+-- INSERTAR TIPOS DE APLICACION DE PAGO
+INSERT INTO tipo_aplicacion_pago
 (
     codigo,
     nombre,
@@ -644,10 +432,11 @@ VALUES
     'Venta al contado',
     'Monto aplicado al pago de una venta realizada al contado',
     4
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSEERTAR TIPOS DE ASESOR 
-INSERT INTO cfg_tipos_asesor
+-- INSERTAR TIPOS DE ASESOR
+INSERT INTO tipo_asesor
 (
     codigo,
     nombre,
@@ -666,42 +455,11 @@ VALUES
     'Asesor externo',
     'Asesor comercial externo o independiente',
     2
-);
-
--- INSERTAR ESTADOS DE ASESOR 
-INSERT INTO cfg_estados_asesor
-(
-    codigo,
-    nombre,
-    descripcion,
-    permite_operar,
-    orden
 )
-VALUES
-(
-    'ACTIVO',
-    'Activo',
-    'Asesor habilitado para realizar actividades comerciales',
-    TRUE,
-    1
-),
-(
-    'SUSPENDIDO',
-    'Suspendido',
-    'Asesor temporalmente inhabilitado para operar',
-    FALSE,
-    2
-),
-(
-    'INACTIVO',
-    'Inactivo',
-    'Asesor que ya no se encuentra operativo',
-    FALSE,
-    3
-);
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR CFG_TIPOS_CALCULO_COMISION
-INSERT INTO cfg_tipos_calculo_comision
+-- INSERTAR TIPOS DE CALCULO DE COMISION
+INSERT INTO tipo_calculo_comision
 (
     codigo,
     nombre,
@@ -720,81 +478,11 @@ VALUES
     'Monto fijo',
     'Comisión definida mediante un importe monetario fijo',
     2
-);
-
--- INSERTAR ESTADOS DE COMISION 
-INSERT INTO cfg_estados_comision
-(
-    codigo,
-    nombre,
-    descripcion,
-    es_final,
-    orden
 )
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente',
-    'Comisión generada pendiente de revisión o aprobación',
-    FALSE,
-    1
-),
-(
-    'APROBADA',
-    'Aprobada',
-    'Comisión revisada y aprobada para su posterior pago',
-    FALSE,
-    2
-),
-(
-    'PAGADA',
-    'Pagada',
-    'Comisión cuyo pago al asesor ya fue realizado',
-    TRUE,
-    3
-),
-(
-    'ANULADA',
-    'Anulada',
-    'Comisión anulada mediante una operación autorizada',
-    TRUE,
-    4
-);
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERATR ESTADOS DE PUBLICACION 
-INSERT INTO cfg_estados_publicacion
-(
-    codigo,
-    nombre,
-    descripcion,
-    visible_publico,
-    orden
-)
-VALUES
-(
-    'BORRADOR',
-    'Borrador',
-    'Contenido en edición y no visible públicamente',
-    FALSE,
-    1
-),
-(
-    'PUBLICADO',
-    'Publicado',
-    'Contenido disponible públicamente',
-    TRUE,
-    2
-),
-(
-    'ARCHIVADO',
-    'Archivado',
-    'Contenido retirado de publicación pero conservado históricamente',
-    FALSE,
-    3
-);
-
--- INSERTAR TIPOS DE SECCION 
-INSERT INTO cfg_tipos_seccion
+-- INSERTAR TIPOS DE SECCION
+INSERT INTO tipo_seccion
 (
     codigo,
     nombre,
@@ -843,11 +531,11 @@ VALUES
     'Contacto',
     'Sección destinada a información o formulario de contacto',
     7
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
-
--- INSERTAR TIPOS DE MULTIMEDIA --
-INSERT INTO cfg_tipos_multimedia
+-- INSERTAR TIPOS DE MULTIMEDIA
+INSERT INTO tipo_multimedia
 (
     codigo,
     nombre,
@@ -872,10 +560,11 @@ VALUES
     'Documento',
     'Archivo descargable publicado desde el sitio web',
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR USOS MULTIMEDIA --
-INSERT INTO cfg_usos_multimedia
+-- INSERTAR USOS DE MULTIMEDIA
+INSERT INTO uso_multimedia
 (
     codigo,
     nombre,
@@ -912,56 +601,11 @@ VALUES
     'Adjunto',
     'Recurso multimedia complementario',
     5
-);
-
--- INSERTAR ESTADOS_CONSULTA_WEB --
-INSERT INTO cfg_estados_consulta_web
-(
-    codigo,
-    nombre,
-    descripcion,
-    es_final,
-    orden
 )
-VALUES
-(
-    'NUEVA',
-    'Nueva',
-    'Consulta recibida pendiente de atención',
-    FALSE,
-    1
-),
-(
-    'EN_ATENCION',
-    'En atención',
-    'Consulta actualmente atendida por el equipo comercial',
-    FALSE,
-    2
-),
-(
-    'CONVERTIDA',
-    'Convertida',
-    'Consulta convertida en prospecto del CRM',
-    TRUE,
-    3
-),
-(
-    'DESCARTADA',
-    'Descartada',
-    'Consulta descartada por no corresponder a una oportunidad comercial válida',
-    TRUE,
-    4
-),
-(
-    'CERRADA',
-    'Cerrada',
-    'Consulta atendida y cerrada sin conversión comercial',
-    TRUE,
-    5
-);
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE NOTIFICACION --
-INSERT INTO cfg_tipos_notificacion
+-- INSERTAR TIPOS DE NOTIFICACION
+INSERT INTO tipo_notificacion
 (
     codigo,
     nombre,
@@ -1025,9 +669,11 @@ VALUES
     'Notificación relacionada con la disponibilidad de un contrato',
     FALSE,
     8
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
-INSERT INTO cfg_canales_notificacion
+-- INSERTAR CANALES DE NOTIFICACION
+INSERT INTO canal_notificacion
 (
     codigo,
     nombre,
@@ -1046,50 +692,11 @@ VALUES
     'Correo electrónico',
     'Notificación enviada mediante correo electrónico',
     2
-);
-
-
--- INSERTAR ESTADOS DE ENVIO DE NOTIFICACION --
-INSERT INTO cfg_estados_envio_notificacion
-(
-    codigo,
-    nombre,
-    descripcion,
-    es_final,
-    orden
 )
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente',
-    'Envío pendiente de procesamiento',
-    FALSE,
-    1
-),
-(
-    'ENVIADO',
-    'Enviado',
-    'Notificación enviada correctamente',
-    TRUE,
-    2
-),
-(
-    'FALLIDO',
-    'Fallido',
-    'El envío no pudo completarse correctamente',
-    FALSE,
-    3
-),
-(
-    'CANCELADO',
-    'Cancelado',
-    'Envío cancelado antes de completarse',
-    TRUE,
-    4
-);
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPO DE MOVIMIENTO FINANCIERO --
-INSERT INTO cfg_tipos_movimiento_financiero
+-- INSERTAR TIPOS DE MOVIMIENTO
+INSERT INTO tipo_movimiento
 (
     codigo,
     nombre,
@@ -1108,42 +715,11 @@ VALUES
     'Egreso',
     'Salida de dinero registrada en la operación financiera',
     2
-);
-
--- INSERTAR ESTADOS DE MOVIMIENTO FINANCIERO -- 
-INSERT INTO cfg_estados_movimiento_financiero
-(
-    codigo,
-    nombre,
-    descripcion,
-    es_final,
-    orden
 )
-VALUES
-(
-    'PENDIENTE',
-    'Pendiente',
-    'Movimiento registrado pendiente de confirmación',
-    FALSE,
-    1
-),
-(
-    'CONFIRMADO',
-    'Confirmado',
-    'Movimiento financiero confirmado',
-    TRUE,
-    2
-),
-(
-    'ANULADO',
-    'Anulado',
-    'Movimiento financiero anulado conservando su trazabilidad',
-    TRUE,
-    3
-);
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CUENTAS FINANCIERAS --
-INSERT INTO cfg_tipos_cuenta_financiera
+-- INSERTAR TIPOS DE CUENTA
+INSERT INTO tipo_cuenta
 (
     codigo,
     nombre,
@@ -1168,10 +744,12 @@ VALUES
     'Billetera digital',
     'Cuenta asociada a un medio de pago digital',
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR PERMISOS --
-INSERT INTO seg_permisos (
+-- INSERTAR PERMISOS
+INSERT INTO permiso
+(
     codigo,
     modulo,
     recurso,
@@ -1188,7 +766,7 @@ VALUES
     'VER',
     'Ver usuarios',
     'Permite consultar usuarios del sistema',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_USUARIO_CREAR',
@@ -1197,7 +775,7 @@ VALUES
     'CREAR',
     'Crear usuarios',
     'Permite registrar nuevos usuarios',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_USUARIO_EDITAR',
@@ -1206,7 +784,7 @@ VALUES
     'EDITAR',
     'Editar usuarios',
     'Permite modificar información y configuración de usuarios',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_ROL_VER',
@@ -1215,7 +793,7 @@ VALUES
     'VER',
     'Ver roles',
     'Permite consultar los roles disponibles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_ROL_GESTIONAR',
@@ -1224,7 +802,7 @@ VALUES
     'GESTIONAR',
     'Gestionar roles',
     'Permite crear, editar y asignar roles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_PERMISO_VER',
@@ -1233,7 +811,7 @@ VALUES
     'VER',
     'Ver permisos',
     'Permite consultar permisos del sistema',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_PERMISO_GESTIONAR',
@@ -1242,7 +820,7 @@ VALUES
     'GESTIONAR',
     'Gestionar permisos',
     'Permite asignar y administrar permisos de los roles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_AUDITORIA_VER',
@@ -1251,23 +829,23 @@ VALUES
     'VER',
     'Ver auditoría',
     'Permite consultar eventos de auditoría y seguridad',
-    1
-);
+    TRUE
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ROLES A LOS PERMISOS 
-INSERT INTO seg_roles_permisos (
+-- ASIGNAR PERMISOS AL ROL ADMINISTRADOR
+INSERT INTO asignacion_permiso
+(
     id_rol,
     id_permiso,
-    asignado_por,
     activo
 )
 SELECT
     r.id_rol,
     p.id_permiso,
-    1,
-    1
-FROM seg_roles r
-JOIN seg_permisos p
+    TRUE
+FROM rol r
+JOIN permiso p
     ON p.codigo IN (
         'SEGURIDAD_USUARIO_VER',
         'SEGURIDAD_USUARIO_CREAR',
@@ -1279,11 +857,11 @@ JOIN seg_permisos p
         'SEGURIDAD_AUDITORIA_VER'
     )
 WHERE r.codigo = 'ADMINISTRADOR'
-  AND r.activo = 1
-  AND p.activo = 1
+  AND r.activo = TRUE
+  AND p.activo = TRUE
   AND NOT EXISTS (
       SELECT 1
-      FROM seg_roles_permisos rp
-      WHERE rp.id_rol = r.id_rol
-        AND rp.id_permiso = p.id_permiso
+      FROM asignacion_permiso ap
+      WHERE ap.id_rol = r.id_rol
+        AND ap.id_permiso = p.id_permiso
   );
