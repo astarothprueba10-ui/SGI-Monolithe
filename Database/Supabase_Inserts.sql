@@ -1,0 +1,1376 @@
+-- =============================================================================
+-- SCRIPT DE INSERTS SEMILLA PARA SUPABASE (POSTGRESQL)
+-- Proyecto: SGI-Monolithe
+-- =============================================================================
+
+-- INSERTS
+
+-- INSERTAR ESTADOS DE PROYECTO
+INSERT INTO estado_proyecto
+(codigo, nombre, descripcion, orden)
+VALUES
+('PLANIFICACION', 'Planificación',
+ 'Proyecto en fase de planificación', 1),
+
+('PREVENTA', 'Preventa',
+ 'Proyecto habilitado para ventas anticipadas', 2),
+
+('ACTIVO', 'Activo',
+ 'Proyecto actualmente en ejecución y comercialización', 3),
+
+('FINALIZADO', 'Finalizado',
+ 'Proyecto concluido', 4),
+
+('SUSPENDIDO', 'Suspendido',
+ 'Proyecto temporalmente suspendido', 5),
+
+('CANCELADO', 'Cancelado',
+ 'Proyecto cancelado', 6)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE ETAPA
+INSERT INTO estado_etapa
+(codigo, nombre, descripcion, orden)
+VALUES
+('PLANIFICADA', 'Planificada',
+ 'Etapa definida pero todavía no iniciada', 1),
+
+('ACTIVA', 'Activa',
+ 'Etapa actualmente activa', 2),
+
+('FINALIZADA', 'Finalizada',
+ 'Etapa concluida', 3),
+
+('SUSPENDIDA', 'Suspendida',
+ 'Etapa temporalmente suspendida', 4),
+
+('CANCELADA', 'Cancelada',
+ 'Etapa cancelada', 5)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE MANZANA
+INSERT INTO estado_manzana
+(codigo, nombre, descripcion, orden)
+VALUES
+('PLANIFICADA', 'Planificada',
+ 'Manzana definida dentro del proyecto', 1),
+
+('ACTIVA', 'Activa',
+ 'Manzana habilitada', 2),
+
+('INACTIVA', 'Inactiva',
+ 'Manzana temporalmente inhabilitada', 3),
+
+('CERRADA', 'Cerrada',
+ 'Manzana sin operaciones disponibles', 4)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE LOTE
+INSERT INTO estado_lote
+(
+    codigo,
+    nombre,
+    descripcion,
+    permite_reserva,
+    permite_venta,
+    orden
+)
+VALUES
+(
+    'DISPONIBLE',
+    'Disponible',
+    'Lote disponible para comercialización',
+    TRUE,
+    TRUE,
+    1
+),
+(
+    'RESERVADO',
+    'Reservado',
+    'Lote reservado temporalmente por un cliente',
+    FALSE,
+    FALSE,
+    2
+),
+(
+    'VENDIDO',
+    'Vendido',
+    'Lote asociado a una venta confirmada',
+    FALSE,
+    FALSE,
+    3
+),
+(
+    'BLOQUEADO',
+    'Bloqueado',
+    'Lote bloqueado administrativamente',
+    FALSE,
+    FALSE,
+    4
+),
+(
+    'NO_DISPONIBLE',
+    'No disponible',
+    'Lote fuera de comercialización',
+    FALSE,
+    FALSE,
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE DOCUMENTO
+INSERT INTO tipo_documento
+(
+    codigo,
+    nombre,
+    descripcion,
+    longitud_minima,
+    longitud_maxima,
+    solo_numerico,
+    orden
+)
+VALUES
+('DNI', 'DNI', 'Documento Nacional de Identidad', 8, 8, TRUE, 1),
+('CE', 'Carné de extranjería', 'Carné de extranjería', 8, 12, FALSE, 2),
+('PASAPORTE', 'Pasaporte', 'Documento de viaje internacional', 6, 20, FALSE, 3),
+('RUC', 'RUC', 'Registro Único de Contribuyentes', 11, 11, TRUE, 4)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE CONTACTO
+INSERT INTO tipo_contacto
+(codigo, nombre, orden)
+VALUES
+('EMAIL', 'Correo electrónico', 1),
+('CELULAR', 'Celular', 2),
+('TELEFONO', 'Teléfono', 3),
+('WHATSAPP', 'WhatsApp', 4)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE PROSPECTO
+INSERT INTO estado_prospecto
+(codigo, nombre, descripcion, es_estado_final, orden)
+VALUES
+('NUEVO', 'Nuevo',
+ 'Prospecto recién registrado', FALSE, 1),
+
+('CONTACTADO', 'Contactado',
+ 'Se realizó el primer contacto', FALSE, 2),
+
+('EN_SEGUIMIENTO', 'En seguimiento',
+ 'Prospecto actualmente atendido por el equipo comercial', FALSE, 3),
+
+('INTERESADO', 'Interesado',
+ 'Ha manifestado intención clara de compra', FALSE, 4),
+
+('NEGOCIACION', 'En negociación',
+ 'Se encuentra evaluando condiciones comerciales', FALSE, 5),
+
+('CONVERTIDO', 'Convertido',
+ 'El prospecto se convirtió en cliente', TRUE, 6),
+
+('NO_INTERESADO', 'No interesado',
+ 'No desea continuar con el proceso comercial', TRUE, 7),
+
+('DESCARTADO', 'Descartado',
+ 'Prospecto descartado por criterios comerciales', TRUE, 8)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ORIGENES DE PROSPECTO
+INSERT INTO origen_prospecto
+(codigo, nombre, orden)
+VALUES
+('WEB', 'Página web', 1),
+('FACEBOOK', 'Facebook', 2),
+('INSTAGRAM', 'Instagram', 3),
+('WHATSAPP', 'WhatsApp', 4),
+('TIKTOK', 'TikTok', 5),
+('REFERIDO', 'Referido', 6),
+('FERIA', 'Feria o evento', 7),
+('VISITA_OFICINA', 'Visita a oficina', 8),
+('LLAMADA', 'Llamada telefónica', 9),
+('OTRO', 'Otro', 10)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE SEGUIMIENTO
+INSERT INTO tipo_seguimiento
+(codigo, nombre, orden)
+VALUES
+('LLAMADA', 'Llamada', 1),
+('WHATSAPP', 'WhatsApp', 2),
+('EMAIL', 'Correo electrónico', 3),
+('REUNION', 'Reunión', 4),
+('VISITA_PROYECTO', 'Visita al proyecto', 5),
+('VISITA_OFICINA', 'Visita a oficina', 6),
+('OTRO', 'Otro', 7)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE CONSENTIMIENTO
+INSERT INTO tipo_consentimiento
+(codigo, nombre, descripcion)
+VALUES
+(
+    'TRATAMIENTO_DATOS',
+    'Tratamiento de datos personales',
+    'Consentimiento para tratamiento de datos personales'
+),
+(
+    'COMUNICACIONES_COMERCIALES',
+    'Comunicaciones comerciales',
+    'Consentimiento para recibir información comercial'
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR MONEDAS
+INSERT INTO moneda
+(codigo, nombre, simbolo)
+VALUES
+('PEN', 'Sol peruano', 'S/'),
+('USD', 'Dólar estadounidense', '$')
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE RESERVA
+INSERT INTO estado_reserva
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+('PENDIENTE', 'Pendiente',
+ 'Reserva registrada pendiente de confirmación', FALSE, 1),
+
+('VIGENTE', 'Vigente',
+ 'Reserva actualmente vigente', FALSE, 2),
+
+('CONVERTIDA', 'Convertida',
+ 'Reserva convertida en venta', TRUE, 3),
+
+('VENCIDA', 'Vencida',
+ 'Reserva vencida por expiración del plazo', TRUE, 4),
+
+('CANCELADA', 'Cancelada',
+ 'Reserva cancelada', TRUE, 5)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE VENTA
+INSERT INTO estado_venta
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+('PENDIENTE', 'Pendiente',
+ 'Venta iniciada pero todavía no confirmada', FALSE, 1),
+
+('CONFIRMADA', 'Confirmada',
+ 'Venta comercialmente confirmada', FALSE, 2),
+
+('CONTRATADA', 'Contratada',
+ 'Venta asociada a contrato formalizado', FALSE, 3),
+
+('COMPLETADA', 'Completada',
+ 'Venta totalmente finalizada', TRUE, 4),
+
+('ANULADA', 'Anulada',
+ 'Venta anulada', TRUE, 5)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE CONTRATO
+INSERT INTO estado_contrato
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+('BORRADOR', 'Borrador',
+ 'Contrato en preparación', FALSE, 1),
+
+('PENDIENTE_FIRMA', 'Pendiente de firma',
+ 'Contrato preparado pendiente de firma', FALSE, 2),
+
+('VIGENTE', 'Vigente',
+ 'Contrato formalizado y vigente', FALSE, 3),
+
+('FINALIZADO', 'Finalizado',
+ 'Contrato concluido', TRUE, 4),
+
+('RESUELTO', 'Resuelto',
+ 'Contrato resuelto anticipadamente', TRUE, 5),
+
+('ANULADO', 'Anulado',
+ 'Contrato anulado', TRUE, 6)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE USUARIO
+INSERT INTO estado_usuario
+(codigo, nombre, descripcion, permite_acceso, orden)
+VALUES
+(
+    'ACTIVO',
+    'Activo',
+    'Usuario habilitado para acceder al sistema',
+    TRUE,
+    1
+),
+(
+    'BLOQUEADO',
+    'Bloqueado',
+    'Usuario bloqueado por motivos de seguridad',
+    FALSE,
+    2
+),
+(
+    'SUSPENDIDO',
+    'Suspendido',
+    'Usuario temporalmente suspendido',
+    FALSE,
+    3
+),
+(
+    'INACTIVO',
+    'Inactivo',
+    'Usuario sin acceso al sistema',
+    FALSE,
+    4
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ROLES INICIALES
+INSERT INTO rol
+(codigo, nombre, descripcion, es_sistema)
+VALUES
+(
+    'ADMINISTRADOR',
+    'Administrador',
+    'Administración general del SIGI MONOLITHE',
+    TRUE
+),
+(
+    'GERENCIA',
+    'Gerencia',
+    'Acceso gerencial e indicadores del sistema',
+    TRUE
+),
+(
+    'MARKETING',
+    'Marketing',
+    'Gestión de contenidos web, campañas y prospectos',
+    TRUE
+),
+(
+    'ASESOR',
+    'Asesor',
+    'Gestión comercial de prospectos, lotes y ventas',
+    TRUE
+),
+(
+    'FINANZAS',
+    'Finanzas',
+    'Gestión de financiamientos, pagos y cobranza',
+    TRUE
+),
+(
+    'CLIENTE',
+    'Cliente',
+    'Acceso al portal de autogestión del comprador',
+    TRUE
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE TARIFA
+INSERT INTO tipo_tarifa
+(codigo, nombre, descripcion, orden)
+VALUES
+(
+    'POR_M2',
+    'Precio por metro cuadrado',
+    'El precio base se calcula multiplicando el valor de la tarifa por el área del lote',
+    1
+),
+(
+    'MONTO_FIJO',
+    'Monto fijo',
+    'La tarifa representa directamente el precio base del lote',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE AJUSTE DE PRECIO
+INSERT INTO tipo_ajuste_precio
+(codigo, nombre, descripcion, orden)
+VALUES
+(
+    'PORCENTAJE',
+    'Porcentaje',
+    'El ajuste se calcula como porcentaje sobre el precio base',
+    1
+),
+(
+    'MONTO_FIJO',
+    'Monto fijo',
+    'El ajuste corresponde a un importe monetario fijo',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR MODALIDADES DE VENTA
+INSERT INTO modalidad_venta
+(
+    codigo,
+    nombre,
+    descripcion,
+    requiere_plan_pago,
+    orden
+)
+VALUES
+(
+    'CONTADO',
+    'Contado',
+    'Venta cuyo importe se cancela sin financiamiento',
+    FALSE,
+    1
+),
+(
+    'FINANCIADA',
+    'Financiada',
+    'Venta que genera un plan de financiamiento y cronograma de cuotas',
+    TRUE,
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE CONTRATO
+INSERT INTO tipo_contrato
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'PRECONTRATO',
+    'Precontrato',
+    'Documento contractual utilizado durante una operación financiada antes de la formalización definitiva',
+    1
+),
+(
+    'COMPRAVENTA',
+    'Contrato de compraventa',
+    'Contrato formal de compraventa asociado a la operación inmobiliaria',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE PLAN DE PAGO
+INSERT INTO estado_plan_pago
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente',
+    'Plan creado pendiente de activación',
+    FALSE,
+    1
+),
+(
+    'ACTIVO',
+    'Activo',
+    'Plan de financiamiento actualmente vigente',
+    FALSE,
+    2
+),
+(
+    'COMPLETADO',
+    'Completado',
+    'Todas las obligaciones del plan han sido pagadas',
+    TRUE,
+    3
+),
+(
+    'RESUELTO',
+    'Resuelto',
+    'Plan terminado por aplicación de una condición contractual',
+    TRUE,
+    4
+),
+(
+    'ANULADO',
+    'Anulado',
+    'Plan anulado administrativamente',
+    TRUE,
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE CUOTA
+INSERT INTO estado_cuota
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente',
+    'Cuota aún no vencida y sin pago completo',
+    FALSE,
+    1
+),
+(
+    'PARCIAL',
+    'Pago parcial',
+    'Cuota con uno o más abonos pero aún con importe pendiente',
+    FALSE,
+    2
+),
+(
+    'PAGADA',
+    'Pagada',
+    'Cuota pagada completamente',
+    TRUE,
+    3
+),
+(
+    'VENCIDA',
+    'Vencida',
+    'Cuota cuya fecha de vencimiento transcurrió sin pago completo',
+    FALSE,
+    4
+),
+(
+    'ANULADA',
+    'Anulada',
+    'Cuota anulada por una modificación válida del plan',
+    TRUE,
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR METODOS DE PAGO
+INSERT INTO metodo_pago
+(
+    codigo,
+    nombre,
+    descripcion,
+    requiere_numero_operacion,
+    requiere_voucher,
+    orden
+)
+VALUES
+(
+    'TRANSFERENCIA',
+    'Transferencia bancaria',
+    'Pago realizado mediante transferencia bancaria',
+    TRUE,
+    TRUE,
+    1
+),
+(
+    'DEPOSITO',
+    'Depósito bancario',
+    'Pago realizado mediante depósito bancario',
+    TRUE,
+    TRUE,
+    2
+),
+(
+    'YAPE_PLIN',
+    'Yape / Plin',
+    'Pago mediante billetera digital',
+    TRUE,
+    TRUE,
+    3
+),
+(
+    'EFECTIVO',
+    'Efectivo',
+    'Pago recibido en efectivo',
+    FALSE,
+    FALSE,
+    4
+),
+(
+    'OTRO',
+    'Otro',
+    'Otro método de pago autorizado',
+    FALSE,
+    FALSE,
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE VOUCHER
+INSERT INTO estado_voucher
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente de validación',
+    'Voucher recibido pendiente de revisión por cobranzas o finanzas',
+    FALSE,
+    1
+),
+(
+    'APROBADO',
+    'Aprobado',
+    'Voucher validado correctamente',
+    TRUE,
+    2
+),
+(
+    'RECHAZADO',
+    'Rechazado',
+    'Voucher rechazado durante la validación',
+    TRUE,
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE PAGO
+INSERT INTO estado_pago
+(codigo, nombre, descripcion, es_final, orden)
+VALUES
+(
+    'REGISTRADO',
+    'Registrado',
+    'Pago registrado en el sistema',
+    FALSE,
+    1
+),
+(
+    'CONFIRMADO',
+    'Confirmado',
+    'Pago validado y confirmado',
+    TRUE,
+    2
+),
+(
+    'ANULADO',
+    'Anulado',
+    'Pago anulado mediante una operación autorizada',
+    TRUE,
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE APLICACION DE PAGO
+INSERT INTO tipo_aplicacion_pago
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'SEPARACION',
+    'Separación',
+    'Monto aplicado al pago de una reserva o separación de lote',
+    1
+),
+(
+    'INICIAL',
+    'Inicial',
+    'Monto aplicado a la cuota inicial de una venta financiada',
+    2
+),
+(
+    'CUOTA',
+    'Cuota',
+    'Monto aplicado a una cuota del cronograma de financiamiento',
+    3
+),
+(
+    'VENTA_CONTADO',
+    'Venta al contado',
+    'Monto aplicado al pago de una venta realizada al contado',
+    4
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE ASESOR
+INSERT INTO tipo_asesor
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'INTERNO',
+    'Asesor interno',
+    'Asesor que forma parte del equipo interno de la empresa',
+    1
+),
+(
+    'EXTERNO',
+    'Asesor externo',
+    'Asesor comercial externo o independiente',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE ASESOR
+INSERT INTO estado_asesor
+(
+    codigo,
+    nombre,
+    descripcion,
+    permite_operar,
+    orden
+)
+VALUES
+(
+    'ACTIVO',
+    'Activo',
+    'Asesor habilitado para realizar actividades comerciales',
+    TRUE,
+    1
+),
+(
+    'SUSPENDIDO',
+    'Suspendido',
+    'Asesor temporalmente inhabilitado para operar',
+    FALSE,
+    2
+),
+(
+    'INACTIVO',
+    'Inactivo',
+    'Asesor que ya no se encuentra operativo',
+    FALSE,
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE CALCULO DE COMISION
+INSERT INTO tipo_calculo_comision
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'PORCENTAJE',
+    'Porcentaje',
+    'Comisión calculada como porcentaje de una base económica',
+    1
+),
+(
+    'MONTO_FIJO',
+    'Monto fijo',
+    'Comisión definida mediante un importe monetario fijo',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE COMISION
+INSERT INTO estado_comision
+(
+    codigo,
+    nombre,
+    descripcion,
+    es_final,
+    orden
+)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente',
+    'Comisión generada pendiente de revisión o aprobación',
+    FALSE,
+    1
+),
+(
+    'APROBADA',
+    'Aprobada',
+    'Comisión revisada y aprobada para su posterior pago',
+    FALSE,
+    2
+),
+(
+    'PAGADA',
+    'Pagada',
+    'Comisión cuyo pago al asesor ya fue realizado',
+    TRUE,
+    3
+),
+(
+    'ANULADA',
+    'Anulada',
+    'Comisión anulada mediante una operación autorizada',
+    TRUE,
+    4
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE PUBLICACION
+INSERT INTO estado_publicacion
+(
+    codigo,
+    nombre,
+    descripcion,
+    visible_publico,
+    orden
+)
+VALUES
+(
+    'BORRADOR',
+    'Borrador',
+    'Contenido en edición y no visible públicamente',
+    FALSE,
+    1
+),
+(
+    'PUBLICADO',
+    'Publicado',
+    'Contenido disponible públicamente',
+    TRUE,
+    2
+),
+(
+    'ARCHIVADO',
+    'Archivado',
+    'Contenido retirado de publicación pero conservado históricamente',
+    FALSE,
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE SECCION
+INSERT INTO tipo_seccion
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'HERO',
+    'Hero',
+    'Sección principal o banner destacado de una página',
+    1
+),
+(
+    'TEXTO',
+    'Texto',
+    'Sección de contenido textual',
+    2
+),
+(
+    'CARACTERISTICAS',
+    'Características',
+    'Sección de beneficios, servicios o características',
+    3
+),
+(
+    'GALERIA',
+    'Galería',
+    'Sección destinada a contenido multimedia',
+    4
+),
+(
+    'PROYECTOS',
+    'Proyectos',
+    'Sección vinculada a proyectos inmobiliarios',
+    5
+),
+(
+    'CTA',
+    'Llamado a la acción',
+    'Sección con mensaje y acción destacada',
+    6
+),
+(
+    'CONTACTO',
+    'Contacto',
+    'Sección destinada a información o formulario de contacto',
+    7
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE MULTIMEDIA
+INSERT INTO tipo_multimedia
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'IMAGEN',
+    'Imagen',
+    'Imagen utilizada en páginas, secciones, galerías o elementos del sitio web',
+    1
+),
+(
+    'VIDEO',
+    'Video',
+    'Contenido audiovisual almacenado o enlazado desde una fuente externa',
+    2
+),
+(
+    'DOCUMENTO',
+    'Documento',
+    'Archivo descargable publicado desde el sitio web',
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR USOS DE MULTIMEDIA
+INSERT INTO uso_multimedia
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'PRINCIPAL',
+    'Principal',
+    'Recurso multimedia principal del contenido',
+    1
+),
+(
+    'FONDO',
+    'Fondo',
+    'Recurso utilizado como fondo visual',
+    2
+),
+(
+    'GALERIA',
+    'Galería',
+    'Recurso que forma parte de una galería',
+    3
+),
+(
+    'ICONO',
+    'Ícono',
+    'Recurso utilizado como ícono o elemento gráfico',
+    4
+),
+(
+    'ADJUNTO',
+    'Adjunto',
+    'Recurso multimedia complementario',
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE CONSULTA WEB
+INSERT INTO estado_consulta_web
+(
+    codigo,
+    nombre,
+    descripcion,
+    es_final,
+    orden
+)
+VALUES
+(
+    'NUEVA',
+    'Nueva',
+    'Consulta recibida pendiente de atención',
+    FALSE,
+    1
+),
+(
+    'EN_ATENCION',
+    'En atención',
+    'Consulta actualmente atendida por el equipo comercial',
+    FALSE,
+    2
+),
+(
+    'CONVERTIDA',
+    'Convertida',
+    'Consulta convertida en prospecto del CRM',
+    TRUE,
+    3
+),
+(
+    'DESCARTADA',
+    'Descartada',
+    'Consulta descartada por no corresponder a una oportunidad comercial válida',
+    TRUE,
+    4
+),
+(
+    'CERRADA',
+    'Cerrada',
+    'Consulta atendida y cerrada sin conversión comercial',
+    TRUE,
+    5
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE NOTIFICACION
+INSERT INTO tipo_notificacion
+(
+    codigo,
+    nombre,
+    descripcion,
+    permite_preferencia,
+    orden
+)
+VALUES
+(
+    'GENERAL',
+    'General',
+    'Notificación informativa general',
+    TRUE,
+    1
+),
+(
+    'RESERVA_POR_VENCER',
+    'Reserva por vencer',
+    'Alerta relacionada con una reserva próxima a vencer',
+    FALSE,
+    2
+),
+(
+    'RESERVA_VENCIDA',
+    'Reserva vencida',
+    'Notificación relacionada con una reserva vencida',
+    FALSE,
+    3
+),
+(
+    'CUOTA_PROXIMA',
+    'Cuota próxima',
+    'Recordatorio de una cuota próxima a vencer',
+    FALSE,
+    4
+),
+(
+    'CUOTA_VENCIDA',
+    'Cuota vencida',
+    'Alerta relacionada con una cuota vencida',
+    FALSE,
+    5
+),
+(
+    'PAGO_CONFIRMADO',
+    'Pago confirmado',
+    'Notificación de confirmación de un pago',
+    FALSE,
+    6
+),
+(
+    'PAGO_RECHAZADO',
+    'Pago rechazado',
+    'Notificación relacionada con un pago o voucher rechazado',
+    FALSE,
+    7
+),
+(
+    'CONTRATO_DISPONIBLE',
+    'Contrato disponible',
+    'Notificación relacionada con la disponibilidad de un contrato',
+    FALSE,
+    8
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR CANALES DE NOTIFICACION
+INSERT INTO canal_notificacion
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'PORTAL',
+    'Portal',
+    'Notificación visible dentro del portal del usuario',
+    1
+),
+(
+    'EMAIL',
+    'Correo electrónico',
+    'Notificación enviada mediante correo electrónico',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE ENVIO
+INSERT INTO estado_envio
+(
+    codigo,
+    nombre,
+    descripcion,
+    es_final,
+    orden
+)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente',
+    'Envío pendiente de procesamiento',
+    FALSE,
+    1
+),
+(
+    'ENVIADO',
+    'Enviado',
+    'Notificación enviada correctamente',
+    TRUE,
+    2
+),
+(
+    'FALLIDO',
+    'Fallido',
+    'El envío no pudo completarse correctamente',
+    FALSE,
+    3
+),
+(
+    'CANCELADO',
+    'Cancelado',
+    'Envío cancelado antes de completarse',
+    TRUE,
+    4
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE MOVIMIENTO
+INSERT INTO tipo_movimiento
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'INGRESO',
+    'Ingreso',
+    'Entrada de dinero registrada en la operación financiera',
+    1
+),
+(
+    'EGRESO',
+    'Egreso',
+    'Salida de dinero registrada en la operación financiera',
+    2
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR ESTADOS DE MOVIMIENTO
+INSERT INTO estado_movimiento
+(
+    codigo,
+    nombre,
+    descripcion,
+    es_final,
+    orden
+)
+VALUES
+(
+    'PENDIENTE',
+    'Pendiente',
+    'Movimiento registrado pendiente de confirmación',
+    FALSE,
+    1
+),
+(
+    'CONFIRMADO',
+    'Confirmado',
+    'Movimiento financiero confirmado',
+    TRUE,
+    2
+),
+(
+    'ANULADO',
+    'Anulado',
+    'Movimiento financiero anulado conservando su trazabilidad',
+    TRUE,
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR TIPOS DE CUENTA
+INSERT INTO tipo_cuenta
+(
+    codigo,
+    nombre,
+    descripcion,
+    orden
+)
+VALUES
+(
+    'BANCO',
+    'Cuenta bancaria',
+    'Cuenta bancaria utilizada para ingresos o egresos operativos',
+    1
+),
+(
+    'CAJA',
+    'Caja',
+    'Caja física utilizada para operaciones en efectivo',
+    2
+),
+(
+    'BILLETERA_DIGITAL',
+    'Billetera digital',
+    'Cuenta asociada a un medio de pago digital',
+    3
+)
+ON CONFLICT DO NOTHING;
+
+
+-- INSERTAR PERMISOS
+INSERT INTO permiso
+(
+    codigo,
+    modulo,
+    recurso,
+    accion,
+    nombre,
+    descripcion,
+    activo
+)
+VALUES
+(
+    'SEGURIDAD_USUARIO_VER',
+    'SEGURIDAD',
+    'USUARIO',
+    'VER',
+    'Ver usuarios',
+    'Permite consultar usuarios del sistema',
+    TRUE
+),
+(
+    'SEGURIDAD_USUARIO_CREAR',
+    'SEGURIDAD',
+    'USUARIO',
+    'CREAR',
+    'Crear usuarios',
+    'Permite registrar nuevos usuarios',
+    TRUE
+),
+(
+    'SEGURIDAD_USUARIO_EDITAR',
+    'SEGURIDAD',
+    'USUARIO',
+    'EDITAR',
+    'Editar usuarios',
+    'Permite modificar información y configuración de usuarios',
+    TRUE
+),
+(
+    'SEGURIDAD_ROL_VER',
+    'SEGURIDAD',
+    'ROL',
+    'VER',
+    'Ver roles',
+    'Permite consultar los roles disponibles',
+    TRUE
+),
+(
+    'SEGURIDAD_ROL_GESTIONAR',
+    'SEGURIDAD',
+    'ROL',
+    'GESTIONAR',
+    'Gestionar roles',
+    'Permite crear, editar y asignar roles',
+    TRUE
+),
+(
+    'SEGURIDAD_PERMISO_VER',
+    'SEGURIDAD',
+    'PERMISO',
+    'VER',
+    'Ver permisos',
+    'Permite consultar permisos del sistema',
+    TRUE
+),
+(
+    'SEGURIDAD_PERMISO_GESTIONAR',
+    'SEGURIDAD',
+    'PERMISO',
+    'GESTIONAR',
+    'Gestionar permisos',
+    'Permite asignar y administrar permisos de los roles',
+    TRUE
+),
+(
+    'SEGURIDAD_AUDITORIA_VER',
+    'SEGURIDAD',
+    'AUDITORIA',
+    'VER',
+    'Ver auditoría',
+    'Permite consultar eventos de auditoría y seguridad',
+    TRUE
+)
+ON CONFLICT DO NOTHING;
+
+
+-- ASIGNAR PERMISOS AL ROL ADMINISTRADOR
+INSERT INTO asignacion_permiso
+(
+    id_rol,
+    id_permiso,
+    activo
+)
+SELECT
+    r.id_rol,
+    p.id_permiso,
+    TRUE
+FROM rol r
+JOIN permiso p
+    ON p.codigo IN (
+        'SEGURIDAD_USUARIO_VER',
+        'SEGURIDAD_USUARIO_CREAR',
+        'SEGURIDAD_USUARIO_EDITAR',
+        'SEGURIDAD_ROL_VER',
+        'SEGURIDAD_ROL_GESTIONAR',
+        'SEGURIDAD_PERMISO_VER',
+        'SEGURIDAD_PERMISO_GESTIONAR',
+        'SEGURIDAD_AUDITORIA_VER'
+    )
+WHERE r.codigo = 'ADMINISTRADOR'
+  AND r.activo = TRUE
+  AND p.activo = TRUE
+  AND NOT EXISTS (
+      SELECT 1
+      FROM asignacion_permiso ap
+      WHERE ap.id_rol = r.id_rol
+        AND ap.id_permiso = p.id_permiso
+  );

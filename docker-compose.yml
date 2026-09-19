@@ -1,0 +1,52 @@
+services:
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: sgi-auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT:-8081}:8081"
+    environment:
+      - SERVER_PORT=8081
+      - DB_URL=${SUPABASE_DB_URL:-jdbc:postgresql://db.agrytrijoibwasaezedc.supabase.co:5432/postgres?sslmode=require}
+      - DB_USERNAME=${SUPABASE_DB_USERNAME:-postgres.agrytrijoibwasaezedc}
+      - DB_PASSWORD=${SUPABASE_DB_PASSWORD:-""}
+      - JWT_PRIVATE_KEY_PATH=/app/keys/private_key.pem
+      - JWT_PUBLIC_KEY_PATH=/app/keys/public_key.pem
+      - MAIL_FROM=${MAIL_FROM:-no-reply@monolithe.com}
+      - MAIL_HOST=${MAIL_HOST:-smtp.gmail.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME:-""}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-""}
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
+    restart: unless-stopped
+
+  portal-cliente:
+    build:
+      context: ./apps/portal-cliente
+      dockerfile: Dockerfile
+    container_name: sgi-portal-cliente
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-https://agrytrijoibwasaezedc.supabase.co}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFncnl0cmlqb2lid2FzYWV6ZWRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTkxMTAsImV4cCI6MjA5NTM5NTExMH0.-3Uft_OR_gPAyJnKCP3QKxJ42lq2_dUvxOqUchxT3F0}
+      - VITE_AUTH_API_URL=http://localhost:8081/api/auth
+    volumes:
+      - ./apps/portal-cliente/src:/app/src
+    restart: unless-stopped
+
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      dockerfile: Dockerfile
+    container_name: sgi-admin-dashboard
+    ports:
+      - "5174:5174"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-https://agrytrijoibwasaezedc.supabase.co}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFncnl0cmlqb2lid2FzYWV6ZWRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTkxMTAsImV4cCI6MjA5NTM5NTExMH0.-3Uft_OR_gPAyJnKCP3QKxJ42lq2_dUvxOqUchxT3F0}
+      - VITE_AUTH_API_URL=http://localhost:8081/api/auth
+    volumes:
+      - ./apps/admin-dashboard/src:/app/src
+    restart: unless-stopped

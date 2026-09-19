@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "cfg_estados_usuario")
+@Table(name = "estado_usuario")
 public class UserStatus {
 
     @Id

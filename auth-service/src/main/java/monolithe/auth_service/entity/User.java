@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "seg_usuarios")
+@Table(name = "usuario")
 public class User {
 
     @Id
@@ -28,13 +28,13 @@ public class User {
     @JoinColumn(name = "id_estado_usuario", nullable = false)
     private UserStatus estadoUsuario;
 
-    @Column(name = "usuario_login", nullable = false, unique = true, length = 120)
+    @Column(name = "login", nullable = false, unique = true, length = 120)
     private String usuarioLogin;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "clave_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "requiere_cambio_password", nullable = false)
+    @Column(name = "cambio_requerido", nullable = false)
     private Boolean requiereCambioPassword;
 
     @JdbcTypeCode(SqlTypes.SMALLINT)
@@ -47,7 +47,7 @@ public class User {
     @Column(name = "ultimo_acceso")
     private LocalDateTime ultimoAcceso;
 
-    @Column(name = "password_actualizado_en")
+    @Column(name = "fecha_cambio_clave")
     private LocalDateTime passwordActualizadoEn;
 
     @Column(name = "fecha_creacion", nullable = false, insertable = false, updatable = false)

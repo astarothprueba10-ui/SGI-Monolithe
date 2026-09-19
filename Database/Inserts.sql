@@ -1,7 +1,7 @@
 -- INSERTS
 
--- INSERTAMOS CFG_ESTADOS_PROYECTO
-INSERT INTO cfg_estados_proyecto
+-- INSERTAR ESTADOS DE PROYECTO
+INSERT INTO estado_proyecto
 (codigo, nombre, descripcion, orden)
 VALUES
 ('PLANIFICACION', 'Planificación',
@@ -20,10 +20,12 @@ VALUES
  'Proyecto temporalmente suspendido', 5),
 
 ('CANCELADO', 'Cancelado',
- 'Proyecto cancelado', 6);
- 
- -- INSERT CFG_ESTADOS_ETAPA 
- INSERT INTO cfg_estados_etapa
+ 'Proyecto cancelado', 6)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE ETAPA
+INSERT INTO estado_etapa
 (codigo, nombre, descripcion, orden)
 VALUES
 ('PLANIFICADA', 'Planificada',
@@ -39,10 +41,12 @@ VALUES
  'Etapa temporalmente suspendida', 4),
 
 ('CANCELADA', 'Cancelada',
- 'Etapa cancelada', 5);
- 
- -- INSERT CFG_ESTADOS_MANZANA
- INSERT INTO cfg_estados_manzana
+ 'Etapa cancelada', 5)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE MANZANA
+INSERT INTO estado_manzana
 (codigo, nombre, descripcion, orden)
 VALUES
 ('PLANIFICADA', 'Planificada',
@@ -55,10 +59,12 @@ VALUES
  'Manzana temporalmente inhabilitada', 3),
 
 ('CERRADA', 'Cerrada',
- 'Manzana sin operaciones disponibles', 4);
- 
- -- INSERT CFG_ESTADOS_LOTES
- INSERT INTO cfg_estados_lote
+ 'Manzana sin operaciones disponibles', 4)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE LOTE
+INSERT INTO estado_lote
 (
     codigo,
     nombre,
@@ -107,10 +113,12 @@ VALUES
     FALSE,
     FALSE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE DOCUMENTOS 
-INSERT INTO cfg_tipos_documento
+
+-- INSERTAR TIPOS DE DOCUMENTO
+INSERT INTO tipo_documento
 (
     codigo,
     nombre,
@@ -124,19 +132,23 @@ VALUES
 ('DNI', 'DNI', 'Documento Nacional de Identidad', 8, 8, TRUE, 1),
 ('CE', 'Carné de extranjería', 'Carné de extranjería', 8, 12, FALSE, 2),
 ('PASAPORTE', 'Pasaporte', 'Documento de viaje internacional', 6, 20, FALSE, 3),
-('RUC', 'RUC', 'Registro Único de Contribuyentes', 11, 11, TRUE, 4);
+('RUC', 'RUC', 'Registro Único de Contribuyentes', 11, 11, TRUE, 4)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONTACTO 
-INSERT INTO cfg_tipos_contacto
+
+-- INSERTAR TIPOS DE CONTACTO
+INSERT INTO tipo_contacto
 (codigo, nombre, orden)
 VALUES
 ('EMAIL', 'Correo electrónico', 1),
 ('CELULAR', 'Celular', 2),
 ('TELEFONO', 'Teléfono', 3),
-('WHATSAPP', 'WhatsApp', 4);
+('WHATSAPP', 'WhatsApp', 4)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE PROSPECTOS 
-INSERT INTO cfg_estados_prospecto
+
+-- INSERTAR ESTADOS DE PROSPECTO
+INSERT INTO estado_prospecto
 (codigo, nombre, descripcion, es_estado_final, orden)
 VALUES
 ('NUEVO', 'Nuevo',
@@ -161,10 +173,12 @@ VALUES
  'No desea continuar con el proceso comercial', TRUE, 7),
 
 ('DESCARTADO', 'Descartado',
- 'Prospecto descartado por criterios comerciales', TRUE, 8);
- 
- -- INSERTAR ORIGENES PROSPECTOS
- INSERT INTO cfg_origenes_prospecto
+ 'Prospecto descartado por criterios comerciales', TRUE, 8)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ORIGENES DE PROSPECTO
+INSERT INTO origen_prospecto
 (codigo, nombre, orden)
 VALUES
 ('WEB', 'Página web', 1),
@@ -176,11 +190,12 @@ VALUES
 ('FERIA', 'Feria o evento', 7),
 ('VISITA_OFICINA', 'Visita a oficina', 8),
 ('LLAMADA', 'Llamada telefónica', 9),
-('OTRO', 'Otro', 10);
+('OTRO', 'Otro', 10)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
-  
-  -- CFG_TIPOS_SEGUIMIENTO
-  INSERT INTO cfg_tipos_seguimiento
+
+-- INSERTAR TIPOS DE SEGUIMIENTO
+INSERT INTO tipo_seguimiento
 (codigo, nombre, orden)
 VALUES
 ('LLAMADA', 'Llamada', 1),
@@ -189,10 +204,12 @@ VALUES
 ('REUNION', 'Reunión', 4),
 ('VISITA_PROYECTO', 'Visita al proyecto', 5),
 ('VISITA_OFICINA', 'Visita a oficina', 6),
-('OTRO', 'Otro', 7);
+('OTRO', 'Otro', 7)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONSENTIMIENTOS 
-INSERT INTO cfg_tipos_consentimiento
+
+-- INSERTAR TIPOS DE CONSENTIMIENTO
+INSERT INTO tipo_consentimiento
 (codigo, nombre, descripcion)
 VALUES
 (
@@ -204,17 +221,21 @@ VALUES
     'COMUNICACIONES_COMERCIALES',
     'Comunicaciones comerciales',
     'Consentimiento para recibir información comercial'
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR MONEDAS 
-INSERT INTO cfg_monedas
+
+-- INSERTAR MONEDAS
+INSERT INTO moneda
 (codigo, nombre, simbolo)
 VALUES
 ('PEN', 'Sol peruano', 'S/'),
-('USD', 'Dólar estadounidense', '$');
+('USD', 'Dólar estadounidense', '$')
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE RESERVA 
-INSERT INTO cfg_estados_reserva
+
+-- INSERTAR ESTADOS DE RESERVA
+INSERT INTO estado_reserva
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 ('PENDIENTE', 'Pendiente',
@@ -230,10 +251,12 @@ VALUES
  'Reserva vencida por expiración del plazo', TRUE, 4),
 
 ('CANCELADA', 'Cancelada',
- 'Reserva cancelada', TRUE, 5);
- 
- -- INSERTAR ESTADOS DE VENTA 
- INSERT INTO cfg_estados_venta
+ 'Reserva cancelada', TRUE, 5)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE VENTA
+INSERT INTO estado_venta
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 ('PENDIENTE', 'Pendiente',
@@ -249,10 +272,12 @@ VALUES
  'Venta totalmente finalizada', TRUE, 4),
 
 ('ANULADA', 'Anulada',
- 'Venta anulada', TRUE, 5);
- 
- -- INSERTAR ESTADOS DE PREPARACION 
- INSERT INTO cfg_estados_contrato
+ 'Venta anulada', TRUE, 5)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE CONTRATO
+INSERT INTO estado_contrato
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 ('BORRADOR', 'Borrador',
@@ -271,10 +296,12 @@ VALUES
  'Contrato resuelto anticipadamente', TRUE, 5),
 
 ('ANULADO', 'Anulado',
- 'Contrato anulado', TRUE, 6);
- 
- -- INSERTAR ESTADOS DE USUARIOS 
- INSERT INTO cfg_estados_usuario
+ 'Contrato anulado', TRUE, 6)
+ON DUPLICATE KEY UPDATE codigo = codigo;
+
+
+-- INSERTAR ESTADOS DE USUARIO
+INSERT INTO estado_usuario
 (codigo, nombre, descripcion, permite_acceso, orden)
 VALUES
 (
@@ -304,10 +331,12 @@ VALUES
     'Usuario sin acceso al sistema',
     FALSE,
     4
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ROLES INICIALES 
-INSERT INTO seg_roles
+
+-- INSERTAR ROLES INICIALES
+INSERT INTO rol
 (codigo, nombre, descripcion, es_sistema)
 VALUES
 (
@@ -345,10 +374,12 @@ VALUES
     'Cliente',
     'Acceso al portal de autogestión del comprador',
     TRUE
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE TARIFAS 
-INSERT INTO cfg_tipos_tarifa
+
+-- INSERTAR TIPOS DE TARIFA
+INSERT INTO tipo_tarifa
 (codigo, nombre, descripcion, orden)
 VALUES
 (
@@ -362,10 +393,12 @@ VALUES
     'Monto fijo',
     'La tarifa representa directamente el precio base del lote',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE AJUSTES DE PRECIO 
-INSERT INTO cfg_tipos_ajuste_precio
+
+-- INSERTAR TIPOS DE AJUSTE DE PRECIO
+INSERT INTO tipo_ajuste_precio
 (codigo, nombre, descripcion, orden)
 VALUES
 (
@@ -379,10 +412,12 @@ VALUES
     'Monto fijo',
     'El ajuste corresponde a un importe monetario fijo',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR MODALIDADES DE VENTA --
-INSERT INTO cfg_modalidades_venta
+
+-- INSERTAR MODALIDADES DE VENTA
+INSERT INTO modalidad_venta
 (
     codigo,
     nombre,
@@ -404,10 +439,12 @@ VALUES
     'Venta que genera un plan de financiamiento y cronograma de cuotas',
     TRUE,
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CONTRATOS
-INSERT INTO cfg_tipos_contrato
+
+-- INSERTAR TIPOS DE CONTRATO
+INSERT INTO tipo_contrato
 (
     codigo,
     nombre,
@@ -426,10 +463,12 @@ VALUES
     'Contrato de compraventa',
     'Contrato formal de compraventa asociado a la operación inmobiliaria',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE PLAN DE PAGO --
-INSERT INTO cfg_estados_plan_pago
+
+-- INSERTAR ESTADOS DE PLAN DE PAGO
+INSERT INTO estado_plan_pago
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 (
@@ -466,10 +505,12 @@ VALUES
     'Plan anulado administrativamente',
     TRUE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR CFG_ESTADOS_CUOTA --
-INSERT INTO cfg_estados_cuota
+
+-- INSERTAR ESTADOS DE CUOTA
+INSERT INTO estado_cuota
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 (
@@ -506,10 +547,12 @@ VALUES
     'Cuota anulada por una modificación válida del plan',
     TRUE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR METODOS DE PAGO 
-INSERT INTO cfg_metodos_pago
+
+-- INSERTAR METODOS DE PAGO
+INSERT INTO metodo_pago
 (
     codigo,
     nombre,
@@ -558,10 +601,12 @@ VALUES
     FALSE,
     FALSE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE VOUCHER 
-INSERT INTO cfg_estados_voucher
+
+-- INSERTAR ESTADOS DE VOUCHER
+INSERT INTO estado_voucher
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 (
@@ -584,10 +629,12 @@ VALUES
     'Voucher rechazado durante la validación',
     TRUE,
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE PAGO 
-INSERT INTO cfg_estados_pago
+
+-- INSERTAR ESTADOS DE PAGO
+INSERT INTO estado_pago
 (codigo, nombre, descripcion, es_final, orden)
 VALUES
 (
@@ -610,10 +657,12 @@ VALUES
     'Pago anulado mediante una operación autorizada',
     TRUE,
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE APLICACION DE PAGO 
-INSERT INTO cfg_tipos_aplicacion_pago
+
+-- INSERTAR TIPOS DE APLICACION DE PAGO
+INSERT INTO tipo_aplicacion_pago
 (
     codigo,
     nombre,
@@ -644,10 +693,12 @@ VALUES
     'Venta al contado',
     'Monto aplicado al pago de una venta realizada al contado',
     4
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSEERTAR TIPOS DE ASESOR 
-INSERT INTO cfg_tipos_asesor
+
+-- INSERTAR TIPOS DE ASESOR
+INSERT INTO tipo_asesor
 (
     codigo,
     nombre,
@@ -666,10 +717,12 @@ VALUES
     'Asesor externo',
     'Asesor comercial externo o independiente',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE ASESOR 
-INSERT INTO cfg_estados_asesor
+
+-- INSERTAR ESTADOS DE ASESOR
+INSERT INTO estado_asesor
 (
     codigo,
     nombre,
@@ -698,10 +751,12 @@ VALUES
     'Asesor que ya no se encuentra operativo',
     FALSE,
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR CFG_TIPOS_CALCULO_COMISION
-INSERT INTO cfg_tipos_calculo_comision
+
+-- INSERTAR TIPOS DE CALCULO DE COMISION
+INSERT INTO tipo_calculo_comision
 (
     codigo,
     nombre,
@@ -720,10 +775,12 @@ VALUES
     'Monto fijo',
     'Comisión definida mediante un importe monetario fijo',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE COMISION 
-INSERT INTO cfg_estados_comision
+
+-- INSERTAR ESTADOS DE COMISION
+INSERT INTO estado_comision
 (
     codigo,
     nombre,
@@ -759,10 +816,12 @@ VALUES
     'Comisión anulada mediante una operación autorizada',
     TRUE,
     4
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERATR ESTADOS DE PUBLICACION 
-INSERT INTO cfg_estados_publicacion
+
+-- INSERTAR ESTADOS DE PUBLICACION
+INSERT INTO estado_publicacion
 (
     codigo,
     nombre,
@@ -791,10 +850,12 @@ VALUES
     'Contenido retirado de publicación pero conservado históricamente',
     FALSE,
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE SECCION 
-INSERT INTO cfg_tipos_seccion
+
+-- INSERTAR TIPOS DE SECCION
+INSERT INTO tipo_seccion
 (
     codigo,
     nombre,
@@ -843,11 +904,12 @@ VALUES
     'Contacto',
     'Sección destinada a información o formulario de contacto',
     7
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
 
--- INSERTAR TIPOS DE MULTIMEDIA --
-INSERT INTO cfg_tipos_multimedia
+-- INSERTAR TIPOS DE MULTIMEDIA
+INSERT INTO tipo_multimedia
 (
     codigo,
     nombre,
@@ -872,10 +934,12 @@ VALUES
     'Documento',
     'Archivo descargable publicado desde el sitio web',
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR USOS MULTIMEDIA --
-INSERT INTO cfg_usos_multimedia
+
+-- INSERTAR USOS DE MULTIMEDIA
+INSERT INTO uso_multimedia
 (
     codigo,
     nombre,
@@ -912,10 +976,12 @@ VALUES
     'Adjunto',
     'Recurso multimedia complementario',
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS_CONSULTA_WEB --
-INSERT INTO cfg_estados_consulta_web
+
+-- INSERTAR ESTADOS DE CONSULTA WEB
+INSERT INTO estado_consulta_web
 (
     codigo,
     nombre,
@@ -958,10 +1024,12 @@ VALUES
     'Consulta atendida y cerrada sin conversión comercial',
     TRUE,
     5
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE NOTIFICACION --
-INSERT INTO cfg_tipos_notificacion
+
+-- INSERTAR TIPOS DE NOTIFICACION
+INSERT INTO tipo_notificacion
 (
     codigo,
     nombre,
@@ -1025,9 +1093,12 @@ VALUES
     'Notificación relacionada con la disponibilidad de un contrato',
     FALSE,
     8
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
-INSERT INTO cfg_canales_notificacion
+
+-- INSERTAR CANALES DE NOTIFICACION
+INSERT INTO canal_notificacion
 (
     codigo,
     nombre,
@@ -1046,11 +1117,12 @@ VALUES
     'Correo electrónico',
     'Notificación enviada mediante correo electrónico',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
 
--- INSERTAR ESTADOS DE ENVIO DE NOTIFICACION --
-INSERT INTO cfg_estados_envio_notificacion
+-- INSERTAR ESTADOS DE ENVIO
+INSERT INTO estado_envio
 (
     codigo,
     nombre,
@@ -1086,10 +1158,12 @@ VALUES
     'Envío cancelado antes de completarse',
     TRUE,
     4
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPO DE MOVIMIENTO FINANCIERO --
-INSERT INTO cfg_tipos_movimiento_financiero
+
+-- INSERTAR TIPOS DE MOVIMIENTO
+INSERT INTO tipo_movimiento
 (
     codigo,
     nombre,
@@ -1108,10 +1182,12 @@ VALUES
     'Egreso',
     'Salida de dinero registrada en la operación financiera',
     2
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ESTADOS DE MOVIMIENTO FINANCIERO -- 
-INSERT INTO cfg_estados_movimiento_financiero
+
+-- INSERTAR ESTADOS DE MOVIMIENTO
+INSERT INTO estado_movimiento
 (
     codigo,
     nombre,
@@ -1140,10 +1216,12 @@ VALUES
     'Movimiento financiero anulado conservando su trazabilidad',
     TRUE,
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR TIPOS DE CUENTAS FINANCIERAS --
-INSERT INTO cfg_tipos_cuenta_financiera
+
+-- INSERTAR TIPOS DE CUENTA
+INSERT INTO tipo_cuenta
 (
     codigo,
     nombre,
@@ -1168,10 +1246,13 @@ VALUES
     'Billetera digital',
     'Cuenta asociada a un medio de pago digital',
     3
-);
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR PERMISOS --
-INSERT INTO seg_permisos (
+
+-- INSERTAR PERMISOS
+INSERT INTO permiso
+(
     codigo,
     modulo,
     recurso,
@@ -1188,7 +1269,7 @@ VALUES
     'VER',
     'Ver usuarios',
     'Permite consultar usuarios del sistema',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_USUARIO_CREAR',
@@ -1197,7 +1278,7 @@ VALUES
     'CREAR',
     'Crear usuarios',
     'Permite registrar nuevos usuarios',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_USUARIO_EDITAR',
@@ -1206,7 +1287,7 @@ VALUES
     'EDITAR',
     'Editar usuarios',
     'Permite modificar información y configuración de usuarios',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_ROL_VER',
@@ -1215,7 +1296,7 @@ VALUES
     'VER',
     'Ver roles',
     'Permite consultar los roles disponibles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_ROL_GESTIONAR',
@@ -1224,7 +1305,7 @@ VALUES
     'GESTIONAR',
     'Gestionar roles',
     'Permite crear, editar y asignar roles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_PERMISO_VER',
@@ -1233,7 +1314,7 @@ VALUES
     'VER',
     'Ver permisos',
     'Permite consultar permisos del sistema',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_PERMISO_GESTIONAR',
@@ -1242,7 +1323,7 @@ VALUES
     'GESTIONAR',
     'Gestionar permisos',
     'Permite asignar y administrar permisos de los roles',
-    1
+    TRUE
 ),
 (
     'SEGURIDAD_AUDITORIA_VER',
@@ -1251,23 +1332,24 @@ VALUES
     'VER',
     'Ver auditoría',
     'Permite consultar eventos de auditoría y seguridad',
-    1
-);
+    TRUE
+)
+ON DUPLICATE KEY UPDATE codigo = codigo;
 
--- INSERTAR ROLES A LOS PERMISOS 
-INSERT INTO seg_roles_permisos (
+
+-- ASIGNAR PERMISOS AL ROL ADMINISTRADOR
+INSERT INTO asignacion_permiso
+(
     id_rol,
     id_permiso,
-    asignado_por,
     activo
 )
 SELECT
     r.id_rol,
     p.id_permiso,
-    1,
-    1
-FROM seg_roles r
-JOIN seg_permisos p
+    TRUE
+FROM rol r
+JOIN permiso p
     ON p.codigo IN (
         'SEGURIDAD_USUARIO_VER',
         'SEGURIDAD_USUARIO_CREAR',
@@ -1279,11 +1361,11 @@ JOIN seg_permisos p
         'SEGURIDAD_AUDITORIA_VER'
     )
 WHERE r.codigo = 'ADMINISTRADOR'
-  AND r.activo = 1
-  AND p.activo = 1
+  AND r.activo = TRUE
+  AND p.activo = TRUE
   AND NOT EXISTS (
       SELECT 1
-      FROM seg_roles_permisos rp
-      WHERE rp.id_rol = r.id_rol
-        AND rp.id_permiso = p.id_permiso
+      FROM asignacion_permiso ap
+      WHERE ap.id_rol = r.id_rol
+        AND ap.id_permiso = p.id_permiso
   );

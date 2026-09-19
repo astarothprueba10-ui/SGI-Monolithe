@@ -29,16 +29,16 @@ public class AuditService {
         try {
 
             jdbcClient.sql("""
-                    INSERT INTO aud_eventos (
+                    INSERT INTO evento_auditoria (
                         id_usuario,
                         modulo,
                         accion,
                         entidad,
-                        id_entidad,
+                        clave_entidad,
                         resultado,
                         descripcion,
                         ip_origen,
-                        user_agent,
+                        agente_usuario,
                         metodo_http,
                         ruta
                     )
