@@ -9,22 +9,23 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
-
-
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "cfg_estados_usuario")
-public class UserStatus {
+@Table(name = "estado")
+public class Estado {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @JdbcTypeCode(SqlTypes.SMALLINT)
-    @Column(name = "id_estado_usuario")
-    private Integer idEstadoUsuario;
+    @Column(name = "id_estado")
+    private Integer idEstado;
 
-    @Column(name = "codigo", nullable = false, unique = true, length = 30)
+    @Column(name = "entidad", nullable = false, length = 40)
+    private String entidad;
+
+    @Column(name = "codigo", nullable = false, length = 30)
     private String codigo;
 
     @Column(name = "nombre", nullable = false, length = 80)
@@ -33,7 +34,7 @@ public class UserStatus {
     @Column(name = "descripcion", length = 255)
     private String descripcion;
 
-    @Column(name = "permite_acceso", nullable = false)
+    @Column(name = "permite_acceso")
     private Boolean permiteAcceso;
 
     @Column(name = "activo", nullable = false)

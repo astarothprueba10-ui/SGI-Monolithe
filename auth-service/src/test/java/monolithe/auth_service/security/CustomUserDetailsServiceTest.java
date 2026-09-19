@@ -5,7 +5,7 @@ import monolithe.auth_service.entity.Role;
 import monolithe.auth_service.entity.RolePermission;
 import monolithe.auth_service.entity.User;
 import monolithe.auth_service.entity.UserRole;
-import monolithe.auth_service.entity.UserStatus;
+import monolithe.auth_service.entity.Estado;
 import monolithe.auth_service.repository.RolePermissionRepository;
 import monolithe.auth_service.repository.UserRepository;
 import monolithe.auth_service.repository.UserRoleRepository;
@@ -225,9 +225,27 @@ class CustomUserDetailsServiceTest {
         );
     }
 
+    @Test
+    void noDebeHabilitarUsuarioSiEstadoEsDeOtraEntidad() {
+
+        User usuario = crearUsuarioActivo();
+        usuario.getEstadoUsuario().setEntidad("VENTA");
+
+        when(userRepository
+                .findByUsuarioLogin("admin"))
+                .thenReturn(Optional.of(usuario));
+
+        UserPrincipal principal =
+                (UserPrincipal) userDetailsService
+                        .loadUserByUsername("admin");
+
+        assertFalse(principal.isEnabled());
+    }
+
     private User crearUsuarioActivo() {
 
-        UserStatus estado = new UserStatus();
+        Estado estado = new Estado();
+        estado.setEntidad("USUARIO");
         estado.setActivo(true);
         estado.setPermiteAcceso(true);
 
