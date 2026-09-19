@@ -3,13 +3,22 @@ USE MONOLITHE;
 
 -- 01. CATALOGOS / CFG
 
--- TABLA estados_proyecto
-CREATE TABLE estado_proyecto (
-    id_estado_proyecto SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
+-- TABLA estado
+CREATE TABLE estado (
+    id_estado SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
+
+    entidad VARCHAR(40) NOT NULL,
 
     codigo VARCHAR(30) NOT NULL,
     nombre VARCHAR(80) NOT NULL,
     descripcion VARCHAR(255),
+
+    es_final BOOLEAN NOT NULL DEFAULT FALSE,
+
+    permite_reserva BOOLEAN NULL,
+    permite_venta BOOLEAN NULL,
+    permite_acceso BOOLEAN NULL,
+    visible_publico BOOLEAN NULL,
 
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -21,99 +30,17 @@ CREATE TABLE estado_proyecto (
         DEFAULT CURRENT_TIMESTAMP(6)
         ON UPDATE CURRENT_TIMESTAMP(6),
 
-    CONSTRAINT pk_estado_proyecto
-        PRIMARY KEY (id_estado_proyecto),
+    CONSTRAINT pk_estado
+        PRIMARY KEY (id_estado),
 
-    CONSTRAINT unq_estado_proyecto_codigo
-        UNIQUE (codigo)
+    CONSTRAINT unq_estado_entidad_codigo
+        UNIQUE (entidad, codigo),
 
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
--- TABLA estado_etapa
-CREATE TABLE estado_etapa (
-    id_estado_etapa SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_etapa
-        PRIMARY KEY (id_estado_etapa),
-
-    CONSTRAINT unq_estado_etapa_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-
--- TABLA estado_manzana
-CREATE TABLE estado_manzana (
-    id_estado_manzana SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_manzana
-        PRIMARY KEY (id_estado_manzana),
-
-    CONSTRAINT unq_estado_manzana_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
--- TABLA estado_lote
-CREATE TABLE estado_lote (
-    id_estado_lote SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    permite_reserva BOOLEAN NOT NULL DEFAULT FALSE,
-    permite_venta BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_lote
-        PRIMARY KEY (id_estado_lote),
-
-    CONSTRAINT unq_estado_lote_codigo
-        UNIQUE (codigo)
-
+    INDEX idx_estado_entidad_activo_orden (
+        entidad,
+        activo,
+        orden
+    )
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci;
@@ -297,35 +224,6 @@ CREATE TABLE tipo_contacto (
   COLLATE=utf8mb4_0900_ai_ci;
   
    -- TABLA ESTADO_PROSPECTO
-  CREATE TABLE estado_prospecto (
-    id_estado_prospecto SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_estado_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_prospecto
-        PRIMARY KEY (id_estado_prospecto),
-
-    CONSTRAINT unq_estado_prospecto_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA ORIGEN_PROSPECTO
   CREATE TABLE origen_prospecto (
     id_origen_prospecto SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -409,65 +307,7 @@ CREATE TABLE tipo_seguimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
     -- TABLA ESTADO_RESERVA
-  CREATE TABLE estado_reserva (
-    id_estado_reserva SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_reserva
-        PRIMARY KEY (id_estado_reserva),
-
-    CONSTRAINT unq_estado_reserva_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA ESTADO_VENTAS
-  CREATE TABLE estado_venta (
-    id_estado_venta SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_venta
-        PRIMARY KEY (id_estado_venta),
-
-    CONSTRAINT unq_estado_venta_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- tabla tipo_contrato --
   CREATE TABLE tipo_contrato (
     id_tipo_contrato SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -497,65 +337,7 @@ CREATE TABLE tipo_seguimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- TABLA ESTADO_CONTRATO
-  CREATE TABLE estado_contrato (
-    id_estado_contrato SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_contrato
-        PRIMARY KEY (id_estado_contrato),
-
-    CONSTRAINT unq_estado_contrato_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-    -- tabla estado_usuario
-  CREATE TABLE estado_usuario (
-    id_estado_usuario SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    permite_acceso BOOLEAN NOT NULL DEFAULT TRUE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_usuario
-        PRIMARY KEY (id_estado_usuario),
-
-    CONSTRAINT unq_estado_usuario_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
+  -- tabla estado_usuario
   -- tabla cfg_modalidades_venta
   CREATE TABLE modalidad_venta (
     id_modalidad_venta SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -587,65 +369,7 @@ CREATE TABLE tipo_seguimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- tabla estado_plan_pago --
-  CREATE TABLE estado_plan_pago (
-    id_estado_plan_pago SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_plan_pago
-        PRIMARY KEY (id_estado_plan_pago),
-
-    CONSTRAINT unq_estado_plan_pago_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA ESTADO_CUOTA --
-  CREATE TABLE estado_cuota (
-    id_estado_cuota SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_cuota
-        PRIMARY KEY (id_estado_cuota),
-
-    CONSTRAINT unq_estado_cuota_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA METODOS_PAGO -- 
   CREATE TABLE metodo_pago (
     id_metodo_pago SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -678,66 +402,8 @@ CREATE TABLE tipo_seguimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- TABLA ESTADO_VAUCHER
- CREATE TABLE estado_voucher (
-    id_estado_voucher SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_voucher
-        PRIMARY KEY (id_estado_voucher),
-
-    CONSTRAINT unq_estado_voucher_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-  -- TABLA CFG_ESTADOS_PAGO --
-  CREATE TABLE estado_pago (
-    id_estado_pago SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_pago
-        PRIMARY KEY (id_estado_pago),
-
-    CONSTRAINT unq_estado_pago_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
-    -- CFG_TIPOS_APLICACION_PAGO --
+ -- TABLA CFG_ESTADOS_PAGO --
+  -- CFG_TIPOS_APLICACION_PAGO --
   CREATE TABLE tipo_aplicacion_pago (
     id_tipo_aplicacion_pago SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
@@ -794,35 +460,6 @@ CREATE TABLE tipo_seguimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- TABLA CFG_ESTADOS_ASESOR
-  CREATE TABLE estado_asesor (
-    id_estado_asesor SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    permite_operar BOOLEAN NOT NULL DEFAULT TRUE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_asesor
-        PRIMARY KEY (id_estado_asesor),
-
-    CONSTRAINT unq_estado_asesor_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA CFG_TIPOS_CALCULO_COMISION
   CREATE TABLE tipo_calculo_comision (
     id_tipo_calculo_comision SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -851,66 +488,7 @@ CREATE TABLE tipo_seguimiento (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci;
   
-  -- TABLA CFG_ESTADOS_COMISION
-CREATE TABLE estado_comision (
-    id_estado_comision SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_comision
-        PRIMARY KEY (id_estado_comision),
-
-    CONSTRAINT unq_estado_comision_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA CFG_ESTADOS_PUBLICACIONES 
-  CREATE TABLE estado_publicacion (
-    id_estado_publicacion SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    visible_publico BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_publicacion
-        PRIMARY KEY (id_estado_publicacion),
-
-    CONSTRAINT unq_estado_publicacion_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA CFG_TIPOS DE SECCION --
 CREATE TABLE tipo_seccion (
     id_tipo_seccion SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -996,35 +574,6 @@ CREATE TABLE tipo_seccion (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- CFG_ESTADOS_CONSULTA_WEB --
-  CREATE TABLE estado_consulta_web (
-    id_estado_consulta_web SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_consulta_web
-        PRIMARY KEY (id_estado_consulta_web),
-
-    CONSTRAINT unq_estado_consulta_web_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA CFG_TIPOS_NOTIFICACIÓN --
   CREATE TABLE tipo_notificacion (
     id_tipo_notificacion SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -1083,36 +632,6 @@ CREATE TABLE tipo_seccion (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_0900_ai_ci;
   
--- TABLA CFG_ESTADOS_ENVIO_NOTIFICACION --
-CREATE TABLE estado_envio (
-    id_estado_envio SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_envio
-        PRIMARY KEY (id_estado_envio),
-
-    CONSTRAINT unq_estado_envio_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
 -- TABLA CFG_TIPOS_MOVIMIENTO_FINANCIERO --
 CREATE TABLE tipo_movimiento (
     id_tipo_movimiento SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -1142,35 +661,6 @@ CREATE TABLE tipo_movimiento (
   COLLATE=utf8mb4_0900_ai_ci;
   
   -- TABLA CFG_ESTADOS_MOVIMIENTO_FINANCIERO --
-  CREATE TABLE estado_movimiento (
-    id_estado_movimiento SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
-
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(80) NOT NULL,
-    descripcion VARCHAR(255),
-
-    es_final BOOLEAN NOT NULL DEFAULT FALSE,
-
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    orden SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-
-    fecha_creacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6),
-
-    fecha_actualizacion DATETIME(6) NOT NULL
-        DEFAULT CURRENT_TIMESTAMP(6)
-        ON UPDATE CURRENT_TIMESTAMP(6),
-
-    CONSTRAINT pk_estado_movimiento
-        PRIMARY KEY (id_estado_movimiento),
-
-    CONSTRAINT unq_estado_movimiento_codigo
-        UNIQUE (codigo)
-
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_0900_ai_ci;
-  
   -- TABLA CFG_TIPOS_CUENTA_FINANCIERA 
   CREATE TABLE tipo_cuenta (
     id_tipo_cuenta SMALLINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -1425,7 +915,7 @@ CREATE TABLE tipo_movimiento (
     id_usuario BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_persona BIGINT UNSIGNED NOT NULL,
-    id_estado_usuario SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     login VARCHAR(120) NOT NULL,
     clave_hash VARCHAR(255) NOT NULL,
@@ -1459,11 +949,11 @@ CREATE TABLE tipo_movimiento (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_usuario_estado
-        FOREIGN KEY (id_estado_usuario)
-        REFERENCES estado_usuario(id_estado_usuario)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
-    INDEX idx_usuario_estado (id_estado_usuario)
+    INDEX idx_usuario_estado (id_estado)
 
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
@@ -1750,7 +1240,7 @@ CREATE TABLE tipo_movimiento (
 CREATE TABLE proyecto (
     id_proyecto BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_estado_proyecto SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     codigo VARCHAR(30) NOT NULL,
     nombre VARCHAR(150) NOT NULL,
@@ -1788,8 +1278,8 @@ CREATE TABLE proyecto (
         UNIQUE (codigo),
 
     CONSTRAINT fk_proyecto_estado
-        FOREIGN KEY (id_estado_proyecto)
-        REFERENCES estado_proyecto(id_estado_proyecto)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_proyecto_area
@@ -1826,7 +1316,7 @@ CREATE TABLE etapa (
     id_etapa BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_proyecto BIGINT UNSIGNED NOT NULL,
-    id_estado_etapa SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     codigo VARCHAR(30) NOT NULL,
     nombre VARCHAR(100) NOT NULL,
@@ -1861,8 +1351,8 @@ CREATE TABLE etapa (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_etapa_estado
-        FOREIGN KEY (id_estado_etapa)
-        REFERENCES estado_etapa(id_estado_etapa)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_etapa_orden
@@ -1885,7 +1375,7 @@ CREATE TABLE manzana (
 
     id_etapa BIGINT UNSIGNED NOT NULL,
     id_proyecto BIGINT UNSIGNED NOT NULL,
-    id_estado_manzana SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     codigo VARCHAR(30) NOT NULL,
     nombre VARCHAR(100),
@@ -1917,8 +1407,8 @@ CREATE TABLE manzana (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_manzana_estado
-        FOREIGN KEY (id_estado_manzana)
-        REFERENCES estado_manzana(id_estado_manzana)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_manzana_orden
@@ -2214,7 +1704,7 @@ CREATE TABLE lote (
     id_zona BIGINT UNSIGNED,
     id_proyecto BIGINT UNSIGNED NOT NULL,
     id_tipo_lote SMALLINT UNSIGNED,
-    id_estado_lote SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     codigo VARCHAR(40) NOT NULL,
     numero VARCHAR(20) NOT NULL,
@@ -2265,8 +1755,8 @@ CREATE TABLE lote (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_lote_estado
-        FOREIGN KEY (id_estado_lote)
-        REFERENCES estado_lote(id_estado_lote)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_lote_area
@@ -2450,12 +1940,12 @@ CREATE TABLE precio_lote (
 
     CONSTRAINT fk_historial_anterior
         FOREIGN KEY (id_estado_anterior)
-        REFERENCES estado_lote(id_estado_lote)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_historial_nuevo
         FOREIGN KEY (id_estado_nuevo)
-        REFERENCES estado_lote(id_estado_lote)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_historial_usuario
@@ -2724,7 +2214,7 @@ CREATE TABLE precio_lote (
 
     id_persona BIGINT UNSIGNED NOT NULL,
     id_proyecto BIGINT UNSIGNED NOT NULL,
-    id_estado_prospecto SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_origen_prospecto SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED,
 
@@ -2771,8 +2261,8 @@ CREATE TABLE precio_lote (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_interes_estado
-        FOREIGN KEY (id_estado_prospecto)
-        REFERENCES estado_prospecto(id_estado_prospecto)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_interes_origen
@@ -2848,7 +2338,7 @@ CREATE TABLE precio_lote (
 
     INDEX idx_interes_persona (id_persona),
 
-    INDEX idx_interes_estado (id_estado_prospecto),
+    INDEX idx_interes_estado (id_estado),
 
     INDEX idx_interes_origen (id_origen_prospecto),
 
@@ -2992,7 +2482,7 @@ CREATE TABLE precio_lote (
 
     id_lote BIGINT UNSIGNED NOT NULL,
     id_persona BIGINT UNSIGNED NOT NULL,
-    id_estado_reserva SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
     id_usuario BIGINT UNSIGNED,
 
@@ -3037,8 +2527,8 @@ CREATE TABLE precio_lote (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_reserva_estado
-        FOREIGN KEY (id_estado_reserva)
-        REFERENCES estado_reserva(id_estado_reserva)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_reserva_moneda
@@ -3063,7 +2553,7 @@ CREATE TABLE precio_lote (
 
     INDEX idx_reserva_lote_estado (
         id_lote,
-        id_estado_reserva
+        id_estado
     ),
 
     INDEX idx_reserva_persona (
@@ -3071,7 +2561,7 @@ CREATE TABLE precio_lote (
     ),
 
     INDEX idx_reserva_estado (
-        id_estado_reserva
+        id_estado
     ),
 
     INDEX idx_reserva_vencimiento (
@@ -3088,7 +2578,7 @@ CREATE TABLE precio_lote (
 
     id_lote BIGINT UNSIGNED NOT NULL,
     id_reserva BIGINT UNSIGNED,
-    id_estado_venta SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_modalidad_venta SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
     id_usuario BIGINT UNSIGNED,
@@ -3161,8 +2651,8 @@ CREATE TABLE precio_lote (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_venta_estado
-        FOREIGN KEY (id_estado_venta)
-        REFERENCES estado_venta(id_estado_venta)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_venta_modalidad
@@ -3217,7 +2707,7 @@ CREATE TABLE precio_lote (
     ),
 
     INDEX idx_venta_estado (
-        id_estado_venta
+        id_estado
     ),
 
     INDEX idx_venta_modalidad (
@@ -3294,7 +2784,7 @@ CREATE TABLE precio_lote (
 
     id_venta BIGINT UNSIGNED NOT NULL,
     id_tipo_contrato SMALLINT UNSIGNED NOT NULL,
-    id_estado_contrato SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_usuario BIGINT UNSIGNED,
 
     codigo VARCHAR(40) NOT NULL,
@@ -3335,8 +2825,8 @@ CREATE TABLE precio_lote (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_contrato_estado
-        FOREIGN KEY (id_estado_contrato)
-        REFERENCES estado_contrato(id_estado_contrato)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_contrato_usuario
@@ -3517,7 +3007,7 @@ CREATE TABLE plan_pago (
     id_plan_pago BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_venta BIGINT UNSIGNED NOT NULL,
-    id_estado_plan_pago SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
 
     codigo VARCHAR(40) NOT NULL,
@@ -3586,8 +3076,8 @@ CREATE TABLE plan_pago (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_plan_estado
-        FOREIGN KEY (id_estado_plan_pago)
-        REFERENCES estado_plan_pago(id_estado_plan_pago)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_plan_moneda
@@ -3672,7 +3162,7 @@ CREATE TABLE plan_pago (
         ),
 
     INDEX idx_plan_estado (
-        id_estado_plan_pago
+        id_estado
     ),
 
     INDEX idx_plan_vigente (
@@ -3689,7 +3179,7 @@ CREATE TABLE cuota (
     id_cuota BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_plan_pago BIGINT UNSIGNED NOT NULL,
-    id_estado_cuota SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     numero SMALLINT UNSIGNED NOT NULL,
 
@@ -3731,8 +3221,8 @@ CREATE TABLE cuota (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_cuota_estado
-        FOREIGN KEY (id_estado_cuota)
-        REFERENCES estado_cuota(id_estado_cuota)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_cuota_numero
@@ -3761,7 +3251,7 @@ CREATE TABLE cuota (
         ),
 
     INDEX idx_cuota_estado (
-        id_estado_cuota
+        id_estado
     ),
 
     INDEX idx_cuota_vencimiento (
@@ -3785,7 +3275,7 @@ CREATE TABLE pago (
     id_venta BIGINT UNSIGNED,
     id_plan_pago BIGINT UNSIGNED,
 
-    id_estado_pago SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_metodo_pago SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
 
@@ -3864,8 +3354,8 @@ CREATE TABLE pago (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_pago_estado
-        FOREIGN KEY (id_estado_pago)
-        REFERENCES estado_pago(id_estado_pago)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_pago_metodo
@@ -3966,7 +3456,7 @@ CREATE TABLE pago (
     ),
 
     INDEX idx_pago_estado (
-        id_estado_pago
+        id_estado
     ),
 
     INDEX idx_pago_metodo (
@@ -4115,7 +3605,7 @@ CREATE TABLE pago (
     id_voucher BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
     id_pago BIGINT UNSIGNED NOT NULL,
-    id_estado_voucher SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     id_usuario_carga BIGINT UNSIGNED,
     id_usuario_valida BIGINT UNSIGNED,
@@ -4166,8 +3656,8 @@ CREATE TABLE pago (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_voucher_estado
-        FOREIGN KEY (id_estado_voucher)
-        REFERENCES estado_voucher(id_estado_voucher)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_voucher_carga
@@ -4220,7 +3710,7 @@ CREATE TABLE pago (
     ),
 
     INDEX idx_voucher_estado (
-        id_estado_voucher
+        id_estado
     ),
 
     INDEX idx_voucher_fecha (
@@ -4262,12 +3752,12 @@ CREATE TABLE pago (
 
     CONSTRAINT fk_hist_plan_anterior
         FOREIGN KEY (id_estado_anterior)
-        REFERENCES estado_plan_pago(id_estado_plan_pago)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_hist_plan_nuevo
         FOREIGN KEY (id_estado_nuevo)
-        REFERENCES estado_plan_pago(id_estado_plan_pago)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_hist_plan_usuario
@@ -4615,7 +4105,7 @@ CREATE TABLE pago (
 
     id_asignacion BIGINT UNSIGNED NOT NULL,
     id_regla_comision BIGINT UNSIGNED NOT NULL,
-    id_estado_comision SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
     id_moneda SMALLINT UNSIGNED NOT NULL,
 
     id_usuario_aprueba BIGINT UNSIGNED,
@@ -4670,8 +4160,8 @@ CREATE TABLE pago (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_comision_estado
-        FOREIGN KEY (id_estado_comision)
-        REFERENCES estado_comision(id_estado_comision)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_comision_moneda
@@ -4795,7 +4285,7 @@ CREATE TABLE pago (
     ),
 
     INDEX idx_comision_estado (
-        id_estado_comision,
+        id_estado,
         fecha_generacion
     ),
 
@@ -4813,7 +4303,7 @@ CREATE TABLE pago (
   CREATE TABLE pagina (
     id_pagina BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_estado_publicacion SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     id_usuario_registra BIGINT UNSIGNED,
     id_usuario_publica BIGINT UNSIGNED,
@@ -4852,8 +4342,8 @@ CREATE TABLE pago (
         UNIQUE (ruta),
 
     CONSTRAINT fk_pagina_estado
-        FOREIGN KEY (id_estado_publicacion)
-        REFERENCES estado_publicacion(id_estado_publicacion)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_pagina_registra
@@ -4885,7 +4375,7 @@ CREATE TABLE pago (
         ),
 
     INDEX idx_pagina_estado (
-        id_estado_publicacion
+        id_estado
     ),
 
     INDEX idx_pagina_menu (
@@ -5408,7 +4898,7 @@ CREATE TABLE seccion (
   CREATE TABLE consulta_web (
     id_consulta BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 
-    id_estado_consulta_web SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     id_pagina BIGINT UNSIGNED,
     id_proyecto BIGINT UNSIGNED,
@@ -5452,8 +4942,8 @@ CREATE TABLE seccion (
         UNIQUE (codigo),
 
     CONSTRAINT fk_consulta_estado
-        FOREIGN KEY (id_estado_consulta_web)
-        REFERENCES estado_consulta_web(id_estado_consulta_web)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_consulta_pagina
@@ -5535,7 +5025,7 @@ CREATE TABLE seccion (
         ),
 
     INDEX idx_consulta_estado (
-        id_estado_consulta_web
+        id_estado
     ),
 
     INDEX idx_consulta_proyecto (
@@ -5551,7 +5041,7 @@ CREATE TABLE seccion (
     ),
 
     INDEX idx_consulta_estado_fec (
-        id_estado_consulta_web,
+        id_estado,
         fecha_recepcion
     ),
 
@@ -5689,7 +5179,7 @@ CREATE TABLE notificacion (
 
     id_notificacion BIGINT UNSIGNED NOT NULL,
     id_canal_notificacion SMALLINT UNSIGNED NOT NULL,
-    id_estado_envio SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     destinatario VARCHAR(255),
 
@@ -5731,8 +5221,8 @@ CREATE TABLE notificacion (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_envio_estado
-        FOREIGN KEY (id_estado_envio)
-        REFERENCES estado_envio(id_estado_envio)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT chk_envio_intentos
@@ -5785,7 +5275,7 @@ CREATE TABLE notificacion (
         ),
 
     INDEX idx_envio_estado_prog (
-        id_estado_envio,
+        id_estado,
         fecha_programada
     ),
 
@@ -6150,7 +5640,7 @@ CREATE TABLE notificacion (
 
     id_categoria BIGINT UNSIGNED NOT NULL,
     id_cuenta BIGINT UNSIGNED NOT NULL,
-    id_estado_movimiento SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     id_pago BIGINT UNSIGNED,
     id_comision BIGINT UNSIGNED,
@@ -6205,8 +5695,8 @@ CREATE TABLE notificacion (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_movimiento_estado
-        FOREIGN KEY (id_estado_movimiento)
-        REFERENCES estado_movimiento(id_estado_movimiento)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_movimiento_pago
@@ -6306,7 +5796,7 @@ CREATE TABLE notificacion (
     ),
 
     INDEX idx_movimiento_estado (
-        id_estado_movimiento
+        id_estado
     ),
 
     INDEX idx_movimiento_fecha (
@@ -6323,7 +5813,7 @@ CREATE TABLE notificacion (
 
     id_cuenta_origen BIGINT UNSIGNED NOT NULL,
     id_cuenta_destino BIGINT UNSIGNED NOT NULL,
-    id_estado_movimiento SMALLINT UNSIGNED NOT NULL,
+    id_estado SMALLINT UNSIGNED NOT NULL,
 
     id_usuario_registra BIGINT UNSIGNED,
     id_usuario_confirma BIGINT UNSIGNED,
@@ -6372,8 +5862,8 @@ CREATE TABLE notificacion (
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_transf_estado
-        FOREIGN KEY (id_estado_movimiento)
-        REFERENCES estado_movimiento(id_estado_movimiento)
+        FOREIGN KEY (id_estado)
+        REFERENCES estado(id_estado)
         ON DELETE RESTRICT,
 
     CONSTRAINT fk_transf_registra
@@ -6471,7 +5961,7 @@ CREATE TABLE notificacion (
     ),
 
     INDEX idx_transf_estado (
-        id_estado_movimiento
+        id_estado
     ),
 
     INDEX idx_transf_fecha (
