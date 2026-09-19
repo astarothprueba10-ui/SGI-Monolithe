@@ -18,8 +18,8 @@ public class PersonContactRepository {
 
         String sql = """
                 SELECT pc.valor
-                FROM core_personas_contactos pc
-                INNER JOIN cfg_tipos_contacto tc
+                FROM contacto pc
+                INNER JOIN tipo_contacto tc
                         ON tc.id_tipo_contacto = pc.id_tipo_contacto
                 WHERE pc.id_persona = :idPersona
                   AND tc.codigo = 'EMAIL'

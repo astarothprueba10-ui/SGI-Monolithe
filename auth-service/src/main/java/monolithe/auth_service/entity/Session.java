@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "seg_sesiones")
+@Table(name = "sesion")
 public class Session {
 
     @Id
@@ -24,7 +24,7 @@ public class Session {
     private User usuario;
 
     @Column(
-        name = "refresh_token_hash",
+        name = "hash_token_refresco",
         nullable = false,
         unique = true,
         length = 64
@@ -34,7 +34,7 @@ public class Session {
     @Column(name = "ip_origen", length = 45)
     private String ipOrigen;
 
-    @Column(name = "user_agent", length = 500)
+    @Column(name = "agente_usuario", length = 500)
     private String userAgent;
 
     @Column(

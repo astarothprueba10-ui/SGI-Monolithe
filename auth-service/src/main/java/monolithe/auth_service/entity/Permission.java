@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "seg_permisos")
+@Table(name = "permiso")
 public class Permission {
 
     @Id

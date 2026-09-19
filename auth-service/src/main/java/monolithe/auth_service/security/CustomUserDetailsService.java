@@ -71,6 +71,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 }
 
                 boolean enabled = usuario.getEstadoUsuario() != null
+                                && "USUARIO".equals(
+                                                usuario.getEstadoUsuario().getEntidad())
                                 && Boolean.TRUE.equals(
                                                 usuario.getEstadoUsuario().getActivo())
                                 && Boolean.TRUE.equals(
