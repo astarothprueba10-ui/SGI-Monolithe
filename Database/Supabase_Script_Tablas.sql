@@ -2015,8 +2015,8 @@ CREATE TABLE geometria_lote (
 
     CONSTRAINT chk_geo_puntos
      CHECK (
-     JSON_TYPE(puntos) = 'ARRAY'
-     AND JSON_LENGTH(puntos) >= 3
+     json_typeof(puntos) = 'array'
+     AND json_array_length(puntos) >= 3
      ),
 
     CONSTRAINT chk_geo_etiqueta
