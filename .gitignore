@@ -18,6 +18,15 @@
 
 secrets/
 secret/
+.secret/
+.mcp.json
+.secret/
+*.secret
+
+# Heavy multimedia and archives
+*.mp4
+*.zip
+*.tar.gz
 
 **/application-local.properties
 **/application-secrets.properties
@@ -110,5 +119,6 @@ Desktop.ini
 # ------------------------------
 *.tmp
 *.temp
+.temp/
 *.swp
 *.bak
