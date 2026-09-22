@@ -49,7 +49,7 @@ SELECT
     COUNT(*) = 145 AS ok
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND indexname LIKE 'idx\_%' ESCAPE '\\';
+  AND indexname ~ '^idx_';
 
 -- 5. Triggers de fecha_actualizacion
 SELECT
@@ -62,7 +62,7 @@ JOIN pg_class c ON c.oid = t.tgrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
   AND NOT t.tgisinternal
-  AND t.tgname LIKE 'trg\_%\_fecha\_actualizacion' ESCAPE '\\';
+  AND t.tgname ~ '^trg_.*_fecha_actualizacion$';
 
 -- 6. Columnas generadas
 SELECT
