@@ -4334,12 +4334,10 @@ CREATE TABLE vinculo_multimedia (
 
     CONSTRAINT chk_vinculo_destino
      CHECK (
-     (
-     (id_pagina IS NOT NULL)
-     +
-     (id_seccion IS NOT NULL)
-     +
-     (id_elemento IS NOT NULL)
+     num_nonnulls(
+     id_pagina,
+     id_seccion,
+     id_elemento
      ) = 1
      ),
 
