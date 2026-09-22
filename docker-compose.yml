@@ -8,9 +8,9 @@ services:
       - "${AUTH_SERVICE_PORT:-8081}:8081"
     environment:
       SERVER_PORT: 8081
-      DB_URL: ${SUPABASE_DB_URL:-jdbc:postgresql://REDACTED_POOLER_HOST:5432/postgres?sslmode=require}
-      DB_USERNAME: ${SUPABASE_DB_USERNAME:-postgres.REDACTED_PROJECT_REF}
-      DB_PASSWORD: ${SUPABASE_DB_PASSWORD:-""}
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
       JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt-private.pem}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt-public.pem}
       MAIL_FROM: ${MAIL_FROM:-no-reply@monolithe.local}
@@ -39,8 +39,8 @@ services:
       - "5173:5173"
     environment:
       VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://REDACTED_PROJECT_REF.supabase.co}
-      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-REDACTED_ANON_KEY}
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
       - ./apps/portal-cliente/src:/app/src
     depends_on:
@@ -56,8 +56,8 @@ services:
       - "5174:5174"
     environment:
       VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://REDACTED_PROJECT_REF.supabase.co}
-      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-REDACTED_ANON_KEY}
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
       - ./apps/admin-dashboard/src:/app/src
     depends_on:

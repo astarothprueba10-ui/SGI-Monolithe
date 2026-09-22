@@ -20,7 +20,6 @@ secrets/
 secret/
 .secret/
 .mcp.json
-.secret/
 *.secret
 
 # Heavy multimedia and archives
