@@ -19,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -52,7 +53,7 @@ public class PasswordResetService {
                                 .orElseThrow(() -> new IllegalStateException(
                                                 "Usuario no encontrado"));
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 /*
                  * Invalidamos tokens anteriores que todavía
@@ -157,7 +158,7 @@ public class PasswordResetService {
                                 .orElseThrow(() -> new InvalidTokenException(
                                                 "Token de recuperación inválido o ya utilizado"));
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 if (!token.getFechaExpiracion().isAfter(ahora)) {
                         throw new InvalidTokenException(

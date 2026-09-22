@@ -2,7 +2,7 @@ package monolithe.auth_service.service;
 
 import monolithe.auth_service.entity.Session;
 import monolithe.auth_service.entity.User;
-import monolithe.auth_service.entity.UserStatus;
+import monolithe.auth_service.entity.Estado;
 import monolithe.auth_service.exception.InvalidTokenException;
 import monolithe.auth_service.repository.SessionRepository;
 import monolithe.auth_service.repository.UserRepository;
@@ -204,9 +204,45 @@ class RefreshTokenServiceTest {
                 .save(any(Session.class));
     }
 
+    @Test
+    void debeRechazarRefreshTokenSiEstadoEsDeOtraEntidad() {
+
+        User usuario = crearUsuarioActivo();
+        usuario.getEstadoUsuario().setEntidad("VENTA");
+
+        String refreshTokenActual = "refresh-token-valido";
+
+        Session sesionActual = new Session();
+        sesionActual.setUsuario(usuario);
+        sesionActual.setFechaExpiracion(
+                LocalDateTime.now().plusDays(1)
+        );
+
+        when(sessionRepository
+                .findByRefreshTokenHashAndFechaRevocacionIsNull(
+                        refreshTokenService.calcularSha256(
+                                refreshTokenActual
+                        )
+                ))
+                .thenReturn(Optional.of(sesionActual));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> refreshTokenService.rotarRefreshToken(
+                        refreshTokenActual,
+                        "127.0.0.1",
+                        "JUnit"
+                )
+        );
+
+        verify(sessionRepository, never())
+                .save(any(Session.class));
+    }
+
     private User crearUsuarioActivo() {
 
-        UserStatus estado = new UserStatus();
+        Estado estado = new Estado();
+        estado.setEntidad("USUARIO");
         estado.setActivo(true);
         estado.setPermiteAcceso(true);
 

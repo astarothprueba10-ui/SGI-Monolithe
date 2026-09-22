@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,6 +72,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 }
 
                 boolean enabled = usuario.getEstadoUsuario() != null
+                                && "USUARIO".equals(
+                                                usuario.getEstadoUsuario().getEntidad())
                                 && Boolean.TRUE.equals(
                                                 usuario.getEstadoUsuario().getActivo())
                                 && Boolean.TRUE.equals(
@@ -78,9 +81,9 @@ public class CustomUserDetailsService implements UserDetailsService {
 
                 boolean accountNonLocked = usuario.getBloqueadoHasta() == null
                                 || usuario.getBloqueadoHasta()
-                                                .isBefore(LocalDateTime.now())
+                                                .isBefore(LocalDateTime.now(ZoneOffset.UTC))
                                 || usuario.getBloqueadoHasta()
-                                                .isEqual(LocalDateTime.now());
+                                                .isEqual(LocalDateTime.now(ZoneOffset.UTC));
 
                 return new UserPrincipal(
                                 usuario.getIdUsuario(),

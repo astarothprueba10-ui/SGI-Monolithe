@@ -67,7 +67,9 @@ public class SecurityConfig {
                                                                 "/api/auth/forgot-password",
                                                                 "/api/auth/reset-password",
                                                                 "/actuator/health",
-                                                                "/actuator/info")
+                                                                "/actuator/health/**",
+                                                                "/actuator/info",
+                                                                "/error")
                                                 .permitAll()
 
                                                 .requestMatchers("/api/auth/change-password")

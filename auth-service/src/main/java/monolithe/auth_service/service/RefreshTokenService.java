@@ -18,6 +18,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -64,7 +65,7 @@ public class RefreshTokenService {
                                 .orElseThrow(() -> new InvalidTokenException(
                                                 "Refresh token inválido"));
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 if (!sesionActual.getFechaExpiracion().isAfter(ahora)) {
                         throw new InvalidTokenException(
@@ -128,7 +129,7 @@ public class RefreshTokenService {
 
                 String refreshTokenHash = calcularSha256(refreshToken);
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 Session sesion = new Session();
 
@@ -136,6 +137,7 @@ public class RefreshTokenService {
                 sesion.setRefreshTokenHash(refreshTokenHash);
                 sesion.setIpOrigen(limitarTexto(ipOrigen, 45));
                 sesion.setUserAgent(limitarTexto(userAgent, 500));
+                sesion.setFechaInicio(ahora);
                 sesion.setUltimaActividad(ahora);
                 sesion.setFechaExpiracion(
                                 ahora.plusSeconds(refreshTokenExpiration));
@@ -149,7 +151,9 @@ public class RefreshTokenService {
                         User usuario,
                         LocalDateTime ahora) {
 
-                if (usuario.getEstadoUsuario() == null) {
+                if (usuario.getEstadoUsuario() == null
+                                || !"USUARIO".equals(
+                                                usuario.getEstadoUsuario().getEntidad())) {
                         throw new IllegalArgumentException(
                                         "El usuario no tiene un estado válido");
                 }
@@ -212,7 +216,7 @@ public class RefreshTokenService {
                         return null;
                 }
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 sesion.setUltimaActividad(ahora);
                 sesion.setFechaRevocacion(ahora);
@@ -228,7 +232,7 @@ public class RefreshTokenService {
                         Long idUsuario,
                         String motivo) {
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 var sesionesActivas = sessionRepository
                                 .findByUsuarioIdUsuarioAndFechaRevocacionIsNull(

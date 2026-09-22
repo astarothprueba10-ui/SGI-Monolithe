@@ -25,8 +25,8 @@ public class User {
     private Long idPersona;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_estado_usuario", nullable = false)
-    private UserStatus estadoUsuario;
+    @JoinColumn(name = "id_estado", nullable = false)
+    private Estado estadoUsuario;
 
     @Column(name = "login", nullable = false, unique = true, length = 120)
     private String usuarioLogin;

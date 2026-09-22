@@ -11,13 +11,31 @@ import { Pagos } from './pages/portal/Pagos';
 import { Perfil } from './pages/portal/Perfil';
 import { Soporte } from './pages/portal/Soporte';
 
+function tieneSesion() {
+  return Boolean(
+    localStorage.getItem('monolithe_access_token') ||
+      sessionStorage.getItem('monolithe_access_token')
+  );
+}
+
+function RequireAuth({ children }: { children: React.ReactElement }) {
+  return tieneSesion() ? children : <Navigate to="/login" replace />;
+}
+
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/portal" replace />} />
+        <Route path="/" element={<Navigate to={tieneSesion() ? '/portal' : '/login'} replace />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/portal" element={<PortalLayout />}>
+        <Route
+          path="/portal"
+          element={
+            <RequireAuth>
+              <PortalLayout />
+            </RequireAuth>
+          }
+        >
           <Route index element={<Inicio />} />
           <Route path="lote" element={<MiLote />} />
           <Route path="cronograma" element={<Cronograma />} />
@@ -27,8 +45,8 @@ export function App() {
           <Route path="soporte" element={<Soporte />} />
           <Route path="perfil" element={<Perfil />} />
         </Route>
-        <Route path="*" element={<Navigate to="/portal" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>);
-
+    </BrowserRouter>
+  );
 }

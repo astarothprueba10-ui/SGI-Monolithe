@@ -23,6 +23,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Service
@@ -249,7 +250,7 @@ public class AuthenticationService {
 
                 usuario.setRequiereCambioPassword(false);
                 usuario.setPasswordActualizadoEn(
-                                LocalDateTime.now());
+                                LocalDateTime.now(ZoneOffset.UTC));
 
                 userRepository.save(usuario);
 
