@@ -43,7 +43,6 @@ public class Session {
     @Column(
         name = "fecha_inicio",
         nullable = false,
-        insertable = false,
         updatable = false
     )
     private LocalDateTime fechaInicio;
