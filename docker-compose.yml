@@ -1,0 +1,61 @@
+services:
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: sgi-auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT:-8081}:8081"
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      MAIL_FROM: ${MAIL_FROM:-no-reply@monolithe.local}
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-dummy}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-dummy}
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174
+    volumes:
+      - type: bind
+        source: ${JWT_PRIVATE_KEY_PATH_HOST}
+        target: /run/secrets/jwt-private.pem
+        read_only: true
+      - type: bind
+        source: ${JWT_PUBLIC_KEY_PATH_HOST}
+        target: /run/secrets/jwt-public.pem
+        read_only: true
+    restart: unless-stopped
+
+  portal-cliente:
+    build:
+      context: ./apps/portal-cliente
+      dockerfile: Dockerfile
+    container_name: sgi-portal-cliente
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+    volumes:
+      - ./apps/portal-cliente/src:/app/src
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      dockerfile: Dockerfile
+    container_name: sgi-admin-dashboard
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+    volumes:
+      - ./apps/admin-dashboard/src:/app/src
+    depends_on:
+      - auth-service
+    restart: unless-stopped

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +32,7 @@ public class LoginSecurityService {
                         return null;
                 }
 
-                LocalDateTime ahora = LocalDateTime.now();
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 int intentosActuales = usuario.getIntentosFallidos() != null
                                 ? usuario.getIntentosFallidos()
@@ -79,7 +80,7 @@ public class LoginSecurityService {
                 usuario.setIntentosFallidos(0);
                 usuario.setBloqueadoHasta(null);
                 usuario.setUltimoAcceso(
-                                LocalDateTime.now());
+                                LocalDateTime.now(ZoneOffset.UTC));
 
                 userRepository.save(usuario);
         }
