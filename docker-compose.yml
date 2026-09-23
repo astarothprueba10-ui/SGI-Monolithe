@@ -21,11 +21,11 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
     volumes:
       - type: bind
-        source: ${JWT_PRIVATE_KEY_PATH_HOST:-./secrets/jwt-private.pem}
+        source: ${JWT_PRIVATE_KEY_PATH_HOST:-./.secret/keys/jwt-private.pem}
         target: /run/secrets/jwt-private.pem
         read_only: true
       - type: bind
-        source: ${JWT_PUBLIC_KEY_PATH_HOST:-./secrets/jwt-public.pem}
+        source: ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}
         target: /run/secrets/jwt-public.pem
         read_only: true
     restart: unless-stopped
@@ -82,7 +82,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
     volumes:
       - type: bind
-        source: ${JWT_PUBLIC_KEY_PATH_HOST:-./secrets/jwt-public.pem}
+        source: ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}
         target: /run/secrets/jwt-public.pem
         read_only: true
     restart: unless-stopped

@@ -16,12 +16,21 @@ echo -e "${CYAN}================================================================
 echo -e "${CYAN}🏡 SGI Monolithe - Entorno de Desarrollo Local${RESET}"
 echo -e "${CYAN}==============================================================================${RESET}"
 
-# 1. Validar .secret/
+# 1. Validar .secret/ y subcarpeta keys/
+mkdir -p "$ROOT_DIR/.secret/keys"
+chmod 700 "$ROOT_DIR/.secret" "$ROOT_DIR/.secret/keys"
+
 if [ ! -f "$ROOT_DIR/.secret/supabase.env" ]; then
     echo -e "${AMARILLO}⚠️ No se encontró .secret/supabase.env. Copiando desde plantilla...${RESET}"
-    mkdir -p "$ROOT_DIR/.secret"
     cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.secret/supabase.env"
     chmod 600 "$ROOT_DIR/.secret/supabase.env"
+fi
+
+if [ ! -f "$ROOT_DIR/.secret/keys/jwt-private.pem" ]; then
+    echo -e "${AMARILLO}🔑 Generando par de llaves RSA en .secret/keys/...${RESET}"
+    openssl genrsa -out "$ROOT_DIR/.secret/keys/jwt-private.pem" 2048 2>/dev/null
+    openssl rsa -in "$ROOT_DIR/.secret/keys/jwt-private.pem" -pubout -out "$ROOT_DIR/.secret/keys/jwt-public.pem" 2>/dev/null
+    chmod 600 "$ROOT_DIR/.secret/keys/"*.pem
 fi
 
 # 2. Levantar Backend en contenedor si no está activo
