@@ -1,10 +1,8 @@
-FROM node:20-alpine
+FROM node:22-slim
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
-
 COPY . .
+RUN if [ ! -d "node_modules" ]; then npm install --no-audit --no-fund; fi
 
 EXPOSE 5174
 

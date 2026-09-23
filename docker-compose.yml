@@ -63,3 +63,40 @@ services:
     depends_on:
       - auth-service
     restart: unless-stopped
+
+  pagina-web-backend:
+    build:
+      context: ./PaginaWeb/backend
+      dockerfile: Dockerfile
+    container_name: sgi-pagina-web-backend
+    ports:
+      - "${WEB_BACKEND_PORT:-8082}:8082"
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt-public.pem}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
+    volumes:
+      - type: bind
+        source: ${JWT_PUBLIC_KEY_PATH_HOST:-./secrets/jwt-public.pem}
+        target: /run/secrets/jwt-public.pem
+        read_only: true
+    restart: unless-stopped
+
+  pagina-web-frontend:
+    build:
+      context: ./PaginaWeb/frontend
+      dockerfile: Dockerfile
+    container_name: sgi-pagina-web-frontend
+    ports:
+      - "5175:5175"
+    environment:
+      VITE_API_URL: ${VITE_WEB_API_URL:-http://localhost:8082}
+      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+    volumes:
+      - ./PaginaWeb/frontend/src:/app/src
+    depends_on:
+      - pagina-web-backend
+    restart: unless-stopped
