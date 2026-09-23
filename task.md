@@ -23,3 +23,7 @@
 - [x] 6. Suite de verificación automatizada:
   - Creado script ejecutable `scripts/probar_pagina_web.sh`
   - Ejecución integral y prueba de persistencia en vivo con resultado 100% exitoso
+- [x] 7. Ejecución local activa y scripts de arranque para el equipo:
+  - Eliminados todos los `.env` sueltos en texto plano (solo plantillas `.env.example`)
+  - Creado script de un solo clic `scripts/iniciar_local.sh`
+  - Servidores activos: Backend en `http://localhost:8082` (UP) y Frontend Vite en `http://localhost:5175` (200 OK)
