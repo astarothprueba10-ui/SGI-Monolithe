@@ -6,19 +6,20 @@
   - Mover `cms-service/` a `PaginaWeb/backend/`
   - Crear `PaginaWeb/README.md` con arquitectura y guía de uso
 - [x] 2. Configurar y validar scripts, Docker y variables de entorno:
-  - Actualizar `.gitignore`, `docker-compose.yml` y variables `.env`
-  - Crear Dockerfile para `PaginaWeb/backend` y `PaginaWeb/frontend`
+  - Centralizar y proteger credenciales en `.secret/supabase.env` con permisos 600
+  - Actualizar `docker-compose.yml` con `env_file: .secret/supabase.env`
+  - Crear Dockerfiles para `PaginaWeb/backend` y `PaginaWeb/frontend`
 - [x] 3. Validar y alinear esquema Supabase para la Web Pública y CMS:
-  - Verificar tablas `pagina`, `seccion`, `consulta_web`, `proyecto` y `estado`
-  - Asegurar coherencia entre entidades JPA y PostgreSQL
+  - Validar tablas `cms_consultas_web`, `inm_proyectos`, `cms_paginas`, `cms_secciones` y `cfg_estados_*`
+  - Integrar soporte dual de backend: Supabase BaaS directo (@supabase/supabase-js) + Spring Boot API
 - [x] 4. Desarrollar y robustecer endpoints en `PaginaWeb/backend`:
   - Recepción de consultas web/leads (`POST /api/public/consultas`)
   - Listado público de proyectos para la web (`GET /api/public/proyectos`)
-  - Validaciones y manejo de excepciones
-- [x] 5. Conectar `PaginaWeb/frontend` con el backend:
-  - Capa de servicios API HTTP conectada a `PaginaWeb/backend`
-  - Enlazar formulario de contacto (`LeadForm.tsx` y `Contact.tsx`) para registrar consultas reales
-  - Enlazar páginas dinámicas y catálogo
-- [x] 6. Validación integral de compilación y pruebas:
-  - Compilación TypeScript de `PaginaWeb/frontend`
-  - Build y tests Maven de `PaginaWeb/backend` en contenedor Docker oficial
+  - Validación Hibernate `ddl-auto=validate` contra Supabase PostgreSQL 17 exitosa
+- [x] 5. Conectar `PaginaWeb/frontend` (Vite + React 18 + TS):
+  - Configurar `vite.config.ts` para carga segura desde `.secret/`
+  - Implementar cliente oficial Supabase en `PaginaWeb/frontend/src/lib/supabase.ts`
+  - Conectar formularios y catálogo en `Projects.tsx` con fallback inteligente
+- [x] 6. Suite de verificación automatizada:
+  - Creado script ejecutable `scripts/probar_pagina_web.sh`
+  - Ejecución integral y prueba de persistencia en vivo con resultado 100% exitoso

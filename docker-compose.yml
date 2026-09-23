@@ -69,6 +69,8 @@ services:
       context: ./PaginaWeb/backend
       dockerfile: Dockerfile
     container_name: sgi-pagina-web-backend
+    env_file:
+      - .secret/supabase.env
     ports:
       - "${WEB_BACKEND_PORT:-8082}:8082"
     environment:
@@ -90,11 +92,14 @@ services:
       context: ./PaginaWeb/frontend
       dockerfile: Dockerfile
     container_name: sgi-pagina-web-frontend
+    env_file:
+      - .secret/supabase.env
     ports:
       - "5175:5175"
     environment:
-      VITE_API_URL: ${VITE_WEB_API_URL:-http://localhost:8082}
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8082}
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
       - ./PaginaWeb/frontend/src:/app/src
     depends_on:
