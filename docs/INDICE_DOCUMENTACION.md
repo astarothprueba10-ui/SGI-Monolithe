@@ -1,4 +1,4 @@
-# 📁 Índice de Documentación — SIGI MONOLITHE
+# Índice de Documentación — SIGI MONOLITHE
 
 > Última actualización: 23/09/2026
 
@@ -14,13 +14,13 @@ docs/
 │   └── documentos_obsoletos_historicos/
 │
 ├── 01_gestion_proyecto/             # Planificación y Gantt
-│   ├── GANTT_SIGI_MONOLITHE.md      # ⭐ Gantt en Markdown (referencia rápida)
+│   ├── GANTT_SIGI_MONOLITHE.md      # Gantt en Markdown (referencia rápida)
 │   ├── diagrama_gantt_sigi_monolithe.xml  # Fuente XML (importable en GanttPRO)
 │   ├── cronograma_sprints.xlsx      # Vista Excel del cronograma
 │   └── acta_constitucion_sigi_monolithe.docx
 │
 ├── 02_requerimientos_especificaciones/
-│   └── DOCUMENTO_MAESTRO_REQUERIMIENTOS_Y_SPRINTS_ALINEADO.md  # ⭐ SSOT
+│   └── DOCUMENTO_MAESTRO_REQUERIMIENTOS_Y_SPRINTS_ALINEADO.md  # SSOT
 │
 ├── 04_transcripciones_analisis/
 │   ├── analisis_consolidado_reglas_negocio.md
@@ -30,7 +30,7 @@ docs/
 │   └── transcripcion_reunion_coordinacion_equipo.txt
 │
 └── 05_base_de_datos/
-    ├── 01_supabase_schema.sql       # ⭐ Schema principal (102 tablas)
+    ├── 01_supabase_schema.sql       # Schema principal (102 tablas)
     ├── 02_supabase_seed.sql         # Datos iniciales / catálogos
     ├── 03_supabase_rls_y_auth.sql   # Políticas RLS y autenticación
     ├── 04_funciones_rpc_core.sql    # Funciones y RPCs Supabase
@@ -40,7 +40,7 @@ docs/
 
 ---
 
-## 📌 Documentos Clave
+## Documentos Clave
 
 | Documento | Descripción | Ubicación |
 |---|---|---|
@@ -51,7 +51,7 @@ docs/
 
 ---
 
-## 🔗 GitHub Projects (Tableros)
+## GitHub Projects (Tableros)
 
 | Proyecto | URL | Propósito |
 |---|---|---|
@@ -60,7 +60,7 @@ docs/
 
 ---
 
-## 📦 Respaldo del Contexto Base
+## Respaldo del Contexto Base
 
 El archivo `Contexto base.zip` se conserva en `docs/` como respaldo del entregable académico original.
 El contenido está descomprimido y organizado en `docs/00_archivos_fuente/contexto_base_original/`.

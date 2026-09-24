@@ -1,258 +1,170 @@
-# 🏢 SGI-Monolithe — Sistema Integral de Gestión Inmobiliaria
+# SGI-Monolithe — Sistema Integral de Gestión Inmobiliaria
 
-> **Presentación Oficial del Proyecto:** He diseñado y estructurado **SGI-Monolithe** como la plataforma tecnológica centralizada de grado empresarial para la habilitación urbana y comercialización inmobiliaria. Este ecosistema cubre el ciclo de vida completo del negocio: desde la captación digital de prospectos y visualización interactiva de planos en tiempo real, hasta la formalización de contratos de compraventa, financiamiento directo en cuotas y liquidación automatizada de comisiones.
-
----
-
-## 📌 Badges del Ecosistema Tecnológico
-
-[![Java](https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_17.6-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Docker](https://img.shields.io/badge/Docker-Compose_v2-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+**Arquitectura Monorepo Híbrida Desacoplada**  
+*Backoffice ERP/CRM (React 18) | Portal de Clientes (React 18) | Web Pública (React 18) | Microservicios Java 21 & Spring Boot 4 | Base de Datos Supabase (PostgreSQL 17.6)*
 
 ---
 
-## 📑 Tabla de Contenidos
-1. [Visión General, Alcance y Objetivos](#-1-visión-general-alcance-y-objetivos)
-2. [Reglas de Negocio Oficiales e Inmutables](#-2-reglas-de-negocio-oficiales-e-inmutables)
-3. [Arquitectura General del Sistema (Monorepo Híbrido)](#-3-arquitectura-general-del-sistema-monorepo-híbrido)
-4. [¿Por qué esta Arquitectura? Decisiones de Ingeniería](#-4-por-qué-esta-arquitectura-decisiones-de-ingeniería)
-5. [Catálogo de Aplicaciones Frontend (`apps/`)](#-5-catálogo-de-aplicaciones-frontend-apps)
-6. [Catálogo de Servicios Backend (`services/`)](#-6-catálogo-de-servicios-backend-services)
-7. [Base de Datos y Almacenamiento (`database/`)](#-7-base-de-datos-y-almacenamiento-database)
-8. [Estructura Detallada del Repositorio](#-8-estructura-detallada-del-repositorio)
-9. [Cronograma Gantt Maestro y Estado de Sprints](#-9-cronograma-gantt-maestro-y-estado-de-sprints)
-10. [Políticas Estrictas de Seguridad y Manejo de Secretos](#-10-políticas-estrictas-de-seguridad-y-manejo-de-secretos)
-11. [Flujo de Trabajo en GitHub y Estándares de Código](#-11-flujo-de-trabajo-en-github-y-estándares-de-código)
-12. [Guía de Arranque Rápido (Local y Docker)](#-12-guía-de-arranque-rápido-local-y-docker)
-13. [Prompt de Asistencia de IA para el Equipo](#-13-prompt-de-asistencia-de-ia-para-el-equipo)
+## Badges del Ecosistema Tecnológico
+
+![Java](https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.4.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.6.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5.4.10-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_17.6-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.14-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ---
 
-## 🎯 1. Visión General, Alcance y Objetivos
+## Tabla de Contenidos
 
-He concebido este proyecto para digitalizar y automatizar integralmente las operaciones comerciales y financieras de una empresa inmobiliaria. El sistema resuelve tres necesidades críticas:
-
-1. **Presencia Pública y Captación:** Una vitrina web ágil donde los interesados exploran el catálogo de proyectos y solicitan asesoría comercial.
-2. **Autoservicio y Transparencia para el Comprador:** Un portal privado para que los clientes consulten el estado de sus lotes, cronogramas de pago y carguen sus comprobantes de depósito sin depender de llamadas telefónicas.
-3. **Control Operativo Integral (ERP/CRM):** Un centro de operaciones unificado para que la gerencia, asesores y tesorería administren el inventario físico, gestionen prospectos, emitan contratos y liquiden comisiones.
-
-```mermaid
-mindmap
-  root((SGI-Monolithe))
-    Comercialización
-      Página Web Pública
-      Captación de Leads
-      Catálogo de Proyectos
-    Experiencia del Cliente
-      Portal con acceso DNI
-      Ficha técnica de lote adjudicado
-      Cronograma de pagos y estados de cuenta
-      Carga directa de vouchers
-    Operaciones y Finanzas
-      Backoffice ERP / CRM
-      Plano vectorial interactivo de 70 lotes
-      Simulador de financiamiento hasta 36 cuotas
-      Validación de pagos y control de morosidad
-      Motor de comisiones de 2% y 3%
-```
+1. [Visión General, Alcance y Objetivos](#1-visión-general-alcance-y-objetivos)
+2. [Reglas de Negocio Oficiales e Inmutables](#2-reglas-de-negocio-oficiales-e-inmutables)
+3. [Arquitectura General del Sistema (Monorepo Híbrido)](#3-arquitectura-general-del-sistema-monorepo-híbrido)
+4. [¿Por qué esta Arquitectura? Decisiones de Ingeniería](#4-por-qué-esta-arquitectura-decisiones-de-ingeniería)
+5. [Catálogo de Aplicaciones Frontend (`apps/`)](#5-catálogo-de-aplicaciones-frontend-apps)
+6. [Catálogo de Servicios Backend (`services/`)](#6-catálogo-de-servicios-backend-services)
+7. [Base de Datos y Almacenamiento (`database/`)](#7-base-de-datos-y-almacenamiento-database)
+8. [Estructura Detallada del Repositorio](#8-estructura-detallada-del-repositorio)
+9. [Cronograma Gantt Maestro y Estado de Sprints](#9-cronograma-gantt-maestro-y-estado-de-sprints)
+10. [Políticas Estrictas de Seguridad y Manejo de Secretos](#10-políticas-estrictas-de-seguridad-y-manejo-de-secretos)
+11. [Flujo de Trabajo en GitHub y Estándares de Código](#11-flujo-de-trabajo-en-github-y-estándares-de-código)
+12. [Guía de Arranque Rápido (Local y Docker)](#12-guía-de-arranque-rápido-local-y-docker)
+13. [Prompt de Asistencia de IA para el Equipo](#13-prompt-de-asistencia-de-ia-para-el-equipo)
 
 ---
 
-## ⚖️ 2. Reglas de Negocio Oficiales e Inmutables
+## 1. Visión General, Alcance y Objetivos
 
-He codificado las reglas del dominio inmobiliario como restricciones inviolables en la arquitectura:
+**SGI-Monolithe** es la plataforma tecnológica central diseñada para automatizar y escalar integralmente las operaciones comerciales, administrativas, financieras y legales de desarrollos inmobiliarios y proyectos de habilitación urbana.
 
-### A. Inventario y Lotes
-* **Universo Fijo:** El proyecto inicial comprende exactamente **70 lotes**.
-* **Precios Dinámicos:** El precio base por $m^2$ y precio final se calculan por ubicación estratégica (esquinas, frente a parque, accesos principales y área total).
-* **Ciclo de Estados del Lote:**
-  $$\text{Disponible} \longrightarrow \text{Separado} \longrightarrow \text{Vendido}$$
-  *(El estado `Bloqueado` se reserva para contingencias administrativas, legales o de mantenimiento).*
-
-### B. Separaciones y Reservas
-* **Monto de Separación Preventiva:** **S/ 500.00** exactos.
-* **Plazo de Vigencia:** **7 días calendario** a partir del abono para cancelar la cuota inicial pactada.
-* **Cláusula de No Reembolso:** Si transcurren los 7 días sin completar la cuota inicial, la separación caduca automáticamente, el lote revierte a estado `Disponible` y el importe de S/ 500.00 **no es reembolsable**.
-
-### C. Modalidades de Pago y Financiamiento
-* **Venta al Contado:** Pago total del lote. Faculta la entrega de Contrato de Bien Futuro, memoria descriptiva y minuta para Escritura Pública con posesión inmediata.
-* **Venta Financiada:** Pago de cuota inicial pactada + saldo financiado directamente en hasta **36 cuotas mensuales (3 años)**.
-* **Causal Resolutoria por Morosidad:** El impago acumulado de **3 cuotas mensuales consecutivas** otorga a la inmobiliaria la potestad legal de resolver el contrato de pleno derecho, con reversión del lote.
-
-### D. Esquema de Liquidación de Comisiones
-* **Asesores Comisionistas (Externos):**
-  * Venta al Contado: **3%** sobre el precio total de venta.
-  * Venta Financiada: **2%** sobre el precio total de venta.
-  * **Regla de Oro:** La comisión se devenga y liquida **únicamente cuando se formaliza la firma del contrato formal con la cuota inicial cancelada**, nunca con la simple separación preventiva.
-* **Asesores en Planilla (Fijos):** Sueldo base mensual con incentivos comerciales por volumen.
-
-### E. Protocolo de Visitas Guiadas
-* **Días Habilitados:** Exclusivamente Lunes, Miércoles, Viernes y Sábados.
-* **Franjas Horarias:** 11:00 AM y 03:00 PM (restricción por logística y traslado seguro al terreno).
+### Alcance del Proyecto
+El sistema gestiona de forma centralizada todo el ciclo de vida inmobiliario:
+* **Captación y Lead Management:** Formulario web de prospectos, integración con WhatsApp Business API e historial de seguimiento comercial en CRM.
+* **Control Físico y Plano SVG Interactivo:** Gestión dinámica de disponibilidad de lotes (70 lotes del Proyecto Habilitación Urbana), filtrado visual por manzanas, rangos de área ($m^2$) y precio en dólares/soles.
+* **Proceso de Separación y Venta:** Registro de separaciones con monto oficial ($S/\ 500.00$), bloqueo temporal por 7 días calendario, generación automática de contratos de compraventa y formalización de clientes.
+* **Motor Financiero y Extranet del Cliente:** Control de financiamiento directo de 1 a 36 cuotas, cálculo automatizado de mora, panel de Tesorería para validación de vouchers de pago y Portal de Autoservicio para clientes con autenticación por DNI.
+* **Cálculo Automatizado de Comisiones:** Liquidación de comisiones para asesores (3% en ventas al contado, 2% en ventas financiadas) y métricas en tiempo real.
 
 ---
 
-## 🏗️ 3. Arquitectura General del Sistema (Monorepo Híbrido)
+## 2. Reglas de Negocio Oficiales e Inmutables
 
-He implementado un modelo de **Monorepo Modular Desacoplado** que divide claramente las responsabilidades en capas especializadas:
+El desarrollo del software responde estrictamente a las reglas del **Documento Maestro de Especificaciones Técnicas**:
+
+| Dominio | Regla de Negocio | Impacto en Arquitectura / Base de Datos |
+|---|---|---|
+| **Separación** | Monto fijo de $S/\ 500.00$ con un plazo máximo de **7 días calendario** de reserva. | El backend ejecuta una tarea programada para liberar lotes expirados a `Disponible`. |
+| **Moneda Base** | Los precios principales se cotizan en **Dólares ($)**, pero se admite pago equivalente en **Soles (S/)** según tipo de cambio oficial. | Tablas `lotes` y `transacciones` almacenan `precio_usd`, `precio_pen` y `tipo_cambio_aplicado`. |
+| **Financiamiento** | De 1 a **36 cuotas mensuales**. Interés aplicable según plazo. | Generación de tabla `cronograma_pagos` en BD con estados `POR_VENCER`, `PAGADO`, `VENCIDO`. |
+| **Resolución** | La acumulación de **3 cuotas impagas consecutivas** es causal de resolución de contrato y reversión del lote a `Disponible`. | Alerta automática en Dashboard y marcado de contrato como `EN_RESOLUCION`. |
+| **Comisiones** | **3%** para ventas al contado / **2%** para ventas financiadas. Pagadero tras validación de la cuota inicial / separación confirmada. | Motor de liquidación en `services/auth-service` y reportes en Backoffice. |
+| **Clientes DNI** | Clientes acceden a su portal privado utilizando su **DNI** como usuario y contraseña inicial temporal. | Servicio de autenticación autogenera hash BCrypt con expiración en el primer login. |
+
+---
+
+## 3. Arquitectura General del Sistema (Monorepo Híbrido)
+
+He implementado una **Arquitectura Híbrida Modular** que combina la simplicidad de despliegue de un monorepo con el desacoplamiento de servicios REST independientes y la persistencia administrada en la nube mediante Supabase Cloud:
 
 ```mermaid
 graph TD
-    subgraph PRESENTATION ["🖥️ Capa de Presentación (React 18 + Vite + TypeScript + Tailwind)"]
-        WEB["🌐 apps/pagina-web (:5175)<br/>Web Pública, Catálogo & Leads"]
-        CLIENT["👤 apps/portal-cliente (:5173)<br/>Extranet Compradores & Cuotas"]
-        ADMIN["🏢 apps/backoffice (:5174)<br/>ERP / CRM / Plano SVG / Finanzas"]
+    subgraph PRESENTATION ["Capa de Presentación (React 18 + Vite + TypeScript + Tailwind)"]
+        WEB["apps/pagina-web (:5175)<br/>Web Pública, Catálogo & Leads"]
+        CLIENT["apps/portal-cliente (:5173)<br/>Extranet Compradores & Cuotas"]
+        ADMIN["apps/backoffice (:5174)<br/>ERP / CRM / Plano SVG / Finanzas"]
     end
 
-    subgraph SERVICES ["⚙️ Capa de Servicios Backend (Spring Boot 4 + Java 21)"]
-        AUTH_SRV["🔐 services/auth-service (:8081)<br/>JWT RSA-2048, RBAC, Rate Limiting"]
-        CMS_SRV["📝 services/cms-service (:8082)<br/>Consultas Web, Catálogo & Contenidos"]
+    subgraph SERVICES ["Capa de Servicios Backend (Spring Boot 4 + Java 21)"]
+        AUTH_SRV["services/auth-service (:8081)<br/>JWT RSA-2048, RBAC, Rate Limiting"]
+        CMS_SRV["services/cms-service (:8082)<br/>Consultas Web, Catálogo & Contenidos"]
     end
 
-    subgraph DATABASE ["🗄️ Base de Datos y Almacenamiento (Supabase Cloud)"]
-        POSTGRES[("🐘 Supabase PostgreSQL 17.6<br/>102 Tablas | 181 Índices | RLS")]
-        STORAGE_BUCKET["📦 Supabase Storage<br/>Vouchers, Contratos & Planos PDF"]
+    subgraph DATABASE ["Base de Datos y Almacenamiento (Supabase Cloud)"]
+        POSTGRES[("Supabase PostgreSQL 17.6<br/>102 Tablas | 181 Índices | RLS")]
+        STORAGE_BUCKET["Supabase Storage<br/>Vouchers, Contratos & Planos PDF"]
     end
 
     WEB -->|"HTTP REST"| CMS_SRV
     WEB -.->|"@supabase/supabase-js (Lectura Pública)"| POSTGRES
     CLIENT -->|"JWT Asimétrico"| AUTH_SRV
-    CLIENT -->|"RLS (DNI Cliente)"| POSTGRES
-    CLIENT -->|"Carga de Comprobantes"| STORAGE_BUCKET
-    ADMIN -->|"JWT RBAC (ADMIN, ASESOR, TESORERIA)"| AUTH_SRV
-    ADMIN -->|"Operaciones Transaccionales"| POSTGRES
+    CLIENT -.->|"@supabase/supabase-js"| POSTGRES
+    ADMIN -->|"JWT Asimétrico"| AUTH_SRV
+    ADMIN -->|"HTTP REST"| CMS_SRV
+    ADMIN -.->|"@supabase/supabase-js (Full Access RLS)"| POSTGRES
 
-    CMS_SRV -->|"Spring Data JPA / JDBC"| POSTGRES
-    AUTH_SRV -->|"Spring Data JPA / JDBC"| POSTGRES
-```
-
-### Flujo Transaccional de Venta y Financiación
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Cliente as Comprador
-    actor Asesor as Asesor Inmobiliario
-    participant Backoffice as apps/backoffice
-    participant Auth as services/auth-service
-    participant Supabase as Supabase (PostgreSQL 17)
-    actor Tesorero as Tesorería
-
-    Asesor->>Backoffice: Selecciona Lote en Plano SVG y registra separación S/ 500
-    Backoffice->>Supabase: Actualiza lote a estado "Separado" (Bloqueo 7 días)
-    Cliente->>Tesorero: Transfiere cuota inicial bancaria
-    Tesorero->>Backoffice: Valida voucher y confirma pago inicial
-    Asesor->>Backoffice: Genera contrato y cronograma (hasta 36 cuotas)
-    Backoffice->>Supabase: Lote pasa a "Vendido", liquida comisión (2% o 3%)
-    Cliente->>Backoffice: Accede con DNI a apps/portal-cliente para consultar cuotas
+    AUTH_SRV -->|"HikariCP / JDBC"| POSTGRES
+    CMS_SRV -->|"HikariCP / JDBC"| POSTGRES
 ```
 
 ---
 
-## 🔬 4. ¿Por qué esta Arquitectura? Decisiones de Ingeniería
+## 4. ¿Por qué esta Arquitectura? Decisiones de Ingeniería
 
-Una pregunta recurrente del equipo es: *¿Por qué combinamos Spring Boot con Supabase y por qué usamos React montado sobre Vite?* Aquí detallo las decisiones arquitectónicas adoptadas:
-
-### A. ¿Por qué React 18 montado sobre Vite y NO Angular o Vue?
-* **Vite como Bundler:** Vite no es un framework, sino el compilador de última generación. Reemplaza a Webpack proporcionando arranque instantáneo y Hot Module Replacement (HMR) en milisegundos.
-* **React 18:** Proporciona el ecosistema de componentes UI más consolidado del mercado (`tailwind-merge`, `lucide-react`, `recharts`, `framer-motion`), reduciendo el tiempo de desarrollo.
-* **Plano Vectorial Interactivo SVG:** Los 70 lotes se renderizan dinámicamente mediante coordenadas poligonales en React. El Virtual DOM de React actualiza eficientemente los cambios de estado (`Disponible`, `Separado`, `Vendido`) sin recargar la página.
-* **Frente a Angular:** Angular introduce sobrecarga de boilerplate, archivos `.module.ts` extensos y curvas de aprendizaje pronunciadas con RxJS que ralentizan un monorepo de 3 aplicaciones frontales independientes.
-
-### B. ¿Por qué Spring Boot (Java 21) si Supabase ya incluye Backend y Base de Datos?
-Supabase proporciona PostgreSQL, autenticación básica y storage. Sin embargo, en un **sistema financiero e inmobiliario**, confiar la lógica exclusivamente a un cliente frontend directo contra Supabase representa riesgos graves:
-1. **Protección de Reglas Financieras:** La validación de caducidad de reservas (7 días), cálculo de cronogramas a 36 meses, causales de resolución por 3 cuotas impagas y devengo de comisiones (2% y 3%) son reglas de negocio críticas. Si residieran en el frontend en JavaScript, cualquier usuario podría alterarlas mediante las herramientas del navegador.
-2. **Criptografía y Llaves Asimétricas:** `services/auth-service` firma tokens JWT utilizando claves asimétricas RSA de 2048 bits (`jwt-private.pem`). La clave privada reside estrictamente en el backend protegida por el sistema operativo, nunca expuesta a clientes web.
+1. **Desacoplamiento Front/Back:** Los frontends se compilan como Single Page Applications (SPAs) ultra rápidas con Vite. La lógica pesada de negocio reside en Java/Spring Boot.
+2. **Criptografía y Llaves Asimétricas:** `services/auth-service` firma tokens JWT utilizando claves asimétricas RSA de 2048 bits (`jwt-private.pem`). La clave privada reside strictly en el backend protegida por el sistema operativo, nunca expuesta a clientes web.
 3. **Resiliencia contra Ataques de Fuerza Bruta:** He integrado **Bucket4j** en Spring Boot para aplicar limitación de tasa (*rate limiting*) sobre los endpoints de inicio de sesión, mitigando ataques antes de consultar la base de datos.
 4. **Validación Transaccional Estricta:** Hibernate (`ddl-auto=validate`) valida que las entidades Java correspondan exactamente al esquema físico de PostgreSQL 17, impidiendo corrupción de datos.
 
 > **En síntesis:**  
-> 🐘 **Supabase** es el **Músculo y la Memoria** (PostgreSQL 17 de alta disponibilidad, RLS y almacenamiento de archivos).  
-> ☕ **Spring Boot** es el **Cerebro y la Ley** (Lógica de negocio, seguridad criptográfica, validaciones y contratos).  
-> ⚛️ **React + Vite** es la **Cara** (Interfaces fluidas y accesibles para usuarios, clientes y administradores).
+> **Supabase** es el **Músculo y la Memoria** (PostgreSQL 17 de alta disponibilidad, RLS y almacenamiento de archivos).  
+> **Spring Boot** es el **Cerebro y la Ley** (Lógica de negocio, seguridad criptográfica, validaciones y contratos).  
+> **React + Vite** es la **Cara** (Interfaces fluidas y accesibles para usuarios, clientes y administradores).
 
 ---
 
-## 📱 5. Catálogo de Aplicaciones Frontend (`apps/`)
+## 5. Catálogo de Aplicaciones Frontend (`apps/`)
 
-### 1. Web Pública (`apps/pagina-web`)
-* **Puerto:** `http://localhost:5175`
-* **Audiencia:** Público general, prospectos comerciales e inversionistas.
-* **Objetivo:** Exhibir los proyectos de habilitación urbana, catálogo público de lotes, fotografías, amenidades y formulario de captura de leads.
-* **Integración:** Conexión directa a `cms-service` (:8082) y lectura optimizada con `@supabase/supabase-js`.
+### 1. Web Pública (`apps/pagina-web` - Puerto `:5175`)
+* **Propósito:** Portal público comercial orientado a la captación de leads y exhibición del proyecto inmobiliario.
+* **Componentes:** Hero con slider de imágenes, catálogo dinámico de lotes disponibles, cotizador en línea y formulario de contacto directo sincronizado con la tabla `consultas_web`.
 
-### 2. Portal Cliente (`apps/portal-cliente`)
-* **Puerto:** `http://localhost:5173`
-* **Audiencia:** Compradores que ya cuentan con un lote separado o adjudicado.
-* **Acceso:** Autenticación directa mediante **DNI** y contraseña temporal.
-* **Funcionalidades:**
-  * Consulta de ficha técnica y metraje del lote adjudicado.
-  * Visualización del cronograma de cuotas pactadas y fechas de vencimiento.
-  * Carga digital de comprobantes/vouchers de depósito bancario.
-  * Semáforo de estados de cuenta (`Al día`, `Por vencer`, `En mora`).
+### 2. Portal del Cliente (`apps/portal-cliente` - Puerto `:5173`)
+* **Propósito:** Extranet de autoservicio para compradores.
+* **Componentes:** Autenticación por DNI, dashboard personal con avance de pago, cronograma dinámico de cuotas, módulo para subir comprobantes/vouchers de pago y descarga de contratos en PDF.
 
-### 3. Backoffice Inmobiliario (`apps/backoffice`)
-* **Puerto:** `http://localhost:5174`
-* **Audiencia:** Administradores, Asesores de Ventas y Personal de Tesorería.
-* **Funcionalidades:**
-  * **CRM de Prospectos:** Embudo de conversión y seguimiento de visitas guiadas (Lunes, Miércoles, Viernes y Sábados a las 11:00 AM y 03:00 PM).
-  * **Mapa de Lotes Interactivo:** Plano SVG en tiempo real con filtrado de los 70 lotes por estado.
-  * **Gestión de Ventas:** Registro de separaciones de S/ 500 y generación de contratos.
-  * **Tesorería:** Aprobación o rechazo de vouchers bancarios y fiscalización de cuotas.
-  * **Liquidación de Comisiones:** Control de comisiones al 3% (contado) y 2% (financiado).
+### 3. Backoffice ERP/CRM (`apps/backoffice` - Puerto `:5174`)
+* **Propósito:** Panel administrativo central para ventas, tesorería, gerencia y asesores comerciales.
+* **Componentes:** Plano interactivo SVG con 70 lotes vectoriales y cambio de estados en tiempo real, CRM de prospectos (Kanban), módulo de ventas y separaciones, validación de vouchers de pago y panel de comisiones.
 
 ---
 
-## ⚙️ 6. Catálogo de Servicios Backend (`services/`)
+## 6. Catálogo de Servicios Backend (`services/`)
 
-| Servicio | Puerto | Stack Tecnológico | Rol en el Sistema |
-|---|:---:|---|---|
-| **`auth-service`** | `8081` | Java 21, Spring Boot 4.1.1, Spring Security, OAuth2 Resource Server, Bucket4j | Emisión de tokens JWT con par de llaves asimétricas RSA-2048, autenticación RBAC (`ADMIN`, `ASESOR`, `TESORERIA`, `CLIENTE`), registro de auditoría en `aud_eventos` y control de intentos fallidos. |
-| **`cms-service`** | `8082` | Java 21, Spring Boot 4.1.1, Spring Data JPA, Hibernate, PostgreSQL Driver | API REST para la gestión de proyectos inmobiliarios (`/api/public/proyectos`) y recepción segura de consultas web de prospectos (`/api/public/consultas`). |
+### 1. Auth Service (`services/auth-service` - Puerto `:8081`)
+* **Tecnología:** Java 21 LTS + Spring Boot 3.4.1 + Spring Security.
+* **Funcionalidad:** Emisión y validación de JWT con firma RSA-2048, control de acceso basado en roles (RBAC: `ROLE_ADMIN`, `ROLE_ASESOR`, `ROLE_CLIENTE`, `ROLE_TESORERIA`), auditoría de intentos fallidos y rate limiting con Bucket4j.
 
----
-
-## 🗄️ 7. Base de Datos y Almacenamiento (`database/`)
-
-La base de datos central reside en **Supabase Cloud (PostgreSQL 17.6)** en la región `us-west-2`.
-
-### Organización del Esquema (102 Tablas Normalizadas)
-* **`seg_` (Seguridad):** Usuarios, roles, permisos y asignaciones RBAC.
-* **`core_` (Entidades):** Personas, clientes, asesores y datos de contacto.
-* **`inm_` (Inmobiliario):** Proyectos, etapas, manzanas, los **70 lotes** y coordenadas para planos SVG.
-* **`crm_` (Gestión Comercial):** Prospectos (leads), interacciones y agenda de visitas.
-* **`ven_` (Ventas):** Reservas preventivas (S/ 500), contratos formales de compraventa y minutas.
-* **`pag_` (Financiamiento):** Planes de pago, cronogramas de hasta 36 cuotas y control de comprobantes.
-* **`com_` (Comisiones):** Metas de asesores, porcentajes (2% y 3%) y desembolsos devengados.
-* **`cms_` (Contenido Web):** Consultas web, páginas, secciones y parámetros institucionales.
-
-### Políticas Row Level Security (RLS)
-He configurado RLS en PostgreSQL para garantizar que:
-* Los clientes autenticados en `portal-cliente` **únicamente** puedan consultar las filas vinculadas a su DNI en las tablas de cuotas y contratos.
-* Las consultas públicas de `pagina-web` tengan acceso exclusivamente de lectura a proyectos publicados.
-* Las mutaciones financieras requieran credenciales administrativas validadas por JWT.
+### 2. CMS & Consultas Service (`services/cms-service` - Puerto `:8082`)
+* **Tecnología:** Java 21 LTS + Spring Boot 3.4.1 + Spring Data JPA.
+* **Funcionalidad:** API REST para ingesta de consultas web, gestión del catálogo comercial, información de proyectos y orquestación de correos electrónicos transaccionales.
 
 ---
 
-## 📁 8. Estructura Detallada del Repositorio
+## 7. Base de Datos y Almacenamiento (`database/`)
+
+* **Motor:** PostgreSQL 17.6 administrado en Supabase Cloud.
+* **Esquema:** 102 tablas relacionales organizadas bajo principios de tercera forma normal (3NF), 181 índices de rendimiento, claves foráneas estrictas y Row Level Security (RLS) configurado por rol.
+* **Storage:** Buckets en Supabase Storage (`vouchers`, `contratos`, `planos`) con políticas de acceso privado.
+
+---
+
+## 8. Estructura Detallada del Repositorio
 
 He organizado el árbol de archivos bajo el patrón estándar de Monorepos de la industria:
 
 ```text
 SGI-Monolithe/
 ├── apps/                               # Aplicaciones Frontend (React 18 + Vite)
-│   ├── pagina-web/                     # 🌐 Web pública y captación de prospectos (5175)
-│   ├── portal-cliente/                 # 👤 Extranet privada de compradores (5173)
-│   └── backoffice/                     # 🏢 Sistema ERP / CRM / Ventas / Finanzas (5174)
+│   ├── pagina-web/                     # Web pública y captación de prospectos (5175)
+│   ├── portal-cliente/                 # Extranet privada de compradores (5173)
+│   └── backoffice/                     # Sistema ERP / CRM / Ventas / Finanzas (5174)
 │
 ├── services/                           # Servicios Backend (Spring Boot 4 + Java 21)
-│   ├── auth-service/                   # 🔐 Servicio de Autenticación, JWT RSA y RBAC (8081)
-│   └── cms-service/                    # 📝 Servicio de CMS y Consultas Web (8082)
+│   ├── auth-service/                   # Servicio de Autenticación, JWT RSA y RBAC (8081)
+│   └── cms-service/                    # Servicio de CMS y Consultas Web (8082)
 │
 ├── database/                           # Control Unificado de Base de Datos
 │   ├── migrations/                     # Scripts SQL DDL versionados de tablas e índices
@@ -271,7 +183,7 @@ SGI-Monolithe/
 │   ├── probar_pagina_web.sh            # Smoke test automatizado de persistencia y APIs
 │   └── check_db_tables.cjs             # Comprobador de integridad de tablas Supabase
 │
-├── .secret/                            # ⚠️ SECRETOS LOCALES (Ignorado en Git - chmod 700)
+├── .secret/                            # SECRETOS LOCALES (Ignorado en Git - chmod 700)
 │   ├── keys/                           # Llaves criptográficas RSA (jwt-private.pem, chmod 600)
 │   └── supabase.env                    # Credenciales de conexión Supabase (chmod 600)
 │
@@ -282,7 +194,7 @@ SGI-Monolithe/
 
 ---
 
-## 📅 9. Cronograma Gantt Maestro y Estado de Sprints
+## 9. Cronograma Gantt Maestro y Estado de Sprints
 
 He alineado las tareas del proyecto con el **Diagrama de Gantt Oficial (263 tareas)** y el modelo entidad-relación de Supabase:
 
@@ -314,7 +226,7 @@ flowchart LR
 
 ---
 
-## 🔒 10. Políticas Estrictas de Seguridad y Manejo de Secretos
+## 10. Políticas Estrictas de Seguridad y Manejo de Secretos
 
 Para evitar incidentes de seguridad en el repositorio público o de equipo, he establecido las siguientes normas obligatorias:
 
@@ -334,7 +246,7 @@ Para evitar incidentes de seguridad en el repositorio público o de equipo, he e
 
 ---
 
-## 🌿 11. Flujo de Trabajo en GitHub y Estándares de Código
+## 11. Flujo de Trabajo en GitHub y Estándares de Código
 
 He adoptado un flujo de trabajo ágil basado en ramas protegidas y convenciones semánticas:
 
@@ -353,7 +265,7 @@ Cada confirmación de código debe seguir el formato estándar:
 
 ---
 
-## 🚀 12. Guía de Arranque Rápido (Local y Docker)
+## 12. Guía de Arranque Rápido (Local y Docker)
 
 ### Prerrequisitos en tu Computadora
 * **Git** instalado.
@@ -397,7 +309,7 @@ Una vez iniciado el sistema, los puntos de acceso locales son:
 
 ---
 
-## 🤖 13. Prompt de Asistencia de IA para el Equipo
+## 13. Prompt de Asistencia de IA para el Equipo
 
 Si algún compañero del equipo utiliza herramientas de Inteligencia Artificial (como **GitHub Copilot**, **Antigravity** o **Claude**) para programar en este repositorio, debe proveerle el siguiente prompt inicial para garantizar coherencia con la arquitectura:
 
@@ -420,4 +332,3 @@ REGLAS DE DESARROLLO:
 ---
 
 *Documentación técnica elaborada y validada por el equipo de desarrollo de **SGI-Monolithe**.*
-

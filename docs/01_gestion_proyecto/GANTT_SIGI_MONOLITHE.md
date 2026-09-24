@@ -1,11 +1,11 @@
-# 📊 Diagrama de Gantt — SIGI MONOLITHE
+# Diagrama de Gantt — SIGI MONOLITHE
 > **Fuente oficial:** `diagrama_gantt_sigi_monolithe.xml` (263 tareas, exportado desde GanttPRO)  
 > **Inicio:** 17/08/2026 | **Fin:** 04/12/2026  
 > **Total sprints:** 9 (Sprint 0 → Sprint 8)
 
 ---
 
-## 🗓️ Cronograma General de Sprints
+## Cronograma General de Sprints
 
 ```mermaid
 gantt
@@ -43,24 +43,24 @@ gantt
 
 ---
 
-## 📈 Estado Actual (23/09/2026)
+## Estado Actual (23/09/2026)
 
 | Sprint | Período | Estado | % UI | % DB |
 |---|---|---|---|---|
-| **Sprint 0** | 17/08 – 26/08 | ✅ Completado | 100% | 100% |
-| **Sprint 1** | 27/08 – 07/09 | 🔄 En curso | 90% | 100% |
-| **Sprint 2** | 07/09 – 18/09 | 🔄 En curso | 85% | 100% |
-| **Sprint 3** | 21/09 – 02/10 | 🟡 **Activo HOY** | 85% | 100% |
-| **Sprint 4** | 05/10 – 16/10 | ⏳ Próximo | – | 100% |
-| **Sprint 5** | 19/10 – 30/10 | ⏳ Planificado | – | 100% |
-| **Sprint 6** | 02/11 – 13/11 | ⏳ Planificado | – | 100% |
-| **Sprint 7** | 16/11 – 27/11 | ⏳ Planificado | – | 100% |
-| **Sprint 8** | 30/11 – 04/12 | ⏳ Planificado | – | – |
+| **Sprint 0** | 17/08 – 26/08 | Completado | 100% | 100% |
+| **Sprint 1** | 27/08 – 07/09 | En curso | 90% | 100% |
+| **Sprint 2** | 07/09 – 18/09 | En curso | 85% | 100% |
+| **Sprint 3** | 21/09 – 02/10 | **Activo HOY** | 85% | 100% |
+| **Sprint 4** | 05/10 – 16/10 | Próximo | – | 100% |
+| **Sprint 5** | 19/10 – 30/10 | Planificado | – | 100% |
+| **Sprint 6** | 02/11 – 13/11 | Planificado | – | 100% |
+| **Sprint 7** | 16/11 – 27/11 | Planificado | – | 100% |
+| **Sprint 8** | 30/11 – 04/12 | Planificado | – | – |
 
 ---
 
-## 📋 Sprint 0 — Fundamentos, Base de Datos y Arquitectura
-**Período:** 17/08/2026 – 26/08/2026 | **Horas:** 64h | **Estado:** ✅ COMPLETADO
+## Sprint 0 — Fundamentos, Base de Datos y Arquitectura
+**Período:** 17/08/2026 – 26/08/2026 | **Horas:** 64h | **Estado:** COMPLETADO
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -90,8 +90,8 @@ gantt
 
 ---
 
-## 📋 Sprint 1 — Seguridad y Acceso
-**Período:** 27/08/2026 – 07/09/2026 | **Horas:** 80h | **Estado:** 🔄 90% COMPLETADO
+## Sprint 1 — Seguridad y Acceso
+**Período:** 27/08/2026 – 07/09/2026 | **Horas:** 80h | **Estado:** 90% COMPLETADO
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -99,7 +99,7 @@ gantt
 | Seguridad | Crear tablas de usuarios, roles y permisos | 27/08 |
 | Seguridad | Implementar autenticación de usuarios administrativos | 27/08 |
 | Seguridad | Implementar autorización por roles | 28/08 |
-| Seguridad | ⚠️ Implementar auditoría básica de accesos | 30/09 |
+| Seguridad | Implementar auditoría básica de accesos | 30/09 |
 | Web Pública | Definir estructura de contenido de la web pública | 27/08 |
 | Web Pública | Diseñar interfaz de la web pública | 27/08 |
 | Web Pública | Implementar página de inicio | 27/08 |
@@ -117,8 +117,8 @@ gantt
 
 ---
 
-## 📋 Sprint 2 — Catálogo Inmobiliario y Plano SVG
-**Período:** 07/09/2026 – 18/09/2026 | **Horas:** 192h | **Estado:** 🔄 85% UI / 100% DB
+## Sprint 2 — Catálogo Inmobiliario y Plano SVG
+**Período:** 07/09/2026 – 18/09/2026 | **Horas:** 192h | **Estado:** 85% UI / 100% DB
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -136,8 +136,8 @@ gantt
 
 ---
 
-## 📋 Sprint 3 — CRM y Agenda de Visitas (🟡 ACTIVO)
-**Período:** 21/09/2026 – 02/10/2026 | **Horas:** 80h | **Estado:** 🟡 EN PROGRESO
+## Sprint 3 — CRM y Agenda de Visitas (ACTIVO)
+**Período:** 21/09/2026 – 02/10/2026 | **Horas:** 80h | **Estado:** EN PROGRESO
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -157,8 +157,8 @@ gantt
 
 ---
 
-## 📋 Sprint 4 — Ventas y Separaciones
-**Período:** 05/10/2026 – 16/10/2026 | **Horas:** 88h | **Estado:** ⏳ Próximo
+## Sprint 4 — Ventas y Separaciones
+**Período:** 05/10/2026 – 16/10/2026 | **Horas:** 88h | **Estado:** Próximo
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -182,8 +182,8 @@ gantt
 
 ---
 
-## 📋 Sprint 5 — Financiamiento, Cronograma y Vouchers
-**Período:** 19/10/2026 – 30/10/2026 | **Horas:** 80h | **Estado:** ⏳ Planificado
+## Sprint 5 — Financiamiento, Cronograma y Vouchers
+**Período:** 19/10/2026 – 30/10/2026 | **Horas:** 80h | **Estado:** Planificado
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -205,8 +205,8 @@ gantt
 
 ---
 
-## 📋 Sprint 6 — Portal del Cliente (Autoservicio DNI)
-**Período:** 02/11/2026 – 13/11/2026 | **Horas:** 80h | **Estado:** ⏳ Planificado
+## Sprint 6 — Portal del Cliente (Autoservicio DNI)
+**Período:** 02/11/2026 – 13/11/2026 | **Horas:** 80h | **Estado:** Planificado
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -235,8 +235,8 @@ gantt
 
 ---
 
-## 📋 Sprint 7 — Motor de Comisiones y Dashboard Gerencial
-**Período:** 16/11/2026 – 27/11/2026 | **Horas:** 80h | **Estado:** ⏳ Planificado
+## Sprint 7 — Motor de Comisiones y Dashboard Gerencial
+**Período:** 16/11/2026 – 27/11/2026 | **Horas:** 80h | **Estado:** Planificado
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -268,8 +268,8 @@ gantt
 
 ---
 
-## 📋 Sprint 8 — UAT, Cierre y Go-Live
-**Período:** 30/11/2026 – 04/12/2026 | **Horas:** 40h | **Estado:** ⏳ Planificado
+## Sprint 8 — UAT, Cierre y Go-Live
+**Período:** 30/11/2026 – 04/12/2026 | **Horas:** 40h | **Estado:** Planificado
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -292,12 +292,12 @@ gantt
 
 ---
 
-## 🔗 Integración con GanttPRO
+## Integración con GanttPRO
 
 El archivo fuente `diagrama_gantt_sigi_monolithe.xml` puede reimportarse en **GanttPRO**:
 1. Acceder a [app.ganttpro.com](https://app.ganttpro.com)
 2. **Import project** → formato **MS Project XML**
 3. Seleccionar `docs/01_gestion_proyecto/diagrama_gantt_sigi_monolithe.xml`
 
-> ⚠️ GanttPRO no expone API pública para sincronización automática bidireccional con GitHub Projects.
+> GanttPRO no expone API pública para sincronización automática bidireccional con GitHub Projects.
 > La fuente operativa del equipo es **GitHub Projects** (tablero Kanban + Sprints).
