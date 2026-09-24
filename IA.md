@@ -1,4 +1,4 @@
-# GEMINI.md — Reglas Generales para Gemini y Antigravity en SGI-Monolithe
+# IA.md — Reglas Generales para Gemini y Antigravity en SGI-Monolithe
 
 Este repositorio cuenta con reglas estrictas e inmutables:
 
