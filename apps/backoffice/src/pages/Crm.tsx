@@ -74,7 +74,6 @@ export function Crm() {
         } />
       
 
-      {/* Embudo */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
         {FUNNEL.map((step) => {
           const count = LEADS.filter((l) => l.stage === step.stage).length;

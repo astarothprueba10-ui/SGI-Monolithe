@@ -5,20 +5,12 @@ Módulo monorepo para la presencia digital comercial y gestión de contenidos de
 ## Estructura del Módulo
 
 ```
-PaginaWeb/
-├── backend/               # Microservicio Spring Boot (Java 21) para CMS y APIs públicas (puerto 8082)
-│   ├── src/main/java/     # Controladores, Entidades JPA, Repositorios y Servicios
+services/cms-service/
+├── src/main/java/         # Controladores, Entidades JPA, Repositorios y Servicios
 │   ├── src/main/resources/# application.properties (Conexión Supabase PostgreSQL)
 │   ├── Dockerfile         # Imagen multi-stage (Maven 3.9 + Temurin JRE 21 Alpine)
 │   └── pom.xml            # Dependencias Maven (Spring Web, Security OAuth2 JWT, JPA, Postgres)
-├── frontend/              # Aplicación Web React + Vite + TailwindCSS + TypeScript (puerto 5175)
-│   ├── src/pages/         # Web pública (Home, Proyectos, Contacto, Nosotros, Beneficios)
-│   ├── src/pages/cms/     # Panel de administración CMS (Editor, Publicaciones, Media)
-│   ├── src/components/    # Componentes reutilizables, formularios de contacto y UI
-│   ├── src/services/api.ts# Cliente HTTP tipado conectado al backend y Supabase
-│   ├── Dockerfile         # Imagen optimizada Node 22 Slim
-│   └── package.json       # Scripts de Vite y dependencias frontend
-└── README.md              # Documentación técnica del módulo
+└── README.md              # Documentación técnica del servicio
 ```
 
 ---
@@ -38,7 +30,7 @@ El backend se conecta directamente a la base de datos Supabase mediante PostgreS
 
 ---
 
-## 2. API Backend (`PaginaWeb/backend`)
+## 2. API Backend (`services/cms-service`)
 
 ### Endpoints Públicos
 - `GET /api/public/proyectos`: Lista los proyectos inmobiliarios disponibles para el catálogo público.

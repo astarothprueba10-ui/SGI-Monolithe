@@ -53,7 +53,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                                 continue;
                         }
 
-                        // Rol para Spring Security
                         authorities.add(
                                         "ROLE_" + rol.getCodigo());
 

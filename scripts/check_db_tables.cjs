@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'REDACTED_PUBLISHABLE
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function verifyPersistedLead() {
-  console.log('🔍 Consultando el lead recién insertado en cms_consultas_web...');
+  console.log('Consultando el lead recién insertado en cms_consultas_web...');
   const { data, error } = await supabase
     .from('cms_consultas_web')
     .select('id_consulta_web, id_estado_consulta_web, codigo, nombres, correo, telefono, mensaje, fecha_recepcion')
@@ -16,9 +16,10 @@ async function verifyPersistedLead() {
   if (error) {
     console.error('Error al leer con anon key:', error.message);
   } else {
-    console.log(`✅ Registros encontrados en Supabase (${data.length}):`);
+    console.log(`Registros encontrados en Supabase (${data.length}):`);
     console.table(data);
   }
 }
 
 verifyPersistedLead();
+

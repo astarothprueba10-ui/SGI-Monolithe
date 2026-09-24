@@ -41,15 +41,11 @@ export interface SessionUser {
   roles: RoleName[];
 }
 
-/* ---------- Estados visuales ---------- */
-
 export type LotStatus = 'Disponible' | 'Separado' | 'Vendido';
 export type PaymentStatus = 'Pagado' | 'Pendiente' | 'Vencido';
 export type ReviewStatus = 'En revisión' | 'Aprobado' | 'Rechazado';
 export type ActivityStatus = 'Activo' | 'Inactivo';
 export type StatusToken = LotStatus | PaymentStatus | ReviewStatus | ActivityStatus;
-
-/* ---------- Dominio ---------- */
 
 export interface Project {
   id: string;

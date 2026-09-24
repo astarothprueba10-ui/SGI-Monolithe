@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
-# ============================================================
 # poblar_github_projects.sh
 # Puebla GitHub Projects con tareas del Gantt de SIGI MONOLITHE
 # Requiere: gh auth con scope "project"
 # Uso: bash scripts/poblar_github_projects.sh
-# ============================================================
 set -euo pipefail
 
 OWNER="astarothprueba10-ui"
 
-echo "🔑 Verificando autenticación..."
-gh auth status || { echo "❌ Ejecuta: gh auth refresh -s project"; exit 1; }
+echo "Verificando autenticacion..."
+gh auth status || { echo "ERROR: Ejecuta: gh auth refresh -s project"; exit 1; }
 
-echo "🔍 Obteniendo IDs de los proyectos..."
+echo "Obteniendo IDs de los proyectos..."
 
 KANBAN_ID=$(gh api graphql -f query='
 {
@@ -32,10 +30,10 @@ SPRINT_ID=$(gh api graphql -f query='
   }
 }' --jq '.data.user.projectsV2.nodes[] | select(.number == 2) | .id')
 
-echo "📋 Tablero Kanban ID: $KANBAN_ID"
-echo "🗓️  Planificación Sprints ID: $SPRINT_ID"
+echo "Tablero Kanban ID: $KANBAN_ID"
+echo "Planificacion Sprints ID: $SPRINT_ID"
 
-# ---- Función helper para crear un draft item ----
+# Función helper para crear un draft item
 add_item() {
   local project_id="$1"
   local title="$2"
@@ -48,7 +46,7 @@ add_item() {
 }
 
 echo ""
-echo "🚀 Poblando Sprint 3 (ACTIVO HOY: 21/09 – 02/10) en Kanban y Sprints..."
+echo "Poblando Sprint 3 (ACTIVO HOY: 21/09 - 02/10) en Kanban y Sprints..."
 echo "---"
 
 # Sprint 3 — CRM y Agenda de Visitas
@@ -68,13 +66,13 @@ SPRINT3_TASKS=(
 )
 
 for task in "${SPRINT3_TASKS[@]}"; do
-  echo "  ➕ $task"
+  echo "  + $task"
   add_item "$KANBAN_ID" "$task"
   add_item "$SPRINT_ID" "$task"
 done
 
 echo ""
-echo "📦 Poblando Sprint 4 (Backlog: 05/10 – 16/10)..."
+echo "Poblando Sprint 4 (Backlog: 05/10 - 16/10)..."
 echo "---"
 
 SPRINT4_TASKS=(
@@ -98,13 +96,13 @@ SPRINT4_TASKS=(
 )
 
 for task in "${SPRINT4_TASKS[@]}"; do
-  echo "  ➕ $task"
+  echo "  + $task"
   add_item "$KANBAN_ID" "$task"
   add_item "$SPRINT_ID" "$task"
 done
 
 echo ""
-echo "📦 Poblando Sprint 5 (Backlog: 19/10 – 30/10)..."
+echo "Poblando Sprint 5 (Backlog: 19/10 - 30/10)..."
 echo "---"
 
 SPRINT5_TASKS=(
@@ -126,13 +124,13 @@ SPRINT5_TASKS=(
 )
 
 for task in "${SPRINT5_TASKS[@]}"; do
-  echo "  ➕ $task"
+  echo "  + $task"
   add_item "$KANBAN_ID" "$task"
   add_item "$SPRINT_ID" "$task"
 done
 
 echo ""
-echo "📦 Poblando Sprints 6-8 (Backlog)..."
+echo "Poblando Sprints 6-8 (Backlog)..."
 echo "---"
 
 SPRINT6_TASKS=(
@@ -193,12 +191,12 @@ SPRINT8_TASKS=(
 )
 
 for task in "${SPRINT6_TASKS[@]}" "${SPRINT7_TASKS[@]}" "${SPRINT8_TASKS[@]}"; do
-  echo "  ➕ $task"
+  echo "  + $task"
   add_item "$KANBAN_ID" "$task"
   add_item "$SPRINT_ID" "$task"
 done
 
 echo ""
-echo "✅ ¡GitHub Projects poblado exitosamente!"
+echo "GitHub Projects poblado exitosamente!"
 echo "   Tablero Kanban: https://github.com/users/$OWNER/projects/1"
 echo "   Planificación Sprints: https://github.com/users/$OWNER/projects/2"

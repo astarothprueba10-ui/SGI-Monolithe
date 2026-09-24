@@ -210,7 +210,6 @@ export function LotMap() {
           </div>
         </Card>
 
-        {/* Ficha del lote */}
         <Card className="h-fit xl:sticky xl:top-6">
           <CardHeader
             title={selected ? `Lote ${selected.code}` : 'Detalle del lote'}

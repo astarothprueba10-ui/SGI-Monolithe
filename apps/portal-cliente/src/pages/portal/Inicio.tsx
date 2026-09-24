@@ -51,7 +51,6 @@ export function Inicio() {
         } />
       
 
-      {/* Panel primario: obligación de pago vigente */}
       <section className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
         <Card className="flex flex-col p-6">
           <div className="flex items-start justify-between gap-4">
@@ -146,7 +145,6 @@ export function Inicio() {
         </Card>
       </section>
 
-      {/* Panel secundario */}
       <section className="grid gap-5 md:grid-cols-2">
         <Card className="flex flex-col">
           <CardHeader

@@ -1,7 +1,7 @@
 services:
   auth-service:
     build:
-      context: ./auth-service
+      context: ./services/auth-service
       dockerfile: Dockerfile
     container_name: sgi-auth-service
     ports:
@@ -47,11 +47,11 @@ services:
       - auth-service
     restart: unless-stopped
 
-  admin-dashboard:
+  backoffice:
     build:
-      context: ./apps/admin-dashboard
+      context: ./apps/backoffice
       dockerfile: Dockerfile
-    container_name: sgi-admin-dashboard
+    container_name: sgi-backoffice
     ports:
       - "5174:5174"
     environment:
@@ -59,14 +59,14 @@ services:
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
-      - ./apps/admin-dashboard/src:/app/src
+      - ./apps/backoffice/src:/app/src
     depends_on:
       - auth-service
     restart: unless-stopped
 
   pagina-web-backend:
     build:
-      context: ./PaginaWeb/backend
+      context: ./services/cms-service
       dockerfile: Dockerfile
     container_name: sgi-pagina-web-backend
     env_file:
@@ -89,7 +89,7 @@ services:
 
   pagina-web-frontend:
     build:
-      context: ./PaginaWeb/frontend
+      context: ./apps/pagina-web
       dockerfile: Dockerfile
     container_name: sgi-pagina-web-frontend
     env_file:
@@ -101,7 +101,7 @@ services:
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
-      - ./PaginaWeb/frontend/src:/app/src
+      - ./apps/pagina-web/src:/app/src
     depends_on:
       - pagina-web-backend
     restart: unless-stopped

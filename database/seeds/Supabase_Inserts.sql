@@ -1,6 +1,6 @@
 -- =============================================================================
 -- DATOS INICIALES SGI MONOLITHE PARA SUPABASE / POSTGRESQL
--- Fuente de verdad: Database/Inserts.sql
+-- Fuente de verdad: database/seeds/Inserts.sql
 -- =============================================================================
 
 SET search_path TO public;

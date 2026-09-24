@@ -16,9 +16,9 @@
 *.jks
 *.keystore
 
+.secret/
 secrets/
 secret/
-.secret/
 .mcp.json
 *.secret
 

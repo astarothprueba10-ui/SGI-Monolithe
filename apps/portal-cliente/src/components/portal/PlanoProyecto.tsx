@@ -39,7 +39,6 @@ export function PlanoProyecto() {
           aria-label="Plano simplificado de la manzana D, etapa II, con el lote 14 del cliente destacado"
           className="h-auto w-full min-w-[520px]">
           
-          {/* Vías */}
           <rect x="0" y="0" width="640" height="300" fill="#F7F8FA" />
           <rect x="0" y="118" width="640" height="30" fill="#E2E6EC" />
           <line
@@ -55,7 +54,6 @@ export function PlanoProyecto() {
             AV. LOS ALGARROBOS
           </text>
 
-          {/* Áreas verdes */}
           <rect
             x="560"
             y="24"

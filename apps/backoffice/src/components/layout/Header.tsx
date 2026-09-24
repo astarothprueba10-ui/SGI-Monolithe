@@ -43,7 +43,6 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-brand-100 bg-white/95 px-5 backdrop-blur">
-      {/* Breadcrumb */}
       <nav aria-label="Ruta de navegación" className="hidden min-w-0 items-center gap-1.5 md:flex">
         <Link
           to="/"
@@ -57,7 +56,6 @@ export function Header() {
         </span>
       </nav>
 
-      {/* Buscador global */}
       <div className="relative ml-auto w-full max-w-sm">
         <SearchIcon
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300"
@@ -95,7 +93,6 @@ export function Header() {
         null}
       </div>
 
-      {/* Notificaciones */}
       <Dropdown
         width="w-80"
         trigger={({ toggle, open }) =>
@@ -164,7 +161,6 @@ export function Header() {
         }
       </Dropdown>
 
-      {/* Perfil */}
       <Dropdown
         trigger={({ toggle }) =>
         <button

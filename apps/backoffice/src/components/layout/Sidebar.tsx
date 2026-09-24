@@ -27,7 +27,6 @@ export function Sidebar({
         collapsed ? 'w-[68px]' : 'w-[248px]'
       )}>
       
-      {/* Marca */}
       <div
         className={cn(
           'flex h-16 shrink-0 items-center gap-2.5 border-b border-white/10 px-4',
@@ -47,7 +46,6 @@ export function Sidebar({
         null}
       </div>
 
-      {/* Usuario */}
       <div
         className={cn(
           'flex items-center gap-3 border-b border-white/10 px-4 py-3.5',
@@ -65,7 +63,6 @@ export function Sidebar({
         null}
       </div>
 
-      {/* Navegación */}
       <nav
         aria-label="Navegación principal"
         className="flex-1 overflow-y-auto px-2.5 py-3">

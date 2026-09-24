@@ -134,7 +134,6 @@ export function Dashboard() {
         </Alert> :
       null}
 
-      {/* KPIs: el primero manda jerárquicamente */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="sm:col-span-2 xl:col-span-1 xl:row-span-2">
           <KpiCard kpi={kpis[0]} featured />
@@ -144,7 +143,6 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Gráfico + operaciones pendientes */}
       <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader
@@ -171,7 +169,6 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Resumen de lotes + actividad */}
       <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
         {hasModule('projects') || hasModule('lots') ?
         <Card className="xl:col-span-2">

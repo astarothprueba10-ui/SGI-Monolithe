@@ -52,7 +52,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 0: Fundamentos, Base de Datos y UX/UI
+### SPRINT 0: Fundamentos, Base de Datos y UX/UI
 - **Fechas:** 17/08/2026 – 26/08/2026 | **Duración:** 64 horas
 - **Relación con otros Sprints:** Es la base habilitadora. Sin el Modelo Entidad-Relación (DER) y la arquitectura Git/entornos, ningún sprint posterior puede iniciar.
 - **Entregables Clave:**
@@ -63,7 +63,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 1: Seguridad, Autenticación y Landing Web
+### SPRINT 1: Seguridad, Autenticación y Landing Web
 - **Fechas:** 27/08/2026 – 07/09/2026 | **Duración:** 216 horas
 - **Relación:** Provee el middleware de autenticación (JWT / Sesiones) y RBAC (Control de Acceso Basado en Roles) que consumirán todos los módulos de gestión.
 - **Entregables Clave:**
@@ -74,7 +74,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 2: Inventario Inmobiliario, Lotes y Plano Interactivo
+### SPRINT 2: Inventario Inmobiliario, Lotes y Plano Interactivo
 - **Fechas:** 07/09/2026 – 18/09/2026 | **Duración:** 192 horas
 - **Relación:** Define las entidades centrales del negocio (`Proyecto`, `Etapa`, `Manzana`, `Lote`). El CRM (Sprint 3) y Ventas (Sprint 4) dependen 100% de este inventario.
 - **Entregables Clave:**
@@ -84,7 +84,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 3: CRM Inmobiliario, Leads y Agenda de Visitas
+### SPRINT 3: CRM Inmobiliario, Leads y Agenda de Visitas
 - **Fechas:** 21/09/2026 – 02/10/2026 | **Duración:** 80 horas
 - **Relación:** Captura la demanda comercial (prospectos). Al concretarse la intención de compra, el lead pasa al flujo de Venta/Separación (Sprint 4).
 - **Entregables Clave:**
@@ -95,7 +95,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 4: Ventas, Separaciones (S/ 500) y Contratos
+### SPRINT 4: Ventas, Separaciones (S/ 500) y Contratos
 - **Fechas:** 05/10/2026 – 16/10/2026 | **Duración:** 88 horas
 - **Relación:** Transforma un Lote `Disponible` a `Separado` o `Vendido`, y un Lead a `Cliente Comprador`. Habilita la generación de pagos (Sprint 5) y comisiones (Sprint 7).
 - **Entregables Clave:**
@@ -106,7 +106,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 5: Financiamiento, Cronograma de Pagos y Validación de Vouchers
+### SPRINT 5: Financiamiento, Cronograma de Pagos y Validación de Vouchers
 - **Fechas:** 19/10/2026 – 30/10/2026 | **Duración:** 80 horas
 - **Relación:** Gestiona la vida financiera del contrato a 3 años. Alimenta el estado de cuenta que el cliente verá en su portal (Sprint 6) y los ingresos de tesorería (Sprint 7).
 - **Entregables Clave:**
@@ -117,7 +117,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 6: Portal del Cliente (Extranet con DNI)
+### SPRINT 6: Portal del Cliente (Extranet con DNI)
 - **Fechas:** 02/11/2026 – 13/11/2026 | **Duración:** 80 horas
 - **Relación:** Es la interfaz de autoservicio para el comprador. Reduce la carga operativa de los asesores al permitir que el cliente consulte sus pagos y suba vouchers por sí mismo.
 - **Entregables Clave:**
@@ -129,7 +129,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 7: Liquidación de Comisiones, Finanzas y Dashboard Gerencial
+### SPRINT 7: Liquidación de Comisiones, Finanzas y Dashboard Gerencial
 - **Fechas:** 16/11/2026 – 27/11/2026 | **Duración:** 80 horas
 - **Relación:** Consolida los datos generados en Ventas (Sprint 4) y Pagos (Sprint 5) para liquidar a los asesores y ofrecer analítica a la Gerencia.
 - **Entregables Clave:**
@@ -142,7 +142,7 @@ flowchart TD
 
 ---
 
-### 🔹 SPRINT 8: Pruebas UAT, Cierre, Hardening y Despliegue Go-Live
+### SPRINT 8: Pruebas UAT, Cierre, Hardening y Despliegue Go-Live
 - **Fechas:** 30/11/2026 – 04/12/2026 | **Duración:** 40 horas
 - **Relación:** Fase final de validación integral, corrección de bugs, pruebas con usuarios reales (UAT) y pase definitivo a producción.
 - **Entregables Clave:**

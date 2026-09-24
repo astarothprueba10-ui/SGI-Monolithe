@@ -170,7 +170,6 @@ export function Cronograma() {
 
 
         <>
-            {/* Tabla (escritorio) */}
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full border-collapse text-left">
                 <caption className="sr-only">
@@ -234,7 +233,6 @@ export function Cronograma() {
               </table>
             </div>
 
-            {/* Lista (móvil) */}
             <ul className="divide-y divide-slateux-200 md:hidden">
               {visibles.map((c) =>
             <li key={c.numero} className="px-5 py-4">

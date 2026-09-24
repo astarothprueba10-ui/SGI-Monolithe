@@ -55,10 +55,6 @@ public class PasswordResetService {
 
                 LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
-                /*
-                 * Invalidamos tokens anteriores que todavía
-                 * no habían sido utilizados.
-                 */
                 var tokensAnteriores = passwordResetTokenRepository
                                 .findByUsuarioIdUsuarioAndFechaUsoIsNull(
                                                 idUsuario);
@@ -89,10 +85,6 @@ public class PasswordResetService {
 
                 passwordResetTokenRepository.save(token);
 
-                /*
-                 * Solo devolvemos el token real una vez.
-                 * La BD conserva únicamente su SHA-256.
-                 */
                 return tokenReal;
         }
 
@@ -185,27 +177,15 @@ public class PasswordResetService {
                 usuario.setRequiereCambioPassword(false);
                 usuario.setPasswordActualizadoEn(ahora);
 
-                /*
-                 * Si el bloqueo provenía de intentos fallidos,
-                 * recuperamos también el acceso normal.
-                 */
                 usuario.setIntentosFallidos(0);
                 usuario.setBloqueadoHasta(null);
 
                 userRepository.save(usuario);
 
-                /*
-                 * El token queda consumido y no puede volver
-                 * a utilizarse.
-                 */
                 token.setFechaUso(ahora);
 
                 passwordResetTokenRepository.save(token);
 
-                /*
-                 * Una recuperación de contraseña invalida
-                 * todas las sesiones existentes.
-                 */
                 refreshTokenService.revocarTodasLasSesiones(
                                 usuario.getIdUsuario(),
                                 "RECUPERACION_PASSWORD");

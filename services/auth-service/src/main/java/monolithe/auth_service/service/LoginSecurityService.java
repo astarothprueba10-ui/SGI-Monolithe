@@ -38,10 +38,6 @@ public class LoginSecurityService {
                                 ? usuario.getIntentosFallidos()
                                 : 0;
 
-                /*
-                 * Si existía un bloqueo anterior pero ya venció,
-                 * comienza un nuevo ciclo de intentos.
-                 */
                 if (usuario.getBloqueadoHasta() != null
                                 && !usuario.getBloqueadoHasta().isAfter(ahora)) {
 

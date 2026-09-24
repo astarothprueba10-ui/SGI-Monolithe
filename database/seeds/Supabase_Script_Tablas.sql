@@ -1,6 +1,6 @@
 -- =============================================================================
 -- ESQUEMA DEFINITIVO SGI MONOLITHE PARA SUPABASE / POSTGRESQL
--- Fuente de verdad: Database/Script - Tablas.sql (83 tablas normalizadas)
+-- Fuente de verdad: database/scripts/Script - Tablas.sql (83 tablas normalizadas)
 -- =============================================================================
 -- Conversion aplicada:
 --   AUTO_INCREMENT a columnas IDENTITY

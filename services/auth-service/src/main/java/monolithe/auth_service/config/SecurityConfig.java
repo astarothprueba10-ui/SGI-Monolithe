@@ -59,7 +59,6 @@ public class SecurityConfig {
 
                                 .authorizeHttpRequests(auth -> auth
 
-                                                // Rutas públicas
                                                 .requestMatchers(
                                                                 "/api/auth/login",
                                                                 "/api/auth/refresh",
@@ -115,12 +114,6 @@ public class SecurityConfig {
 
                 authoritiesConverter.setAuthoritiesClaimName("authorities");
 
-                /*
-                 * No agregamos prefijo porque el JWT ya contiene:
-                 * ROLE_ADMINISTRADOR
-                 * ROLE_GERENCIA
-                 * etc.
-                 */
                 authoritiesConverter.setAuthorityPrefix("");
 
                 JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

@@ -76,9 +76,6 @@ public class RefreshTokenService {
 
                 validarUsuario(usuario, ahora);
 
-                /*
-                 * El token actual deja de ser válido.
-                 */
                 sesionActual.setUltimaActividad(ahora);
                 sesionActual.setFechaRevocacion(ahora);
                 sesionActual.setMotivoRevocacion(
@@ -86,10 +83,6 @@ public class RefreshTokenService {
 
                 sessionRepository.save(sesionActual);
 
-                /*
-                 * Se genera una sesión nueva con un
-                 * Refresh Token completamente diferente.
-                 */
                 String nuevoRefreshToken = crearNuevaSesion(
                                 usuario,
                                 ipOrigen,
