@@ -145,9 +145,76 @@ graph TD
 
 ## 7. Base de Datos y Almacenamiento (`database/`)
 
-* **Motor:** PostgreSQL 17.6 administrado en Supabase Cloud.
-* **Esquema:** 102 tablas relacionales organizadas bajo principios de tercera forma normal (3NF), 181 índices de rendimiento, claves foráneas estrictas y Row Level Security (RLS) configurado por rol.
-* **Storage:** Buckets en Supabase Storage (`vouchers`, `contratos`, `planos`) con políticas de acceso privado.
+El modelo relacional esta desplegado sobre **PostgreSQL 17.6** en **Supabase Cloud** (region `us-west-2`). Cuenta con **102 tablas normalizadas** bajo Tercera Forma Normal (3NF), **181 indices** de alto rendimiento, claves foraneas estrictas y politicas **Row Level Security (RLS)** activadas por perfil de usuario.
+
+### 7.1. Diagrama Entidad-Relacion Core (Flujo Transaccional)
+
+```mermaid
+erDiagram
+    core_personas ||--o| seg_usuarios : "autentica como"
+    core_personas ||--o{ crm_prospectos : "origina"
+    core_personas ||--o{ com_asesores : "labora como"
+    
+    inm_proyectos ||--|{ inm_etapas : "contiene"
+    inm_etapas ||--|{ inm_manzanas : "divide en"
+    inm_manzanas ||--|{ inm_lotes : "alberga (70 lotes)"
+    
+    inm_lotes ||--o{ ven_reservas : "recibe reserva S/ 500"
+    inm_lotes ||--o| ven_ventas : "se adjudica en"
+    
+    crm_prospectos ||--o{ crm_visitas_terreno : "agenda visita"
+    crm_prospectos ||--o{ ven_reservas : "formaliza reserva"
+    
+    ven_ventas ||--|| ven_contratos : "emite"
+    ven_ventas ||--|| pag_planes_pago : "financia mediante"
+    
+    pag_planes_pago ||--|{ pag_cuotas : "divide en (hasta 36)"
+    pag_cuotas ||--o{ pag_vouchers : "sustenta con"
+    pag_vouchers ||--o| pag_pagos : "valida tesoreria"
+    
+    ven_ventas ||--o{ com_comisiones : "liquida (2% o 3%)"
+    com_asesores ||--o{ com_comisiones : "percibe"
+    
+    cms_consultas_web ||--o| crm_prospectos : "convierte a"
+```
+
+### 7.2. Catalogo de Tablas por Dominio y Modulo (102 Tablas)
+
+El modelo de datos se estructura en prefijos funcionales que organizan las 102 tablas del sistema:
+
+| Prefijo / Modulo | Nro. Tablas | Tablas Principales | Responsabilidad de Negocio |
+|---|:---:|---|---|
+| **`cfg_` (Configuracion)** | 41 | `cfg_estados_lote`, `cfg_estados_reserva`, `cfg_estados_venta`, `cfg_estados_cuota`, `cfg_metodos_pago`, `cfg_estados_voucher`, `cfg_tipos_asesor`, `cfg_estados_comision` | Catalogos inmutables de estados, tipos de documento, monedas, tarifas y parametros maestros del sistema. |
+| **`core_` (Entidades Base)** | 4 | `core_personas`, `core_personas_documentos`, `core_personas_contactos`, `core_personas_direcciones` | Repositorio maestro de identidad: clientes, prospectos, asesores y administradores sin duplicacion de datos personales. |
+| **`seg_` (Seguridad & RBAC)** | 7 | `seg_usuarios`, `seg_roles`, `seg_permisos`, `seg_usuarios_roles`, `seg_roles_permisos`, `seg_sesiones`, `aud_eventos` | Control de acceso basado en roles (`ADMIN`, `ASESOR`, `TESORERIA`, `CLIENTE`), registro de sesiones y auditoria de seguridad. |
+| **`inm_` (Inventario Inmobiliario)** | 8 | `inm_proyectos`, `inm_etapas`, `inm_manzanas`, `inm_lotes`, `inm_tarifas`, `inm_planos_interactivos`, `inm_multimedia_lote`, `inm_ajustes_precio` | Catalogo territorial de los **70 lotes**, metrajes, precios por m2, poligonos para planos vectoriales SVG y estado fisico (`Disponible`, `Separado`, `Vendido`, `Bloqueado`). |
+| **`crm_` (Gestion Comercial)** | 5 | `crm_prospectos`, `crm_seguimientos`, `crm_visitas_terreno`, `crm_consentimientos`, `crm_origenes` | Embudo de ventas, asignacion de asesores, historial de llamadas y agenda de visitas al terreno (L/M/V/S 11:00 AM y 03:00 PM). |
+| **`ven_` (Ventas y Separaciones)** | 6 | `ven_reservas`, `ven_ventas`, `ven_contratos`, `ven_documentos_venta`, `ven_titulares`, `ven_minutas` | Registro de separacion preventiva de **S/ 500.00** con control de caducidad a **7 dias calendario**, formalizacion de venta y generacion de contrato. |
+| **`pag_` (Financiamiento & Cuotas)** | 6 | `pag_planes_pago`, `pag_cuotas`, `pag_vouchers`, `pag_pagos`, `pag_aplicaciones_pago`, `pag_comprobantes` | Simulacion y generacion del cronograma de **hasta 36 cuotas**, verificacion de vouchers por tesoreria y alerta por **3 cuotas vencidas** (causal resolutoria). |
+| **`com_` (Comisiones)** | 6 | `com_asesores`, `com_reglas_comision`, `com_comisiones`, `com_liquidaciones`, `com_bonos`, `com_descuentos` | Motor de calculo de comisiones: **3% para venta al contado** y **2% para venta financiada**, condicionada a la firma del contrato formal con cuota inicial cancelada. |
+| **`cms_` (Web Publica & Leads)** | 5 | `cms_consultas_web`, `cms_paginas`, `cms_secciones`, `cms_multimedia`, `cms_parametros` | Recepcion de consultas web desde `apps/pagina-web`, contenido editable de paginas institucionales y configuracion de banners. |
+| **`fin_` & `not_` (Tesoreria & Alertas)** | 14 | `fin_cuentas_bancarias`, `fin_movimientos`, `not_notificaciones`, `not_envios`, `not_plantillas` | Conciliacion de cuentas de la empresa y despacho de alertas transaccionales (vencimientos y aprobacion de vouchers). |
+
+### 7.3. Flujo Transaccional de Datos entre Tablas
+
+```text
+1. Visitante envia formulario web           -> Insercion en cms_consultas_web
+2. Asesor califica la consulta             -> Creacion en core_personas + crm_prospectos
+3. Prospecto agenda visita al terreno       -> Registro en crm_visitas_terreno (L/M/V/S)
+4. Cliente abona S/ 500 para reservar lote  -> Registro en ven_reservas, lote pasa a Separado (7 dias)
+5. Cliente abona cuota inicial              -> Registro en ven_ventas + ven_contratos, lote pasa a Vendido
+6. Sistema genera plan de financiamiento   -> Insercion en pag_planes_pago + 36 filas en pag_cuotas
+7. Cliente sube comprobante mensual en DNI -> Creacion en pag_vouchers (Estado: Pendiente)
+8. Tesoreria revisa y aprueba voucher       -> Insercion en pag_pagos + actualizacion de cuota a Pagada
+9. Desembolso comercial tras contrato       -> Liquidacion en com_comisiones (3% contado o 2% financiado)
+```
+
+### 7.4. Almacenamiento en Supabase Storage
+
+Los documentos binarios residen en buckets privados de Supabase con URLs firmadas temporales:
+* **`vouchers/`**: Comprobantes de transferencia y depositos bancarios subidos por compradores.
+* **`contratos/`**: Copias digitales firmadas de contratos de compraventa y minutas en formato PDF.
+* **`planos/`**: Archivos vectoriales y planos de habilitacion urbana asociados a `inm_planos_interactivos`.
 
 ---
 
