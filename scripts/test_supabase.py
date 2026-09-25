@@ -25,11 +25,11 @@ def main():
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
 
-    db_password = os.environ.get('SUPABASE_DB_PASSWORD', 'REDACTED_DB_PASSWORD')
+    db_password = os.environ.get('SUPABASE_DB_PASSWORD', '')
 
     conn = pg8000.native.Connection(
-        user=os.environ.get('SUPABASE_DB_USER', 'postgres.REDACTED_PROJECT_REF'),
-        host=os.environ.get('SUPABASE_DB_HOST', 'REDACTED_POOLER_HOST'),
+        user=os.environ.get('SUPABASE_DB_USER', ''),
+        host=os.environ.get('SUPABASE_DB_HOST', ''),
         port=int(os.environ.get('SUPABASE_DB_PORT', 5432)),
         database='postgres',
         password=db_password,

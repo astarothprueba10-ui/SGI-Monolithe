@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
   const secretEnv = loadSecretEnv(path.join(secretDir, 'supabase.env'));
   const localEnv = loadEnv(mode, process.cwd(), '');
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || secretEnv.VITE_SUPABASE_URL || secretEnv.SUPABASE_URL || localEnv.VITE_SUPABASE_URL || 'https://REDACTED_PROJECT_REF.supabase.co';
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || secretEnv.VITE_SUPABASE_URL || secretEnv.SUPABASE_URL || localEnv.VITE_SUPABASE_URL || '';
   const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || secretEnv.VITE_SUPABASE_ANON_KEY || secretEnv.SUPABASE_ANON_KEY || localEnv.VITE_SUPABASE_ANON_KEY || '';
   const apiUrl = process.env.VITE_API_URL || secretEnv.VITE_API_URL || localEnv.VITE_API_URL || 'http://localhost:8082';
 

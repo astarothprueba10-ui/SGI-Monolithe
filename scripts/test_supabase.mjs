@@ -1,12 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://REDACTED_PROJECT_REF.supabase.co';
-const SUPABASE_ANON_KEY = 'REDACTED_PUBLISHABLE_KEY';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('ERROR: Variables SUPABASE_URL y SUPABASE_ANON_KEY requeridas.');
+    console.error('Ejecuta: source .env && node scripts/test_supabase.mjs');
+    process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function main() {
-    console.log('Conectando a Supabase vía @supabase/supabase-js...');
+    console.log('Conectando a Supabase via @supabase/supabase-js...');
     
     const { data: estados, error: errEstados } = await supabase
         .from('cfg_estados_lote')
@@ -14,11 +20,11 @@ async function main() {
         .order('orden', { ascending: true });
 
     if (errEstados) {
-        console.error('Error al consultar catálogo:', errEstados.message);
+        console.error('Error al consultar catalogo:', errEstados.message);
         return;
     }
 
-    console.log('\n1. Consulta de Catálogo (cfg_estados_lote):');
+    console.log('\n1. Consulta de Catalogo (cfg_estados_lote):');
     console.table(estados);
 
     console.log('\n2. Ejecutando Procedimiento Almacenado RPC: sp_listar_lotes_plano()');
@@ -28,7 +34,7 @@ async function main() {
     if (errRpc) {
         console.error('Error ejecutando RPC:', errRpc.message);
     } else {
-        console.log(`Procedimiento ejecutado con éxito. Total lotes devueltos: ${lotesPlano ? lotesPlano.length : 0}`);
+        console.log(`Procedimiento ejecutado con exito. Total lotes devueltos: ${lotesPlano ? lotesPlano.length : 0}`);
         if (lotesPlano && lotesPlano.length > 0) {
             console.table(lotesPlano.slice(0, 5));
         }
@@ -36,4 +42,3 @@ async function main() {
 }
 
 main();
-
