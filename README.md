@@ -18,6 +18,11 @@
 
 ---
 
+> **AVISO OBLIGATORIO PARA DESARROLLADORES Y AGENTES IA:**  
+> Antes de realizar cualquier cambio, consulta obligatoriamente la documentación técnica centralizada en [`docs/`](docs/INDICE_DOCUMENTACION.md) y las directrices maestras en [`AGENTS.md`](AGENTS.md). Toda la arquitectura, el modelo de base de datos y la planificación por Sprints están estandarizados allí.
+
+---
+
 ## Tabla de Contenidos
 
 1. [Visión General, Alcance y Objetivos](#1-visión-general-alcance-y-objetivos)

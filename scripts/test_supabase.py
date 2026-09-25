@@ -27,14 +27,31 @@ def main():
 
     db_password = os.environ.get('SUPABASE_DB_PASSWORD', '')
 
-    conn = pg8000.native.Connection(
-        user=os.environ.get('SUPABASE_DB_USER', ''),
-        host=os.environ.get('SUPABASE_DB_HOST', ''),
-        port=int(os.environ.get('SUPABASE_DB_PORT', 5432)),
-        database='postgres',
-        password=db_password,
-        ssl_context=ssl_context
-    )
+    host = os.environ.get('SUPABASE_DB_HOST', '')
+    user = os.environ.get('SUPABASE_DB_USER', '')
+    port = int(os.environ.get('SUPABASE_DB_PORT', 5432))
+
+    try:
+        conn = pg8000.native.Connection(
+            user=user,
+            host=host,
+            port=port,
+            database='postgres',
+            password=db_password,
+            ssl_context=ssl_context
+        )
+    except Exception:
+        pooler_host = os.environ.get('SUPABASE_POOLER_HOST', 'aws-0-us-west-2.pooler.supabase.com')
+        project_ref = os.environ.get('SUPABASE_PROJECT_REF', '')
+        pooler_user = f"postgres.{project_ref}" if project_ref and not user.startswith('postgres.') else user
+        conn = pg8000.native.Connection(
+            user=pooler_user,
+            host=pooler_host,
+            port=5432,
+            database='postgres',
+            password=db_password,
+            ssl_context=ssl_context
+        )
     print("Conectado exitosamente.\n")
 
     print("1. Lectura de Catálogo cfg_estados_lote:")
