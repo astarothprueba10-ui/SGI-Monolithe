@@ -46,7 +46,7 @@ export function MiLote() {
         <Card>
           <CardHeader
             title="Plano de la manzana"
-            description="Representación simplificada de la Mz. D con la ubicación de tu lote."
+            description={`Representación simplificada de la ${lote.manzana} con la ubicación de tu lote.`}
             icon={<LayoutPanelLeftIcon className="h-[18px] w-[18px]" />} />
           
           <div className="p-5">
