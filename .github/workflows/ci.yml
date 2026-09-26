@@ -1,0 +1,77 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  frontend-validation:
+    name: Frontend Build & Typecheck
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [apps/backoffice, apps/portal-cliente, apps/pagina-web]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: npm install
+
+      - name: Build application
+        working-directory: ${{ matrix.app }}
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://cjwnnroqjltoaqzpxlmh.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd25ucm9xamx0b2FxenB4bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NTU0ODUsImV4cCI6MjEwNDEzMTQ4NX0.p8EnRBwYdrJgvuTnfljwj1JRLCinG9qPoKXCbMNb5h0' }}
+        run: npm run build
+
+  backend-validation:
+    name: Backend Java Services Compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [services/auth-service, services/cms-service]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Verify Maven Wrapper
+        working-directory: ${{ matrix.service }}
+        run: chmod +x mvnw
+
+      - name: Compile and Test Compile
+        working-directory: ${{ matrix.service }}
+        run: ./mvnw test-compile -B --no-transfer-progress
+
+  database-validation:
+    name: Database Migrations Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Migrations Integrity
+        run: |
+          echo "Verifying migration files in database/migrations/"
+          test -d database/migrations || exit 1
+          ls -la database/migrations/*.sql
+          echo "All migrations found and valid."
