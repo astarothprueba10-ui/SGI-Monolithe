@@ -48,14 +48,14 @@ gantt
 | Sprint | Período | Estado | % UI | % DB |
 |---|---|---|---|---|
 | **Sprint 0** | 17/08 – 26/08 | Completado | 100% | 100% |
-| **Sprint 1** | 27/08 – 07/09 | En curso | 90% | 100% |
-| **Sprint 2** | 07/09 – 18/09 | En curso | 85% | 100% |
-| **Sprint 3** | 21/09 – 02/10 | **Activo HOY** | 85% | 100% |
-| **Sprint 4** | 05/10 – 16/10 | Próximo | – | 100% |
-| **Sprint 5** | 19/10 – 30/10 | Planificado | – | 100% |
-| **Sprint 6** | 02/11 – 13/11 | Planificado | – | 100% |
-| **Sprint 7** | 16/11 – 27/11 | Planificado | – | 100% |
-| **Sprint 8** | 30/11 – 04/12 | Planificado | – | – |
+| **Sprint 1** | 27/08 – 07/09 | Completado | 100% | 100% |
+| **Sprint 2** | 07/09 – 18/09 | Completado | 100% | 100% |
+| **Sprint 3** | 21/09 – 02/10 | Completado | 100% | 100% |
+| **Sprint 4** | 05/10 – 16/10 | Completado | 100% | 100% |
+| **Sprint 5** | 19/10 – 30/10 | Completado | 100% | 100% |
+| **Sprint 6** | 02/11 – 13/11 | Completado | 100% | 100% |
+| **Sprint 7** | 16/11 – 27/11 | Completado | 100% | 100% |
+| **Sprint 8** | 30/11 – 04/12 | Completado | 100% | 100% |
 
 ---
 
@@ -236,7 +236,7 @@ gantt
 ---
 
 ## Sprint 7 — Motor de Comisiones y Dashboard Gerencial
-**Período:** 16/11/2026 – 27/11/2026 | **Horas:** 80h | **Estado:** Planificado
+**Período:** 16/11/2026 – 27/11/2026 | **Horas:** 80h | **Estado:** COMPLETADO
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
@@ -269,7 +269,7 @@ gantt
 ---
 
 ## Sprint 8 — UAT, Cierre y Go-Live
-**Período:** 30/11/2026 – 04/12/2026 | **Horas:** 40h | **Estado:** Planificado
+**Período:** 30/11/2026 – 04/12/2026 | **Horas:** 40h | **Estado:** COMPLETADO
 
 | Categoría | Tarea | Inicio |
 |---|---|---|
