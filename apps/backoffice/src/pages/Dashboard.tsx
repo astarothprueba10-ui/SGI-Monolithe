@@ -18,8 +18,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { ROLE_KPIS } from '../data/kpis';
 import { COLLECTION_TREND, DASHBOARD_INTRO, SALES_TREND } from '../data/dashboard';
 import { LEAD_SOURCES } from '../data/crm';
-import { ADVISORS } from '../data/people';
+import { commissionsService } from '../services/commissionsService';
+import type { ManagerialKpis } from '../services/commissionsService';
 import type { RoleName } from '../types';
+import type { Kpi } from '../components/ui/KpiCard';
 
 interface ChartConfig {
   title: string;
@@ -83,9 +85,34 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
   }
 };
 
+function buildDynamicKpis(baseKpis: Kpi[], data: ManagerialKpis | null): Kpi[] {
+  if (!data) return baseKpis;
+  return baseKpis.map((kpi) => {
+    if (kpi.label.includes('Ventas')) return { ...kpi, value: `S/ ${(data.totalVentas / 1000).toFixed(1)}k`, hint: `S/ ${data.totalVentas.toLocaleString('es-PE')} total` };
+    if (kpi.label.includes('disponibles')) return { ...kpi, value: String(data.lotesDisponibles), hint: `de ${data.totalLotes} totales` };
+    if (kpi.label.includes('separados')) return { ...kpi, value: String(data.lotesReservados) };
+    if (kpi.label.includes('vendidos')) return { ...kpi, value: String(data.lotesVendidos) };
+    if (kpi.label.includes('Recaudación') || kpi.label.includes('Cobranza') || kpi.label.includes('cobrados')) {
+      return { ...kpi, value: `S/ ${(data.totalRecaudado / 1000).toFixed(1)}k`, hint: `S/ ${data.totalRecaudado.toLocaleString('es-PE')} cobrado` };
+    }
+    if (kpi.label.includes('Comisiones') || kpi.label.includes('comisión')) {
+      return { ...kpi, value: `S/ ${data.comisionesGeneradas.toLocaleString('es-PE')}`, hint: `S/ ${data.comisionesAprobadas.toLocaleString('es-PE')} aprobadas` };
+    }
+    return kpi;
+  });
+}
+
 export function Dashboard() {
   const { role, user, hasModule } = useAuth();
-  const kpis = ROLE_KPIS[role];
+  const [managerialKpis, setManagerialKpis] = React.useState<ManagerialKpis | null>(null);
+
+  React.useEffect(() => {
+    commissionsService.getManagerialKpis().then((res) => {
+      if (res) setManagerialKpis(res);
+    });
+  }, []);
+
+  const kpis = buildDynamicKpis(ROLE_KPIS[role], managerialKpis);
   const intro = DASHBOARD_INTRO[role];
   const chart = CHART_BY_ROLE[role];
 
