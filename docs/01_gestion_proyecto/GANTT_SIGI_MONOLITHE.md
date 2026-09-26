@@ -43,19 +43,19 @@ gantt
 
 ---
 
-## Estado Actual (23/09/2026)
+## Estado Actual (25/09/2026)
 
 | Sprint | Período | Estado | % UI | % DB |
 |---|---|---|---|---|
 | **Sprint 0** | 17/08 – 26/08 | Completado | 100% | 100% |
 | **Sprint 1** | 27/08 – 07/09 | Completado | 100% | 100% |
 | **Sprint 2** | 07/09 – 18/09 | Completado | 100% | 100% |
-| **Sprint 3** | 21/09 – 02/10 | Completado | 100% | 100% |
-| **Sprint 4** | 05/10 – 16/10 | Completado | 100% | 100% |
-| **Sprint 5** | 19/10 – 30/10 | Completado | 100% | 100% |
-| **Sprint 6** | 02/11 – 13/11 | Completado | 100% | 100% |
-| **Sprint 7** | 16/11 – 27/11 | Completado | 100% | 100% |
-| **Sprint 8** | 30/11 – 04/12 | Completado | 100% | 100% |
+| **Sprint 3** | 21/09 – 02/10 | En progreso (Semana 1) | 95% | 100% |
+| **Sprint 4** | 05/10 – 16/10 | Proximo | 0% | 100% |
+| **Sprint 5** | 19/10 – 30/10 | Planificado | 0% | 100% |
+| **Sprint 6** | 02/11 – 13/11 | Planificado | 0% | 100% |
+| **Sprint 7** | 16/11 – 27/11 | Planificado | 0% | 100% |
+| **Sprint 8** | 30/11 – 04/12 | Planificado | 0% | 100% |
 
 ---
 
