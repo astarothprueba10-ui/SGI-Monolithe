@@ -671,6 +671,36 @@ AS $$
     ORDER BY v.fecha_visita ASC;
 $$;
 
+-- 4.8. sp_confirmar_visita()
+CREATE OR REPLACE FUNCTION public.sp_confirmar_visita(p_id_visita BIGINT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE public.crm_visitas
+    SET estado = 'CONFIRMADA', fecha_actualizacion = now()
+    WHERE id_visita = p_id_visita;
+
+    RETURN jsonb_build_object('success', TRUE, 'id_visita', p_id_visita, 'estado', 'CONFIRMADA');
+END;
+$$;
+
+-- 4.9. sp_cancelar_visita()
+CREATE OR REPLACE FUNCTION public.sp_cancelar_visita(p_id_visita BIGINT, p_motivo TEXT DEFAULT 'Cancelada por cliente')
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE public.crm_visitas
+    SET estado = 'CANCELADA', observaciones = COALESCE(observaciones || ' | ', '') || p_motivo, fecha_actualizacion = now()
+    WHERE id_visita = p_id_visita;
+
+    RETURN jsonb_build_object('success', TRUE, 'id_visita', p_id_visita, 'estado', 'CANCELADA');
+END;
+$$;
+
 -- Permisos de ejecucion para API PostgREST
 GRANT EXECUTE ON FUNCTION public.sp_listar_prospectos() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.sp_listar_asesores() TO anon, authenticated, service_role;
@@ -679,3 +709,5 @@ GRANT EXECUTE ON FUNCTION public.sp_cambiar_etapa_prospecto(BIGINT, INT, TEXT) T
 GRANT EXECUTE ON FUNCTION public.sp_crear_prospecto(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, TEXT, BIGINT, TEXT) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.sp_agendar_visita(BIGINT, BIGINT, BIGINT, TIMESTAMPTZ, VARCHAR, VARCHAR, TEXT) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.sp_listar_visitas() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.sp_confirmar_visita(BIGINT) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.sp_cancelar_visita(BIGINT, TEXT) TO anon, authenticated, service_role;

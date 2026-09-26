@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DownloadIcon, PhoneIcon, PlusIcon, UserPlusIcon, UsersIcon } from 'lucide-react';
+import { CalendarIcon, CheckCircleIcon, DownloadIcon, PhoneIcon, PlusIcon, UserPlusIcon, XCircleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -13,7 +13,7 @@ import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { LEADS as INITIAL_LEADS, LEAD_SOURCES } from '../data/crm';
 import { SALES } from '../data/sales';
-import { crmService, type Advisor, type CreateLeadInput } from '../services/crmService';
+import { crmService, type Advisor, type CreateLeadInput, type Visit } from '../services/crmService';
 import { cn } from '../utils/cn';
 import { currency, percent } from '../utils/format';
 import type { Lead } from '../types';
@@ -53,22 +53,35 @@ export function Crm() {
   const [assignLead, setAssignLead] = useState<Lead | null>(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<number | null>(null);
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
+  const [isNewVisitOpen, setIsNewVisitOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CreateLeadInput>(INITIAL_FORM);
   const [leadsList, setLeadsList] = useState<Lead[]>(INITIAL_LEADS);
   const [advisorsList, setAdvisorsList] = useState<Advisor[]>([]);
+  const [visitsList, setVisitsList] = useState<Visit[]>([]);
+
+  const [visitForm, setVisitForm] = useState({
+    prospectId: 0,
+    advisorId: 0,
+    visitDate: '',
+    shift: '11:00' as '11:00' | '15:00',
+    meetingPoint: 'Oficina de Ventas - Lurin',
+    notes: ''
+  });
 
   const loadData = async () => {
     try {
-      const [leads, advisors] = await Promise.all([
+      const [leads, advisors, visits] = await Promise.all([
         crmService.getLeads(),
-        crmService.getAdvisors()
+        crmService.getAdvisors(),
+        crmService.getVisits()
       ]);
       if (leads.length > 0) setLeadsList(leads);
       if (advisors.length > 0) {
         setAdvisorsList(advisors);
         setSelectedAdvisorId(advisors[0].id);
       }
+      if (visits.length > 0) setVisitsList(visits);
     } catch (err) {
       console.warn('Cargando con datos locales fallback:', err);
     }
@@ -131,6 +144,52 @@ export function Crm() {
     }
   };
 
+  const handleScheduleVisitSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!visitForm.prospectId || !visitForm.advisorId || !visitForm.visitDate) {
+      toast.error('Campos requeridos', { description: 'Seleccione lead, asesor y fecha.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await crmService.scheduleVisit({
+        prospectId: visitForm.prospectId,
+        advisorId: visitForm.advisorId,
+        visitDate: new Date(`${visitForm.visitDate}T${visitForm.shift}:00Z`).toISOString(),
+        shift: visitForm.shift,
+        meetingPoint: visitForm.meetingPoint,
+        notes: visitForm.notes
+      });
+      toast.success('Visita agendada', { description: 'Visita oficial al terreno agendada con exito.' });
+      setIsNewVisitOpen(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error('Error al agendar visita', { description: err.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmVisit = async (id: number) => {
+    try {
+      await crmService.confirmVisit(id);
+      toast.success('Visita confirmada', { description: 'La asistencia ha sido confirmada.' });
+      await loadData();
+    } catch (err: any) {
+      toast.error('Error al confirmar', { description: err.message });
+    }
+  };
+
+  const handleCancelVisit = async (id: number) => {
+    try {
+      await crmService.cancelVisit(id, 'Cancelada por coordinacion');
+      toast.success('Visita cancelada', { description: 'La visita fue marcada como cancelada.' });
+      await loadData();
+    } catch (err: any) {
+      toast.error('Error al cancelar', { description: err.message });
+    }
+  };
+
   const buyers = SALES.filter((s) => s.type === 'Venta');
 
   return (
@@ -184,6 +243,7 @@ export function Crm() {
         onChange={setTab}
         items={[
           { id: 'leads', label: 'Leads y potenciales', count: leadsList.length },
+          { id: 'visitas', label: 'Agenda de visitas', count: visitsList.length },
           { id: 'asesores', label: 'Equipo de asesores', count: advisorsList.length },
           { id: 'compradores', label: 'Compradores', count: buyers.length },
           { id: 'fuentes', label: 'Fuentes de captacion' }
@@ -293,6 +353,106 @@ export function Crm() {
                           Asignar
                         </Button>
                       </Gate>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+            </Table>
+          )}
+        </Card>
+      )}
+
+      {tab === 'visitas' && (
+        <Card>
+          <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
+            <CardHeader
+              title="Agenda de visitas guiadas al terreno"
+              description="Coordinacion de traslados y visitas oficiales al proyecto (Miercoles a Domingo 11:00 AM y 3:00 PM)."
+            />
+            <Button
+              icon={CalendarIcon}
+              variant="primary"
+              onClick={() => {
+                if (leadsList.length > 0 && advisorsList.length > 0) {
+                  setVisitForm({
+                    prospectId: leadsList[0].rawId || 1,
+                    advisorId: advisorsList[0].id,
+                    visitDate: '',
+                    shift: '11:00',
+                    meetingPoint: 'Oficina de Ventas - Lurin',
+                    notes: ''
+                  });
+                }
+                setIsNewVisitOpen(true);
+              }}
+            >
+              Agendar visita
+            </Button>
+          </div>
+
+          {visitsList.length === 0 ? (
+            <EmptyState
+              title="No hay visitas agendadas"
+              description="Haga clic en 'Agendar visita' para coordinar un traslado con un prospecto."
+            />
+          ) : (
+            <Table
+              head={
+                <>
+                  <TH>Prospecto / Contacto</TH>
+                  <TH>Fecha y Turno</TH>
+                  <TH>Asesor comercial</TH>
+                  <TH>Punto de encuentro</TH>
+                  <TH align="center">Estado</TH>
+                  <TH align="right">Acciones</TH>
+                </>
+              }
+            >
+              {visitsList.map((vis) => (
+                <TR key={vis.id}>
+                  <TD>
+                    <p className="font-medium text-brand-900">{vis.prospectName}</p>
+                    <p className="text-[12px] text-brand-400">{vis.prospectPhone}</p>
+                  </TD>
+                  <TD>
+                    <p className="font-semibold text-brand-800">{vis.date}</p>
+                    <p className="text-[12px] text-brand-500">Turno {vis.shift}</p>
+                  </TD>
+                  <TD className="text-brand-700">{vis.advisorName}</TD>
+                  <TD className="text-brand-500 text-[12px]">{vis.meetingPoint}</TD>
+                  <TD align="center">
+                    <Badge
+                      tone={
+                        vis.status === 'CONFIRMADA'
+                          ? 'success'
+                          : vis.status === 'CANCELADA'
+                          ? 'danger'
+                          : 'brand'
+                      }
+                    >
+                      {vis.status}
+                    </Badge>
+                  </TD>
+                  <TD align="right">
+                    <div className="flex justify-end gap-1.5">
+                      {vis.status === 'PROGRAMADA' && (
+                        <Button
+                          size="sm"
+                          icon={CheckCircleIcon}
+                          onClick={() => handleConfirmVisit(vis.id)}
+                        >
+                          Confirmar
+                        </Button>
+                      )}
+                      {vis.status !== 'CANCELADA' && (
+                        <Button
+                          size="sm"
+                          icon={XCircleIcon}
+                          onClick={() => handleCancelVisit(vis.id)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
                     </div>
                   </TD>
                 </TR>
@@ -552,6 +712,98 @@ export function Crm() {
               placeholder="Ej. Los Jardines de Lurin · Mz. B"
             />
           </div>
+        </form>
+      </Modal>
+
+      {/* Modal Agendar Visita */}
+      <Modal
+        open={isNewVisitOpen}
+        onClose={() => setIsNewVisitOpen(false)}
+        title="Agendar visita guiada al terreno"
+        description="Coordinacion de visita bajo horarios oficiales (Miercoles a Domingo, 11:00 AM y 3:00 PM)."
+        footer={
+          <>
+            <Button onClick={() => setIsNewVisitOpen(false)} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={handleScheduleVisitSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Agendando...' : 'Confirmar visita'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleScheduleVisitSubmit} className="space-y-3">
+          <div>
+            <label className="text-[12px] font-medium text-brand-700">Prospecto interesado *</label>
+            <Select
+              value={visitForm.prospectId || ''}
+              onChange={(e) => setVisitForm({ ...visitForm, prospectId: Number(e.target.value) })}
+            >
+              {leadsList.map((l) => (
+                <option key={l.id} value={l.rawId || Number(l.id.replace(/\D/g, ''))}>
+                  {l.id} - {l.name} ({l.phone})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-[12px] font-medium text-brand-700">Asesor responsable *</label>
+            <Select
+              value={visitForm.advisorId || ''}
+              onChange={(e) => setVisitForm({ ...visitForm, advisorId: Number(e.target.value) })}
+            >
+              {advisorsList.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.code})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[12px] font-medium text-brand-700">Fecha de visita *</label>
+              <Input
+                type="date"
+                required
+                value={visitForm.visitDate}
+                onChange={(e) => setVisitForm({ ...visitForm, visitDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-brand-700">Turno oficial *</label>
+              <Select
+                value={visitForm.shift}
+                onChange={(e) => setVisitForm({ ...visitForm, shift: e.target.value as any })}
+              >
+                <option value="11:00">11:00 AM (Manana)</option>
+                <option value="15:00">3:00 PM (Tarde)</option>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[12px] font-medium text-brand-700">Punto de encuentro</label>
+            <Input
+              value={visitForm.meetingPoint}
+              onChange={(e) => setVisitForm({ ...visitForm, meetingPoint: e.target.value })}
+              placeholder="Ej. Oficina de Ventas - Lurin"
+            />
+          </div>
+
+          <div>
+            <label className="text-[12px] font-medium text-brand-700">Notas de traslado</label>
+            <Input
+              value={visitForm.notes}
+              onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })}
+              placeholder="Ej. 2 personas, movilidad de la empresa"
+            />
+          </div>
+
+          <p className="text-[11px] text-brand-400">
+            Regla de negocio: Las visitas oficiales solo se programan de Miercoles a Domingo en los turnos autorizados de 11:00 y 15:00.
+          </p>
         </form>
       </Modal>
     </div>

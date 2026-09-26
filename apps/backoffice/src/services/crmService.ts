@@ -23,6 +23,31 @@ export interface CreateLeadInput {
   notes?: string;
 }
 
+export interface Visit {
+  id: number;
+  prospectId: number;
+  prospectName: string;
+  prospectPhone: string;
+  advisorId: number;
+  advisorName: string;
+  projectName: string;
+  date: string;
+  shift: string;
+  status: 'PROGRAMADA' | 'CONFIRMADA' | 'REALIZADA' | 'CANCELADA' | 'REPROGRAMADA';
+  meetingPoint: string;
+  notes: string | null;
+}
+
+export interface ScheduleVisitInput {
+  prospectId: number;
+  advisorId: number;
+  projectId?: number;
+  visitDate: string;
+  shift: '11:00' | '15:00';
+  meetingPoint?: string;
+  notes?: string;
+}
+
 interface RawProspecto {
   id_prospecto: number;
   codigo: string;
@@ -181,6 +206,78 @@ export const crmService = {
     if (error) {
       console.error('Error al registrar prospecto:', error);
       throw new Error(`Fallo creacion de prospecto: ${error.message}`);
+    }
+    return Boolean(data?.success);
+  },
+
+  /**
+   * Obtiene la lista completa de visitas guiadas programadas.
+   */
+  async getVisits(): Promise<Visit[]> {
+    const { data, error } = await supabase.rpc('sp_listar_visitas');
+    if (error) {
+      console.error('Error al listar visitas:', error);
+      throw new Error(`Fallo consulta de visitas: ${error.message}`);
+    }
+    return ((data as any[]) || []).map((r) => ({
+      id: Number(r.id_visita),
+      prospectId: Number(r.id_prospecto),
+      prospectName: r.prospecto_nombre,
+      prospectPhone: r.prospecto_telefono,
+      advisorId: Number(r.id_asesor),
+      advisorName: r.asesor_nombre,
+      projectName: r.proyecto_nombre,
+      date: new Date(r.fecha_visita).toLocaleDateString('es-PE'),
+      shift: r.turno,
+      status: r.estado,
+      meetingPoint: r.punto_encuentro,
+      notes: r.observaciones
+    }));
+  },
+
+  /**
+   * Agenda una nueva visita guiada con validacion oficial de dias y turnos.
+   */
+  async scheduleVisit(input: ScheduleVisitInput): Promise<boolean> {
+    const { data, error } = await supabase.rpc('sp_agendar_visita', {
+      p_id_prospecto: input.prospectId,
+      p_id_asesor: input.advisorId,
+      p_id_proyecto: input.projectId || 2,
+      p_fecha_visita: input.visitDate,
+      p_turno: input.shift,
+      p_punto_encuentro: input.meetingPoint || 'Oficina de Ventas - Lurin',
+      p_observaciones: input.notes || null
+    });
+    if (error) {
+      console.error('Error al agendar visita:', error);
+      throw new Error(`Fallo al agendar visita: ${error.message}`);
+    }
+    return Boolean(data?.success);
+  },
+
+  /**
+   * Confirma la asistencia de un prospecto a una visita guiada.
+   */
+  async confirmVisit(visitId: number): Promise<boolean> {
+    const { data, error } = await supabase.rpc('sp_confirmar_visita', { p_id_visita: visitId });
+    if (error) {
+      console.error('Error al confirmar visita:', error);
+      throw new Error(`Fallo confirmacion de visita: ${error.message}`);
+    }
+    return Boolean(data?.success);
+  },
+
+  /**
+   * Cancela una visita guiada registrando el motivo.
+   */
+  async cancelVisit(visitId: number, reason?: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('sp_cancelar_visita', {
+      p_id_visita: visitId,
+      p_motivo: reason || 'Cancelada por cliente'
+    });
+    if (error) {
+      console.error('Error al cancelar visita:', error);
+      throw new Error(`Fallo cancelacion de visita: ${error.message}`);
     }
     return Boolean(data?.success);
   }
