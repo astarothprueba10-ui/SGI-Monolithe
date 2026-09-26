@@ -12,13 +12,7 @@ export interface OverdueContractAlert {
   contractStatus: string;
 }
 
-/**
- * Servicio de gestion de financiamiento, cuotas, semaforo de mora y vouchers.
- */
 export const financingService = {
-  /**
-   * Lista el cronograma de cuotas con semaforo financiero para una venta.
-   */
   async getInstallments(saleId: number): Promise<Installment[]> {
     const { data, error } = await supabase.rpc('sp_listar_cronograma_venta', {
       p_id_venta: saleId
@@ -41,9 +35,6 @@ export const financingService = {
     }));
   },
 
-  /**
-   * Obtiene la bandeja de vouchers para validacion de tesoreria.
-   */
   async getVouchers(): Promise<Voucher[]> {
     const { data, error } = await supabase.rpc('sp_listar_vouchers_tesoreria');
     if (error) {
@@ -63,14 +54,11 @@ export const financingService = {
     }));
   },
 
-  /**
-   * Valida o rechaza un voucher de pago y amortiza la cuota.
-   */
   async validateVoucher(voucherId: number, action: 'APROBAR' | 'RECHAZAR', reason?: string) {
     const { data, error } = await supabase.rpc('sp_validar_voucher', {
       p_id_voucher: voucherId,
       p_accion: action,
-      p_id_usuario: 3, // Usuario administrador
+      p_id_usuario: 3,
       p_motivo_rechazo: reason || null
     });
 
@@ -78,9 +66,6 @@ export const financingService = {
     return data;
   },
 
-  /**
-   * Evalua la clausula resolutoria en cartera (3 o mas cuotas vencidas).
-   */
   async evaluateResolutoryClause(): Promise<OverdueContractAlert[]> {
     const { data, error } = await supabase.rpc('sp_evaluar_clausula_resolutoria');
     if (error) {
@@ -100,9 +85,6 @@ export const financingService = {
     }));
   },
 
-  /**
-   * Actualiza el semaforo de mora de cuotas en toda la cartera.
-   */
   async updateInstallmentsOverdue() {
     const { data, error } = await supabase.rpc('sp_actualizar_estados_cuotas');
     if (error) throw new Error(error.message);

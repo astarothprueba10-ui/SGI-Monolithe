@@ -80,9 +80,6 @@ interface RawAsesor {
   leads_activos: string | number;
 }
 
-/**
- * Mapea la fila cruda de base de datos a la interfaz Lead del Backoffice.
- */
 function mapRawToLead(raw: RawProspecto): Lead {
   const stageMap: Record<string, Lead['stage']> = {
     NUEVO: 'Nuevo',
@@ -120,13 +117,7 @@ function mapRawToLead(raw: RawProspecto): Lead {
   };
 }
 
-/**
- * Servicio de CRM para gestion de prospectos, embudo y asesores comerciales.
- */
 export const crmService = {
-  /**
-   * Obtiene la lista completa de prospectos desde Supabase.
-   */
   async getLeads(): Promise<Lead[]> {
     const { data, error } = await supabase.rpc('sp_listar_prospectos');
     if (error) {
@@ -136,9 +127,6 @@ export const crmService = {
     return ((data as RawProspecto[]) || []).map(mapRawToLead);
   },
 
-  /**
-   * Obtiene la lista de asesores comerciales activos con su carga de leads.
-   */
   async getAdvisors(): Promise<Advisor[]> {
     const { data, error } = await supabase.rpc('sp_listar_asesores');
     if (error) {
@@ -156,9 +144,6 @@ export const crmService = {
     }));
   },
 
-  /**
-   * Asigna un prospecto a un asesor comercial.
-   */
   async assignLead(prospectId: number, advisorId: number, reason = 'Asignacion manual'): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_asignar_prospecto_asesor', {
       p_id_prospecto: prospectId,
@@ -172,9 +157,6 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  /**
-   * Modifica la etapa del embudo comercial para un prospecto.
-   */
   async updateLeadStage(prospectId: number, stageId: number, note?: string): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_cambiar_etapa_prospecto', {
       p_id_prospecto: prospectId,
@@ -188,9 +170,6 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  /**
-   * Crea un nuevo prospecto y lo registra en el embudo comercial.
-   */
   async createLead(input: CreateLeadInput): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_crear_prospecto', {
       p_nombres: input.names,
@@ -210,9 +189,6 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  /**
-   * Obtiene la lista completa de visitas guiadas programadas.
-   */
   async getVisits(): Promise<Visit[]> {
     const { data, error } = await supabase.rpc('sp_listar_visitas');
     if (error) {
@@ -235,9 +211,6 @@ export const crmService = {
     }));
   },
 
-  /**
-   * Agenda una nueva visita guiada con validacion oficial de dias y turnos.
-   */
   async scheduleVisit(input: ScheduleVisitInput): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_agendar_visita', {
       p_id_prospecto: input.prospectId,
@@ -255,9 +228,6 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  /**
-   * Confirma la asistencia de un prospecto a una visita guiada.
-   */
   async confirmVisit(visitId: number): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_confirmar_visita', { p_id_visita: visitId });
     if (error) {
@@ -267,9 +237,6 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  /**
-   * Cancela una visita guiada registrando el motivo.
-   */
   async cancelVisit(visitId: number, reason?: string): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_cancelar_visita', {
       p_id_visita: visitId,

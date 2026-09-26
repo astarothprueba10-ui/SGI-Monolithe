@@ -1,13 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Lot, LotStatus, Project } from '../types';
 
-/**
- * Servicio para consultar y gestionar lotes y proyectos desde Supabase.
- */
 export const lotsService = {
-  /**
-   * Obtiene la lista completa de lotes para el plano interactivo y catalogo.
-   */
   async getLots(projectId?: number): Promise<Lot[]> {
     const { data, error } = await supabase.rpc('sp_listar_lotes_plano', {
       p_id_proyecto: projectId || null
@@ -23,7 +17,7 @@ export const lotsService = {
       const price = Number(r.precio_base) || 0;
       const blockLetter = r.manzana_nombre?.split(' ')[1] || 'A';
       const colNum = parseInt(r.numero_lote, 10) || 1;
-      const rowNum = blockLetter.charCodeAt(0) - 64; // A=1, B=2, C=3...
+      const rowNum = blockLetter.charCodeAt(0) - 64;
 
       let status: LotStatus = 'Disponible';
       if (r.estado_codigo === 'RESERVADO' || r.estado_codigo === 'SEPARADO') {
@@ -49,9 +43,6 @@ export const lotsService = {
     });
   },
 
-  /**
-   * Obtiene la lista de proyectos inmobiliarios activos.
-   */
   async getProjects(): Promise<Project[]> {
     const { data, error } = await supabase
       .from('inm_proyectos')
@@ -79,9 +70,6 @@ export const lotsService = {
     }));
   },
 
-  /**
-   * Registra una separacion oficial de S/ 500 con plazo de 7 dias calendario.
-   */
   async reserveLot(lotId: number, personaId: number, userId?: number, notes?: string) {
     return await supabase.rpc('sp_registrar_separacion', {
       p_id_lote: lotId,
@@ -91,9 +79,6 @@ export const lotsService = {
     });
   },
 
-  /**
-   * Cambia el estado de un lote registrando la transicion en el historial.
-   */
   async updateLotStatus(lotId: number, newStatus: string, userId?: number, reason?: string) {
     return await supabase.rpc('sp_cambiar_estado_lote', {
       p_id_lote: lotId,

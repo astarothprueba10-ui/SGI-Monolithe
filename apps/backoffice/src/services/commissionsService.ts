@@ -29,13 +29,7 @@ export interface ManagerialKpis {
   comisionesAprobadas: number;
 }
 
-/**
- * Servicio de liquidacion de comisiones y KPIs ejecutivos.
- */
 export const commissionsService = {
-  /**
-   * Obtiene el reporte de liquidacion de comisiones por asesor.
-   */
   async getSettlements(): Promise<CommissionSettlement[]> {
     const { data, error } = await supabase.rpc('sp_listar_liquidaciones_asesores');
     if (error) {
@@ -61,9 +55,6 @@ export const commissionsService = {
     }));
   },
 
-  /**
-   * Calcula la comision para una venta (3% Contado, 2% Financiado).
-   */
   async calculateCommission(saleId: number, advisorId: number = 1) {
     const { data, error } = await supabase.rpc('sp_calcular_comision_venta', {
       p_id_venta: saleId,
@@ -74,9 +65,6 @@ export const commissionsService = {
     return data;
   },
 
-  /**
-   * Aprueba el devengo de comision verificando contrato formal vigente.
-   */
   async approveCommission(commissionId: number, userId: number = 3) {
     const { data, error } = await supabase.rpc('sp_aprobar_devengo_comision', {
       p_id_comision: commissionId,
@@ -87,9 +75,6 @@ export const commissionsService = {
     return data;
   },
 
-  /**
-   * Consulta los KPIs consolidados del dashboard ejecutivo.
-   */
   async getManagerialKpis(): Promise<ManagerialKpis | null> {
     const { data, error } = await supabase.rpc('sp_obtener_kpis_gerenciales');
     if (error) {

@@ -34,7 +34,6 @@ export function Financing() {
   const loadFinancingData = async () => {
     setLoading(true);
     try {
-      // 1. Cargar cuotas de la venta financiada en curso (VTA-2026-0001, id_venta = 2)
       const liveCuotas = await financingService.getInstallments(2);
       if (liveCuotas && liveCuotas.length > 0) {
         const mergedCuotas = [
@@ -44,7 +43,6 @@ export function Financing() {
         setInstallmentsList(mergedCuotas);
       }
 
-      // 2. Cargar bandeja de vouchers en vivo
       const liveVouchers = await financingService.getVouchers();
       if (liveVouchers && liveVouchers.length > 0) {
         const mergedVouchers = [
@@ -54,7 +52,6 @@ export function Financing() {
         setVouchersList(mergedVouchers);
       }
 
-      // 3. Evaluar alertas de clausula resolutoria
       const alerts = await financingService.evaluateResolutoryClause();
       setResolutoryAlerts(alerts.filter((a) => a.applicableClause));
     } catch (err: any) {
@@ -82,7 +79,6 @@ export function Financing() {
     try {
       const vId = parseInt(voucherIdStr, 10);
       if (isNaN(vId)) {
-        // Voucher mockeado
         toast.success(action === 'APROBAR' ? 'Voucher aprobado' : 'Voucher rechazado');
         setVouchersList((prev) =>
           prev.map((v) => (v.id === voucherIdStr ? { ...v, status: action === 'APROBAR' ? 'Aprobado' : 'Rechazado' } : v))

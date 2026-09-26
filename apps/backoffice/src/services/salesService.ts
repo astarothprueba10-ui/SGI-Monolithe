@@ -25,13 +25,7 @@ export interface SalesFilter {
   tab?: 'todas' | 'Separación' | 'Venta';
 }
 
-/**
- * Servicio de gestion de ventas, separaciones y contratos.
- */
 export const salesService = {
-  /**
-   * Obtiene la lista unificada de ventas y separaciones formalizadas.
-   */
   async getSales(): Promise<Sale[]> {
     const { data, error } = await supabase.rpc('sp_listar_ventas');
     if (error) {
@@ -56,9 +50,6 @@ export const salesService = {
     }));
   },
 
-  /**
-   * Formaliza una venta al contado con minuta de compraventa.
-   */
   async formalizeCashSale(input: FormalizeCashInput) {
     const { data, error } = await supabase.rpc('sp_formalizar_venta_contado', {
       p_id_lote: input.lotId,
@@ -73,9 +64,6 @@ export const salesService = {
     return data;
   },
 
-  /**
-   * Formaliza una venta financiada generando cronograma y contrato.
-   */
   async formalizeFinancedSale(input: FormalizeFinancedInput) {
     const { data, error } = await supabase.rpc('sp_formalizar_venta_financiada', {
       p_id_lote: input.lotId,
@@ -92,9 +80,6 @@ export const salesService = {
     return data;
   },
 
-  /**
-   * Ejecuta el control de caducidad para revertir separaciones mayores a 7 dias.
-   */
   async expireOverdueReservations() {
     const { data, error } = await supabase.rpc('sp_caducar_separaciones_vencidas');
     if (error) throw new Error(error.message);

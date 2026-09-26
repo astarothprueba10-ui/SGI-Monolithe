@@ -25,7 +25,6 @@ export function Sales() {
   const [salesList, setSalesList] = useState<Sale[]>(SALES);
   const [loading, setLoading] = useState(false);
 
-  // Modal para nueva formalización
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [availableLots, setAvailableLots] = useState<Lot[]>([]);
   const [formLotId, setFormLotId] = useState('');
@@ -40,7 +39,6 @@ export function Sales() {
     try {
       const liveSales = await salesService.getSales();
       if (liveSales && liveSales.length > 0) {
-        // Combinar ventas en vivo con mock de separaciones para vista completa
         const merged = [
           ...liveSales,
           ...SALES.filter((s) => !liveSales.some((ls) => ls.code === s.code))
@@ -95,7 +93,7 @@ export function Sales() {
       if (formModality === 'Contado') {
         await salesService.formalizeCashSale({
           lotId: lotIdNum,
-          personaId: 13, // Persona regular por defecto
+          personaId: 13,
           totalAmount: totalNum
         });
         toast.success('Venta al contado formalizada exitosamente');

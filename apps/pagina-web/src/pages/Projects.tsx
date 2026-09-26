@@ -32,7 +32,6 @@ export function Projects() {
         setListaProyectos(mapeados);
       }
     } catch {
-      // Si la API remota no está activa, mantiene los proyectos estáticos locales
     }
   }
 

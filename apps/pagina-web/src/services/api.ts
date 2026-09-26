@@ -73,15 +73,11 @@ export async function enviarConsulta(payload: ConsultaPayload): Promise<Consulta
       return await response.json();
     }
   } catch {
-    // Si el backend no está disponible, intentar inserción directa en Supabase
   }
 
   return enviarConsultaDirectoSupabase(payload);
 }
 
-/**
- * Inserción directa en la tabla cms_consultas_web de Supabase.
- */
 async function enviarConsultaDirectoSupabase(payload: ConsultaPayload): Promise<ConsultaResponse> {
   const codigo = generarCodigoSeguimiento();
   const fechaRecepcion = new Date().toISOString();
@@ -90,7 +86,7 @@ async function enviarConsultaDirectoSupabase(payload: ConsultaPayload): Promise<
     .from('cms_consultas_web')
     .insert([
       {
-        id_estado_consulta_web: 6, // Estado NUEVA
+        id_estado_consulta_web: 6,
         codigo: codigo,
         nombres: payload.nombre.trim(),
         correo: payload.correo?.trim() || null,
@@ -145,7 +141,6 @@ export async function obtenerProyectosPublicos(): Promise<ProyectoDto[]> {
       }
     }
   } catch {
-    // Si falla el backend, consultar Supabase directamente
   }
 
   const { data, error } = await supabase
@@ -175,9 +170,6 @@ export async function obtenerProyectosPublicos(): Promise<ProyectoDto[]> {
   }));
 }
 
-/**
- * Obtiene la lista de páginas publicadas para la web pública.
- */
 export async function obtenerPaginasPublicadas(): Promise<PaginaDto[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/public/paginas`, {
@@ -188,7 +180,6 @@ export async function obtenerPaginasPublicadas(): Promise<PaginaDto[]> {
       return await response.json();
     }
   } catch {
-    // Fallback a Supabase
   }
 
   const { data, error } = await supabase

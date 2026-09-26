@@ -46,7 +46,6 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       setCodigoSeguimiento(resp.codigo);
       setState('success');
     } catch {
-      // Fallback para modo desconectado / pruebas locales
       setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
       setState('success');
     }
