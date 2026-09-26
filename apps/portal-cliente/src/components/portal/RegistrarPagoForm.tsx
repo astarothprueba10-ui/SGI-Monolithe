@@ -11,6 +11,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { cuotas } from '../../data/portal';
 import { formatCurrency, formatDate } from '../../utils/format';
+import { supabase } from '../../lib/supabase';
 
 const medios = [
 'Transferencia BCP',
@@ -56,12 +57,27 @@ export function RegistrarPagoForm() {
 
   async function confirmar() {
     setEnviando(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setEnviando(false);
-    setConfirmando(false);
-    setExito(true);
-    setOperacion('');
-    setArchivo(null);
+    try {
+      await supabase.rpc('sp_registrar_pago_voucher', {
+        p_id_venta: 2,
+        p_id_cuota: 37,
+        p_monto: cuotaSel?.monto || 2400.0,
+        p_id_metodo_pago: medio.includes('BCP') || medio.includes('Interbank') ? 6 : medio.includes('Yape') ? 8 : 7,
+        p_numero_operacion: operacion,
+        p_nombre_archivo: archivo || 'voucher.pdf',
+        p_clave_archivo: `vouchers/2026/${Date.now()}_${archivo || 'voucher.pdf'}`,
+        p_hash_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        p_id_usuario: 3
+      });
+      setExito(true);
+      setOperacion('');
+      setArchivo(null);
+    } catch (err: any) {
+      setError('Error al registrar voucher: ' + err.message);
+    } finally {
+      setEnviando(false);
+      setConfirmando(false);
+    }
   }
 
   return (
