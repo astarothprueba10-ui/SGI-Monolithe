@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   DownloadIcon,
@@ -17,6 +17,7 @@ import { EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { LOTS, PROJECTS } from '../data/projects';
+import { lotsService } from '../services/lotsService';
 import { area as fmtArea, currency, number } from '../utils/format';
 import { cn } from '../utils/cn';
 import type { Lot, LotStatus } from '../types';
@@ -35,9 +36,22 @@ export function LotMap() {
   const [active, setActive] = useState<LotStatus[]>(STATUSES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reserveOpen, setReserveOpen] = useState(false);
+  const [lots, setLots] = useState<Lot[]>(LOTS);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const project = PROJECTS.find((p) => p.id === projectId)!;
-  const projectLots = useMemo(() => LOTS.filter((l) => l.projectId === projectId), [projectId]);
+  useEffect(() => {
+    lotsService.getLots().then((liveLots) => {
+      if (liveLots.length > 0) {
+        setLots(liveLots);
+      }
+    });
+  }, []);
+
+  const project = PROJECTS.find((p) => p.id === projectId) || PROJECTS[0];
+  const projectLots = useMemo(() => {
+    const filtered = lots.filter((l) => l.projectId === projectId || projectId === 'PRJ-01' || l.projectId === '2');
+    return filtered.length > 0 ? filtered : lots;
+  }, [lots, projectId]);
 
   const counts = useMemo(
     () =>
@@ -298,27 +312,40 @@ export function LotMap() {
         open={reserveOpen}
         onClose={() => setReserveOpen(false)}
         title={`Separar lote ${selected?.code ?? ''}`}
-        description="La separación queda en estado “En revisión” hasta validar el voucher."
+        description="La separación oficial bloquea el lote por 7 días calendario con abono de S/ 500.00."
         footer={
         <>
             <Button onClick={() => setReserveOpen(false)}>Cancelar</Button>
             <Button
             variant="primary"
-            onClick={() => {
+            disabled={isSubmitting}
+            onClick={async () => {
+              if (!selected) return;
+              setIsSubmitting(true);
+              const res = await lotsService.reserveLot(Number(selected.id), 4, undefined, 'Separacion desde Backoffice');
+              setIsSubmitting(false);
               setReserveOpen(false);
-              toast.success('Separación registrada', {
-                description: `Lote ${selected?.code} pasó a estado Separado.`
-              });
+
+              if (res.error) {
+                toast.error('Error al registrar separacion', { description: res.error.message });
+              } else {
+                setLots((prev) =>
+                  prev.map((l) => (l.id === selected.id ? { ...l, status: 'Separado' as LotStatus } : l))
+                );
+                toast.success('Separación registrada', {
+                  description: `Lote ${selected?.code} pasó a estado Separado con S/ 500.`
+                });
+              }
             }}>
             
-              Confirmar separación
+              {isSubmitting ? 'Procesando...' : 'Confirmar separación'}
             </Button>
           </>
         }>
         
         <div className="space-y-3 text-[13px] text-brand-600">
           <p>
-            Se generará una separación por {currency(3000)} con vigencia de 7 días calendario para{' '}
+            Se generará una separación por <span className="font-semibold text-brand-900">{currency(500)}</span> con vigencia de 7 días calendario para{' '}
             <span className="font-medium text-brand-900">
               {selected ? `${selected.block} · ${selected.code}` : ''}
             </span>

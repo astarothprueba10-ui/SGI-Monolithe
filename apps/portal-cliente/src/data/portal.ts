@@ -21,28 +21,28 @@ export const cliente: Cliente = {
 };
 
 export const lote: Lote = {
-  proyecto: 'Residencial Monolithe Valle Verde',
-  ubicacion: 'Km 12.5 Carretera Central, Cieneguilla, Lima',
-  etapa: 'Etapa II',
-  manzana: 'Mz. D',
-  numero: 'Lote 14',
-  area: 162.5,
-  precio: 78500,
-  estado: 'Vendido — en financiamiento',
-  frente: 6.5,
-  fondo: 25,
+  proyecto: 'Habilitación Urbana Los Jardines de Lurín',
+  ubicacion: 'Km 32.5 Panamericana Sur, Lurín, Lima',
+  etapa: 'Etapa I',
+  manzana: 'Mz. A',
+  numero: 'Lote 01',
+  area: 120,
+  precio: 108000,
+  estado: 'Separado — en formalización',
+  frente: 8,
+  fondo: 15,
   uso: 'Residencial unifamiliar',
   partida: 'P.E. 11 452 908'
 };
 
 export const financiamiento: Financiamiento = {
-  precioTotal: 78500,
-  inicial: 15700,
-  montoFinanciado: 62800,
-  totalPagado: 31400.05,
-  saldoPendiente: 47099.95,
+  precioTotal: 108000,
+  inicial: 21600,
+  montoFinanciado: 86400,
+  totalPagado: 38400.00,
+  saldoPendiente: 69600.00,
   cuotasTotales: 36,
-  cuotasPagadas: 9,
+  cuotasPagadas: 7,
   tea: 11.5
 };
 

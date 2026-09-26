@@ -11,7 +11,9 @@
 **SIGI MONOLITHE** es la plataforma tecnológica centralizada para la gestión de proyectos de habilitación urbana e inmobiliaria, diseñada para optimizar el ciclo completo de negocio: desde la prospección de clientes y visualización de planos, hasta la formalización de ventas, financiamiento directo en cuotas y liquidación de comisiones.
 
 ### Stack Tecnológico Oficial
-* **Frontend Web:** React 18 + TypeScript + Vite + Tailwind CSS (`apps/admin-dashboard` y `apps/portal-cliente`).
+* **Frontend Backoffice:** React 18 + TypeScript + Vite + CSS (`apps/backoffice`).
+* **Frontend Web Publica:** React 18 + TypeScript + Vite + CSS (`apps/pagina-web`).
+* **Frontend Portal Cliente:** React 18 + TypeScript + Vite + CSS (`apps/portal-cliente`).
 * **Backend & Base de Datos:** Supabase (PostgreSQL 17.6) en región `us-west-2` con Row Level Security (RLS) y extensiones `uuid-ossp` y `pgcrypto`.
 * **Diseño UI/UX:** Prototipado en Figma y componentes con Framer Motion y Lucide Icons.
 * **Modelo de Datos:** 102 tablas normalizadas y 181 índices de alto rendimiento.
@@ -39,7 +41,7 @@ flowchart LR
 | Sprint | Fechas Oficiales | Horas | Objetivo Central y Entregables | Estado Actual |
 |---|---|---|---|---|
 | **Sprint 0** | **17/08/2026 – 26/08/2026** | 64h | **Fundamentos, Base de Datos y UX/UI:** Modelo entidad-relación de 102 tablas en Supabase, scripts de migración, catálogos iniciales y wireframes Figma. | **100% COMPLETADO** |
-| **Sprint 1** | **27/08/2026 – 07/09/2026** | 80h | **Seguridad, Autenticación y Auditoría:** Login en ambas apps (`admin-dashboard` y `portal-cliente`), roles RBAC (`ADMIN`, `ASESOR`, `TESORERIA`, `CLIENTE`) y tabla `aud_eventos`. | **90% COMPLETADO** |
+| **Sprint 1** | **27/08/2026 - 07/09/2026** | 80h | **Seguridad, Autenticacion y Auditoria:** Login en las tres apps (`backoffice`, `pagina-web` y `portal-cliente`), roles RBAC (`ADMINISTRADOR`, `ASESOR`, `FINANZAS`, `CLIENTE`) y tabla `aud_eventos`. | **90% COMPLETADO** |
 | **Sprint 2** | **07/09/2026 – 18/09/2026** | 192h | **Catálogo Inmobiliario y Plano SVG:** Gestión de proyectos, manzanas y los **70 lotes**. Plano interactivo vectorial SVG con filtros por estado (`Disponible`, `Separado`, `Vendido`, `Bloqueado`). | **85% UI / 100% DB** |
 | **Sprint 3** | **21/09/2026 – 02/10/2026** | 80h | **CRM Inmobiliario y Agenda de Visitas:** Captura de prospectos (leads), embudo de conversión y módulo de agenda de visitas al terreno con validación de horarios oficiales. | **85% UI / 100% DB** |
 | **Sprint 4** | **05/10/2026 – 16/10/2026** | 88h | **Ventas y Separaciones:** Registro de separación de **S/ 500.00**, control de plazo de **7 días calendario**, generación de contrato de compraventa y formalización de clientes. | **85% UI / 100% DB** |
@@ -112,7 +114,7 @@ Para garantizar que el equipo no trabaje en tareas redundantes ni sea evaluado s
 
 ## 5. Mapeo del Sistema con las Aplicaciones en el Repositorio
 
-| Módulo del Gantt | Vistas Implementadas en `apps/admin-dashboard` | Vistas en `apps/portal-cliente` | Tablas Principales Supabase |
+| Modulo del Gantt | Vistas Implementadas en `apps/backoffice` | Vistas en `apps/pagina-web` | Vistas en `apps/portal-cliente` | Tablas Principales Supabase |
 |---|---|---|---|
 | **Seguridad** | `src/pages/Login.tsx`, `UsersAndRoles.tsx` | `src/pages/Login.tsx` | `seg_usuarios`, `seg_roles`, `core_personas` |
 | **Lotes y Planos** | `src/pages/Projects.tsx`, `LotMap.tsx` | `src/pages/portal/MiLote.tsx`, `PlanoProyecto.tsx` | `inm_proyectos`, `inm_lotes`, `inm_planos_interactivos` |

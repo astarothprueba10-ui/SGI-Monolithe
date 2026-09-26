@@ -80,6 +80,7 @@ export interface Lot {
 
 export interface Lead {
   id: string;
+  rawId?: number;
   name: string;
   phone: string;
   email: string;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DownloadIcon, MapIcon, PlusIcon, SlidersHorizontalIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -12,8 +12,9 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState } from '../components/ui/Feedback';
 import { Gate } from '../components/auth/PermissionRoute';
 import { LOTS, PROJECTS } from '../data/projects';
+import { lotsService } from '../services/lotsService';
 import { currency, number } from '../utils/format';
-import type { LotStatus } from '../types';
+import type { Lot, LotStatus, Project } from '../types';
 
 const PAGE_SIZE = 12;
 
@@ -23,10 +24,21 @@ export function Projects() {
   const [projectId, setProjectId] = useState('all');
   const [status, setStatus] = useState<'all' | LotStatus>('all');
   const [page, setPage] = useState(1);
+  const [allLots, setAllLots] = useState<Lot[]>(LOTS);
+  const [allProjects, setAllProjects] = useState<Project[]>(PROJECTS);
+
+  useEffect(() => {
+    lotsService.getLots().then((liveLots) => {
+      if (liveLots.length > 0) setAllLots(liveLots);
+    });
+    lotsService.getProjects().then((liveProjects) => {
+      if (liveProjects.length > 0) setAllProjects(liveProjects);
+    });
+  }, []);
 
   const lots = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return LOTS.filter((lot) => {
+    return allLots.filter((lot) => {
       const byProject = projectId === 'all' || lot.projectId === projectId;
       const byStatus = status === 'all' || lot.status === status;
       const byQuery =
@@ -36,7 +48,7 @@ export function Projects() {
       (lot.client ?? '').toLowerCase().includes(q);
       return byProject && byStatus && byQuery;
     });
-  }, [query, projectId, status]);
+  }, [allLots, query, projectId, status]);
 
   const paged = lots.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -77,7 +89,7 @@ export function Projects() {
 
       {tab === 'proyectos' ?
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {PROJECTS.map((project) => {
+          {allProjects.map((project) => {
           const soldPct = Math.round(project.sold / project.totalLots * 100);
           return (
             <Card key={project.id} className="flex flex-col">
@@ -159,7 +171,7 @@ export function Projects() {
             className="w-[180px]">
             
               <option value="all">Todos los proyectos</option>
-              {PROJECTS.map((p) =>
+              {allProjects.map((p) =>
             <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
