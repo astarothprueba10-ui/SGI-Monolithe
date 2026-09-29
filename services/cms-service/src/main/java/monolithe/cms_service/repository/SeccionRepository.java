@@ -10,5 +10,18 @@ public interface SeccionRepository extends JpaRepository<Seccion, Long> {
 
     List<Seccion> findByIdPaginaAndVisibleTrueAndActivoTrueOrderByOrdenAsc(Long idPagina);
 
-    Optional<Seccion> findByIdPaginaAndCodigoAndActivoTrue(Long idPagina, String codigo);
+    Optional<Seccion> findByIdPaginaAndCodigoAndActivoTrue(
+            Long idPagina,
+            String codigo
+    );
+
+    List<Seccion> findByIdPaginaAndActivoTrueOrderByOrdenAsc(
+            Long idPagina
+    );
+
+    boolean existsByIdPaginaAndCodigoAndIdSeccionNot(
+            Long idPagina,
+            String codigo,
+            Long idSeccion
+    );
 }

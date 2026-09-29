@@ -23,4 +23,8 @@ public interface PaginaRepository extends JpaRepository<Pagina, Long> {
     boolean existsByCodigo(String codigo);
 
     boolean existsBySlug(String slug);
+
+    boolean existsByCodigoAndIdPaginaNot(String codigo, Long idPagina);
+
+boolean existsBySlugAndIdPaginaNot(String slug, Long idPagina);
 }

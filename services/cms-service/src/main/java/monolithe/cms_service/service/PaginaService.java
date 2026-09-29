@@ -4,12 +4,16 @@ import lombok.RequiredArgsConstructor;
 import monolithe.cms_service.dto.PaginaRequest;
 import monolithe.cms_service.entity.EstadoPublicacion;
 import monolithe.cms_service.entity.Pagina;
+import monolithe.cms_service.exception.ConflictException;
+import monolithe.cms_service.exception.ResourceNotFoundException;
 import monolithe.cms_service.repository.PaginaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -32,17 +36,20 @@ public class PaginaService {
 
     public List<Pagina> listarPublicadas() {
         EstadoPublicacion publicado = estadoService.obtenerPublicado();
-        return paginaRepository.findByIdEstadoPublicacionAndActivoTrueOrderByOrdenAsc(publicado.getIdEstadoPublicacion());
+        return paginaRepository
+                .findByIdEstadoPublicacionAndActivoTrueOrderByOrdenAsc(publicado.getIdEstadoPublicacion());
     }
 
     public Optional<Pagina> buscarPublicadaPorCodigo(String codigo) {
         EstadoPublicacion publicado = estadoService.obtenerPublicado();
-        return paginaRepository.findByCodigoAndIdEstadoPublicacionAndActivoTrue(codigo, publicado.getIdEstadoPublicacion());
+        return paginaRepository.findByCodigoAndIdEstadoPublicacionAndActivoTrue(codigo,
+                publicado.getIdEstadoPublicacion());
     }
 
     public Optional<Pagina> buscarPublicadaPorRuta(String ruta) {
         EstadoPublicacion publicado = estadoService.obtenerPublicado();
-        return paginaRepository.findBySlugAndIdEstadoPublicacionAndActivoTrue(normalizarRuta(ruta), publicado.getIdEstadoPublicacion());
+        return paginaRepository.findBySlugAndIdEstadoPublicacionAndActivoTrue(normalizarRuta(ruta),
+                publicado.getIdEstadoPublicacion());
     }
 
     @Transactional
@@ -51,11 +58,11 @@ public class PaginaService {
         String slug = normalizarRuta(request.getRuta());
 
         if (paginaRepository.existsByCodigo(codigo)) {
-            throw new IllegalArgumentException("Ya existe una página con el código: " + codigo);
+            throw new ConflictException("Ya existe una página con el código: " + codigo);
         }
 
         if (paginaRepository.existsBySlug(slug)) {
-            throw new IllegalArgumentException("Ya existe una página con la ruta/slug: " + slug);
+            throw new ConflictException("Ya existe una página con la ruta/slug: " + slug);
         }
 
         EstadoPublicacion borrador = estadoService.obtenerBorrador();
@@ -73,6 +80,109 @@ public class PaginaService {
         pagina.setMostrarMenu(request.getMostrarMenu() == null || request.getMostrarMenu());
         pagina.setActivo(true);
 
+        return paginaRepository.save(pagina);
+    }
+
+    @Transactional
+    public Pagina actualizarPagina(
+            Long idPagina,
+            PaginaRequest request) {
+
+        Pagina pagina = paginaRepository.findById(idPagina)
+                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe una página activa con id: " + idPagina));
+
+        String codigo = request.getCodigo()
+                .trim()
+                .toUpperCase();
+
+        String slug = normalizarRuta(
+                request.getRuta());
+
+        if (paginaRepository.existsByCodigoAndIdPaginaNot(
+                codigo,
+                idPagina)) {
+
+            throw new ConflictException(
+                    "Ya existe otra página con el código: " + codigo);
+        }
+
+        if (paginaRepository.existsBySlugAndIdPaginaNot(
+                slug,
+                idPagina)) {
+
+            throw new ConflictException(
+                    "Ya existe otra página con la ruta/slug: " + slug);
+        }
+
+        pagina.setCodigo(codigo);
+        pagina.setSlug(slug);
+
+        pagina.setTitulo(
+                request.getTitulo().trim());
+
+        pagina.setDescripcion(
+                limpiar(request.getDescripcion()));
+
+        pagina.setTituloSeo(
+                limpiar(request.getTituloSeo()));
+
+        pagina.setDescripcionSeo(
+                limpiar(request.getDescripcionSeo()));
+
+        pagina.setOrden(
+                request.getOrden() != null
+                        ? request.getOrden().intValue()
+                        : 0);
+
+        pagina.setMostrarMenu(
+                request.getMostrarMenu() == null
+                        || request.getMostrarMenu());
+
+        return paginaRepository.save(pagina);
+    }
+
+    @Transactional
+    public Pagina publicarPagina(
+            Long idPagina,
+            Long idUsuario) {
+
+        Pagina pagina = paginaRepository.findById(idPagina)
+                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe una página activa con id: " + idPagina));
+
+        EstadoPublicacion publicado = estadoService.obtenerPublicado();
+
+        pagina.setIdEstadoPublicacion(
+                publicado.getIdEstadoPublicacion());
+
+        pagina.setFechaPublicacion(
+                OffsetDateTime.now(ZoneOffset.UTC));
+
+        pagina.setIdUsuarioPublicacion(idUsuario);
+
+        return paginaRepository.save(pagina);
+    }
+
+    @Transactional
+    public Pagina volverABorrador(
+            Long idPagina) {
+
+        Pagina pagina = paginaRepository.findById(idPagina)
+                .filter(p -> Boolean.TRUE.equals(p.getActivo()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe una página activa con id: " + idPagina));
+
+        EstadoPublicacion borrador = estadoService.obtenerBorrador();
+
+        pagina.setIdEstadoPublicacion(
+                borrador.getIdEstadoPublicacion());
+
+        pagina.setFechaPublicacion(null);
+        pagina.setIdUsuarioPublicacion(null);
+ 
         return paginaRepository.save(pagina);
     }
 

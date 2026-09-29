@@ -31,35 +31,65 @@ public class PaginaCmsController {
 
         Long idUsuario = obtenerIdUsuario(authentication);
 
-        Pagina pagina =
-                paginaService.crearPagina(
-                        request,
-                        idUsuario
-                );
+        Pagina pagina = paginaService.crearPagina(
+                request,
+                idUsuario);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(pagina);
     }
 
+    @PutMapping("/{idPagina}")
+    public ResponseEntity<Pagina> actualizarPagina(
+            @PathVariable Long idPagina,
+            @Valid @RequestBody PaginaRequest request) {
+
+        Pagina pagina = paginaService.actualizarPagina(
+                idPagina,
+                request);
+
+        return ResponseEntity.ok(pagina);
+    }
+
+    @PatchMapping("/{idPagina}/publicar")
+    public ResponseEntity<Pagina> publicarPagina(
+            @PathVariable Long idPagina,
+            JwtAuthenticationToken authentication) {
+
+        Long idUsuario = obtenerIdUsuario(authentication);
+
+        Pagina pagina = paginaService.publicarPagina(
+                idPagina,
+                idUsuario);
+
+        return ResponseEntity.ok(pagina);
+    }
+
+    @PatchMapping("/{idPagina}/borrador")
+    public ResponseEntity<Pagina> volverABorrador(
+            @PathVariable Long idPagina) {
+
+        Pagina pagina = paginaService.volverABorrador(idPagina);
+
+        return ResponseEntity.ok(pagina);
+    }
+
     private Long obtenerIdUsuario(
             JwtAuthenticationToken authentication) {
 
-        String subject =
-                authentication.getToken().getSubject();
+        String subject = authentication.getToken().getSubject();
 
         if (subject == null || subject.isBlank()) {
             throw new IllegalStateException(
-                    "El token no contiene el identificador del usuario"
-            );
+                    "El token no contiene el identificador del usuario");
         }
 
         try {
             return Long.valueOf(subject);
         } catch (NumberFormatException ex) {
             throw new IllegalStateException(
-                    "El identificador del usuario del token no es válido"
-            );
+                    "El identificador del usuario del token no es válido");
         }
     }
 }

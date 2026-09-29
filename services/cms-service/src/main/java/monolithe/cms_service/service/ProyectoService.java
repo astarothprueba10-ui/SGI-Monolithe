@@ -33,7 +33,7 @@ public class ProyectoService {
      */
     public Optional<ProyectoSummaryResponse> buscarPorId(Long id) {
         return proyectoRepository.findById(id)
-                .filter(Proyecto::getActivo)
+                .filter(proyecto -> Boolean.TRUE.equals(proyecto.getActivo()))
                 .map(this::mapearADto);
     }
 
