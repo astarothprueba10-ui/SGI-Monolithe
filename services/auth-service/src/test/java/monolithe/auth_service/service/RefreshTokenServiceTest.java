@@ -205,10 +205,10 @@ class RefreshTokenServiceTest {
     }
 
     @Test
-    void debeRechazarRefreshTokenSiEstadoEsDeOtraEntidad() {
+    void debeRechazarRefreshTokenSiPermiteAccesoEsFalso() {
 
         User usuario = crearUsuarioActivo();
-        usuario.getEstadoUsuario().setEntidad("VENTA");
+        usuario.getEstadoUsuario().setPermiteAcceso(false);
 
         String refreshTokenActual = "refresh-token-valido";
 
@@ -242,7 +242,6 @@ class RefreshTokenServiceTest {
     private User crearUsuarioActivo() {
 
         Estado estado = new Estado();
-        estado.setEntidad("USUARIO");
         estado.setActivo(true);
         estado.setPermiteAcceso(true);
 

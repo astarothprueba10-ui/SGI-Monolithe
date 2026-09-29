@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -13,17 +11,13 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "estado")
+@Table(name = "cfg_estados_usuario")
 public class Estado {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JdbcTypeCode(SqlTypes.SMALLINT)
-    @Column(name = "id_estado")
+    @Column(name = "id_estado_usuario")
     private Integer idEstado;
-
-    @Column(name = "entidad", nullable = false, length = 40)
-    private String entidad;
 
     @Column(name = "codigo", nullable = false, length = 30)
     private String codigo;
@@ -40,7 +34,6 @@ public class Estado {
     @Column(name = "activo", nullable = false)
     private Boolean activo;
 
-    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "orden", nullable = false)
     private Integer orden;
 

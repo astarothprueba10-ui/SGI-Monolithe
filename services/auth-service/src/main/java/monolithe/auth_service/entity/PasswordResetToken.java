@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "token_recuperacion")
+@Table(name = "seg_tokens_recuperacion")
 public class PasswordResetToken {
 
     @Id
@@ -26,7 +26,7 @@ public class PasswordResetToken {
     private User usuario;
 
     @Column(
-        name = "hash_token",
+        name = "token_hash",
         nullable = false,
         unique = true,
         length = 64
@@ -51,6 +51,6 @@ public class PasswordResetToken {
     @Column(name = "ip_solicitud", length = 45)
     private String ipSolicitud;
 
-    @Column(name = "agente_usuario", length = 500)
+    @Column(name = "user_agent", length = 500)
     private String userAgent;
 }

@@ -11,12 +11,12 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "asignacion_rol")
+@Table(name = "seg_usuarios_roles")
 public class UserRole {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_asignacion")
+    @Column(name = "id_usuario_rol")
     private Long idUsuarioRol;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -42,6 +42,6 @@ public class UserRole {
     private Boolean activo;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_usuario_asigna")
+    @JoinColumn(name = "asignado_por")
     private User asignadoPor;
 }

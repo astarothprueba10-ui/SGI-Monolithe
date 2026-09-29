@@ -11,12 +11,12 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "asignacion_permiso")
+@Table(name = "seg_roles_permisos")
 public class RolePermission {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_asignacion")
+    @Column(name = "id_rol_permiso")
     private Long idRolPermiso;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -36,7 +36,7 @@ public class RolePermission {
     private LocalDateTime fechaAsignacion;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_usuario_asigna")
+    @JoinColumn(name = "asignado_por")
     private User asignadoPor;
 
     @Column(name = "activo", nullable = false)

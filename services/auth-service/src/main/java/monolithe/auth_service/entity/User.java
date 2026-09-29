@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -13,7 +11,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "usuario")
+@Table(name = "seg_usuarios")
 public class User {
 
     @Id
@@ -25,19 +23,18 @@ public class User {
     private Long idPersona;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_estado", nullable = false)
+    @JoinColumn(name = "id_estado_usuario", nullable = false)
     private Estado estadoUsuario;
 
-    @Column(name = "login", nullable = false, unique = true, length = 120)
+    @Column(name = "usuario_login", nullable = false, unique = true, length = 120)
     private String usuarioLogin;
 
-    @Column(name = "clave_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Column(name = "cambio_requerido", nullable = false)
+    @Column(name = "requiere_cambio_password", nullable = false)
     private Boolean requiereCambioPassword;
 
-    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "intentos_fallidos", nullable = false)
     private Integer intentosFallidos;
 
@@ -47,7 +44,7 @@ public class User {
     @Column(name = "ultimo_acceso")
     private LocalDateTime ultimoAcceso;
 
-    @Column(name = "fecha_cambio_clave")
+    @Column(name = "password_actualizado_en")
     private LocalDateTime passwordActualizadoEn;
 
     @Column(name = "fecha_creacion", nullable = false, insertable = false, updatable = false)
