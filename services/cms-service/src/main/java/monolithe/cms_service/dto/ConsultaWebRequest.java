@@ -3,6 +3,7 @@ package monolithe.cms_service.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,7 +32,7 @@ public class ConsultaWebRequest {
     @NotBlank(message = "El mensaje es obligatorio")
     private String mensaje;
 
-    private Boolean aceptaPrivacidad = true;
+    private Boolean aceptaPrivacidad = false;
 
     @Size(max = 100)
     private String utmOrigen;
@@ -41,4 +42,23 @@ public class ConsultaWebRequest {
 
     @Size(max = 150)
     private String utmCampana;
+
+    @AssertTrue(message = "Debe proporcionar al menos un correo o teléfono")
+    public boolean isContactoValido() {
+
+        boolean tieneCorreo = correo != null
+                && !correo.isBlank();
+
+        boolean tieneTelefono = telefono != null
+                && !telefono.isBlank();
+
+        return tieneCorreo || tieneTelefono;
+    }
+
+    @AssertTrue(message = "Debe aceptar la política de privacidad")
+    public boolean isPrivacidadAceptada() {
+
+        return Boolean.TRUE.equals(
+                aceptaPrivacidad);
+    }
 }

@@ -6,20 +6,20 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface SeccionItemRepository
-        extends JpaRepository<SeccionItem, Long> {
+                extends JpaRepository<SeccionItem, Long> {
 
-    List<SeccionItem> findByIdSeccionAndActivoTrueOrderByOrdenAsc(
-            Long idSeccion
-    );
+        List<SeccionItem> findByIdSeccionAndActivoTrueOrderByOrdenAsc(
+                        Long idSeccion);
 
-    boolean existsByIdSeccionAndCodigo(
-            Long idSeccion,
-            String codigo
-    );
+        List<SeccionItem> findByIdSeccionAndVisibleTrueAndActivoTrueOrderByOrdenAsc(
+                        Long idSeccion);
 
-    boolean existsByIdSeccionAndCodigoAndIdSeccionItemNot(
-            Long idSeccion,
-            String codigo,
-            Long idSeccionItem
-    );
+        boolean existsByIdSeccionAndCodigo(
+                        Long idSeccion,
+                        String codigo);
+
+        boolean existsByIdSeccionAndCodigoAndIdSeccionItemNot(
+                        Long idSeccion,
+                        String codigo,
+                        Long idSeccionItem);
 }
