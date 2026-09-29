@@ -1,7 +1,6 @@
 package monolithe.cms_service.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,13 +10,10 @@ import java.util.Map;
 
 @Getter
 @Setter
-public class SeccionRequest {
-
-    @NotNull
-    private Integer idTipoSeccion;
+public class SeccionItemRequest {
 
     @NotBlank
-    @Size(max = 50)
+    @Size(max = 60)
     private String codigo;
 
     @Size(max = 180)
@@ -27,6 +23,12 @@ public class SeccionRequest {
     private String subtitulo;
 
     private String contenido;
+
+    @Size(max = 120)
+    private String textoEnlace;
+
+    @Size(max = 500)
+    private String urlEnlace;
 
     private Map<String, Object> configuracion;
 

@@ -59,6 +59,7 @@ public class SeccionService {
         seccion.setTitulo(limpiar(request.getTitulo()));
         seccion.setSubtitulo(limpiar(request.getSubtitulo()));
         seccion.setContenido(limpiar(request.getContenido()));
+        seccion.setConfiguracion(request.getConfiguracion());
 
         seccion.setOrden(
                 request.getOrden() != null
@@ -112,6 +113,7 @@ public class SeccionService {
         seccion.setTitulo(limpiar(request.getTitulo()));
         seccion.setSubtitulo(limpiar(request.getSubtitulo()));
         seccion.setContenido(limpiar(request.getContenido()));
+        seccion.setConfiguracion(request.getConfiguracion());
 
         seccion.setOrden(
                 request.getOrden() != null
