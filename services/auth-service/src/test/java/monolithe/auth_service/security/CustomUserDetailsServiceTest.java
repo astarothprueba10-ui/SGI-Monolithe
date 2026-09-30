@@ -226,10 +226,10 @@ class CustomUserDetailsServiceTest {
     }
 
     @Test
-    void noDebeHabilitarUsuarioSiEstadoEsDeOtraEntidad() {
+    void noDebeHabilitarUsuarioSiPermiteAccesoEsFalso() {
 
         User usuario = crearUsuarioActivo();
-        usuario.getEstadoUsuario().setEntidad("VENTA");
+        usuario.getEstadoUsuario().setPermiteAcceso(false);
 
         when(userRepository
                 .findByUsuarioLogin("admin"))
@@ -245,7 +245,6 @@ class CustomUserDetailsServiceTest {
     private User crearUsuarioActivo() {
 
         Estado estado = new Estado();
-        estado.setEntidad("USUARIO");
         estado.setActivo(true);
         estado.setPermiteAcceso(true);
 

@@ -16,9 +16,23 @@ import java.math.BigDecimal;
 public class ProyectoSummaryResponse {
 
     private Long idProyecto;
+    private Long idCmsProyecto;
+    private Long idPagina;
     private String codigo;
     private String nombre;
     private String descripcion;
+    private String nombreComercial;
+    private String resumenComercial;
+    private String descripcionComercial;
+
+    private Boolean destacado;
+    private Integer orden;
+
+    private String textoCta;
+    private String urlCta;
+
+    private String paginaCodigo;
+    private String paginaSlug;
     private String direccion;
     private String ubicacionReferencia;
     private String distrito;

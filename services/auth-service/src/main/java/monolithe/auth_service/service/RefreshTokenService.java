@@ -144,9 +144,7 @@ public class RefreshTokenService {
                         User usuario,
                         LocalDateTime ahora) {
 
-                if (usuario.getEstadoUsuario() == null
-                                || !"USUARIO".equals(
-                                                usuario.getEstadoUsuario().getEntidad())) {
+                if (usuario.getEstadoUsuario() == null) {
                         throw new IllegalArgumentException(
                                         "El usuario no tiene un estado válido");
                 }

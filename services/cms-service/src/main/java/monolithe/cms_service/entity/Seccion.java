@@ -6,6 +6,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.Map;
 
 @Entity
 @Table(name = "cms_secciones")
@@ -36,6 +40,10 @@ public class Seccion {
 
     @Column(name = "contenido", columnDefinition = "TEXT")
     private String contenido;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "configuracion", columnDefinition = "jsonb")
+    private Map<String, Object> configuracion;
 
     @Column(name = "orden", nullable = false)
     private Integer orden = 0;
