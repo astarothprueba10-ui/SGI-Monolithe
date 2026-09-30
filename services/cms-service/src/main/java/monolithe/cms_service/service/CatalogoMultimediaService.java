@@ -6,6 +6,8 @@ import monolithe.cms_service.entity.UsoMultimedia;
 import monolithe.cms_service.exception.ResourceNotFoundException;
 import monolithe.cms_service.repository.TipoMultimediaRepository;
 import monolithe.cms_service.repository.UsoMultimediaRepository;
+import monolithe.cms_service.entity.TipoSeccion;
+import monolithe.cms_service.repository.TipoSeccionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,46 +16,44 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CatalogoMultimediaService {
 
-    private final TipoMultimediaRepository tipoMultimediaRepository;
-    private final UsoMultimediaRepository usoMultimediaRepository;
+        private final TipoMultimediaRepository tipoMultimediaRepository;
+        private final UsoMultimediaRepository usoMultimediaRepository;
+        private final TipoSeccionRepository tipoSeccionRepository;
 
-    public List<TipoMultimedia> listarTiposActivos() {
-        return tipoMultimediaRepository
-                .findByActivoTrueOrderByOrdenAsc();
-    }
+        public List<TipoMultimedia> listarTiposActivos() {
+                return tipoMultimediaRepository
+                                .findByActivoTrueOrderByOrdenAsc();
+        }
 
-    public List<UsoMultimedia> listarUsosActivos() {
-        return usoMultimediaRepository
-                .findByActivoTrueOrderByOrdenAsc();
-    }
+        public List<UsoMultimedia> listarUsosActivos() {
+                return usoMultimediaRepository
+                                .findByActivoTrueOrderByOrdenAsc();
+        }
 
-    public TipoMultimedia obtenerTipoActivo(
-            Integer idTipoMultimedia) {
+        public TipoMultimedia obtenerTipoActivo(
+                        Integer idTipoMultimedia) {
 
-        return tipoMultimediaRepository
-                .findByIdTipoMultimediaAndActivoTrue(
-                        idTipoMultimedia
-                )
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "No existe un tipo multimedia activo con id: "
-                                        + idTipoMultimedia
-                        )
-                );
-    }
+                return tipoMultimediaRepository
+                                .findByIdTipoMultimediaAndActivoTrue(
+                                                idTipoMultimedia)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "No existe un tipo multimedia activo con id: "
+                                                                + idTipoMultimedia));
+        }
 
-    public UsoMultimedia obtenerUsoActivo(
-            Integer idUsoMultimedia) {
+        public UsoMultimedia obtenerUsoActivo(
+                        Integer idUsoMultimedia) {
 
-        return usoMultimediaRepository
-                .findByIdUsoMultimediaAndActivoTrue(
-                        idUsoMultimedia
-                )
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "No existe un uso multimedia activo con id: "
-                                        + idUsoMultimedia
-                        )
-                );
-    }
+                return usoMultimediaRepository
+                                .findByIdUsoMultimediaAndActivoTrue(
+                                                idUsoMultimedia)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "No existe un uso multimedia activo con id: "
+                                                                + idUsoMultimedia));
+        }
+
+        public List<TipoSeccion> listarTiposSeccionActivos() {
+                return tipoSeccionRepository
+                                .findByActivoTrueOrderByOrdenAsc();
+        }
 }

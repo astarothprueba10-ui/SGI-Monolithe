@@ -18,6 +18,7 @@ public class SeccionPublicResponse {
 
     private Long idSeccion;
     private Integer idTipoSeccion;
+    private String tipoSeccionCodigo;
 
     private String codigo;
     private String titulo;

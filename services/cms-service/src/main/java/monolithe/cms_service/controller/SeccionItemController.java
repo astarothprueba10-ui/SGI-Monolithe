@@ -17,94 +17,98 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SeccionItemController {
 
-    private final SeccionItemService seccionItemService;
+        private final SeccionItemService seccionItemService;
 
-    @GetMapping("/secciones/{idSeccion}/items")
-    public List<SeccionItem> listar(
-            @PathVariable Long idSeccion) {
+        @GetMapping("/secciones/{idSeccion}/items")
+        public List<SeccionItem> listar(
+                        @PathVariable Long idSeccion,
+                        @RequestParam(defaultValue = "false") boolean incluirInactivos) {
 
-        return seccionItemService
-                .listarPorSeccion(idSeccion);
-    }
-
-    @PostMapping("/secciones/{idSeccion}/items")
-    public ResponseEntity<SeccionItem> crear(
-            @PathVariable Long idSeccion,
-            @Valid @RequestBody SeccionItemRequest request,
-            JwtAuthenticationToken authentication) {
-
-        Long idUsuario =
-                obtenerIdUsuario(authentication);
-
-        SeccionItem item =
-                seccionItemService.crear(
-                        idSeccion,
-                        request,
-                        idUsuario
-                );
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(item);
-    }
-
-    @PutMapping("/seccion-items/{idSeccionItem}")
-    public ResponseEntity<SeccionItem> actualizar(
-            @PathVariable Long idSeccionItem,
-            @Valid @RequestBody SeccionItemRequest request) {
-
-        SeccionItem item =
-                seccionItemService.actualizar(
-                        idSeccionItem,
-                        request
-                );
-
-        return ResponseEntity.ok(item);
-    }
-
-    @PatchMapping("/seccion-items/{idSeccionItem}/visibilidad")
-    public ResponseEntity<SeccionItem> cambiarVisibilidad(
-            @PathVariable Long idSeccionItem,
-            @RequestParam boolean visible) {
-
-        SeccionItem item =
-                seccionItemService.cambiarVisibilidad(
-                        idSeccionItem,
-                        visible
-                );
-
-        return ResponseEntity.ok(item);
-    }
-
-    @DeleteMapping("/seccion-items/{idSeccionItem}")
-    public ResponseEntity<Void> eliminar(
-            @PathVariable Long idSeccionItem) {
-
-        seccionItemService.eliminar(idSeccionItem);
-
-        return ResponseEntity
-                .noContent()
-                .build();
-    }
-
-    private Long obtenerIdUsuario(
-            JwtAuthenticationToken authentication) {
-
-        String subject =
-                authentication.getToken().getSubject();
-
-        if (subject == null || subject.isBlank()) {
-            throw new IllegalStateException(
-                    "El token no contiene el identificador del usuario"
-            );
+                return seccionItemService.listarPorSeccion(
+                                idSeccion,
+                                incluirInactivos);
         }
 
-        try {
-            return Long.valueOf(subject);
-        } catch (NumberFormatException ex) {
-            throw new IllegalStateException(
-                    "El identificador del usuario del token no es válido"
-            );
+        @PostMapping("/secciones/{idSeccion}/items")
+        public ResponseEntity<SeccionItem> crear(
+                        @PathVariable Long idSeccion,
+                        @Valid @RequestBody SeccionItemRequest request,
+                        JwtAuthenticationToken authentication) {
+
+                Long idUsuario = obtenerIdUsuario(authentication);
+
+                SeccionItem item = seccionItemService.crear(
+                                idSeccion,
+                                request,
+                                idUsuario);
+
+                return ResponseEntity
+                                .status(HttpStatus.CREATED)
+                                .body(item);
         }
-    }
+
+        @PutMapping("/seccion-items/{idSeccionItem}")
+        public ResponseEntity<SeccionItem> actualizar(
+                        @PathVariable Long idSeccionItem,
+                        @Valid @RequestBody SeccionItemRequest request) {
+
+                SeccionItem item = seccionItemService.actualizar(
+                                idSeccionItem,
+                                request);
+
+                return ResponseEntity.ok(item);
+        }
+
+        @PatchMapping("/seccion-items/{idSeccionItem}/visibilidad")
+        public ResponseEntity<SeccionItem> cambiarVisibilidad(
+                        @PathVariable Long idSeccionItem,
+                        @RequestParam boolean visible) {
+
+                SeccionItem item = seccionItemService.cambiarVisibilidad(
+                                idSeccionItem,
+                                visible);
+
+                return ResponseEntity.ok(item);
+        }
+
+        @PatchMapping("/seccion-items/{idSeccionItem}/estado")
+        public ResponseEntity<SeccionItem> cambiarEstado(
+                        @PathVariable Long idSeccionItem,
+                        @RequestParam boolean activo) {
+
+                SeccionItem item = seccionItemService.cambiarEstado(
+                                idSeccionItem,
+                                activo);
+
+                return ResponseEntity.ok(item);
+        }
+
+        @DeleteMapping("/seccion-items/{idSeccionItem}")
+        public ResponseEntity<Void> eliminar(
+                        @PathVariable Long idSeccionItem) {
+
+                seccionItemService.eliminar(idSeccionItem);
+
+                return ResponseEntity
+                                .noContent()
+                                .build();
+        }
+
+        private Long obtenerIdUsuario(
+                        JwtAuthenticationToken authentication) {
+
+                String subject = authentication.getToken().getSubject();
+
+                if (subject == null || subject.isBlank()) {
+                        throw new IllegalStateException(
+                                        "El token no contiene el identificador del usuario");
+                }
+
+                try {
+                        return Long.valueOf(subject);
+                } catch (NumberFormatException ex) {
+                        throw new IllegalStateException(
+                                        "El identificador del usuario del token no es válido");
+                }
+        }
 }

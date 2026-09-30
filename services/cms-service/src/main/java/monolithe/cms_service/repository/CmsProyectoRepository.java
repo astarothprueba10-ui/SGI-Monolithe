@@ -4,21 +4,25 @@ import monolithe.cms_service.entity.CmsProyecto;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CmsProyectoRepository
-        extends JpaRepository<CmsProyecto, Long> {
+                extends JpaRepository<CmsProyecto, Long> {
 
-    List<CmsProyecto> findByActivoTrueOrderByOrdenAsc();
+        List<CmsProyecto> findByActivoTrueOrderByOrdenAsc();
 
-    boolean existsByIdProyecto(Long idProyecto);
+        Optional<CmsProyecto> findByIdProyectoAndActivoTrue(
+                        Long idProyecto);
 
-    boolean existsByIdPagina(Long idPagina);
+        boolean existsByIdProyecto(Long idProyecto);
 
-    boolean existsByIdProyectoAndIdCmsProyectoNot(
-            Long idProyecto,
-            Long idCmsProyecto);
+        boolean existsByIdPagina(Long idPagina);
 
-    boolean existsByIdPaginaAndIdCmsProyectoNot(
-            Long idPagina,
-            Long idCmsProyecto);
+        boolean existsByIdProyectoAndIdCmsProyectoNot(
+                        Long idProyecto,
+                        Long idCmsProyecto);
+
+        boolean existsByIdPaginaAndIdCmsProyectoNot(
+                        Long idPagina,
+                        Long idCmsProyecto);
 }

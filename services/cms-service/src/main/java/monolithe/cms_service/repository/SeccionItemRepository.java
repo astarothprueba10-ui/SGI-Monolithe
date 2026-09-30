@@ -14,6 +14,9 @@ public interface SeccionItemRepository
         List<SeccionItem> findByIdSeccionAndVisibleTrueAndActivoTrueOrderByOrdenAsc(
                         Long idSeccion);
 
+        List<SeccionItem> findByIdSeccionOrderByOrdenAsc(
+                        Long idSeccion);
+
         boolean existsByIdSeccionAndCodigo(
                         Long idSeccion,
                         String codigo);

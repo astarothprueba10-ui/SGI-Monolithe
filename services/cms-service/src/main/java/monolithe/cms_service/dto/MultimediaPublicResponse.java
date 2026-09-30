@@ -15,6 +15,7 @@ public class MultimediaPublicResponse {
 
     private Long idMultimedia;
     private Integer idUsoMultimedia;
+    private String usoMultimediaCodigo;
 
     private String codigo;
     private String nombre;
@@ -22,6 +23,7 @@ public class MultimediaPublicResponse {
 
     private String claveArchivo;
     private String urlExterna;
+    private String urlPublica;
 
     private String tipoMime;
     private String textoAlternativo;

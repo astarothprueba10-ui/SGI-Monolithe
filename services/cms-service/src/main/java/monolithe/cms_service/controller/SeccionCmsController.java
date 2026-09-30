@@ -21,9 +21,12 @@ public class SeccionCmsController {
 
     @GetMapping("/paginas/{idPagina}/secciones")
     public List<Seccion> listarSecciones(
-            @PathVariable Long idPagina) {
+            @PathVariable Long idPagina,
+            @RequestParam(defaultValue = "false") boolean incluirInactivos) {
 
-        return seccionService.listarPorPagina(idPagina);
+        return seccionService.listarPorPagina(
+                idPagina,
+                incluirInactivos);
     }
 
     @PostMapping("/paginas/{idPagina}/secciones")
@@ -64,6 +67,18 @@ public class SeccionCmsController {
         Seccion seccion = seccionService.cambiarVisibilidad(
                 idSeccion,
                 visible);
+
+        return ResponseEntity.ok(seccion);
+    }
+
+    @PatchMapping("/secciones/{idSeccion}/estado")
+    public ResponseEntity<Seccion> cambiarEstado(
+            @PathVariable Long idSeccion,
+            @RequestParam boolean activo) {
+
+        Seccion seccion = seccionService.cambiarEstado(
+                idSeccion,
+                activo);
 
         return ResponseEntity.ok(seccion);
     }

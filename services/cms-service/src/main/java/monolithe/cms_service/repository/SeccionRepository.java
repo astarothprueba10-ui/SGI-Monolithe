@@ -8,20 +8,24 @@ import java.util.Optional;
 
 public interface SeccionRepository extends JpaRepository<Seccion, Long> {
 
-    List<Seccion> findByIdPaginaAndVisibleTrueAndActivoTrueOrderByOrdenAsc(Long idPagina);
+        List<Seccion> findByIdPaginaAndVisibleTrueAndActivoTrueOrderByOrdenAsc(Long idPagina);
 
-    Optional<Seccion> findByIdPaginaAndCodigoAndActivoTrue(
-            Long idPagina,
-            String codigo
-    );
+        Optional<Seccion> findByIdPaginaAndCodigoAndActivoTrue(
+                        Long idPagina,
+                        String codigo);
 
-    List<Seccion> findByIdPaginaAndActivoTrueOrderByOrdenAsc(
-            Long idPagina
-    );
+        List<Seccion> findByIdPaginaAndActivoTrueOrderByOrdenAsc(
+                        Long idPagina);
 
-    boolean existsByIdPaginaAndCodigoAndIdSeccionNot(
-            Long idPagina,
-            String codigo,
-            Long idSeccion
-    );
+        List<Seccion> findByIdPaginaOrderByOrdenAsc(
+                        Long idPagina);
+
+        boolean existsByIdPaginaAndCodigoAndIdSeccionNot(
+                        Long idPagina,
+                        String codigo,
+                        Long idSeccion);
+
+        boolean existsByIdPaginaAndCodigo(
+                        Long idPagina,
+                        String codigo);
 }

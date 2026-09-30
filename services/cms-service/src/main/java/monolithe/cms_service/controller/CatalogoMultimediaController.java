@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import monolithe.cms_service.entity.TipoMultimedia;
 import monolithe.cms_service.entity.UsoMultimedia;
 import monolithe.cms_service.service.CatalogoMultimediaService;
+import monolithe.cms_service.entity.TipoSeccion;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,5 +28,12 @@ public class CatalogoMultimediaController {
 
         return catalogoMultimediaService
                 .listarUsosActivos();
+    }
+
+    @GetMapping("/tipos-seccion")
+    public List<TipoSeccion> listarTiposSeccion() {
+
+        return catalogoMultimediaService
+                .listarTiposSeccionActivos();
     }
 }
