@@ -24,10 +24,7 @@ public interface AjusteTipoLoteRepository extends JpaRepository<AjusteTipoLote, 
         WHERE a.proyecto.idProyecto = :idProyecto
           AND a.tipoLote.idTipoLote = :idTipoLote
           AND a.tipoAjustePrecio.idTipoAjustePrecio = :idTipoAjustePrecio
-          AND (
-                a.moneda.idMoneda = :idMoneda
-                OR (a.moneda IS NULL AND :idMoneda IS NULL)
-              )
+          AND a.moneda.idMoneda = :idMoneda
           AND a.activo = true
           AND a.fechaHasta IS NULL
     """)
@@ -36,6 +33,22 @@ public interface AjusteTipoLoteRepository extends JpaRepository<AjusteTipoLote, 
             @Param("idTipoLote") Integer idTipoLote,
             @Param("idTipoAjustePrecio") Integer idTipoAjustePrecio,
             @Param("idMoneda") Integer idMoneda
+    );
+
+    @Query("""
+        SELECT a
+        FROM AjusteTipoLote a
+        WHERE a.proyecto.idProyecto = :idProyecto
+          AND a.tipoLote.idTipoLote = :idTipoLote
+          AND a.tipoAjustePrecio.idTipoAjustePrecio = :idTipoAjustePrecio
+          AND a.moneda IS NULL
+          AND a.activo = true
+          AND a.fechaHasta IS NULL
+    """)
+    Optional<AjusteTipoLote> buscarVigenteSinMoneda(
+            @Param("idProyecto") Long idProyecto,
+            @Param("idTipoLote") Integer idTipoLote,
+            @Param("idTipoAjustePrecio") Integer idTipoAjustePrecio
     );
 }
 
