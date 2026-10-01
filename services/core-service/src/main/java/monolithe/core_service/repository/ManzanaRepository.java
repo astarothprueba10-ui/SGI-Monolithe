@@ -12,6 +12,16 @@ public interface ManzanaRepository extends JpaRepository<Manzana, Long> {
         String codigo
     );
 
+    boolean existsByEtapa_IdEtapaAndCodigoAndIdManzanaNot(
+        Long idEtapa,
+        String codigo,
+        Long idManzana
+    );
+
+    List<Manzana> findByEtapa_IdEtapaOrderByNumeroOrdenAsc(
+        Long idEtapa
+    );
+
     List<Manzana> findByEtapa_IdEtapaAndActivoTrueOrderByNumeroOrdenAsc(
         Long idEtapa
     );
