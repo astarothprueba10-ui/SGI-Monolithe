@@ -12,5 +12,7 @@ public interface ProyectoRepository extends JpaRepository<Proyecto, Long> {
 
     boolean existsByCodigo(String codigo);
 
+    boolean existsByCodigoAndIdProyectoNot(String codigo, Long idProyecto);
+
     List<Proyecto> findByActivoTrueOrderByNombreAsc();
 }
