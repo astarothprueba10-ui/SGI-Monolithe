@@ -28,7 +28,9 @@ public class ProyectoService {
     @Transactional(readOnly = true)
     public List<ProyectoResponse> listarTodos() {
         return proyectoRepository.findAll().stream()
-                .sorted(Comparator.comparing(Proyecto::getNombre, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing(
+                        (Proyecto proyecto) -> proyecto.getNombre(),
+                        Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(this::toResponse)
                 .toList();
     }
@@ -151,8 +153,7 @@ public class ProyectoService {
                 proyecto.getAreaTotalM2(),
                 proyecto.getFechaInicio(),
                 proyecto.getFechaFinEstimada(),
-                proyecto.getActivo()
-        );
+                proyecto.getActivo());
     }
 
     private String normalizarCodigo(String codigo) {
