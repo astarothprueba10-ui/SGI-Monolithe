@@ -8,11 +8,17 @@ import java.util.List;
 public interface ZonaRepository extends JpaRepository<Zona, Long> {
 
     boolean existsByProyecto_IdProyectoAndCodigo(
-        Long idProyecto,
-        String codigo
-    );
+            Long idProyecto,
+            String codigo);
+
+    boolean existsByProyecto_IdProyectoAndCodigoAndIdZonaNot(
+            Long idProyecto,
+            String codigo,
+            Long idZona);
+
+    List<Zona> findByProyecto_IdProyectoOrderByNumeroOrdenAsc(
+            Long idProyecto);
 
     List<Zona> findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(
-        Long idProyecto
-    );
+            Long idProyecto);
 }
