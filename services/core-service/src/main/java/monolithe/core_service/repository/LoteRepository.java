@@ -1,7 +1,9 @@
-package monolithe.core_service.repository;
+567package monolithe.core_service.repository;
 
 import monolithe.core_service.entity.Lote;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
 
 public interface LoteRepository extends JpaRepository<Lote, Long> {
 
@@ -21,5 +23,13 @@ public interface LoteRepository extends JpaRepository<Lote, Long> {
         Long idManzana,
         String numero,
         Long idLote
+    );
+
+    List<Lote> findByManzana_IdManzanaOrderByNumeroAsc(
+        Long idManzana
+    );
+
+    List<Lote> findByManzana_IdManzanaAndActivoTrueOrderByNumeroAsc(
+        Long idManzana
     );
 }
