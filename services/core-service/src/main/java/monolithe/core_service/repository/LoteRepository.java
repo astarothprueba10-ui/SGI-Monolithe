@@ -1,4 +1,4 @@
-567package monolithe.core_service.repository;
+package monolithe.core_service.repository;
 
 import monolithe.core_service.entity.Lote;
 import org.springframework.data.jpa.repository.JpaRepository;
