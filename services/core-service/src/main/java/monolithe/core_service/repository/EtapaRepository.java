@@ -12,6 +12,16 @@ public interface EtapaRepository extends JpaRepository<Etapa, Long> {
         String codigo
     );
 
+    boolean existsByProyecto_IdProyectoAndCodigoAndIdEtapaNot(
+        Long idProyecto,
+        String codigo,
+        Long idEtapa
+    );
+
+    List<Etapa> findByProyecto_IdProyectoOrderByNumeroOrdenAsc(
+        Long idProyecto
+    );
+
     List<Etapa> findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(
         Long idProyecto
     );
