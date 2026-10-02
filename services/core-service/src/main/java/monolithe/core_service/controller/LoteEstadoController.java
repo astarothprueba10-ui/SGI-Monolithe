@@ -8,6 +8,8 @@ import monolithe.core_service.dto.CambioEstadoLoteResponse;
 import monolithe.core_service.dto.LoteHistorialEstadoResponse;
 import monolithe.core_service.service.LoteEstadoService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,10 +26,12 @@ public class LoteEstadoController {
     @PatchMapping("/{idLote}/estado")
     public ResponseEntity<CambioEstadoLoteResponse> cambiarEstado(
             @PathVariable @Positive Long idLote,
-            @Valid @RequestBody CambiarEstadoLoteRequest request
+            @Valid @RequestBody CambiarEstadoLoteRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        Long idUsuario = Long.valueOf(jwt.getSubject());
         return ResponseEntity.ok(
-                loteEstadoService.cambiarEstado(idLote, request)
+                loteEstadoService.cambiarEstado(idLote, idUsuario, request)
         );
     }
 

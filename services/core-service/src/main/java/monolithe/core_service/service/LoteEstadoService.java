@@ -37,6 +37,7 @@ public class LoteEstadoService {
         @Transactional
         public CambioEstadoLoteResponse cambiarEstado(
                         Long idLote,
+                        Long idUsuario,
                         CambiarEstadoLoteRequest request) {
                 if (!loteRepository.existsById(idLote)) {
                         throw new RecursoNoEncontradoException(
@@ -58,7 +59,7 @@ public class LoteEstadoService {
                 String motivo = normalizarMotivo(request.motivo());
 
                 String jsonResultado = ejecutarFuncionPostgres(
-                                idLote, codigoNuevoEstado, motivo);
+                                idLote, idUsuario, codigoNuevoEstado, motivo);
 
                 CambioEstadoLoteResponse respuesta = parsearRespuesta(jsonResultado);
 
@@ -90,17 +91,19 @@ public class LoteEstadoService {
 
         private String ejecutarFuncionPostgres(
                         Long idLote,
+                        Long idUsuario,
                         String codigoEstado,
                         String motivo) {
                 jakarta.persistence.Query query = entityManager.createNativeQuery(
                                 "SELECT sp_cambiar_estado_lote("
                                                 + ":idLote, "
                                                 + ":codigoEstado, "
-                                                + "CAST(NULL AS BIGINT), "
+                                                + ":idUsuario, "
                                                 + ":motivo"
                                                 + ")::text");
                 query.setParameter("idLote", idLote);
                 query.setParameter("codigoEstado", codigoEstado);
+                query.setParameter("idUsuario", idUsuario);
                 query.setParameter("motivo", motivo);
                 return (String) query.getSingleResult();
         }
