@@ -10,6 +10,9 @@ import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import monolithe.core_service.dto.LoteFiltroRequest;
+import monolithe.core_service.specification.LoteSpecification;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Locale;
@@ -45,6 +48,19 @@ public class LoteService {
     @Transactional(readOnly = true)
     public LoteResponse obtenerPorId(Long idLote) {
         return toResponse(obtenerLote(idLote));
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoteResponse> buscar(LoteFiltroRequest filtro) {
+
+        validarRangoArea(filtro);
+
+        return loteRepository.findAll(
+                LoteSpecification.conFiltros(filtro),
+                Sort.by(Sort.Direction.ASC, "codigo"))
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -88,7 +104,8 @@ public class LoteService {
 
         validarUnicidadActualizar(manzanaDestino.getIdManzana(), idLote, codigo, numero);
 
-        asignarValoresLote(lote, manzanaDestino, zona, lote.getIdProyecto(), tipo, estado, codigo, numero, observaciones, request);
+        asignarValoresLote(lote, manzanaDestino, zona, lote.getIdProyecto(), tipo, estado, codigo, numero,
+                observaciones, request);
         if (request.activo() != null) {
             lote.setActivo(request.activo());
         }
@@ -102,6 +119,17 @@ public class LoteService {
         if (Boolean.TRUE.equals(lote.getActivo())) {
             lote.setActivo(false);
             loteRepository.save(lote);
+        }
+    }
+
+    private void validarRangoArea(LoteFiltroRequest filtro) {
+
+        if (filtro.areaMin() != null
+                && filtro.areaMax() != null
+                && filtro.areaMin().compareTo(filtro.areaMax()) > 0) {
+
+            throw new ReglaNegocioException(
+                    "El área mínima no puede ser mayor que el área máxima");
         }
     }
 
@@ -124,13 +152,15 @@ public class LoteService {
             throw new ReglaNegocioException("La manzana no tiene una etapa asociada: " + manzana.getIdManzana());
         }
         if (!Boolean.TRUE.equals(manzana.getEtapa().getActivo())) {
-            throw new ReglaNegocioException("La etapa de la manzana no está activa: " + manzana.getEtapa().getIdEtapa());
+            throw new ReglaNegocioException(
+                    "La etapa de la manzana no está activa: " + manzana.getEtapa().getIdEtapa());
         }
         if (manzana.getEtapa().getProyecto() == null) {
             throw new ReglaNegocioException("La manzana no tiene un proyecto asociado: " + manzana.getIdManzana());
         }
         if (!Boolean.TRUE.equals(manzana.getEtapa().getProyecto().getActivo())) {
-            throw new ReglaNegocioException("El proyecto de la manzana no está activo: " + manzana.getEtapa().getProyecto().getIdProyecto());
+            throw new ReglaNegocioException(
+                    "El proyecto de la manzana no está activo: " + manzana.getEtapa().getProyecto().getIdProyecto());
         }
     }
 
@@ -150,7 +180,8 @@ public class LoteService {
     private EstadoLote obtenerEstadoActivo(String codigo) {
         String codigoNormalizado = normalizarCodigo(codigo);
         EstadoLote estado = estadoLoteRepository.findByCodigo(codigoNormalizado)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Estado de lote no encontrado: " + codigoNormalizado));
+                .orElseThrow(
+                        () -> new RecursoNoEncontradoException("Estado de lote no encontrado: " + codigoNormalizado));
         if (!Boolean.TRUE.equals(estado.getActivo())) {
             throw new ReglaNegocioException("El estado de lote no está activo: " + codigoNormalizado);
         }
@@ -163,7 +194,8 @@ public class LoteService {
         }
         String codigoNormalizado = normalizarCodigo(codigo);
         TipoLote tipo = tipoLoteRepository.findByCodigo(codigoNormalizado)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Tipo de lote no encontrado: " + codigoNormalizado));
+                .orElseThrow(
+                        () -> new RecursoNoEncontradoException("Tipo de lote no encontrado: " + codigoNormalizado));
         if (!Boolean.TRUE.equals(tipo.getActivo())) {
             throw new ReglaNegocioException("El tipo de lote no está activo: " + codigoNormalizado);
         }
@@ -225,8 +257,7 @@ public class LoteService {
             String codigo,
             String numero,
             String observaciones,
-            LoteRequest req
-    ) {
+            LoteRequest req) {
         lote.setManzana(manzana);
         lote.setZona(zona);
         lote.setIdProyecto(idProyecto);
@@ -278,7 +309,6 @@ public class LoteService {
                 lote.getLateralDerechoM(),
                 lote.getLateralIzquierdoM(),
                 lote.getObservaciones(),
-                lote.getActivo()
-        );
+                lote.getActivo());
     }
 }

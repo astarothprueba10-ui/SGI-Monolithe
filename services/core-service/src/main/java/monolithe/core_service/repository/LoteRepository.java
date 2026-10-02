@@ -2,10 +2,13 @@ package monolithe.core_service.repository;
 
 import monolithe.core_service.entity.Lote;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 
-public interface LoteRepository extends JpaRepository<Lote, Long> {
+public interface LoteRepository extends
+        JpaRepository<Lote, Long>,
+        JpaSpecificationExecutor<Lote> {
 
     boolean existsByCodigo(String codigo);
 

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.LoteRequest;
 import monolithe.core_service.dto.LoteResponse;
 import monolithe.core_service.service.LoteService;
+import monolithe.core_service.dto.LoteFiltroRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,12 @@ public class LoteController {
         return ResponseEntity.ok(loteService.listarActivosPorManzana(idManzana));
     }
 
+    @GetMapping("/buscar")
+    public ResponseEntity<List<LoteResponse>> buscar(
+            @Valid @ModelAttribute LoteFiltroRequest filtro) {
+        return ResponseEntity.ok(loteService.buscar(filtro));
+    }
+
     @GetMapping("/{idLote}")
     public ResponseEntity<LoteResponse> obtenerPorId(@PathVariable Long idLote) {
         return ResponseEntity.ok(loteService.obtenerPorId(idLote));
@@ -41,8 +48,7 @@ public class LoteController {
     @PutMapping("/{idLote}")
     public ResponseEntity<LoteResponse> actualizar(
             @PathVariable Long idLote,
-            @Valid @RequestBody LoteRequest request
-    ) {
+            @Valid @RequestBody LoteRequest request) {
         return ResponseEntity.ok(loteService.actualizar(idLote, request));
     }
 
