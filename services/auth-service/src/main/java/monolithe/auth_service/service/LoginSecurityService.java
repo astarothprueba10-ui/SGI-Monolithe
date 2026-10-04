@@ -69,15 +69,6 @@ public class LoginSecurityService {
         @Transactional
         public void registrarAccesoExitoso(Long idUsuario) {
 
-                User usuario = userRepository.findById(idUsuario)
-                                .orElseThrow(() -> new IllegalStateException(
-                                                "Usuario no encontrado"));
-
-                usuario.setIntentosFallidos(0);
-                usuario.setBloqueadoHasta(null);
-                usuario.setUltimoAcceso(
-                                LocalDateTime.now(ZoneOffset.UTC));
-
-                userRepository.save(usuario);
+                userRepository.registrarAccesoExitoso(idUsuario);
         }
 }

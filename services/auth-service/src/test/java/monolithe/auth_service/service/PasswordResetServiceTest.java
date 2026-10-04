@@ -152,7 +152,7 @@ class PasswordResetServiceTest {
 
         token.setUsuario(usuario);
         token.setFechaExpiracion(
-                LocalDateTime.now().plusMinutes(10)
+                LocalDateTime.now(java.time.ZoneOffset.UTC).plusMinutes(10)
         );
 
         String tokenReal = "token-recuperacion-valido";

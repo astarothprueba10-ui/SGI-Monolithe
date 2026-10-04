@@ -107,23 +107,10 @@ class LoginSecurityServiceTest {
     @Test
     void debeReiniciarSeguridadDespuesDeLoginExitoso() {
 
-        User usuario = crearUsuario();
-
-        usuario.setIntentosFallidos(4);
-        usuario.setBloqueadoHasta(
-                LocalDateTime.now().minusSeconds(1)
-        );
-
-        when(userRepository.findById(1L))
-                .thenReturn(Optional.of(usuario));
-
         loginSecurityService.registrarAccesoExitoso(1L);
 
-        assertEquals(0, usuario.getIntentosFallidos());
-        assertNull(usuario.getBloqueadoHasta());
-        assertNotNull(usuario.getUltimoAcceso());
-
-        verify(userRepository).save(usuario);
+        verify(userRepository).registrarAccesoExitoso(1L);
+        verifyNoMoreInteractions(userRepository);
     }
 
     private User crearUsuario() {

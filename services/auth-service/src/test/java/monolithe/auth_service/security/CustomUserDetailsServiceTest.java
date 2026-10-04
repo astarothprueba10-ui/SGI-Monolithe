@@ -1,16 +1,10 @@
 package monolithe.auth_service.security;
 
-import monolithe.auth_service.entity.Permission;
-import monolithe.auth_service.entity.Role;
-import monolithe.auth_service.entity.RolePermission;
-import monolithe.auth_service.entity.User;
-import monolithe.auth_service.entity.UserRole;
-import monolithe.auth_service.entity.Estado;
-import monolithe.auth_service.repository.RolePermissionRepository;
-import monolithe.auth_service.repository.UserRepository;
-import monolithe.auth_service.repository.UserRoleRepository;
+import monolithe.auth_service.dto.AuthenticationContext;
+import monolithe.auth_service.repository.AuthenticationContextRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,243 +14,99 @@ import static org.mockito.Mockito.*;
 
 class CustomUserDetailsServiceTest {
 
-    private UserRepository userRepository;
-    private UserRoleRepository userRoleRepository;
-    private RolePermissionRepository rolePermissionRepository;
-
+    private AuthenticationContextRepository authenticationContextRepository;
     private CustomUserDetailsService userDetailsService;
 
     @BeforeEach
     void setUp() {
-
-        userRepository = mock(UserRepository.class);
-        userRoleRepository = mock(UserRoleRepository.class);
-        rolePermissionRepository =
-                mock(RolePermissionRepository.class);
-
+        authenticationContextRepository =
+                mock(AuthenticationContextRepository.class);
         userDetailsService =
-                new CustomUserDetailsService(
-                        userRepository,
-                        userRoleRepository,
-                        rolePermissionRepository
-                );
+                new CustomUserDetailsService(authenticationContextRepository);
     }
 
     @Test
     void debeCargarRolYPermisosActivosComoAuthorities() {
 
-        User usuario = crearUsuarioActivo();
+        AuthenticationContext contexto = new AuthenticationContext(
+                1L,
+                "admin",
+                "hash-password",
+                false,
+                null,
+                true,
+                true,
+                List.of("ROLE_ADMINISTRADOR", "SEGURIDAD_AUDITORIA_VER"));
 
-        Role rolAdministrador = new Role();
-        rolAdministrador.setIdRol(1);
-        rolAdministrador.setCodigo("ADMINISTRADOR");
-        rolAdministrador.setActivo(true);
-
-        UserRole usuarioRol = new UserRole();
-        usuarioRol.setRol(rolAdministrador);
-
-        Permission permisoAuditoria = new Permission();
-        permisoAuditoria.setIdPermiso(1);
-        permisoAuditoria.setCodigo(
-                "SEGURIDAD_AUDITORIA_VER"
-        );
-        permisoAuditoria.setActivo(true);
-
-        RolePermission rolPermiso =
-                new RolePermission();
-
-        rolPermiso.setPermiso(
-                permisoAuditoria
-        );
-
-        when(userRepository
-                .findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
-
-        when(userRoleRepository
-                .findByUsuarioIdUsuarioAndActivoTrue(1L))
-                .thenReturn(
-                        List.of(usuarioRol)
-                );
-
-        when(rolePermissionRepository
-                .findByRolIdRolAndActivoTrue(1))
-                .thenReturn(
-                        List.of(rolPermiso)
-                );
+        when(authenticationContextRepository.obtenerPorLogin("admin"))
+                .thenReturn(Optional.of(contexto));
 
         UserPrincipal principal =
-                (UserPrincipal) userDetailsService
-                        .loadUserByUsername("admin");
+                (UserPrincipal) userDetailsService.loadUserByUsername("admin");
 
-        List<String> authorities =
-                principal.getAuthorities()
-                        .stream()
-                        .map(authority -> authority.getAuthority())
-                        .toList();
+        List<String> authorities = principal.getAuthorities()
+                .stream()
+                .map(a -> a.getAuthority())
+                .toList();
 
-        assertTrue(
-                authorities.contains(
-                        "ROLE_ADMINISTRADOR"
-                )
-        );
-
-        assertTrue(
-                authorities.contains(
-                        "SEGURIDAD_AUDITORIA_VER"
-                )
-        );
-
+        assertTrue(authorities.contains("ROLE_ADMINISTRADOR"));
+        assertTrue(authorities.contains("SEGURIDAD_AUDITORIA_VER"));
         assertTrue(principal.isEnabled());
         assertTrue(principal.isAccountNonLocked());
     }
 
     @Test
-    void noDebeAgregarRolInactivo() {
-
-        User usuario = crearUsuarioActivo();
-
-        Role rolInactivo = new Role();
-        rolInactivo.setIdRol(2);
-        rolInactivo.setCodigo("GERENCIA");
-        rolInactivo.setActivo(false);
-
-        UserRole usuarioRol = new UserRole();
-        usuarioRol.setRol(rolInactivo);
-
-        when(userRepository
-                .findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
-
-        when(userRoleRepository
-                .findByUsuarioIdUsuarioAndActivoTrue(1L))
-                .thenReturn(
-                        List.of(usuarioRol)
-                );
-
-        UserPrincipal principal =
-                (UserPrincipal) userDetailsService
-                        .loadUserByUsername("admin");
-
-        List<String> authorities =
-                principal.getAuthorities()
-                        .stream()
-                        .map(authority -> authority.getAuthority())
-                        .toList();
-
-        assertFalse(
-                authorities.contains(
-                        "ROLE_GERENCIA"
-                )
-        );
-
-        verify(
-                rolePermissionRepository,
-                never()
-        ).findByRolIdRolAndActivoTrue(
-                anyInt()
-        );
-    }
-
-    @Test
-    void noDebeAgregarPermisoInactivo() {
-
-        User usuario = crearUsuarioActivo();
-
-        Role rolAdministrador = new Role();
-        rolAdministrador.setIdRol(1);
-        rolAdministrador.setCodigo("ADMINISTRADOR");
-        rolAdministrador.setActivo(true);
-
-        UserRole usuarioRol = new UserRole();
-        usuarioRol.setRol(rolAdministrador);
-
-        Permission permisoInactivo =
-                new Permission();
-
-        permisoInactivo.setCodigo(
-                "SEGURIDAD_PERMISO_GESTIONAR"
-        );
-        permisoInactivo.setActivo(false);
-
-        RolePermission rolPermiso =
-                new RolePermission();
-
-        rolPermiso.setPermiso(
-                permisoInactivo
-        );
-
-        when(userRepository
-                .findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
-
-        when(userRoleRepository
-                .findByUsuarioIdUsuarioAndActivoTrue(1L))
-                .thenReturn(
-                        List.of(usuarioRol)
-                );
-
-        when(rolePermissionRepository
-                .findByRolIdRolAndActivoTrue(1))
-                .thenReturn(
-                        List.of(rolPermiso)
-                );
-
-        UserPrincipal principal =
-                (UserPrincipal) userDetailsService
-                        .loadUserByUsername("admin");
-
-        List<String> authorities =
-                principal.getAuthorities()
-                        .stream()
-                        .map(authority -> authority.getAuthority())
-                        .toList();
-
-        assertTrue(
-                authorities.contains(
-                        "ROLE_ADMINISTRADOR"
-                )
-        );
-
-        assertFalse(
-                authorities.contains(
-                        "SEGURIDAD_PERMISO_GESTIONAR"
-                )
-        );
-    }
-
-    @Test
     void noDebeHabilitarUsuarioSiPermiteAccesoEsFalso() {
 
-        User usuario = crearUsuarioActivo();
-        usuario.getEstadoUsuario().setPermiteAcceso(false);
+        AuthenticationContext contexto = new AuthenticationContext(
+                1L,
+                "admin",
+                "hash-password",
+                false,
+                null,
+                true,
+                false,
+                List.of());
 
-        when(userRepository
-                .findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
+        when(authenticationContextRepository.obtenerPorLogin("admin"))
+                .thenReturn(Optional.of(contexto));
 
         UserPrincipal principal =
-                (UserPrincipal) userDetailsService
-                        .loadUserByUsername("admin");
+                (UserPrincipal) userDetailsService.loadUserByUsername("admin");
 
         assertFalse(principal.isEnabled());
     }
 
-    private User crearUsuarioActivo() {
+    @Test
+    void debeLanzarExcepcionSiUsuarioNoExiste() {
 
-        Estado estado = new Estado();
-        estado.setActivo(true);
-        estado.setPermiteAcceso(true);
+        when(authenticationContextRepository.obtenerPorLogin("desconocido"))
+                .thenReturn(Optional.empty());
 
-        User usuario = new User();
+        assertThrows(
+                UsernameNotFoundException.class,
+                () -> userDetailsService.loadUserByUsername("desconocido"));
+    }
 
-        usuario.setIdUsuario(1L);
-        usuario.setUsuarioLogin("admin");
-        usuario.setPasswordHash("hash-password");
-        usuario.setEstadoUsuario(estado);
-        usuario.setRequiereCambioPassword(false);
-        usuario.setBloqueadoHasta(null);
+    @Test
+    void noDebeHabilitarUsuarioSiEstadoNoActivo() {
 
-        return usuario;
+        AuthenticationContext contexto = new AuthenticationContext(
+                2L,
+                "inactivo",
+                "hash-password",
+                false,
+                null,
+                false,
+                true,
+                List.of());
+
+        when(authenticationContextRepository.obtenerPorLogin("inactivo"))
+                .thenReturn(Optional.of(contexto));
+
+        UserPrincipal principal =
+                (UserPrincipal) userDetailsService.loadUserByUsername("inactivo");
+
+        assertFalse(principal.isEnabled());
     }
 }

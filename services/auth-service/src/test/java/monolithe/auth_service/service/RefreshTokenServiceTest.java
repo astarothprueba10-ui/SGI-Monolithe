@@ -46,8 +46,8 @@ class RefreshTokenServiceTest {
 
         User usuario = crearUsuarioActivo();
 
-        when(userRepository.findById(1L))
-                .thenReturn(Optional.of(usuario));
+        when(userRepository.getReferenceById(1L))
+                .thenReturn(usuario);
 
         String refreshToken = refreshTokenService.crearSesion(
                 1L,

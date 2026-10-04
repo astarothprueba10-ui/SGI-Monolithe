@@ -42,8 +42,7 @@ public class RefreshTokenService {
                         String ipOrigen,
                         String userAgent) {
 
-                User usuario = userRepository.findById(idUsuario)
-                                .orElseThrow(() -> new IllegalStateException("Usuario no encontrado"));
+                User usuario = userRepository.getReferenceById(idUsuario);
 
                 return crearNuevaSesion(
                                 usuario,

@@ -26,55 +26,36 @@ public class AuditService {
             String metodoHttp,
             String ruta) {
 
-        try {
-
-            jdbcClient.sql("""
-                    INSERT INTO evento_auditoria (
-                        id_usuario,
-                        modulo,
-                        accion,
-                        entidad,
-                        clave_entidad,
-                        resultado,
-                        descripcion,
-                        ip_origen,
-                        agente_usuario,
-                        metodo_http,
-                        ruta
-                    )
-                    VALUES (
-                        :idUsuario,
-                        'SEGURIDAD',
-                        :accion,
-                        'USUARIO',
-                        :idEntidad,
-                        :resultado,
-                        :descripcion,
-                        :ipOrigen,
-                        :userAgent,
-                        :metodoHttp,
-                        :ruta
-                    )
-                    """)
-                    .param("idUsuario", idUsuario)
-                    .param("accion", accion)
-                    .param("idEntidad",
-                            idUsuario != null ? idUsuario.toString() : null)
-                    .param("resultado", resultado)
-                    .param("descripcion", limitar(descripcion, 1000))
-                    .param("ipOrigen", limitar(ipOrigen, 45))
-                    .param("userAgent", limitar(userAgent, 500))
-                    .param("metodoHttp", limitar(metodoHttp, 10))
-                    .param("ruta", limitar(ruta, 500))
-                    .update();
-
-        } catch (RuntimeException e) {
-
-            log.error(
-                    "No fue posible registrar evento de auditoría. accion={}, idUsuario={}",
-                    accion,
-                    idUsuario);
-        }
+       jdbcClient.sql("""
+        SELECT public.sp_registrar_auditoria(
+            :idUsuario,
+            'SEGURIDAD',
+            :accion,
+            'USUARIO',
+            :idEntidad,
+            :resultado,
+            :descripcion,
+            jsonb_build_object(
+                'ip_origen', :ipOrigen,
+                'user_agent', :userAgent,
+                'metodo_http', :metodoHttp,
+                'ruta', :ruta
+            )
+        )
+        """)
+        .param("idUsuario", idUsuario)
+        .param("accion", accion)
+        .param(
+                "idEntidad",
+                idUsuario != null ? idUsuario.toString() : null)
+        .param("resultado", resultado)
+        .param("descripcion", limitar(descripcion, 1000))
+        .param("ipOrigen", limitar(ipOrigen, 45))
+        .param("userAgent", limitar(userAgent, 500))
+        .param("metodoHttp", limitar(metodoHttp, 10))
+        .param("ruta", limitar(ruta, 500))
+        .query(Long.class)
+        .single();
     }
 
     private String limitar(String texto, int maximo) {
