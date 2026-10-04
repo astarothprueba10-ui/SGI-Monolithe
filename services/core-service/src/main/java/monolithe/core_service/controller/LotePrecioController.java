@@ -7,6 +7,7 @@ import monolithe.core_service.dto.LotePrecioResponse;
 import monolithe.core_service.service.LotePrecioService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class LotePrecioController {
     private final LotePrecioService lotePrecioService;
 
     @GetMapping("/lote/{idLote}/historial")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<List<LotePrecioResponse>> listarHistorial(
             @PathVariable Long idLote
     ) {
@@ -28,6 +30,7 @@ public class LotePrecioController {
     }
 
     @GetMapping("/lote/{idLote}/vigente")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<LotePrecioResponse> obtenerVigente(
             @PathVariable Long idLote,
             @RequestParam("moneda") String codigoMoneda
@@ -41,6 +44,7 @@ public class LotePrecioController {
     }
 
     @PostMapping("/calcular")
+    @PreAuthorize("hasAuthority('lots.edit')")
     public ResponseEntity<LotePrecioResponse> calcularYRegistrar(
             @Valid @RequestBody LotePrecioRequest request
     ) {

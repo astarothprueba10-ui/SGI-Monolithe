@@ -11,6 +11,7 @@ import monolithe.core_service.dto.PlanoInteractivoResponse;
 import monolithe.core_service.service.PlanoInteractivoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,7 @@ public class PlanoInteractivoController {
     private final PlanoInteractivoService planoInteractivoService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('lots.edit')")
     public ResponseEntity<PlanoInteractivoResponse> crearVersion(
             @Valid @RequestBody PlanoInteractivoRequest request
     ) {
@@ -37,6 +39,7 @@ public class PlanoInteractivoController {
     }
 
     @GetMapping("/proyecto/{idProyecto}")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<List<PlanoInteractivoResponse>> listarPorProyecto(
             @PathVariable @Positive Long idProyecto
     ) {
@@ -46,6 +49,7 @@ public class PlanoInteractivoController {
     }
 
     @GetMapping("/proyecto/{idProyecto}/vigente")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<PlanoInteractivoResponse> obtenerVigente(
             @PathVariable @Positive Long idProyecto,
             @RequestParam(required = false) @Positive Long idEtapa
@@ -59,6 +63,7 @@ public class PlanoInteractivoController {
     }
 
     @GetMapping("/proyecto/{idProyecto}/detalle-vigente")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<PlanoInteractivoDetalleResponse> obtenerDetalleVigente(
             @PathVariable @Positive Long idProyecto,
             @RequestParam(required = false) @Positive Long idEtapa
@@ -72,6 +77,7 @@ public class PlanoInteractivoController {
     }
 
     @PutMapping("/geometrias")
+    @PreAuthorize("hasAuthority('lots.edit')")
     public ResponseEntity<LoteGeometriaResponse> guardarGeometria(
             @Valid @RequestBody LoteGeometriaRequest request
     ) {
@@ -81,6 +87,7 @@ public class PlanoInteractivoController {
     }
 
     @DeleteMapping("/geometrias/{idLoteGeometria}")
+    @PreAuthorize("hasAuthority('lots.edit')")
     public ResponseEntity<Void> desactivarGeometria(
             @PathVariable @Positive Long idLoteGeometria
     ) {

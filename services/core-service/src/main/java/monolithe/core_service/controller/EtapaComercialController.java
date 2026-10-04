@@ -7,6 +7,7 @@ import monolithe.core_service.dto.EtapaComercialResponse;
 import monolithe.core_service.service.EtapaComercialService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class EtapaComercialController {
     private final EtapaComercialService etapaComercialService;
 
     @GetMapping("/proyecto/{idProyecto}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<EtapaComercialResponse>> listarPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -28,6 +30,7 @@ public class EtapaComercialController {
     }
 
     @GetMapping("/proyecto/{idProyecto}/activas")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<EtapaComercialResponse>> listarActivasPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -37,6 +40,7 @@ public class EtapaComercialController {
     }
 
     @GetMapping("/{idEtapaComercial}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<EtapaComercialResponse> obtenerPorId(
             @PathVariable Long idEtapaComercial
     ) {
@@ -46,6 +50,7 @@ public class EtapaComercialController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<EtapaComercialResponse> crear(
             @Valid @RequestBody EtapaComercialRequest request
     ) {
@@ -55,6 +60,7 @@ public class EtapaComercialController {
     }
 
     @PutMapping("/{idEtapaComercial}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<EtapaComercialResponse> actualizar(
             @PathVariable Long idEtapaComercial,
             @Valid @RequestBody EtapaComercialRequest request
@@ -65,6 +71,7 @@ public class EtapaComercialController {
     }
 
     @DeleteMapping("/{idEtapaComercial}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<Void> desactivar(
             @PathVariable Long idEtapaComercial
     ) {

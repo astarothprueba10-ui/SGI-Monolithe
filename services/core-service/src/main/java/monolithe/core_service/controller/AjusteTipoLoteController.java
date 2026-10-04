@@ -7,6 +7,7 @@ import monolithe.core_service.dto.AjusteTipoLoteResponse;
 import monolithe.core_service.service.AjusteTipoLoteService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class AjusteTipoLoteController {
     private final AjusteTipoLoteService ajusteTipoLoteService;
 
     @GetMapping("/proyecto/{idProyecto}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<AjusteTipoLoteResponse>> listarPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -28,6 +30,7 @@ public class AjusteTipoLoteController {
     }
 
     @GetMapping("/proyecto/{idProyecto}/activos")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<AjusteTipoLoteResponse>> listarActivosPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -37,6 +40,7 @@ public class AjusteTipoLoteController {
     }
 
     @GetMapping("/{idAjusteTipoLote}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<AjusteTipoLoteResponse> obtenerPorId(
             @PathVariable Long idAjusteTipoLote
     ) {
@@ -46,6 +50,7 @@ public class AjusteTipoLoteController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<AjusteTipoLoteResponse> registrar(
             @Valid @RequestBody AjusteTipoLoteRequest request
     ) {
@@ -55,6 +60,7 @@ public class AjusteTipoLoteController {
     }
 
     @DeleteMapping("/{idAjusteTipoLote}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<Void> desactivar(
             @PathVariable Long idAjusteTipoLote
     ) {

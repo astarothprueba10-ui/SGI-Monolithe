@@ -1,29 +1,35 @@
 export type ModuleKey =
-'dashboard' |
-'projects' |
-'lots' |
-'crm' |
-'marketing' |
-'sales' |
-'financing' |
-'finance' |
-'advisors' |
-'hr' |
-'users' |
-'audit';
+  'dashboard' |
+  'projects' |
+  'lots' |
+  'crm' |
+  'marketing' |
+  'sales' |
+  'financing' |
+  'finance' |
+  'advisors' |
+  'hr' |
+  'users' |
+  'audit';
 
 export type Action =
-'view' |
-'create' |
-'edit' |
-'delete' |
-'approve' |
-'reject' |
-'export';
+  'view' |
+  'create' |
+  'edit' |
+  'delete' |
+  'approve' |
+  'reject' |
+  'export';
 
 export type Permission = `${ModuleKey}.${Action}`;
 
-export type RoleName = 'Administrador' | 'Asesor' | 'Finanzas' | 'Marketing' | 'RRHH';
+export type RoleName =
+  | 'Administrador'
+  | 'Gerencia'
+  | 'Asesor'
+  | 'Finanzas'
+  | 'Marketing'
+  | 'RRHH';
 
 export interface Role {
   name: RoleName;

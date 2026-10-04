@@ -1,6 +1,24 @@
-import React, { createContext, useContext, useMemo } from 'react';
-import { DEMO_USERS, ROLES } from '../data/roles';
-import type { Action, ModuleKey, Permission, RoleName, SessionUser } from '../types';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  type ReactNode
+} from 'react';
+
+import {
+  getSessionPermissions,
+  getSessionRoles,
+  getStoredAuthUser,
+  toSessionUser
+} from '../lib/authSession';
+
+import type {
+  Action,
+  ModuleKey,
+  Permission,
+  RoleName,
+  SessionUser
+} from '../types';
 
 interface AuthValue {
   user: SessionUser;
@@ -14,33 +32,69 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({
-  role,
   children
+}: {
+  children: ReactNode;
+}) {
+  const value = useMemo<AuthValue | null>(() => {
+    const storedAuthUser = getStoredAuthUser();
 
+    if (!storedAuthUser) {
+      return null;
+    }
 
-
-}: {role: RoleName;children: React.ReactNode;}) {
-  const value = useMemo<AuthValue>(() => {
-    const user = DEMO_USERS[role];
-    const permissions = new Set<Permission>(
-      user.roles.flatMap((r) => ROLES[r].permissions)
+    const roles = getSessionRoles(
+      storedAuthUser.autoridades
     );
-    const can = (permission: Permission) => permissions.has(permission);
+
+    if (roles.length === 0) {
+      return null;
+    }
+
+    const user = toSessionUser(
+      storedAuthUser,
+      roles
+    );
+
+    const permissions = getSessionPermissions(
+      storedAuthUser.autoridades
+    );
+
+    const can = (permission: Permission) =>
+      permissions.has(permission);
+
     return {
       user,
-      role,
+      role: user.primaryRole,
       permissions,
-      can,
-      canAny: (module, actions) => actions.some((a) => can(`${module}.${a}` as Permission)),
-      hasModule: (module) => can(`${module}.view` as Permission)
-    };
-  }, [role]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+      can,
+
+      canAny: (module, actions) =>
+        actions.some((action) =>
+          can(`${module}.${action}` as Permission)
+        ),
+
+      hasModule: (module) =>
+        can(`${module}.view` as Permission)
+    };
+  }, []);
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      'No existe una sesión autenticada en el Backoffice.'
+    );
+  }
+
+  return context;
 }
