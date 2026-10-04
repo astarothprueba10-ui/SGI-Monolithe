@@ -60,7 +60,8 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+      VITE_AUTH_API_URL: /api/auth
+      AUTH_PROXY_TARGET: http://auth-service:8081
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
@@ -77,7 +78,14 @@ services:
     ports:
       - "5174:5174"
     environment:
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost:8081/api/auth}
+      VITE_AUTH_API_URL: /api/auth
+      VITE_CMS_API_URL: /cms-api
+      VITE_CORE_API_URL: /api/core
+
+      AUTH_PROXY_TARGET: http://auth-service:8081
+      CMS_PROXY_TARGET: http://pagina-web-backend:8082
+      CORE_PROXY_TARGET: http://core-service:8083
+
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
@@ -122,7 +130,8 @@ services:
     ports:
       - "${WEB_FRONTEND_PORT:-5175}:5175"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8082}
+      VITE_API_URL: /cms-api
+      API_PROXY_TARGET: http://pagina-web-backend:8082
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:

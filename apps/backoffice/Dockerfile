@@ -1,8 +1,12 @@
 FROM node:22-slim
+
 WORKDIR /app
 
+COPY package.json package-lock.json ./
+
+RUN npm install --include=optional --no-audit --no-fund
+
 COPY . .
-RUN if [ ! -d "node_modules" ]; then npm install --no-audit --no-fund; fi
 
 EXPOSE 5174
 
