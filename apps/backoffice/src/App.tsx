@@ -19,6 +19,8 @@ import { Unauthorized } from './pages/Unauthorized';
 import type { ReactElement } from 'react';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
+import { ResetPassword } from './pages/ResetPassword';
+import { ForgotPassword } from './pages/ForgotPassword';
 import {
   getSessionRoles,
   getStoredAuthUser
@@ -75,9 +77,19 @@ export function App({
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-
-          {/* RUTA PÚBLICA */}
+          {/* RUTAS PÚBLICAS */}
           <Route path="/login" element={<Login />} />
+
+          <Route
+            path="/recuperar-contrasena"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/restablecer-contrasena"
+            element={<ResetPassword />}
+          />
+
           <Route
             path="/cambiar-contrasena"
             element={

@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PortalLayout } from './components/portal/PortalLayout';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Cronograma } from './pages/portal/Cronograma';
 import { Documentos } from './pages/portal/Documentos';
 import { Inicio } from './pages/portal/Inicio';
@@ -11,10 +13,11 @@ import { Pagos } from './pages/portal/Pagos';
 import { Perfil } from './pages/portal/Perfil';
 import { Soporte } from './pages/portal/Soporte';
 
+
 function tieneSesion() {
   return Boolean(
     localStorage.getItem('monolithe_access_token') ||
-      sessionStorage.getItem('monolithe_access_token')
+    sessionStorage.getItem('monolithe_access_token')
   );
 }
 
@@ -28,6 +31,15 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to={tieneSesion() ? '/portal' : '/login'} replace />} />
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/recuperar-contrasena"
+          element={<ForgotPassword />}
+        />
+
+        <Route
+          path="/restablecer-contrasena"
+          element={<ResetPassword />}
+        />
         <Route
           path="/portal"
           element={

@@ -1,4 +1,3 @@
-import React from 'react';
 import { HelpCircleIcon } from 'lucide-react';
 import { BrandPanel } from '../components/BrandPanel';
 import { LoginForm } from '../components/LoginForm';
@@ -33,7 +32,7 @@ export function Login() {
                 Iniciar sesión
               </h1>
               <p className="mt-2 text-[14px] leading-relaxed text-slateux-500">
-                Ingresa con tus credenciales corporativas o de cliente
+                Ingresa con tus credenciales de cliente
                 comprador para continuar.
               </p>
 

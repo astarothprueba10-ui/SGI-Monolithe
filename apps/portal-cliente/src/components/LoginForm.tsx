@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, authApi } from '../lib/apiClient';
 import {
   AlertCircleIcon,
@@ -25,6 +25,44 @@ type LoginResponse = {
   mensaje: string;
 };
 
+function resolverMensajeErrorLogin(error: ApiError): string {
+  if (error.status === 423) {
+    return error.message;
+  }
+
+  const esBloqueado = /bloquead|locked/i.test(error.message);
+  const esSesionOToken = /sesi[oó]n|token|expirad/i.test(error.message);
+
+  if (
+    error.status === 401 &&
+    !esBloqueado &&
+    !esSesionOToken &&
+    (error.message === 'No fue posible autenticar al usuario' ||
+      /credencial|autenticar|bad credentials/i.test(error.message))
+  ) {
+    return 'Usuario o contraseña incorrectos';
+  }
+
+  return error.message;
+}
+
+const PORTAL_USUARIO_REGEX = /^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{8}|[a-zA-Z0-9._-]{3,50})$/;
+const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
+
+function validarCredencialesPortal(usuario: string, contrasena: string): string | null {
+  const usuarioLimpio = usuario.trim();
+  if (!usuarioLimpio || usuarioLimpio.length > 120 || !PORTAL_USUARIO_REGEX.test(usuarioLimpio)) {
+    return 'Ingresa un usuario válido';
+  }
+  if (!contrasena) {
+    return 'Ingresa tu contraseña';
+  }
+  if (contrasena.length > 128 || CONTROL_CHARS_REGEX.test(contrasena)) {
+    return 'La contraseña contiene caracteres no permitidos';
+  }
+  return null;
+}
+
 export function LoginForm() {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +79,14 @@ export function LoginForm() {
     if (loading) return;
 
     setError(null);
+
+    const errorValidacion = validarCredencialesPortal(usuario, password);
+    if (errorValidacion) {
+      setError(errorValidacion);
+      usuarioRef.current?.focus();
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -95,7 +141,7 @@ export function LoginForm() {
       }, 350);
     } catch (error) {
       if (error instanceof ApiError) {
-        setError(error.message);
+        setError(resolverMensajeErrorLogin(error));
       } else {
         setError(
           'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.'
@@ -138,6 +184,7 @@ export function LoginForm() {
         autoComplete="username"
         placeholder="Ingresa tu DNI o usuario"
         value={usuario}
+        maxLength={120}
         invalid={Boolean(error)}
         disabled={loading}
         onChange={(e) => setUsuario(e.target.value)}
@@ -151,13 +198,17 @@ export function LoginForm() {
         autoComplete="current-password"
         placeholder="••••••••••"
         value={password}
+        maxLength={128}
         invalid={Boolean(error)}
         disabled={loading}
         onChange={(e) => setPassword(e.target.value)}
         labelAction={
-          <a href="#recuperar" className="rounded text-[13px] font-medium text-ink-600 underline-offset-4 outline-none transition-colors hover:text-ink-800 hover:underline">
+          <Link
+            to="/recuperar-contrasena"
+            className="rounded text-[13px] font-medium text-ink-600 underline-offset-4 outline-none transition-colors hover:text-ink-800 hover:underline"
+          >
             ¿Olvidaste tu contraseña?
-          </a>
+          </Link>
         }
         trailing={
           <button

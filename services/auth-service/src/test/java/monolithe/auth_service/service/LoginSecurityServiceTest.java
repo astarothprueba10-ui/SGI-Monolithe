@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -111,6 +112,32 @@ class LoginSecurityServiceTest {
 
         verify(userRepository).registrarAccesoExitoso(1L);
         verifyNoMoreInteractions(userRepository);
+    }
+
+    @Test
+    void debeCalcularDuracionDeBloqueoEnMinutos() {
+
+        long minutos = loginSecurityService.getLockDurationMinutes();
+
+        assertEquals(15L, minutos);
+    }
+
+    @Test
+    void debeCalcularMinutosRestantesUsandoUtcYRedondearHaciaArriba() {
+
+        LocalDateTime ahoraUtc = LocalDateTime.now(ZoneOffset.UTC);
+
+        long minutosCortos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.plusSeconds(30));
+        assertEquals(1L, minutosCortos);
+
+        long minutosLargos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.plusMinutes(14).plusSeconds(10));
+        assertEquals(15L, minutosLargos);
+
+        long minutosNulo = loginSecurityService.calcularMinutosRestantes(null);
+        assertEquals(15L, minutosNulo);
+
+        long minutosVencidos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.minusSeconds(10));
+        assertEquals(1L, minutosVencidos);
     }
 
     private User crearUsuario() {

@@ -3,6 +3,7 @@ package monolithe.auth_service.service;
 import lombok.RequiredArgsConstructor;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.exception.AccountTemporarilyLockedException;
 import monolithe.auth_service.security.CustomUserDetailsService;
 import monolithe.auth_service.security.JwtService;
 import monolithe.auth_service.security.UserPrincipal;
@@ -58,64 +59,9 @@ public class AuthenticationService {
                                                         solicitud.getContrasena()));
 
                 } catch (LockedException e) {
-
-                        User usuarioBloqueado = userRepository
-                                        .findByUsuarioLogin(solicitud.getUsuario())
-                                        .orElse(null);
-
-                        Long idUsuario = usuarioBloqueado != null
-                                        ? usuarioBloqueado.getIdUsuario()
-                                        : null;
-
-                        auditService.registrar(
-                                        idUsuario,
-                                        "LOGIN_DENEGADO",
-                                        "DENEGADO",
-                                        "Inicio de sesión denegado porque la cuenta está bloqueada temporalmente",
-                                        ipOrigen,
-                                        userAgent,
-                                        "POST",
-                                        "/api/auth/login");
-
-                        throw e;
-
+                        throw procesarCuentaBloqueada(solicitud.getUsuario(), ipOrigen, userAgent);
                 } catch (BadCredentialsException e) {
-                        User usuarioIntentado = userRepository
-                                        .findByUsuarioLogin(solicitud.getUsuario())
-                                        .orElse(null);
-
-                        Long idUsuarioIntentado = usuarioIntentado != null
-                                        ? usuarioIntentado.getIdUsuario()
-                                        : null;
-
-                        Long idUsuarioBloqueado = loginSecurityService.registrarIntentoFallido(
-                                        solicitud.getUsuario());
-
-                        auditService.registrar(
-                                        idUsuarioIntentado,
-                                        "LOGIN_FALLIDO",
-                                        "FALLIDO",
-                                        "Intento de inicio de sesión con credenciales inválidas para el usuario: "
-                                                        + solicitud.getUsuario(),
-                                        ipOrigen,
-                                        userAgent,
-                                        "POST",
-                                        "/api/auth/login");
-
-                        if (idUsuarioBloqueado != null) {
-
-                                auditService.registrar(
-                                                idUsuarioBloqueado,
-                                                "USUARIO_BLOQUEADO",
-                                                "EXITOSO",
-                                                "El usuario fue bloqueado temporalmente por exceder los intentos fallidos de inicio de sesión",
-                                                ipOrigen,
-                                                userAgent,
-                                                "POST",
-                                                "/api/auth/login");
-                        }
-
-                        throw e;
+                        throw procesarCredencialesInvalidas(solicitud.getUsuario(), ipOrigen, userAgent, e);
                 }
 
                 UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
@@ -265,5 +211,69 @@ public class AuthenticationService {
                 refreshTokenService.revocarTodasLasSesiones(
                                 idUsuario,
                                 "LOGOUT_TODAS_SESIONES");
+        }
+
+        private AccountTemporarilyLockedException procesarCuentaBloqueada(
+                        String login,
+                        String ipOrigen,
+                        String userAgent) {
+
+                User usuario = userRepository.findByUsuarioLogin(login).orElse(null);
+                Long idUsuario = usuario != null ? usuario.getIdUsuario() : null;
+
+                auditService.registrar(
+                                idUsuario,
+                                "LOGIN_DENEGADO",
+                                "DENEGADO",
+                                "Inicio de sesión denegado porque la cuenta está bloqueada temporalmente",
+                                ipOrigen,
+                                userAgent,
+                                "POST",
+                                "/api/auth/login");
+
+                LocalDateTime bloqueadoHasta = usuario != null
+                                ? usuario.getBloqueadoHasta()
+                                : null;
+                long minutos = loginSecurityService.calcularMinutosRestantes(bloqueadoHasta);
+
+                return new AccountTemporarilyLockedException(minutos);
+        }
+
+        private RuntimeException procesarCredencialesInvalidas(
+                        String login,
+                        String ipOrigen,
+                        String userAgent,
+                        BadCredentialsException excepcionOriginal) {
+
+                User usuario = userRepository.findByUsuarioLogin(login).orElse(null);
+                Long idUsuario = usuario != null ? usuario.getIdUsuario() : null;
+
+                Long idBloqueado = loginSecurityService.registrarIntentoFallido(login);
+
+                auditService.registrar(
+                                idUsuario,
+                                "LOGIN_FALLIDO",
+                                "FALLIDO",
+                                "Intento de inicio de sesión con credenciales inválidas para el usuario: " + login,
+                                ipOrigen,
+                                userAgent,
+                                "POST",
+                                "/api/auth/login");
+
+                if (idBloqueado != null) {
+                        auditService.registrar(
+                                        idBloqueado,
+                                        "USUARIO_BLOQUEADO",
+                                        "EXITOSO",
+                                        "El usuario fue bloqueado temporalmente por exceder los intentos fallidos de inicio de sesión",
+                                        ipOrigen,
+                                        userAgent,
+                                        "POST",
+                                        "/api/auth/login");
+
+                        return new AccountTemporarilyLockedException(loginSecurityService.getLockDurationMinutes());
+                }
+
+                return excepcionOriginal;
         }
 }

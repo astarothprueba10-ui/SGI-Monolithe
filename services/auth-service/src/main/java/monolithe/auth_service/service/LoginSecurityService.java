@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
@@ -70,5 +71,22 @@ public class LoginSecurityService {
         public void registrarAccesoExitoso(Long idUsuario) {
 
                 userRepository.registrarAccesoExitoso(idUsuario);
+        }
+
+        public long getLockDurationMinutes() {
+                return (long) Math.ceil((double) lockDuration / 60.0);
+        }
+
+        public long calcularMinutosRestantes(LocalDateTime bloqueadoHasta) {
+                if (bloqueadoHasta == null) {
+                        return getLockDurationMinutes();
+                }
+                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
+                if (!bloqueadoHasta.isAfter(ahora)) {
+                        return 1L;
+                }
+                long segundos = Duration.between(ahora, bloqueadoHasta).getSeconds();
+                long minutos = (long) Math.ceil((double) segundos / 60.0);
+                return Math.max(1L, minutos);
         }
 }

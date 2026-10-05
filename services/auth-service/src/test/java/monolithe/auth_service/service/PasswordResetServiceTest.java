@@ -1,322 +1,710 @@
 package monolithe.auth_service.service;
 
-import monolithe.auth_service.entity.PasswordResetToken;
-import monolithe.auth_service.entity.User;
 import monolithe.auth_service.exception.InvalidTokenException;
-import monolithe.auth_service.repository.PasswordResetTokenRepository;
-import monolithe.auth_service.repository.PersonContactRepository;
-import monolithe.auth_service.repository.UserRepository;
+import monolithe.auth_service.repository.PasswordRecoveryProcedureRepository;
+import monolithe.auth_service.repository.projection.FailedOtpAttemptResult;
+import monolithe.auth_service.repository.projection.RecoveryRequestResult;
+import monolithe.auth_service.repository.projection.RecoveryVerificationContext;
+import monolithe.auth_service.repository.projection.TokenRecoveryContext;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PasswordResetServiceTest {
 
-    private PasswordResetTokenRepository passwordResetTokenRepository;
-    private UserRepository userRepository;
-    private PasswordEncoder passwordEncoder;
-    private PasswordPolicyService passwordPolicyService;
-    private RefreshTokenService refreshTokenService;
-    private PersonContactRepository personContactRepository;
-    private EmailService emailService;
-    private AuditService auditService;
+        private PasswordEncoder passwordEncoder;
+        private PasswordPolicyService passwordPolicyService;
+        private EmailService emailService;
 
-    private PasswordResetService passwordResetService;
+        private PasswordRecoveryProcedureRepository passwordRecoveryProcedureRepository;
 
-    @BeforeEach
-    void setUp() {
+        private PasswordResetService passwordResetService;
 
-        passwordResetTokenRepository =
-                mock(PasswordResetTokenRepository.class);
+        @BeforeEach
+        void setUp() {
 
-        userRepository =
-                mock(UserRepository.class);
+                passwordEncoder = mock(PasswordEncoder.class);
 
-        passwordEncoder =
-                mock(PasswordEncoder.class);
+                passwordPolicyService = mock(PasswordPolicyService.class);
 
-        passwordPolicyService =
-                mock(PasswordPolicyService.class);
+                emailService = mock(EmailService.class);
 
-        refreshTokenService =
-                mock(RefreshTokenService.class);
+                passwordRecoveryProcedureRepository = mock(PasswordRecoveryProcedureRepository.class);
 
-        personContactRepository =
-                mock(PersonContactRepository.class);
+                passwordResetService = new PasswordResetService(
+                                passwordEncoder,
+                                passwordPolicyService,
+                                emailService,
+                                passwordRecoveryProcedureRepository);
 
-        emailService =
-                mock(EmailService.class);
+                ReflectionTestUtils.setField(
+                                passwordResetService,
+                                "passwordResetExpiration",
+                                900L);
 
-        auditService =
-                mock(AuditService.class);
+                ReflectionTestUtils.setField(
+                                passwordResetService,
+                                "passwordResetOtpExpiration",
+                                600L);
 
-        passwordResetService = new PasswordResetService(
-                passwordResetTokenRepository,
-                userRepository,
-                passwordEncoder,
-                passwordPolicyService,
-                refreshTokenService,
-                personContactRepository,
-                emailService,
-                auditService
-        );
+                ReflectionTestUtils.setField(
+                                passwordResetService,
+                                "backofficePasswordResetUrl",
+                                "http://localhost:5174/restablecer-contrasena");
 
-        ReflectionTestUtils.setField(
-                passwordResetService,
-                "passwordResetExpiration",
-                900L
-        );
-    }
+                ReflectionTestUtils.setField(
+                                passwordResetService,
+                                "portalPasswordResetUrl",
+                                "http://localhost:5173/restablecer-contrasena");
+        }
 
-    @Test
-    void debeCrearTokenSeguroYGuardarSoloSuHash() {
+        @Test
+        void debeIniciarRestablecimientoConOtp() {
 
-        User usuario = crearUsuario();
+                String tokenReal = "token-recuperacion-valido";
 
-        when(userRepository.findById(1L))
-                .thenReturn(Optional.of(usuario));
+                String tokenHash = passwordResetService.calcularSha256(
+                                tokenReal);
 
-        when(passwordResetTokenRepository
-                .findByUsuarioIdUsuarioAndFechaUsoIsNull(1L))
-                .thenReturn(List.of());
+                TokenRecoveryContext contexto = new TokenRecoveryContext(
+                                10L,
+                                1L,
+                                "hash-anterior");
 
-        String tokenReal =
-                passwordResetService.crearTokenRecuperacion(
-                        1L,
-                        "127.0.0.1",
-                        "JUnit"
-                );
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoToken(tokenHash))
+                                .thenReturn(
+                                                Optional.of(contexto));
 
-        assertNotNull(tokenReal);
-        assertFalse(tokenReal.isBlank());
+                when(passwordEncoder.matches(
+                                "NuevaClave123*",
+                                "hash-anterior"))
+                                .thenReturn(false);
 
-        ArgumentCaptor<PasswordResetToken> captor =
-                ArgumentCaptor.forClass(
-                        PasswordResetToken.class
-                );
+                when(passwordRecoveryProcedureRepository
+                                .obtenerCorreoRecuperacion(1L))
+                                .thenReturn(
+                                                Optional.of(
+                                                                "usuario@empresa.com"));
 
-        verify(passwordResetTokenRepository)
-                .save(captor.capture());
+                when(passwordEncoder.encode(
+                                "NuevaClave123*"))
+                                .thenReturn(
+                                                "hash-password-pendiente");
 
-        PasswordResetToken tokenGuardado =
-                captor.getValue();
+                when(passwordEncoder.encode(
+                                argThat(
+                                                (String valor) -> valor != null
+                                                                && valor.matches("\\d{6}"))))
+                                .thenReturn(
+                                                "hash-otp");
 
-        assertNotNull(tokenGuardado.getTokenHash());
+                String ticket = passwordResetService
+                                .iniciarRestablecimientoConOtp(
+                                                tokenReal,
+                                                "NuevaClave123*",
+                                                "NuevaClave123*");
 
-        assertEquals(
-                64,
-                tokenGuardado.getTokenHash().length()
-        );
+                assertNotNull(ticket);
+                assertFalse(ticket.isBlank());
 
-        assertNotEquals(
-                tokenReal,
-                tokenGuardado.getTokenHash()
-        );
+                verify(passwordPolicyService)
+                                .validar(
+                                                "NuevaClave123*");
 
-        assertEquals(
-                usuario,
-                tokenGuardado.getUsuario()
-        );
+                verify(passwordRecoveryProcedureRepository)
+                                .obtenerContextoToken(
+                                                tokenHash);
 
-        assertNotNull(
-                tokenGuardado.getFechaExpiracion()
-        );
+                verify(passwordRecoveryProcedureRepository)
+                                .obtenerCorreoRecuperacion(
+                                                1L);
 
-        assertEquals(
-                "127.0.0.1",
-                tokenGuardado.getIpSolicitud()
-        );
+                verify(passwordRecoveryProcedureRepository)
+                                .iniciarVerificacion(
+                                                eq(tokenHash),
+                                                anyString(),
+                                                eq("hash-otp"),
+                                                eq("hash-password-pendiente"),
+                                                any(OffsetDateTime.class));
 
-        assertEquals(
-                "JUnit",
-                tokenGuardado.getUserAgent()
-        );
-    }
+                ArgumentCaptor<String> codigoCaptor = ArgumentCaptor.forClass(
+                                String.class);
 
-    @Test
-    void debeRestablecerContrasenaConTokenValido() {
+                verify(emailService)
+                                .enviarCodigoRecuperacion(
+                                                eq("usuario@empresa.com"),
+                                                codigoCaptor.capture(),
+                                                eq(10L));
 
-        User usuario = crearUsuario();
+                String codigoEnviado = codigoCaptor.getValue();
 
-        PasswordResetToken token =
-                new PasswordResetToken();
+                assertNotNull(codigoEnviado);
 
-        token.setUsuario(usuario);
-        token.setFechaExpiracion(
-                LocalDateTime.now(java.time.ZoneOffset.UTC).plusMinutes(10)
-        );
+                assertTrue(
+                                codigoEnviado.matches("\\d{6}"),
+                                "El OTP debe contener exactamente 6 digitos");
+        }
 
-        String tokenReal = "token-recuperacion-valido";
+        @Test
+        void debeRechazarTokenInvalidoAlIniciarOtp() {
 
-        when(passwordResetTokenRepository
-                .findByTokenHashAndFechaUsoIsNull(
-                        passwordResetService.calcularSha256(
-                                tokenReal
-                        )
-                ))
-                .thenReturn(Optional.of(token));
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoToken(
+                                                anyString()))
+                                .thenReturn(
+                                                Optional.empty());
 
-        when(passwordEncoder.matches(
-                "NuevaClave123*",
-                "hash-anterior"
-        ))
-                .thenReturn(false);
+                assertThrows(
+                                InvalidTokenException.class,
+                                () -> passwordResetService
+                                                .iniciarRestablecimientoConOtp(
+                                                                "token-invalido",
+                                                                "NuevaClave123*",
+                                                                "NuevaClave123*"));
 
-        when(passwordEncoder.encode(
-                "NuevaClave123*"
-        ))
-                .thenReturn("nuevo-hash");
+                verify(emailService, never())
+                                .enviarCodigoRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyLong());
+        }
 
-        Long idUsuario =
-                passwordResetService.restablecerContrasena(
-                        tokenReal,
-                        "NuevaClave123*",
-                        "NuevaClave123*"
-                );
+        @Test
+        void debeRechazarContrasenasQueNoCoinciden() {
 
-        assertEquals(
-                1L,
-                idUsuario
-        );
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> passwordResetService
+                                                .iniciarRestablecimientoConOtp(
+                                                                "token",
+                                                                "NuevaClave123*",
+                                                                "OtraClave123*"));
 
-        assertEquals(
-                "nuevo-hash",
-                usuario.getPasswordHash()
-        );
+                verify(passwordRecoveryProcedureRepository, never())
+                                .obtenerContextoToken(
+                                                anyString());
+        }
 
-        assertFalse(
-                Boolean.TRUE.equals(
-                        usuario.getRequiereCambioPassword()
-                )
-        );
+        @Test
+        void debeRechazarContrasenaIgualALaActual() {
 
-        assertEquals(
-                0,
-                usuario.getIntentosFallidos()
-        );
+                String tokenReal = "token-valido";
 
-        assertNull(
-                usuario.getBloqueadoHasta()
-        );
+                String tokenHash = passwordResetService.calcularSha256(
+                                tokenReal);
 
-        assertNotNull(
-                usuario.getPasswordActualizadoEn()
-        );
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoToken(tokenHash))
+                                .thenReturn(
+                                                Optional.of(
+                                                                new TokenRecoveryContext(
+                                                                                10L,
+                                                                                1L,
+                                                                                "hash-anterior")));
 
-        assertNotNull(
-                token.getFechaUso()
-        );
+                when(passwordEncoder.matches(
+                                "NuevaClave123*",
+                                "hash-anterior"))
+                                .thenReturn(true);
 
-        verify(passwordPolicyService)
-                .validar("NuevaClave123*");
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> passwordResetService
+                                                .iniciarRestablecimientoConOtp(
+                                                                tokenReal,
+                                                                "NuevaClave123*",
+                                                                "NuevaClave123*"));
 
-        verify(userRepository)
-                .save(usuario);
+                verify(passwordRecoveryProcedureRepository, never())
+                                .iniciarVerificacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any());
+        }
 
-        verify(passwordResetTokenRepository)
-                .save(token);
+        @Test
+        void debeConfirmarRestablecimientoConOtpCorrecto() {
 
-        verify(refreshTokenService)
-                .revocarTodasLasSesiones(
-                        1L,
-                        "RECUPERACION_PASSWORD"
-                );
-    }
+                String ticketReal = "ticket-recuperacion";
 
-    @Test
-    void debeRechazarTokenExpirado() {
+                String ticketHash = passwordResetService.calcularSha256(
+                                ticketReal);
 
-        User usuario = crearUsuario();
+                RecoveryVerificationContext contexto = new RecoveryVerificationContext(
+                                100L,
+                                1L,
+                                "hash-otp",
+                                "hash-password-pendiente",
+                                0,
+                                OffsetDateTime
+                                                .now(ZoneOffset.UTC)
+                                                .plusMinutes(10),
+                                null,
+                                null);
 
-        PasswordResetToken token =
-                new PasswordResetToken();
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                ticketHash))
+                                .thenReturn(
+                                                Optional.of(contexto));
 
-        token.setUsuario(usuario);
-        token.setFechaExpiracion(
-                LocalDateTime.now().minusMinutes(1)
-        );
+                when(passwordEncoder.matches(
+                                "123456",
+                                "hash-otp"))
+                                .thenReturn(true);
 
-        String tokenReal = "token-expirado";
+                when(passwordRecoveryProcedureRepository
+                                .confirmarRecuperacion(
+                                                ticketHash))
+                                .thenReturn(1L);
 
-        when(passwordResetTokenRepository
-                .findByTokenHashAndFechaUsoIsNull(
-                        passwordResetService.calcularSha256(
-                                tokenReal
-                        )
-                ))
-                .thenReturn(Optional.of(token));
+                Long idUsuario = passwordResetService
+                                .confirmarRestablecimientoConOtp(
+                                                ticketReal,
+                                                "123456");
 
-        assertThrows(
-                InvalidTokenException.class,
-                () -> passwordResetService
-                        .restablecerContrasena(
+                assertEquals(
+                                1L,
+                                idUsuario);
+
+                verify(passwordRecoveryProcedureRepository)
+                                .confirmarRecuperacion(
+                                                ticketHash);
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .registrarIntentoOtpFallido(
+                                                anyString());
+        }
+
+        @Test
+        void debeRegistrarIntentoCuandoOtpEsIncorrecto() {
+
+                String ticketReal = "ticket-recuperacion";
+
+                String ticketHash = passwordResetService.calcularSha256(
+                                ticketReal);
+
+                RecoveryVerificationContext contexto = new RecoveryVerificationContext(
+                                100L,
+                                1L,
+                                "hash-otp",
+                                "hash-password-pendiente",
+                                1,
+                                OffsetDateTime
+                                                .now(ZoneOffset.UTC)
+                                                .plusMinutes(10),
+                                null,
+                                null);
+
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                ticketHash))
+                                .thenReturn(
+                                                Optional.of(contexto));
+
+                when(passwordEncoder.matches(
+                                "999999",
+                                "hash-otp"))
+                                .thenReturn(false);
+
+                when(passwordRecoveryProcedureRepository
+                                .registrarIntentoOtpFallido(
+                                                ticketHash))
+                                .thenReturn(
+                                                new FailedOtpAttemptResult(
+                                                                2,
+                                                                3,
+                                                                false));
+
+                IllegalArgumentException exception = assertThrows(
+                                IllegalArgumentException.class,
+                                () -> passwordResetService
+                                                .confirmarRestablecimientoConOtp(
+                                                                ticketReal,
+                                                                "999999"));
+
+                assertTrue(
+                                exception.getMessage()
+                                                .contains(
+                                                                "Intentos restantes: 3"));
+
+                verify(passwordRecoveryProcedureRepository)
+                                .registrarIntentoOtpFallido(
+                                                ticketHash);
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .confirmarRecuperacion(
+                                                anyString());
+        }
+
+        @Test
+        void debeBloquearVerificacionAlQuintoIntentoOtp() {
+
+                String ticketReal = "ticket-recuperacion";
+
+                String ticketHash = passwordResetService.calcularSha256(
+                                ticketReal);
+
+                RecoveryVerificationContext contexto = new RecoveryVerificationContext(
+                                100L,
+                                1L,
+                                "hash-otp",
+                                "hash-password-pendiente",
+                                4,
+                                OffsetDateTime
+                                                .now(ZoneOffset.UTC)
+                                                .plusMinutes(10),
+                                null,
+                                null);
+
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                ticketHash))
+                                .thenReturn(
+                                                Optional.of(contexto));
+
+                when(passwordEncoder.matches(
+                                "999999",
+                                "hash-otp"))
+                                .thenReturn(false);
+
+                when(passwordRecoveryProcedureRepository
+                                .registrarIntentoOtpFallido(
+                                                ticketHash))
+                                .thenReturn(
+                                                new FailedOtpAttemptResult(
+                                                                5,
+                                                                0,
+                                                                true));
+
+                IllegalArgumentException exception = assertThrows(
+                                IllegalArgumentException.class,
+                                () -> passwordResetService
+                                                .confirmarRestablecimientoConOtp(
+                                                                ticketReal,
+                                                                "999999"));
+
+                assertTrue(
+                                exception.getMessage()
+                                                .contains(
+                                                                "maximo de 5 intentos"));
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .confirmarRecuperacion(
+                                                anyString());
+        }
+
+        @Test
+        void debeRechazarVerificacionOtpExpirada() {
+
+                String ticketReal = "ticket-expirado";
+
+                String ticketHash = passwordResetService.calcularSha256(
+                                ticketReal);
+
+                RecoveryVerificationContext contexto = new RecoveryVerificationContext(
+                                100L,
+                                1L,
+                                "hash-otp",
+                                "hash-password-pendiente",
+                                0,
+                                OffsetDateTime
+                                                .now(ZoneOffset.UTC)
+                                                .minusMinutes(1),
+                                null,
+                                null);
+
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                ticketHash))
+                                .thenReturn(
+                                                Optional.of(contexto));
+
+                assertThrows(
+                                InvalidTokenException.class,
+                                () -> passwordResetService
+                                                .confirmarRestablecimientoConOtp(
+                                                                ticketReal,
+                                                                "123456"));
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .confirmarRecuperacion(
+                                                anyString());
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .registrarIntentoOtpFallido(
+                                                anyString());
+        }
+
+        @Test
+        void debeRechazarTicketInvalido() {
+
+                when(passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                anyString()))
+                                .thenReturn(
+                                                Optional.empty());
+
+                assertThrows(
+                                InvalidTokenException.class,
+                                () -> passwordResetService
+                                                .confirmarRestablecimientoConOtp(
+                                                                "ticket-invalido",
+                                                                "123456"));
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .confirmarRecuperacion(
+                                                anyString());
+        }
+
+        @Test
+        void debeRechazarOtpConFormatoInvalido() {
+
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> passwordResetService
+                                                .confirmarRestablecimientoConOtp(
+                                                                "ticket",
+                                                                "12345"));
+
+                verify(passwordRecoveryProcedureRepository, never())
+                                .obtenerContextoVerificacion(
+                                                anyString());
+        }
+
+        @Test
+        void debeSolicitarRecuperacionCuentaValidaEnviaCorreoConUrlYTokenReal() {
+
+                RecoveryRequestResult resultado = new RecoveryRequestResult(
+                                50L,
+                                "usuario@empresa.com");
+
+                when(passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any(),
+                                                anyString(),
+                                                anyString()))
+                                .thenReturn(
+                                                Optional.of(resultado));
+
+                passwordResetService
+                                .solicitarRecuperacion(
+                                                "usuario_test",
+                                                "BACKOFFICE",
+                                                "192.168.1.1",
+                                                "JUnit");
+
+                ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(
+                                String.class);
+
+                verify(emailService)
+                                .enviarRecuperacionContrasena(
+                                                eq("usuario@empresa.com"),
+                                                urlCaptor.capture(),
+                                                eq(15L));
+
+                String urlEnviada = urlCaptor.getValue();
+
+                assertTrue(
+                                urlEnviada.startsWith(
+                                                "http://localhost:5174/restablecer-contrasena?token="),
+                                "La URL debe usar la base del backoffice: "
+                                                + urlEnviada);
+
+                ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(
+                                String.class);
+
+                verify(passwordRecoveryProcedureRepository)
+                                .solicitarRecuperacion(
+                                                eq("usuario_test"),
+                                                eq("BACKOFFICE"),
+                                                hashCaptor.capture(),
+                                                any(),
+                                                eq("192.168.1.1"),
+                                                eq("JUnit"));
+
+                String tokenHashEnviado = hashCaptor.getValue();
+
+                assertEquals(
+                                64,
+                                tokenHashEnviado.length(),
+                                "El hash SHA-256 debe tener exactamente 64 caracteres hex");
+
+                String tokenReal = urlEnviada.substring(
+                                urlEnviada.indexOf("token=") + 6);
+
+                assertNotEquals(
                                 tokenReal,
-                                "NuevaClave123*",
-                                "NuevaClave123*"
-                        )
-        );
+                                tokenHashEnviado,
+                                "El token real NO debe coincidir con el hash guardado en BD");
+        }
 
-        verify(userRepository, never())
-                .save(any(User.class));
+        @Test
+        void debeSolicitarRecuperacionProcedureRetornaEmptyNoEnviaCorreo() {
 
-        verify(refreshTokenService, never())
-                .revocarTodasLasSesiones(
-                        anyLong(),
-                        anyString()
-                );
-    }
+                when(passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any(),
+                                                any(),
+                                                any()))
+                                .thenReturn(
+                                                Optional.empty());
 
-    @Test
-    void debeRechazarTokenInvalidoOYaUtilizado() {
+                assertDoesNotThrow(
+                                () -> passwordResetService
+                                                .solicitarRecuperacion(
+                                                                "usuario_invalido",
+                                                                "BACKOFFICE",
+                                                                "127.0.0.1",
+                                                                "JUnit"));
 
-        when(passwordResetTokenRepository
-                .findByTokenHashAndFechaUsoIsNull(
-                        anyString()
-                ))
-                .thenReturn(Optional.empty());
+                verify(emailService, never())
+                                .enviarRecuperacionContrasena(
+                                                anyString(),
+                                                anyString(),
+                                                anyLong());
+        }
 
-        assertThrows(
-                InvalidTokenException.class,
-                () -> passwordResetService
-                        .restablecerContrasena(
-                                "token-invalido",
-                                "NuevaClave123*",
-                                "NuevaClave123*"
-                        )
-        );
+        @Test
+        void debeSolicitarRecuperacionOrigenBackofficeUsaUrlBackoffice() {
 
-        verify(userRepository, never())
-                .save(any(User.class));
+                RecoveryRequestResult resultado = new RecoveryRequestResult(
+                                1L,
+                                "admin@empresa.com");
 
-        verify(refreshTokenService, never())
-                .revocarTodasLasSesiones(
-                        anyLong(),
-                        anyString()
-                );
-    }
+                when(passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any(),
+                                                any(),
+                                                any()))
+                                .thenReturn(
+                                                Optional.of(resultado));
 
-    private User crearUsuario() {
+                passwordResetService
+                                .solicitarRecuperacion(
+                                                "admin",
+                                                "BACKOFFICE",
+                                                "10.0.0.1",
+                                                "JUnit");
 
-        User usuario = new User();
+                ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(
+                                String.class);
 
-        usuario.setIdUsuario(1L);
-        usuario.setUsuarioLogin("admin");
-        usuario.setPasswordHash("hash-anterior");
-        usuario.setRequiereCambioPassword(true);
-        usuario.setIntentosFallidos(4);
-        usuario.setBloqueadoHasta(
-                LocalDateTime.now().plusMinutes(5)
-        );
+                verify(emailService)
+                                .enviarRecuperacionContrasena(
+                                                eq("admin@empresa.com"),
+                                                urlCaptor.capture(),
+                                                eq(15L));
 
-        return usuario;
-    }
+                assertTrue(
+                                urlCaptor.getValue()
+                                                .startsWith(
+                                                                "http://localhost:5174/restablecer-contrasena"),
+                                "BACKOFFICE debe usar la URL del backoffice");
+        }
+
+        @Test
+        void debeSolicitarRecuperacionOrigenPortalClienteUsaUrlPortal() {
+
+                RecoveryRequestResult resultado = new RecoveryRequestResult(
+                                2L,
+                                "cliente@empresa.com");
+
+                when(passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any(),
+                                                any(),
+                                                any()))
+                                .thenReturn(
+                                                Optional.of(resultado));
+
+                passwordResetService
+                                .solicitarRecuperacion(
+                                                "cliente",
+                                                "PORTAL_CLIENTE",
+                                                "10.0.0.2",
+                                                "JUnit");
+
+                ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(
+                                String.class);
+
+                verify(emailService)
+                                .enviarRecuperacionContrasena(
+                                                eq("cliente@empresa.com"),
+                                                urlCaptor.capture(),
+                                                eq(15L));
+
+                assertTrue(
+                                urlCaptor.getValue()
+                                                .startsWith(
+                                                                "http://localhost:5173/restablecer-contrasena"),
+                                "PORTAL_CLIENTE debe usar la URL del portal");
+        }
+
+        @Test
+        void debeSolicitarRecuperacionSmtpFallaPropagaMailException() {
+
+                RecoveryRequestResult resultado = new RecoveryRequestResult(
+                                3L,
+                                "usuario@empresa.com");
+
+                when(passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                anyString(),
+                                                anyString(),
+                                                anyString(),
+                                                any(),
+                                                any(),
+                                                any()))
+                                .thenReturn(
+                                                Optional.of(resultado));
+
+                MailException mailException = new MailSendException(
+                                "SMTP no disponible");
+
+                doThrow(mailException)
+                                .when(emailService)
+                                .enviarRecuperacionContrasena(
+                                                anyString(),
+                                                anyString(),
+                                                anyLong());
+
+                assertThrows(
+                                MailException.class,
+                                () -> passwordResetService
+                                                .solicitarRecuperacion(
+                                                                "usuario",
+                                                                "BACKOFFICE",
+                                                                "127.0.0.1",
+                                                                "JUnit"),
+                                "MailException debe propagarse para provocar rollback transaccional");
+        }
 }

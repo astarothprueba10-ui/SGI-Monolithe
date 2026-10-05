@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { FormEvent, useRef, useState } from 'react';
 import {
     EyeIcon,
@@ -33,6 +34,44 @@ const INTERNAL_ROLES = new Set([
     'ROLE_RRHH'
 ]);
 
+function resolverMensajeErrorLogin(error: ApiError): string {
+    if (error.status === 423) {
+        return error.message;
+    }
+
+    const esBloqueado = /bloquead|locked/i.test(error.message);
+    const esSesionOToken = /sesi[oó]n|token|expirad/i.test(error.message);
+
+    if (
+        error.status === 401 &&
+        !esBloqueado &&
+        !esSesionOToken &&
+        (error.message === 'No fue posible autenticar al usuario' ||
+            /credencial|autenticar|bad credentials/i.test(error.message))
+    ) {
+        return 'Usuario o contraseña incorrectos';
+    }
+
+    return error.message;
+}
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
+
+function validarCredencialesLogin(usuario: string, contrasena: string): string | null {
+    const usuarioLimpio = usuario.trim();
+    if (!usuarioLimpio || usuarioLimpio.length > 120 || !EMAIL_REGEX.test(usuarioLimpio)) {
+        return 'Ingresa un usuario válido';
+    }
+    if (!contrasena) {
+        return 'Ingresa tu contraseña';
+    }
+    if (contrasena.length > 128 || CONTROL_CHARS_REGEX.test(contrasena)) {
+        return 'La contraseña contiene caracteres no permitidos';
+    }
+    return null;
+}
+
 export function Login() {
 
     const [usuario, setUsuario] = useState('');
@@ -52,6 +91,14 @@ export function Login() {
 
         setError(null);
         setSuccess(false);
+
+        const errorValidacion = validarCredencialesLogin(usuario, password);
+        if (errorValidacion) {
+            setError(errorValidacion);
+            usuarioRef.current?.focus();
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -115,7 +162,7 @@ export function Login() {
             }, 350);
         } catch (error) {
             if (error instanceof ApiError) {
-                setError(error.message);
+                setError(resolverMensajeErrorLogin(error));
             } else {
                 setError(
                     'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.'
@@ -190,6 +237,7 @@ export function Login() {
                                 onChange={(event) =>
                                     setUsuario(event.target.value)
                                 }
+                                maxLength={120}
                                 placeholder="usuario@monolithe.pe"
                                 autoComplete="username"
                                 disabled={loading}
@@ -209,6 +257,7 @@ export function Login() {
                                     onChange={(event) =>
                                         setPassword(event.target.value)
                                     }
+                                    maxLength={128}
                                     placeholder="••••••••••"
                                     autoComplete="current-password"
                                     disabled={loading}
@@ -236,18 +285,30 @@ export function Login() {
                             </div>
                         </div>
 
-                        <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] text-brand-600">
-                            <input
-                                type="checkbox"
-                                checked={remember}
-                                onChange={(event) =>
-                                    setRemember(event.target.checked)
-                                }
-                                disabled={loading}
-                            />
+                        <div className="flex items-center justify-between gap-4">
 
-                            Recordarme en este equipo
-                        </label>
+                            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-brand-600">
+                                <input
+                                    type="checkbox"
+                                    checked={remember}
+                                    onChange={(event) =>
+                                        setRemember(event.target.checked)
+                                    }
+                                    disabled={loading}
+                                />
+
+                                Recordarme en este equipo
+                            </label>
+
+
+                            <Link
+                                to="/recuperar-contrasena"
+                                className="text-[13px] font-medium text-brand-700 transition hover:text-brand-900"
+                            >
+                                ¿Olvidaste tu contraseña?
+                            </Link>
+
+                        </div>
 
                         <Button
                             type="submit"

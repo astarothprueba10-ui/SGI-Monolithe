@@ -1,27 +1,29 @@
 package monolithe.auth_service.service;
 
 import lombok.RequiredArgsConstructor;
-import monolithe.auth_service.entity.PasswordResetToken;
-import monolithe.auth_service.entity.User;
-import monolithe.auth_service.repository.PasswordResetTokenRepository;
-import monolithe.auth_service.repository.PersonContactRepository;
-import monolithe.auth_service.repository.UserRepository;
+import monolithe.auth_service.exception.InvalidTokenException;
+import monolithe.auth_service.repository.PasswordRecoveryProcedureRepository;
+import monolithe.auth_service.repository.projection.FailedOtpAttemptResult;
+import monolithe.auth_service.repository.projection.RecoveryRequestResult;
+import monolithe.auth_service.repository.projection.RecoveryVerificationContext;
+import monolithe.auth_service.repository.projection.TokenRecoveryContext;
+import monolithe.auth_service.repository.projection.ResendOtpResult;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import monolithe.auth_service.exception.InvalidTokenException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,62 +33,22 @@ public class PasswordResetService {
 
         private final SecureRandom secureRandom = new SecureRandom();
 
-        private final PasswordResetTokenRepository passwordResetTokenRepository;
-        private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
         private final PasswordPolicyService passwordPolicyService;
-        private final RefreshTokenService refreshTokenService;
-        private final PersonContactRepository personContactRepository;
         private final EmailService emailService;
-        private final AuditService auditService;
+        private final PasswordRecoveryProcedureRepository passwordRecoveryProcedureRepository;
 
         @Value("${security.auth.password-reset-expiration}")
         private long passwordResetExpiration;
 
-        @Transactional
-        public String crearTokenRecuperacion(
-                        Long idUsuario,
-                        String ipSolicitud,
-                        String userAgent) {
+        @Value("${security.auth.password-reset-otp-expiration}")
+        private long passwordResetOtpExpiration;
 
-                User usuario = userRepository.findById(idUsuario)
-                                .orElseThrow(() -> new IllegalStateException(
-                                                "Usuario no encontrado"));
+        @Value("${security.auth.backoffice-password-reset-url}")
+        private String backofficePasswordResetUrl;
 
-                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
-
-                var tokensAnteriores = passwordResetTokenRepository
-                                .findByUsuarioIdUsuarioAndFechaUsoIsNull(
-                                                idUsuario);
-
-                tokensAnteriores.forEach(token -> token.setFechaUso(ahora));
-
-                passwordResetTokenRepository.saveAll(
-                                tokensAnteriores);
-
-                String tokenReal = generarTokenSeguro();
-
-                String tokenHash = calcularSha256(tokenReal);
-
-                PasswordResetToken token = new PasswordResetToken();
-
-                token.setUsuario(usuario);
-                token.setTokenHash(tokenHash);
-
-                token.setFechaExpiracion(
-                                ahora.plusSeconds(
-                                                passwordResetExpiration));
-
-                token.setIpSolicitud(
-                                limitarTexto(ipSolicitud, 45));
-
-                token.setUserAgent(
-                                limitarTexto(userAgent, 500));
-
-                passwordResetTokenRepository.save(token);
-
-                return tokenReal;
-        }
+        @Value("${security.auth.portal-password-reset-url}")
+        private String portalPasswordResetUrl;
 
         public String calcularSha256(String token) {
 
@@ -95,7 +57,8 @@ public class PasswordResetService {
                         MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
                         byte[] hash = digest.digest(
-                                        token.getBytes(StandardCharsets.UTF_8));
+                                        token.getBytes(
+                                                        StandardCharsets.UTF_8));
 
                         return HexFormat.of()
                                         .formatHex(hash);
@@ -129,110 +92,428 @@ public class PasswordResetService {
 
                 return texto.length() <= longitudMaxima
                                 ? texto
-                                : texto.substring(0, longitudMaxima);
+                                : texto.substring(
+                                                0,
+                                                longitudMaxima);
         }
 
         @Transactional
-        public Long restablecerContrasena(
+        public String iniciarRestablecimientoConOtp(
                         String tokenReal,
                         String nuevaContrasena,
                         String confirmarContrasena) {
 
-                if (!nuevaContrasena.equals(confirmarContrasena)) {
-                        throw new IllegalArgumentException(
-                                        "La nueva contraseña y su confirmación no coinciden");
-                }
+                if (tokenReal == null
+                                || tokenReal.isBlank()) {
 
-                String tokenHash = calcularSha256(tokenReal);
-
-                PasswordResetToken token = passwordResetTokenRepository
-                                .findByTokenHashAndFechaUsoIsNull(tokenHash)
-                                .orElseThrow(() -> new InvalidTokenException(
-                                                "Token de recuperación inválido o ya utilizado"));
-
-                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
-
-                if (!token.getFechaExpiracion().isAfter(ahora)) {
                         throw new InvalidTokenException(
-                                        "El token de recuperación ha expirado");
+                                        "Token de recuperacion invalido");
                 }
 
-                User usuario = token.getUsuario();
+                if (nuevaContrasena == null
+                                || !nuevaContrasena.equals(
+                                                confirmarContrasena)) {
+
+                        throw new IllegalArgumentException(
+                                        "La nueva contrasena y su confirmacion no coinciden");
+                }
 
                 passwordPolicyService.validar(
                                 nuevaContrasena);
 
+                String tokenHash = calcularSha256(tokenReal);
+
+                TokenRecoveryContext contexto = passwordRecoveryProcedureRepository
+                                .obtenerContextoToken(
+                                                tokenHash)
+                                .orElseThrow(
+                                                () -> new InvalidTokenException(
+                                                                "Token de recuperacion invalido, usado o expirado"));
+
                 if (passwordEncoder.matches(
                                 nuevaContrasena,
-                                usuario.getPasswordHash())) {
+                                contexto.passwordActualHash())) {
 
                         throw new IllegalArgumentException(
-                                        "La nueva contraseña debe ser diferente a la contraseña anterior");
+                                        "La nueva contrasena debe ser diferente a la contrasena anterior");
                 }
 
-                usuario.setPasswordHash(
-                                passwordEncoder.encode(
-                                                nuevaContrasena));
+                String correo = passwordRecoveryProcedureRepository
+                                .obtenerCorreoRecuperacion(
+                                                contexto.idUsuario())
+                                .orElseThrow(
+                                                () -> new IllegalStateException(
+                                                                "No se encontro un correo verificado para el usuario"));
 
-                usuario.setRequiereCambioPassword(false);
-                usuario.setPasswordActualizadoEn(ahora);
+                /*
+                 * Ticket opaco entregado al frontend.
+                 * En base de datos solamente se almacena
+                 * SHA-256(ticketReal).
+                 */
+                String ticketReal = generarTokenSeguro();
 
-                usuario.setIntentosFallidos(0);
-                usuario.setBloqueadoHasta(null);
+                String ticketHash = calcularSha256(ticketReal);
 
-                userRepository.save(usuario);
+                /*
+                 * Codigo OTP de exactamente 6 digitos.
+                 * Nunca se almacena en texto plano.
+                 */
+                String codigoOtp = String.format(
+                                "%06d",
+                                secureRandom.nextInt(
+                                                1_000_000));
 
-                token.setFechaUso(ahora);
+                String otpHash = passwordEncoder.encode(
+                                codigoOtp);
 
-                passwordResetTokenRepository.save(token);
+                /*
+                 * La nueva contrasena se almacena solamente
+                 * como hash pendiente hasta validar el OTP.
+                 */
+                String passwordPendienteHash = passwordEncoder.encode(
+                                nuevaContrasena);
 
-                refreshTokenService.revocarTodasLasSesiones(
-                                usuario.getIdUsuario(),
-                                "RECUPERACION_PASSWORD");
+                OffsetDateTime fechaExpiracionOtp = OffsetDateTime
+                                .now(ZoneOffset.UTC)
+                                .plusSeconds(
+                                                passwordResetOtpExpiration);
 
-                return usuario.getIdUsuario();
+                passwordRecoveryProcedureRepository
+                                .iniciarVerificacion(
+                                                tokenHash,
+                                                ticketHash,
+                                                otpHash,
+                                                passwordPendienteHash,
+                                                fechaExpiracionOtp);
+
+                long minutosExpiracion = Math.max(
+                                1,
+                                (passwordResetOtpExpiration + 59)
+                                                / 60);
+
+                /*
+                 * Si SMTP falla, MailException se propaga.
+                 * Al encontrarnos dentro de @Transactional,
+                 * la operacion de inicio del OTP se revierte.
+                 */
+                emailService.enviarCodigoRecuperacion(
+                                correo,
+                                codigoOtp,
+                                minutosExpiracion);
+
+                return ticketReal;
         }
 
         @Transactional
-        public void solicitarRecuperacion(
+        public ResendOtpResult reenviarCodigoRecuperacion(
+                        String ticketReal) {
+
+                if (ticketReal == null || ticketReal.isBlank()) {
+                        throw new InvalidTokenException(
+                                        "Ticket de recuperacion invalido");
+                }
+
+                String ticketHash = calcularSha256(ticketReal);
+
+                /*
+                 * Generamos un OTP completamente nuevo.
+                 * El codigo anterior quedara invalidado cuando
+                 * el procedimiento sustituya su hash.
+                 */
+                String codigoOtp = String.format(
+                                "%06d",
+                                secureRandom.nextInt(1_000_000));
+
+                String nuevoOtpHash = passwordEncoder.encode(
+                                codigoOtp);
+
+                OffsetDateTime nuevaFechaExpiracion = OffsetDateTime
+                                .now(ZoneOffset.UTC)
+                                .plusSeconds(
+                                                passwordResetOtpExpiration);
+
+                ResendOtpResult resultado = passwordRecoveryProcedureRepository
+                                .reenviarOtp(
+                                                ticketHash,
+                                                nuevoOtpHash,
+                                                nuevaFechaExpiracion);
+
+                if (resultado == null
+                                || resultado.estado() == null) {
+
+                        throw new InvalidTokenException(
+                                        "No fue posible reenviar el codigo de verificacion");
+                }
+
+                switch (resultado.estado()) {
+
+                        case "REENVIADO" -> {
+                                // Continuamos con el envio del correo.
+                        }
+
+                        case "ESPERA" -> throw new IllegalArgumentException(
+                                        "Debes esperar "
+                                                        + resultado.segundosEspera()
+                                                        + " segundos antes de solicitar otro codigo");
+
+                        case "LIMITE_REENVIOS" -> throw new IllegalArgumentException(
+                                        "Se alcanzo el maximo de 3 reenvios permitidos");
+
+                        case "VENTANA_EXPIRADA" -> throw new InvalidTokenException(
+                                        "El periodo para reenviar codigos ha expirado. "
+                                                        + "Debes iniciar nuevamente la recuperacion");
+
+                        case "NO_DISPONIBLE" -> throw new InvalidTokenException(
+                                        "La verificacion ya fue confirmada, bloqueada "
+                                                        + "o alcanzo el maximo de intentos");
+
+                        default -> throw new InvalidTokenException(
+                                        "Verificacion de recuperacion invalida");
+                }
+
+                if (resultado.idUsuario() == null) {
+                        throw new InvalidTokenException(
+                                        "No fue posible identificar al usuario de la recuperacion");
+                }
+
+                String correo = passwordRecoveryProcedureRepository
+                                .obtenerCorreoRecuperacion(
+                                                resultado.idUsuario())
+                                .orElseThrow(
+                                                () -> new IllegalStateException(
+                                                                "No se encontro un correo verificado para el usuario"));
+
+                long minutosExpiracion = Math.max(
+                                1,
+                                (passwordResetOtpExpiration + 59) / 60);
+
+                /*
+                 * El envio ocurre dentro de la misma transaccion.
+                 *
+                 * Si SMTP falla y EmailService propaga MailException,
+                 * el cambio del OTP en base de datos se revierte.
+                 */
+                emailService.enviarCodigoRecuperacion(
+                                correo,
+                                codigoOtp,
+                                minutosExpiracion);
+
+                return resultado;
+        }
+
+        /*
+         * Este metodo deliberadamente NO utiliza
+         * @Transactional.
+         * Si el OTP es incorrecto, el procedimiento
+         * sp_registrar_intento_otp_fallido debe poder
+         * confirmar el incremento del contador aunque
+         * Java posteriormente lance una excepcion.
+         */
+        public Long confirmarRestablecimientoConOtp(
+                        String ticketReal,
+                        String codigoOtp) {
+
+                if (ticketReal == null
+                                || ticketReal.isBlank()) {
+
+                        throw new InvalidTokenException(
+                                        "Ticket de recuperacion invalido");
+                }
+
+                String otpNormalizado = codigoOtp == null
+                                ? null
+                                : codigoOtp.trim();
+
+                if (otpNormalizado == null
+                                || !otpNormalizado.matches(
+                                                "\\d{6}")) {
+
+                        throw new IllegalArgumentException(
+                                        "El codigo de verificacion debe contener 6 digitos");
+                }
+
+                String ticketHash = calcularSha256(ticketReal);
+
+                RecoveryVerificationContext contexto = passwordRecoveryProcedureRepository
+                                .obtenerContextoVerificacion(
+                                                ticketHash)
+                                .orElseThrow(
+                                                () -> new InvalidTokenException(
+                                                                "Verificacion de recuperacion invalida"));
+
+                OffsetDateTime ahora = OffsetDateTime.now(
+                                ZoneOffset.UTC);
+
+                if (contexto.fechaConfirmacion() != null
+                                || contexto.fechaBloqueo() != null
+                                || contexto.intentosFallidos() >= 5
+                                || contexto.fechaExpiracion() == null
+                                || !contexto.fechaExpiracion()
+                                                .isAfter(ahora)
+                                || contexto.otpHash() == null) {
+
+                        throw new InvalidTokenException(
+                                        "La verificacion ha expirado, fue confirmada o esta bloqueada");
+                }
+
+                if (!passwordEncoder.matches(
+                                otpNormalizado,
+                                contexto.otpHash())) {
+
+                        FailedOtpAttemptResult intento = passwordRecoveryProcedureRepository
+                                        .registrarIntentoOtpFallido(
+                                                        ticketHash);
+
+                        if (intento.bloqueado()) {
+
+                                throw new IllegalArgumentException(
+                                                "Codigo incorrecto. Se alcanzo el maximo de 5 intentos");
+                        }
+
+                        throw new IllegalArgumentException(
+                                        "Codigo incorrecto. Intentos restantes: "
+                                                        + intento.intentosRestantes());
+                }
+
+                /*
+                 * El procedimiento almacenado realiza de forma
+                 * atomica:
+                 *
+                 * - aplicacion del password pendiente;
+                 * - confirmacion de la verificacion;
+                 * - limpieza del bloqueo del usuario;
+                 * - revocacion de sesiones;
+                 * - invalidacion de recuperaciones restantes.
+                 */
+                Long idUsuario = passwordRecoveryProcedureRepository
+                                .confirmarRecuperacion(
+                                                ticketHash);
+
+                if (idUsuario == null) {
+
+                        throw new InvalidTokenException(
+                                        "No fue posible confirmar la recuperacion de contrasena");
+                }
+
+                return idUsuario;
+        }
+
+        /*
+         * Devuelve el id del usuario unicamente cuando
+         * realmente se genero la recuperacion.
+         *
+         * Esto permite registrar la auditoria desde el
+         * controlador DESPUES de que esta transaccion
+         * haya terminado y liberado los bloqueos de BD.
+         */
+        @Transactional
+        public Optional<RecoveryRequestResult> solicitarRecuperacion(
                         String usuarioLogin,
+                        String origen,
                         String ipSolicitud,
                         String userAgent) {
 
-                User usuario = userRepository
-                                .findByUsuarioLogin(usuarioLogin)
-                                .orElse(null);
+                /*
+                 * El token real solamente existe en memoria.
+                 * Nunca se almacena directamente en BD.
+                 */
+                String tokenReal = generarTokenSeguro();
 
-                if (usuario == null) {
-                        return;
+                /*
+                 * A PostgreSQL solamente se envia
+                 * SHA-256(tokenReal).
+                 */
+                String tokenHash = calcularSha256(tokenReal);
+
+                OffsetDateTime fechaExpiracion = OffsetDateTime
+                                .now(ZoneOffset.UTC)
+                                .plusSeconds(
+                                                passwordResetExpiration);
+
+                Optional<RecoveryRequestResult> resultado = passwordRecoveryProcedureRepository
+                                .solicitarRecuperacion(
+                                                usuarioLogin,
+                                                origen,
+                                                tokenHash,
+                                                fechaExpiracion,
+                                                limitarTexto(
+                                                                ipSolicitud,
+                                                                45),
+                                                limitarTexto(
+                                                                userAgent,
+                                                                500));
+
+                /*
+                 * La respuesta publica no debe revelar si:
+                 *
+                 * - el usuario no existe;
+                 * - no pertenece al canal solicitado;
+                 * - esta inhabilitado;
+                 * - no posee un correo valido.
+                 */
+                if (resultado.isEmpty()) {
+                        return Optional.empty();
                 }
 
-                String correo = personContactRepository
-                                .buscarEmailPrincipalVerificado(
-                                                usuario.getIdPersona())
-                                .orElse(null);
+                RecoveryRequestResult recuperacion = resultado.get();
 
-                if (correo == null) {
-                        return;
+                String correo = recuperacion.correo();
+
+                if (correo == null
+                                || correo.isBlank()) {
+
+                        throw new IllegalStateException(
+                                        "No se encontro un correo verificado para el usuario");
                 }
 
-                String tokenRecuperacion = crearTokenRecuperacion(
-                                usuario.getIdUsuario(),
-                                ipSolicitud,
-                                userAgent);
+                String baseUrl = resolverBaseUrl(origen);
 
-                emailService.enviarRecuperacionContrasena(
-                                correo,
-                                tokenRecuperacion);
+                String urlRecuperacion = UriComponentsBuilder
+                                .fromUriString(baseUrl)
+                                .queryParam(
+                                                "token",
+                                                tokenReal)
+                                .build()
+                                .toUriString();
 
-                auditService.registrar(
-                                usuario.getIdUsuario(),
-                                "RECUPERACION_SOLICITADA",
-                                "EXITOSO",
-                                "Se solicitó recuperación de contraseña",
-                                ipSolicitud,
-                                userAgent,
-                                "POST",
-                                "/api/auth/forgot-password");
+                long minutosExpiracion = Math.max(
+                                1,
+                                (passwordResetExpiration + 59)
+                                                / 60);
+
+                /*
+                 * EmailService recibe la URL completa.
+                 * El token real no se registra en logs ni
+                 * se almacena directamente en BD.
+                 */
+                emailService
+                                .enviarRecuperacionContrasena(
+                                                correo,
+                                                urlRecuperacion,
+                                                minutosExpiracion);
+
+                /*
+                 * NO registrar auditoria aqui.
+                 *
+                 * Esta transaccion puede mantener bloqueos
+                 * sobre seg_usuarios. AuditService utiliza
+                 * REQUIRES_NEW y aud_eventos posee una
+                 * relacion con el usuario, lo que puede
+                 * producir espera circular hasta el
+                 * statement_timeout.
+                 *
+                 * El controlador registra la auditoria una
+                 * vez terminado este metodo y confirmado
+                 * este COMMIT.
+                 */
+                return Optional.of(recuperacion);
+        }
+
+        private String resolverBaseUrl(
+                        String origen) {
+
+                return "BACKOFFICE".equals(origen)
+                                ? backofficePasswordResetUrl
+                                : portalPasswordResetUrl;
         }
 }
