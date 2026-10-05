@@ -2,10 +2,10 @@ package monolithe.auth_service.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import monolithe.auth_service.dto.ApiErrorResponse;
+import org.springframework.mail.MailException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.mail.MailException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,14 +28,25 @@ public class GlobalExceptionHandler {
                                 request);
         }
 
+        @ExceptionHandler(AccountTemporarilyLockedException.class)
+        public ResponseEntity<ApiErrorResponse> handleAccountTemporarilyLocked(
+                        AccountTemporarilyLockedException exception,
+                        HttpServletRequest request) {
+
+                return construirRespuesta(
+                                HttpStatus.LOCKED,
+                                exception.getMessage(),
+                                request);
+        }
+
         @ExceptionHandler(LockedException.class)
         public ResponseEntity<ApiErrorResponse> handleLocked(
                         LockedException exception,
                         HttpServletRequest request) {
 
                 return construirRespuesta(
-                                HttpStatus.UNAUTHORIZED,
-                                "No fue posible autenticar al usuario",
+                                HttpStatus.LOCKED,
+                                "Usuario bloqueado temporalmente debido a múltiples intentos fallidos.",
                                 request);
         }
 

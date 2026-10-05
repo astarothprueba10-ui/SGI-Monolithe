@@ -7,6 +7,7 @@ import monolithe.core_service.dto.EtapaResponse;
 import monolithe.core_service.service.EtapaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,27 +20,32 @@ public class EtapaController {
     private final EtapaService etapaService;
 
     @GetMapping("/proyecto/{idProyecto}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<EtapaResponse>> listarPorProyecto(@PathVariable Long idProyecto) {
         return ResponseEntity.ok(etapaService.listarPorProyecto(idProyecto));
     }
 
     @GetMapping("/proyecto/{idProyecto}/activas")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<EtapaResponse>> listarActivasPorProyecto(@PathVariable Long idProyecto) {
         return ResponseEntity.ok(etapaService.listarActivasPorProyecto(idProyecto));
     }
 
     @GetMapping("/{idEtapa}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<EtapaResponse> obtenerPorId(@PathVariable Long idEtapa) {
         return ResponseEntity.ok(etapaService.obtenerPorId(idEtapa));
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<EtapaResponse> crear(@Valid @RequestBody EtapaRequest request) {
         EtapaResponse creada = etapaService.crear(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
 
     @PutMapping("/{idEtapa}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<EtapaResponse> actualizar(
             @PathVariable Long idEtapa,
             @Valid @RequestBody EtapaRequest request) {
@@ -48,6 +54,7 @@ public class EtapaController {
     }
 
     @DeleteMapping("/{idEtapa}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<Void> desactivar(@PathVariable Long idEtapa) {
         etapaService.desactivar(idEtapa);
         return ResponseEntity.noContent().build();

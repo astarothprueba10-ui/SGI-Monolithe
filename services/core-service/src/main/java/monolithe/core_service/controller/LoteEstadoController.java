@@ -8,6 +8,7 @@ import monolithe.core_service.dto.CambioEstadoLoteResponse;
 import monolithe.core_service.dto.LoteHistorialEstadoResponse;
 import monolithe.core_service.service.LoteEstadoService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
@@ -24,6 +25,7 @@ public class LoteEstadoController {
     private final LoteEstadoService loteEstadoService;
 
     @PatchMapping("/{idLote}/estado")
+    @PreAuthorize("hasAuthority('lots.edit')")
     public ResponseEntity<CambioEstadoLoteResponse> cambiarEstado(
             @PathVariable @Positive Long idLote,
             @Valid @RequestBody CambiarEstadoLoteRequest request,
@@ -36,6 +38,7 @@ public class LoteEstadoController {
     }
 
     @GetMapping("/{idLote}/historial-estados")
+    @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<List<LoteHistorialEstadoResponse>> listarHistorial(
             @PathVariable @Positive Long idLote
     ) {

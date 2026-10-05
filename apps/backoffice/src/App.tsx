@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
@@ -17,121 +16,214 @@ import { Workers } from './pages/Workers';
 import { UsersAndRoles } from './pages/UsersAndRoles';
 import { Audit } from './pages/Audit';
 import { Unauthorized } from './pages/Unauthorized';
+import type { ReactElement } from 'react';
+import { Login } from './pages/Login';
+import { ChangePassword } from './pages/ChangePassword';
+import { ResetPassword } from './pages/ResetPassword';
+import { ForgotPassword } from './pages/ForgotPassword';
+import {
+  getSessionRoles,
+  getStoredAuthUser
+} from './lib/authSession';
 
-type Role = 'Administrador' | 'Asesor' | 'Finanzas' | 'Marketing' | 'RRHH';
+console.log('ENV CHECK:', {
+  auth: import.meta.env.VITE_AUTH_API_URL,
+  cms: import.meta.env.VITE_CMS_API_URL,
+  core: import.meta.env.VITE_CORE_API_URL
+});
+
+function RequireBackofficeAuth({
+  children
+}: {
+  children: ReactElement;
+}) {
+  const authUser = getStoredAuthUser();
+
+  if (!authUser || getSessionRoles(authUser.autoridades).length === 0) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (authUser.requiereCambioPassword) {
+    return <Navigate to="/cambiar-contrasena" replace />;
+  }
+
+  return children;
+}
+
+function RequirePasswordChange({
+  children
+}: {
+  children: ReactElement;
+}) {
+  const authUser = getStoredAuthUser();
+
+  if (!authUser || getSessionRoles(authUser.autoridades).length === 0) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!authUser.requiereCambioPassword) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
 
 export function App({
-  role = 'Administrador',
   sidebarCollapsed = false
-
-
-
-}: {role?: Role;sidebarCollapsed?: boolean;}) {
+}: {
+  sidebarCollapsed?: boolean;
+}) {
   return (
-    <AuthProvider role={role}>
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route element={<AppShell initialCollapsed={sidebarCollapsed} />}>
+          {/* RUTAS PÚBLICAS */}
+          <Route path="/login" element={<Login />} />
+
+          <Route
+            path="/recuperar-contrasena"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/restablecer-contrasena"
+            element={<ResetPassword />}
+          />
+
+          <Route
+            path="/cambiar-contrasena"
+            element={
+              <RequirePasswordChange>
+                <ChangePassword />
+              </RequirePasswordChange>
+            }
+          />
+
+          {/* RUTAS PROTEGIDAS */}
+          <Route
+            element={
+              <RequireBackofficeAuth>
+                <AppShell initialCollapsed={sidebarCollapsed} />
+              </RequireBackofficeAuth>
+            }
+          >
             <Route
               index
               element={
-              <PermissionRoute permission="dashboard.view">
+                <PermissionRoute permission="dashboard.view">
                   <Dashboard />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/proyectos"
               element={
-              <PermissionRoute permission="projects.view">
+                <PermissionRoute permission="projects.view">
                   <Projects />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/plano"
               element={
-              <PermissionRoute permission="lots.view">
+                <PermissionRoute permission="lots.view">
                   <LotMap />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/crm"
               element={
-              <PermissionRoute permission="crm.view">
+                <PermissionRoute permission="crm.view">
                   <Crm />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/marketing"
               element={
-              <PermissionRoute permission="marketing.view">
+                <PermissionRoute permission="marketing.view">
                   <Marketing />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/ventas"
               element={
-              <PermissionRoute permission="sales.view">
+                <PermissionRoute permission="sales.view">
                   <Sales />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/financiamiento"
               element={
-              <PermissionRoute permission="financing.view">
+                <PermissionRoute permission="financing.view">
                   <Financing />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/finanzas"
               element={
-              <PermissionRoute permission="finance.view">
+                <PermissionRoute permission="finance.view">
                   <Finance />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/asesores"
               element={
-              <PermissionRoute permission="advisors.view">
+                <PermissionRoute permission="advisors.view">
                   <Advisors />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/trabajadores"
               element={
-              <PermissionRoute permission="hr.view">
+                <PermissionRoute permission="hr.view">
                   <Workers />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/usuarios"
               element={
-              <PermissionRoute permission="users.view">
+                <PermissionRoute permission="users.view">
                   <UsersAndRoles />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route
               path="/auditoria"
               element={
-              <PermissionRoute permission="audit.view">
+                <PermissionRoute permission="audit.view">
                   <Audit />
                 </PermissionRoute>
-              } />
-            
+              }
+            />
+
             <Route path="/no-autorizado" element={<Unauthorized />} />
-            <Route path="*" element={<Navigate to="/no-autorizado" replace />} />
+
+            <Route
+              path="*"
+              element={<Navigate to="/no-autorizado" replace />}
+            />
           </Route>
         </Routes>
+
         <Toaster
           position="bottom-right"
           toastOptions={{
@@ -141,9 +233,9 @@ export function App({
               fontSize: '13px',
               color: '#152B45'
             }
-          }} />
-        
+          }}
+        />
       </BrowserRouter>
-    </AuthProvider>);
-
+    </AuthProvider>
+  );
 }

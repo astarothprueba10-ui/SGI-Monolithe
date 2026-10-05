@@ -7,6 +7,7 @@ import monolithe.core_service.dto.TarifaZonaEtapaResponse;
 import monolithe.core_service.service.TarifaZonaEtapaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class TarifaZonaEtapaController {
     private final TarifaZonaEtapaService tarifaZonaEtapaService;
 
     @GetMapping("/proyecto/{idProyecto}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<TarifaZonaEtapaResponse>> listarPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -28,6 +30,7 @@ public class TarifaZonaEtapaController {
     }
 
     @GetMapping("/proyecto/{idProyecto}/activas")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<List<TarifaZonaEtapaResponse>> listarActivasPorProyecto(
             @PathVariable Long idProyecto
     ) {
@@ -37,6 +40,7 @@ public class TarifaZonaEtapaController {
     }
 
     @GetMapping("/{idTarifa}")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<TarifaZonaEtapaResponse> obtenerPorId(
             @PathVariable Long idTarifa
     ) {
@@ -46,6 +50,7 @@ public class TarifaZonaEtapaController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<TarifaZonaEtapaResponse> registrar(
             @Valid @RequestBody TarifaZonaEtapaRequest request
     ) {
@@ -55,6 +60,7 @@ public class TarifaZonaEtapaController {
     }
 
     @DeleteMapping("/{idTarifa}")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<Void> desactivar(
             @PathVariable Long idTarifa
     ) {

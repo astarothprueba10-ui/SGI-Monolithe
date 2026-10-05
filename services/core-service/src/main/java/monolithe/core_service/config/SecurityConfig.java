@@ -5,7 +5,6 @@ import monolithe.core_service.security.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -53,24 +52,12 @@ public class SecurityConfig {
                                                                 "/actuator/info",
                                                                 "/error")
                                                 .permitAll()
-                                                .requestMatchers(HttpMethod.GET, "/api/core/**")
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                false))
-                                                .requestMatchers(HttpMethod.POST, "/api/core/**")
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                true))
-                                                .requestMatchers(HttpMethod.PUT, "/api/core/**")
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                true))
-                                                .requestMatchers(HttpMethod.PATCH, "/api/core/**")
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                true))
-                                                .requestMatchers(HttpMethod.DELETE, "/api/core/**")
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                true))
+                                                .requestMatchers("/api/core/**")
+                                                .access((authentication, context) ->
+                                                                validarJwtSinCambioPendiente(authentication.get()))
                                                 .anyRequest()
-                                                .access((authentication, context) -> evaluarAcceso(authentication.get(),
-                                                                false)))
+                                                .access((authentication, context) ->
+                                                                validarJwtSinCambioPendiente(authentication.get())))
                                 .oauth2ResourceServer(oauth2 -> oauth2
                                                 .authenticationEntryPoint(restAuthenticationEntryPoint)
                                                 .accessDeniedHandler(restAccessDeniedHandler)
@@ -111,9 +98,8 @@ public class SecurityConfig {
                 return source;
         }
 
-        private AuthorizationDecision evaluarAcceso(
-                        org.springframework.security.core.Authentication auth,
-                        boolean requiereEscritura) {
+        private AuthorizationDecision validarJwtSinCambioPendiente(
+                        org.springframework.security.core.Authentication auth) {
                 if (auth == null || !auth.isAuthenticated()) {
                         return new AuthorizationDecision(false);
                 }
@@ -125,12 +111,6 @@ public class SecurityConfig {
                 if (Boolean.TRUE.equals(cambioPendiente)) {
                         return new AuthorizationDecision(false);
                 }
-                if (!requiereEscritura) {
-                        return new AuthorizationDecision(true);
-                }
-                boolean tieneRol = auth.getAuthorities().stream()
-                                .anyMatch(a -> "ROLE_ADMINISTRADOR".equals(a.getAuthority())
-                                                || "ROLE_GERENCIA".equals(a.getAuthority()));
-                return new AuthorizationDecision(tieneRol);
+                return new AuthorizationDecision(true);
         }
 }

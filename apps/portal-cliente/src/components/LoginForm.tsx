@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ApiError, authApi } from '../lib/apiClient';
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -19,10 +20,48 @@ type LoginResponse = {
   requiereCambioPassword: boolean;
   accessToken: string;
   refreshToken: string;
+  tokenType: string;
+  expiresIn: number;
+  mensaje: string;
 };
 
-const AUTH_API_URL =
-  import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8081/api/auth';
+function resolverMensajeErrorLogin(error: ApiError): string {
+  if (error.status === 423) {
+    return error.message;
+  }
+
+  const esBloqueado = /bloquead|locked/i.test(error.message);
+  const esSesionOToken = /sesi[oó]n|token|expirad/i.test(error.message);
+
+  if (
+    error.status === 401 &&
+    !esBloqueado &&
+    !esSesionOToken &&
+    (error.message === 'No fue posible autenticar al usuario' ||
+      /credencial|autenticar|bad credentials/i.test(error.message))
+  ) {
+    return 'Usuario o contraseña incorrectos';
+  }
+
+  return error.message;
+}
+
+const PORTAL_USUARIO_REGEX = /^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{8}|[a-zA-Z0-9._-]{3,50})$/;
+const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
+
+function validarCredencialesPortal(usuario: string, contrasena: string): string | null {
+  const usuarioLimpio = usuario.trim();
+  if (!usuarioLimpio || usuarioLimpio.length > 120 || !PORTAL_USUARIO_REGEX.test(usuarioLimpio)) {
+    return 'Ingresa un usuario válido';
+  }
+  if (!contrasena) {
+    return 'Ingresa tu contraseña';
+  }
+  if (contrasena.length > 128 || CONTROL_CHARS_REGEX.test(contrasena)) {
+    return 'La contraseña contiene caracteres no permitidos';
+  }
+  return null;
+}
 
 export function LoginForm() {
   const [usuario, setUsuario] = useState('');
@@ -40,27 +79,51 @@ export function LoginForm() {
     if (loading) return;
 
     setError(null);
+
+    const errorValidacion = validarCredencialesPortal(usuario, password);
+    if (errorValidacion) {
+      setError(errorValidacion);
+      usuarioRef.current?.focus();
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch(`${AUTH_API_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          usuario: usuario.trim(),
-          contrasena: password
-        })
+      const data = await authApi.post<LoginResponse>('/login', {
+        usuario: usuario.trim(),
+        contrasena: password
       });
 
-      if (!response.ok) {
-        throw new Error('Las credenciales ingresadas no son correctas.');
+      const esCliente = data.autoridades.includes('ROLE_CLIENTE');
+
+      if (!esCliente) {
+        try {
+          await authApi.post<void>('/logout', {
+            refreshToken: data.refreshToken
+          });
+        } catch {
+          console.warn(
+            'No fue posible revocar la sesión de un usuario sin acceso al Portal Cliente.'
+          );
+        }
+
+        throw new ApiError(
+          403,
+          'Este usuario no tiene acceso al Portal Cliente.'
+        );
       }
 
-      const data = (await response.json()) as LoginResponse;
       const storage = remember ? localStorage : sessionStorage;
+      const otherStorage = remember ? sessionStorage : localStorage;
+
+      otherStorage.removeItem('monolithe_access_token');
+      otherStorage.removeItem('monolithe_refresh_token');
+      otherStorage.removeItem('monolithe_user');
 
       storage.setItem('monolithe_access_token', data.accessToken);
       storage.setItem('monolithe_refresh_token', data.refreshToken);
+
       storage.setItem(
         'monolithe_user',
         JSON.stringify({
@@ -72,27 +135,19 @@ export function LoginForm() {
       );
 
       setSignedIn(true);
-      setTimeout(() => navigate('/portal'), 350);
-    } catch {
-      const u = usuario.trim();
-      if ((u === '45892134' || u === 'amorales@gmail.com' || u === 'cliente@sigi.pe' || u === 'demo') && (password === 'Clave123!' || password === 'demo' || password.length >= 4)) {
-        const storage = remember ? localStorage : sessionStorage;
-        storage.setItem('monolithe_access_token', 'demo_client_jwt_token_los_jardines_lurin');
-        storage.setItem('monolithe_refresh_token', 'demo_client_refresh_token');
-        storage.setItem(
-          'monolithe_user',
-          JSON.stringify({
-            idUsuario: 13,
-            usuario: 'Alberto Morales Guerrero',
-            autoridades: ['ROLE_CLIENTE_COMPRADOR'],
-            requiereCambioPassword: false
-          })
+
+      setTimeout(() => {
+        navigate('/portal');
+      }, 350);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(resolverMensajeErrorLogin(error));
+      } else {
+        setError(
+          'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.'
         );
-        setSignedIn(true);
-        setTimeout(() => navigate('/portal'), 350);
-        return;
       }
-      setError('No pudimos iniciar tu sesión. Verifica tu usuario y contraseña.');
+
       usuarioRef.current?.focus();
     } finally {
       setLoading(false);
@@ -129,6 +184,7 @@ export function LoginForm() {
         autoComplete="username"
         placeholder="Ingresa tu DNI o usuario"
         value={usuario}
+        maxLength={120}
         invalid={Boolean(error)}
         disabled={loading}
         onChange={(e) => setUsuario(e.target.value)}
@@ -142,13 +198,17 @@ export function LoginForm() {
         autoComplete="current-password"
         placeholder="••••••••••"
         value={password}
+        maxLength={128}
         invalid={Boolean(error)}
         disabled={loading}
         onChange={(e) => setPassword(e.target.value)}
         labelAction={
-          <a href="#recuperar" className="rounded text-[13px] font-medium text-ink-600 underline-offset-4 outline-none transition-colors hover:text-ink-800 hover:underline">
+          <Link
+            to="/recuperar-contrasena"
+            className="rounded text-[13px] font-medium text-ink-600 underline-offset-4 outline-none transition-colors hover:text-ink-800 hover:underline"
+          >
             ¿Olvidaste tu contraseña?
-          </a>
+          </Link>
         }
         trailing={
           <button

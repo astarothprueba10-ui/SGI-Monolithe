@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ROLE_KPIS } from '../data/kpis';
 import { COLLECTION_TREND, DASHBOARD_INTRO, SALES_TREND } from '../data/dashboard';
 import { LEAD_SOURCES } from '../data/crm';
+import { ADVISORS } from '../data/people';
 import { commissionsService } from '../services/commissionsService';
 import type { ManagerialKpis } from '../services/commissionsService';
 import type { RoleName } from '../types';

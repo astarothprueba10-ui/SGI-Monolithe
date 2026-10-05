@@ -1,8 +1,15 @@
-FROM node:22-slim
+FROM node:20-slim
+
 WORKDIR /app
 
+COPY package.json package-lock.json ./
+
+RUN npm install -g npm@10.9.2 \
+    && npm ci --include=dev --include=optional --no-audit --no-fund \
+    && test -f node_modules/vite/bin/vite.js \
+    && ./node_modules/.bin/vite --version
+
 COPY . .
-RUN if [ ! -d "node_modules" ]; then npm install --no-audit --no-fund; fi
 
 EXPOSE 5173
 

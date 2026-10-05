@@ -44,10 +44,10 @@ export const MODULE_ACTIONS: Record<ModuleKey, Action[]> = {
 };
 
 const perms = (module: ModuleKey, actions: Action[]): Permission[] =>
-actions.map((a) => `${module}.${a}` as Permission);
+  actions.map((a) => `${module}.${a}` as Permission);
 
 const adminPermissions: Permission[] = (Object.keys(MODULE_ACTIONS) as ModuleKey[]).flatMap((m) =>
-perms(m, MODULE_ACTIONS[m].filter((a) => ALL_ACTIONS.includes(a)))
+  perms(m, MODULE_ACTIONS[m].filter((a) => ALL_ACTIONS.includes(a)))
 );
 
 export const ROLES: Record<RoleName, Role> = {
@@ -56,44 +56,62 @@ export const ROLES: Record<RoleName, Role> = {
     description: 'Acceso transversal a todos los módulos, configuración y auditoría.',
     permissions: adminPermissions
   },
+  Gerencia: {
+    name: 'Gerencia',
+    description: 'Supervisión transversal del negocio con acceso de consulta y exportación.',
+    permissions: [
+      ...perms('dashboard', ['view', 'export']),
+
+      ...perms('projects', ['view', 'export']),
+      ...perms('lots', ['view', 'export']),
+      ...perms('crm', ['view', 'export']),
+      ...perms('marketing', ['view', 'export']),
+      ...perms('sales', ['view', 'export']),
+      ...perms('financing', ['view', 'export']),
+      ...perms('finance', ['view', 'export']),
+      ...perms('advisors', ['view', 'export']),
+      ...perms('hr', ['view', 'export']),
+      ...perms('audit', ['view', 'export'])
+    ]
+  },
   Asesor: {
     name: 'Asesor',
     description: 'Gestión comercial: plano, leads, separaciones y ventas. Sin configuración ni RRHH.',
     permissions: [
-    ...perms('dashboard', ['view']),
-    ...perms('projects', ['view']),
-    ...perms('lots', ['view', 'edit']),
-    ...perms('crm', ['view', 'create', 'edit', 'export']),
-    ...perms('sales', ['view', 'create', 'edit'])]
+      ...perms('dashboard', ['view']),
+      ...perms('projects', ['view']),
+      ...perms('lots', ['view', 'edit']),
+      ...perms('crm', ['view', 'create', 'edit', 'export']),
+      ...perms('sales', ['view', 'create', 'edit'])]
 
   },
   Finanzas: {
     name: 'Finanzas',
     description: 'Cobranzas, cronogramas, validación de vouchers y reportes financieros.',
     permissions: [
-    ...perms('dashboard', ['view', 'export']),
-    ...perms('crm', ['view']),
-    ...perms('sales', ['view']),
-    ...perms('financing', ['view', 'create', 'edit', 'approve', 'reject', 'export']),
-    ...perms('finance', ['view', 'create', 'edit', 'export'])]
+      ...perms('dashboard', ['view', 'export']),
+      ...perms('crm', ['view']),
+      ...perms('sales', ['view']),
+      ...perms('financing', ['view', 'create', 'edit', 'approve', 'reject', 'export']),
+      ...perms('finance', ['view', 'create', 'edit', 'export'])]
 
   },
   Marketing: {
     name: 'Marketing',
     description: 'Captación: campañas, fuentes de leads y seguimiento comercial temprano.',
     permissions: [
-    ...perms('dashboard', ['view']),
-    ...perms('crm', ['view', 'create', 'edit', 'export']),
-    ...perms('marketing', ['view', 'create', 'edit', 'export'])]
+      ...perms('dashboard', ['view']),
+      ...perms('crm', ['view', 'create', 'edit', 'export']),
+      ...perms('marketing', ['view', 'create', 'edit', 'export'])]
 
   },
   RRHH: {
     name: 'RRHH',
     description: 'Trabajadores, asesores, comisiones, horarios y descuentos.',
     permissions: [
-    ...perms('dashboard', ['view']),
-    ...perms('advisors', ['view', 'create', 'edit', 'approve', 'export']),
-    ...perms('hr', ['view', 'create', 'edit', 'approve', 'export'])]
+      ...perms('dashboard', ['view']),
+      ...perms('advisors', ['view', 'create', 'edit', 'approve', 'export']),
+      ...perms('hr', ['view', 'create', 'edit', 'approve', 'export'])]
 
   }
 };
@@ -107,6 +125,15 @@ export const DEMO_USERS: Record<RoleName, SessionUser> = {
     initials: 'RS',
     primaryRole: 'Administrador',
     roles: ['Administrador']
+  },
+  Gerencia: {
+    id: 'U-GERENCIA',
+    name: 'Usuario Gerencia',
+    email: 'gerencia@monolithe.pe',
+    jobTitle: 'Gerencia',
+    initials: 'GE',
+    primaryRole: 'Gerencia',
+    roles: ['Gerencia']
   },
   Asesor: {
     id: 'U-014',

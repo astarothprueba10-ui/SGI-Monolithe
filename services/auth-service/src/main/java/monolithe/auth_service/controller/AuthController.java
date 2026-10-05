@@ -3,18 +3,27 @@ package monolithe.auth_service.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
 import monolithe.auth_service.dto.RefreshTokenRequest;
 import monolithe.auth_service.dto.RefreshTokenResponse;
+import monolithe.auth_service.dto.ResetPasswordOtpResponse;
+import monolithe.auth_service.dto.ResetPasswordRequest;
 import monolithe.auth_service.service.AuthenticationService;
 import monolithe.auth_service.dto.ChangePasswordRequest;
 import monolithe.auth_service.dto.ForgotPasswordRequest;
 import monolithe.auth_service.dto.MessageResponse;
-import monolithe.auth_service.dto.ResetPasswordRequest;
 import monolithe.auth_service.service.PasswordResetService;
 import monolithe.auth_service.service.AuditService;
+import monolithe.auth_service.dto.ConfirmResetPasswordRequest;
+import monolithe.auth_service.dto.ResendOtpRequest;
+import monolithe.auth_service.dto.ResendOtpResponse;
+import monolithe.auth_service.repository.projection.ResendOtpResult;
+import monolithe.auth_service.dto.ForgotPasswordResponse;
+import monolithe.auth_service.repository.projection.RecoveryRequestResult;
 
+import org.springframework.mail.MailException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +32,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
         private final AuthenticationService authenticationService;
@@ -139,47 +151,162 @@ public class AuthController {
         }
 
         @PostMapping("/forgot-password")
-        public ResponseEntity<MessageResponse> forgotPassword(
+        public ResponseEntity<ForgotPasswordResponse> forgotPassword(
                         @Valid @RequestBody ForgotPasswordRequest solicitud,
                         HttpServletRequest request) {
 
                 String ipSolicitud = request.getRemoteAddr();
-
                 String userAgent = request.getHeader("User-Agent");
 
-                passwordResetService.solicitarRecuperacion(
-                                solicitud.getUsuario(),
-                                ipSolicitud,
-                                userAgent);
+                String mensajeGenerico = "Si la cuenta esta registrada, recibiras un correo con las instrucciones.";
+
+                Optional<RecoveryRequestResult> recuperacion = Optional.empty();
+
+                try {
+                        recuperacion = passwordResetService.solicitarRecuperacion(
+                                        solicitud.getUsuario(),
+                                        solicitud.getOrigen(),
+                                        ipSolicitud,
+                                        userAgent);
+                } catch (MailException e) {
+                        log.error(
+                                        "Fallo SMTP al enviar correo de recuperacion",
+                                        e);
+                }
+
+                if (recuperacion.isPresent()) {
+
+                        RecoveryRequestResult resultado = recuperacion.get();
+
+                        try {
+                                auditService.registrar(
+                                                resultado.idUsuario(),
+                                                "RECUPERACION_SOLICITADA",
+                                                "EXITOSO",
+                                                "Se solicito recuperacion de contrasena",
+                                                ipSolicitud,
+                                                userAgent,
+                                                "POST",
+                                                "/api/auth/forgot-password");
+                        } catch (RuntimeException e) {
+                                log.error(
+                                                "No se pudo registrar la auditoria de recuperacion",
+                                                e);
+                        }
+
+                        return ResponseEntity.ok(
+                                        new ForgotPasswordResponse(
+                                                        mensajeGenerico,
+                                                        enmascararCorreo(
+                                                                        resultado.correo())));
+                }
 
                 return ResponseEntity.ok(
-                                new MessageResponse(
-                                                "Si la cuenta existe, se enviarán instrucciones para recuperar la contraseña"));
+                                new ForgotPasswordResponse(
+                                                mensajeGenerico,
+                                                null));
         }
 
         @PostMapping("/reset-password")
-        public ResponseEntity<Void> resetPassword(
-                        @Valid @RequestBody ResetPasswordRequest solicitud,
-                        HttpServletRequest request) {
+        public ResponseEntity<ResetPasswordOtpResponse> resetPassword(
+                        @Valid @RequestBody ResetPasswordRequest solicitud) {
 
-                Long idUsuario = passwordResetService.restablecerContrasena(
+                String ticket = passwordResetService.iniciarRestablecimientoConOtp(
                                 solicitud.getToken(),
                                 solicitud.getNuevaContrasena(),
                                 solicitud.getConfirmarContrasena());
 
-                String ipOrigen = request.getRemoteAddr();
-                String userAgent = request.getHeader("User-Agent");
+                return ResponseEntity.ok(
+                                new ResetPasswordOtpResponse(ticket));
+        }
+
+        @PostMapping("/reset-password/resend")
+        public ResponseEntity<ResendOtpResponse> resendResetPasswordOtp(
+                        @Valid @RequestBody ResendOtpRequest solicitud,
+                        HttpServletRequest request) {
+
+                ResendOtpResult resultado = passwordResetService.reenviarCodigoRecuperacion(
+                                solicitud.ticket());
+
+                /*
+                 * La transaccion del servicio ya termino antes
+                 * de registrar auditoria, evitando bloqueos
+                 * entre conexiones.
+                 */
+                try {
+                        auditService.registrar(
+                                        resultado.idUsuario(),
+                                        "OTP_RECUPERACION_REENVIADO",
+                                        "EXITOSO",
+                                        "Se reenvio el codigo OTP de recuperacion de contrasena",
+                                        request.getRemoteAddr(),
+                                        request.getHeader("User-Agent"),
+                                        "POST",
+                                        "/api/auth/reset-password/resend");
+                } catch (RuntimeException e) {
+                        log.error(
+                                        "No se pudo registrar la auditoria del reenvio OTP",
+                                        e);
+                }
+
+                return ResponseEntity.ok(
+                                new ResendOtpResponse(
+                                                "Hemos enviado un nuevo codigo de verificacion a tu correo",
+                                                resultado.reenviosRestantes(),
+                                                resultado.segundosEspera()));
+        }
+
+        @PostMapping("/reset-password/confirm")
+        public ResponseEntity<MessageResponse> confirmResetPassword(
+                        @Valid @RequestBody ConfirmResetPasswordRequest solicitud,
+                        HttpServletRequest request) {
+
+                Long idUsuario = passwordResetService.confirmarRestablecimientoConOtp(
+                                solicitud.getTicket(),
+                                solicitud.getCodigoOtp());
 
                 auditService.registrar(
                                 idUsuario,
                                 "PASSWORD_RESTABLECIDA",
                                 "EXITOSO",
-                                "La contraseña fue restablecida mediante recuperación",
-                                ipOrigen,
-                                userAgent,
+                                "La contrasena fue restablecida mediante verificacion OTP",
+                                request.getRemoteAddr(),
+                                request.getHeader("User-Agent"),
                                 "POST",
-                                "/api/auth/reset-password");
+                                "/api/auth/reset-password/confirm");
 
-                return ResponseEntity.noContent().build();
+                return ResponseEntity.ok(
+                                new MessageResponse(
+                                                "Su contraseña ha sido cambiada con exito"));
+        }
+
+        private String enmascararCorreo(String correo) {
+
+                if (correo == null || correo.isBlank()) {
+                        return null;
+                }
+
+                int posicionArroba = correo.indexOf('@');
+
+                if (posicionArroba <= 0) {
+                        return "****";
+                }
+
+                String local = correo.substring(
+                                0,
+                                posicionArroba);
+
+                String dominio = correo.substring(
+                                posicionArroba);
+
+                int caracteresVisibles = Math.min(
+                                4,
+                                local.length());
+
+                return local.substring(
+                                0,
+                                caracteresVisibles)
+                                + "****"
+                                + dominio;
         }
 }
