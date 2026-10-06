@@ -1,0 +1,134 @@
+import { coreApi } from '../lib/apiClient';
+import type {
+  ProyectoResponse,
+  EtapaResponse,
+  ZonaResponse,
+  ManzanaResponse,
+  LoteResponse,
+  CatalogoResponse,
+  EstadoLoteResponse,
+  MonedaResponse,
+  LoteFiltroRequest
+} from '../types/core';
+
+function buildLotSearchParams(filters: LoteFiltroRequest): string {
+  const params = new URLSearchParams();
+  if (filters.idProyecto !== undefined && filters.idProyecto !== null) {
+    params.append('idProyecto', String(filters.idProyecto));
+  }
+  if (filters.idEtapa !== undefined && filters.idEtapa !== null) {
+    params.append('idEtapa', String(filters.idEtapa));
+  }
+  if (filters.idZona !== undefined && filters.idZona !== null) {
+    params.append('idZona', String(filters.idZona));
+  }
+  if (filters.idManzana !== undefined && filters.idManzana !== null) {
+    params.append('idManzana', String(filters.idManzana));
+  }
+  if (filters.idEstadoLote !== undefined && filters.idEstadoLote !== null) {
+    params.append('idEstadoLote', String(filters.idEstadoLote));
+  }
+  if (filters.idTipoLote !== undefined && filters.idTipoLote !== null) {
+    params.append('idTipoLote', String(filters.idTipoLote));
+  }
+  if (filters.texto !== undefined && filters.texto !== null && filters.texto.trim() !== '') {
+    params.append('texto', filters.texto.trim());
+  }
+  if (filters.areaMin !== undefined && filters.areaMin !== null) {
+    params.append('areaMin', String(filters.areaMin));
+  }
+  if (filters.areaMax !== undefined && filters.areaMax !== null) {
+    params.append('areaMax', String(filters.areaMax));
+  }
+  if (filters.activo !== undefined && filters.activo !== null) {
+    params.append('activo', String(filters.activo));
+  }
+  const str = params.toString();
+  return str ? `/lotes/buscar?${str}` : '/lotes/buscar';
+}
+
+export const coreService = {
+  // Proyectos
+  getProjects(): Promise<ProyectoResponse[]> {
+    return coreApi.get<ProyectoResponse[]>('/proyectos');
+  },
+  getActiveProjects(): Promise<ProyectoResponse[]> {
+    return coreApi.get<ProyectoResponse[]>('/proyectos/activos');
+  },
+  getProjectById(idProyecto: number): Promise<ProyectoResponse> {
+    return coreApi.get<ProyectoResponse>(`/proyectos/${idProyecto}`);
+  },
+
+  // Etapas
+  getStagesByProject(idProyecto: number): Promise<EtapaResponse[]> {
+    return coreApi.get<EtapaResponse[]>(`/etapas/proyecto/${idProyecto}`);
+  },
+  getActiveStagesByProject(idProyecto: number): Promise<EtapaResponse[]> {
+    return coreApi.get<EtapaResponse[]>(`/etapas/proyecto/${idProyecto}/activas`);
+  },
+  getStageById(idEtapa: number): Promise<EtapaResponse> {
+    return coreApi.get<EtapaResponse>(`/etapas/${idEtapa}`);
+  },
+
+  // Zonas
+  getZonesByProject(idProyecto: number): Promise<ZonaResponse[]> {
+    return coreApi.get<ZonaResponse[]>(`/zonas/proyecto/${idProyecto}`);
+  },
+  getActiveZonesByProject(idProyecto: number): Promise<ZonaResponse[]> {
+    return coreApi.get<ZonaResponse[]>(`/zonas/proyecto/${idProyecto}/activas`);
+  },
+  getZoneById(idZona: number): Promise<ZonaResponse> {
+    return coreApi.get<ZonaResponse>(`/zonas/${idZona}`);
+  },
+
+  // Manzanas
+  getBlocksByStage(idEtapa: number): Promise<ManzanaResponse[]> {
+    return coreApi.get<ManzanaResponse[]>(`/manzanas/etapa/${idEtapa}`);
+  },
+  getActiveBlocksByStage(idEtapa: number): Promise<ManzanaResponse[]> {
+    return coreApi.get<ManzanaResponse[]>(`/manzanas/etapa/${idEtapa}/activas`);
+  },
+  getBlockById(idManzana: number): Promise<ManzanaResponse> {
+    return coreApi.get<ManzanaResponse>(`/manzanas/${idManzana}`);
+  },
+
+  // Lotes
+  getLotsByBlock(idManzana: number): Promise<LoteResponse[]> {
+    return coreApi.get<LoteResponse[]>(`/lotes/manzana/${idManzana}`);
+  },
+  getActiveLotsByBlock(idManzana: number): Promise<LoteResponse[]> {
+    return coreApi.get<LoteResponse[]>(`/lotes/manzana/${idManzana}/activos`);
+  },
+  getLotById(idLote: number): Promise<LoteResponse> {
+    return coreApi.get<LoteResponse>(`/lotes/${idLote}`);
+  },
+  searchLots(filters: LoteFiltroRequest = {}): Promise<LoteResponse[]> {
+    return coreApi.get<LoteResponse[]>(buildLotSearchParams(filters));
+  },
+
+  // Catálogos
+  getProjectStatuses(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/estados-proyecto');
+  },
+  getStageStatuses(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/estados-etapa');
+  },
+  getBlockStatuses(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/estados-manzana');
+  },
+  getLotStatuses(): Promise<EstadoLoteResponse[]> {
+    return coreApi.get<EstadoLoteResponse[]>('/catalogos/estados-lote');
+  },
+  getLotTypes(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/tipos-lote');
+  },
+  getCurrencies(): Promise<MonedaResponse[]> {
+    return coreApi.get<MonedaResponse[]>('/catalogos/monedas');
+  },
+  getTariffTypes(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/tipos-tarifa');
+  },
+  getPriceAdjustmentTypes(): Promise<CatalogoResponse[]> {
+    return coreApi.get<CatalogoResponse[]>('/catalogos/tipos-ajuste-precio');
+  }
+};

@@ -1,72 +1,58 @@
+import { coreService } from './coreService';
 import { supabase } from '../lib/supabase';
 import type { Lot, LotStatus, Project } from '../types';
 
 export const lotsService = {
   async getLots(projectId?: number): Promise<Lot[]> {
-    const { data, error } = await supabase.rpc('sp_listar_lotes_plano', {
-      p_id_proyecto: projectId || null
+    const rawLots = await coreService.searchLots({
+      idProyecto: projectId || undefined
     });
 
-    if (error) {
-      console.error('Error al consultar sp_listar_lotes_plano:', error.message);
-      return [];
-    }
-
-    return (data || []).map((r: any) => {
-      const area = Number(r.area_m2) || 90;
-      const price = Number(r.precio_base) || 0;
-      const blockLetter = r.manzana_nombre?.split(' ')[1] || 'A';
-      const colNum = parseInt(r.numero_lote, 10) || 1;
+    return rawLots.map((r) => {
+      const area = r.areaM2 ? Number(r.areaM2) : 90;
+      const colNum = parseInt(r.numero || '1', 10) || 1;
+      const blockLetter = (r.nombreManzana || 'Manzana A').split(' ')[1] || 'A';
       const rowNum = blockLetter.charCodeAt(0) - 64;
 
       let status: LotStatus = 'Disponible';
-      if (r.estado_codigo === 'RESERVADO' || r.estado_codigo === 'SEPARADO') {
+      if (r.codigoEstadoLote === 'RESERVADO' || r.codigoEstadoLote === 'SEPARADO') {
         status = 'Separado';
-      } else if (r.estado_codigo === 'VENDIDO') {
+      } else if (r.codigoEstadoLote === 'VENDIDO') {
         status = 'Vendido';
       }
 
       return {
-        id: String(r.id_lote),
-        code: r.codigo_lote,
-        projectId: String(r.id_proyecto),
-        stage: 'Etapa 1',
-        block: r.manzana_nombre,
-        type: colNum === 1 || colNum === 10 ? 'Esquina' : colNum === 5 ? 'Parque' : 'Residencial',
+        id: String(r.idLote),
+        code: r.codigo,
+        projectId: String(r.idProyecto || projectId || 1),
+        stage: r.nombreEtapa || 'Etapa 1',
+        block: r.nombreManzana || 'Mz A',
+        type: (r.nombreTipoLote as any) || 'Residencial',
         area,
-        pricePerM2: area > 0 ? Math.round(price / area) : 500,
-        price,
+        pricePerM2: 500,
+        price: area * 500,
         status,
-        row: rowNum,
+        row: rowNum > 0 ? rowNum : 1,
         col: colNum
       };
     });
   },
 
   async getProjects(): Promise<Project[]> {
-    const { data, error } = await supabase
-      .from('inm_proyectos')
-      .select('id_proyecto, codigo, nombre, distrito, area_total_m2, activo')
-      .eq('activo', true)
-      .limit(10);
+    const rawProjects = await coreService.getProjects();
 
-    if (error) {
-      console.error('Error al consultar inm_proyectos:', error.message);
-      return [];
-    }
-
-    return (data || []).map((p: any) => ({
-      id: String(p.id_proyecto),
+    return rawProjects.map((p) => ({
+      id: String(p.idProyecto),
       name: p.nombre,
-      district: `${p.distrito}, Lima`,
+      district: p.distrito ? `${p.distrito}, ${p.provincia || 'Lima'}` : 'Lima',
       stages: 1,
-      blocks: 7,
-      totalLots: 70,
-      available: 70,
+      blocks: 1,
+      totalLots: 0,
+      available: 0,
       reserved: 0,
       sold: 0,
-      priceFrom: 49000,
-      status: 'Activo' as const
+      priceFrom: 0,
+      status: p.activo ? 'Activo' : 'Inactivo'
     }));
   },
 

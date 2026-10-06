@@ -46,7 +46,7 @@ export function Pagination({
             className={cn(
               'inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-[13px] tabular transition-colors duration-150 ease-smooth',
               p === page ?
-              'border-brand-700 bg-brand-700 text-white' :
+              'border-brand-900 bg-brand-900 text-white shadow-sm font-semibold' :
               'border-brand-200 text-brand-600 hover:bg-brand-50'
             )}>
             
