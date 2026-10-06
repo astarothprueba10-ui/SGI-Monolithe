@@ -5,6 +5,7 @@ import { AppShell } from './components/layout/AppShell';
 import { PermissionRoute } from './components/auth/PermissionRoute';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
+import { ProjectDetail } from './pages/ProjectDetail';
 import { LotMap } from './pages/LotMap';
 import { Crm } from './pages/Crm';
 import { Marketing } from './pages/Marketing';
@@ -121,6 +122,15 @@ export function App({
               element={
                 <PermissionRoute permission="projects.view">
                   <Projects />
+                </PermissionRoute>
+              }
+            />
+
+            <Route
+              path="/proyectos/:idProyecto"
+              element={
+                <PermissionRoute permission="projects.view">
+                  <ProjectDetail />
                 </PermissionRoute>
               }
             />

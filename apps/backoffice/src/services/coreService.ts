@@ -5,7 +5,9 @@ import type {
   EtapaResponse,
   EtapaRequest,
   ZonaResponse,
+  ZonaRequest,
   ManzanaResponse,
+  ManzanaRequest,
   LoteResponse,
   CatalogoResponse,
   EstadoLoteResponse,
@@ -94,6 +96,12 @@ export const coreService = {
   getZoneById(idZona: number): Promise<ZonaResponse> {
     return coreApi.get<ZonaResponse>(`/zonas/${idZona}`);
   },
+  createZone(data: ZonaRequest): Promise<ZonaResponse> {
+    return coreApi.post<ZonaResponse>('/zonas', data);
+  },
+  updateZone(idZona: number, data: ZonaRequest): Promise<ZonaResponse> {
+    return coreApi.put<ZonaResponse>(`/zonas/${idZona}`, data);
+  },
 
   // Manzanas
   getBlocksByStage(idEtapa: number): Promise<ManzanaResponse[]> {
@@ -104,6 +112,12 @@ export const coreService = {
   },
   getBlockById(idManzana: number): Promise<ManzanaResponse> {
     return coreApi.get<ManzanaResponse>(`/manzanas/${idManzana}`);
+  },
+  createBlock(data: ManzanaRequest): Promise<ManzanaResponse> {
+    return coreApi.post<ManzanaResponse>('/manzanas', data);
+  },
+  updateBlock(idManzana: number, data: ManzanaRequest): Promise<ManzanaResponse> {
+    return coreApi.put<ManzanaResponse>(`/manzanas/${idManzana}`, data);
   },
 
   // Lotes

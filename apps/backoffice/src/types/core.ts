@@ -81,6 +81,15 @@ export interface ZonaResponse {
   activo: boolean;
 }
 
+export type ZonaRequest = {
+  idProyecto: number;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  numeroOrden?: number | null;
+  activo?: boolean | null;
+};
+
 export interface ManzanaResponse {
   idManzana: number;
   idEtapa: number;
@@ -98,6 +107,16 @@ export interface ManzanaResponse {
   numeroOrden?: number;
   activo: boolean;
 }
+
+export type ManzanaRequest = {
+  idEtapa: number;
+  codigoEstadoManzana: string;
+  codigo: string;
+  nombre?: string | null;
+  descripcion?: string | null;
+  numeroOrden?: number | null;
+  activo?: boolean | null;
+};
 
 export interface LoteResponse {
   idLote: number;
