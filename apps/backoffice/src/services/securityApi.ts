@@ -63,6 +63,40 @@ export interface SecurityOperationResponse {
   mensaje: string;
 }
 
+export interface AuditRole {
+  codigo: string;
+  nombre: string;
+}
+
+export interface AuditEvent {
+  idEvento: number;
+  fechaEvento: string;
+
+  idUsuario: number | null;
+  usuarioLogin: string | null;
+  nombreUsuario: string | null;
+  roles: AuditRole[];
+
+  modulo: string;
+  accion: string;
+
+  entidad: string | null;
+  idEntidad: string | null;
+
+  resultado: 'EXITOSO' | 'FALLIDO' | 'DENEGADO';
+  descripcion: string | null;
+
+  ipOrigen: string | null;
+  userAgent: string | null;
+  requestId: string | null;
+  metodoHttp: string | null;
+  ruta: string | null;
+
+  datosAntes: unknown | null;
+  datosDespues: unknown | null;
+  datosContexto: unknown | null;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -190,6 +224,9 @@ export const securityApi = {
         method: 'PATCH',
         body: JSON.stringify({ usuarioLogin })
       }
-    )
+    ),
+
+  listarAuditoria: () =>
+    request<AuditEvent[]>('/audit')
 };
 

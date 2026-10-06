@@ -46,6 +46,12 @@ public class SecurityQueryController {
         return ResponseEntity.ok(service.listarPersonasSinUsuario(Long.valueOf(jwt.getSubject())));
     }
 
+    @GetMapping("/audit")
+    @PreAuthorize("hasAuthority('audit.view')")
+    public ResponseEntity<JsonNode> listarAuditoria(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(service.listarAuditoria(Long.valueOf(jwt.getSubject())));
+    }
+
     @PostMapping("/people/{idPersona}/email")
     @PreAuthorize("hasAuthority('users.create')")
     public ResponseEntity<UserOperationResponse> asociarCorreoPersona(

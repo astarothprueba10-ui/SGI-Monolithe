@@ -12,12 +12,13 @@ import java.util.Map;
 @Repository
 public class SecurityQueryProcedureRepository {
 
-    private final SimpleJdbcCall listarUsuarios, listarRoles, listarPermisosRol, listarPersonas;
+    private final SimpleJdbcCall listarUsuarios, listarRoles, listarPermisosRol, listarPersonas, listarAuditoriaSP;
 
     public SecurityQueryProcedureRepository(JdbcTemplate jdbc) {
         listarUsuarios = crearCallActor(jdbc, "sp_listar_usuarios_seguridad");
         listarRoles = crearCallActor(jdbc, "sp_listar_roles_seguridad");
         listarPersonas = crearCallActor(jdbc, "sp_listar_personas_sin_usuario");
+        listarAuditoriaSP = crearCallActor(jdbc, "sp_listar_auditoria_seguridad");
 
         listarPermisosRol = new SimpleJdbcCall(jdbc)
                 .withSchemaName("public")
@@ -34,6 +35,7 @@ public class SecurityQueryProcedureRepository {
     public SecurityQueryResult listarUsuarios(Long actor) { return ejecutarActor(listarUsuarios, actor); }
     public SecurityQueryResult listarRoles(Long actor) { return ejecutarActor(listarRoles, actor); }
     public SecurityQueryResult listarPersonasSinUsuario(Long actor) { return ejecutarActor(listarPersonas, actor); }
+    public SecurityQueryResult listarAuditoria(Long actor) { return ejecutarActor(listarAuditoriaSP, actor); }
 
     public SecurityQueryResult listarPermisosRol(Long actor, String codigoRol) {
         Map<String, Object> out = listarPermisosRol.execute(new MapSqlParameterSource()

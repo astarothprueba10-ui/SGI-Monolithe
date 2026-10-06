@@ -27,6 +27,10 @@ public class SecurityQueryService {
         return convertir(repository.listarPersonasSinUsuario(actor));
     }
 
+    public JsonNode listarAuditoria(Long actor) {
+        return convertir(repository.listarAuditoria(actor));
+    }
+
     public JsonNode listarPermisosRol(Long actor, String rol) {
         return convertir(repository.listarPermisosRol(actor, rol));
     }

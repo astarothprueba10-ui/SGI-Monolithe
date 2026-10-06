@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { MenuIcon, PhoneIcon, UserRoundIcon, XIcon } from 'lucide-react';
 import { Logo } from './Logo';
-import { LinkButton } from '../ui/Button';
+import { AnchorButton, LinkButton } from '../ui/Button';
 import { contactInfo, navLinks } from '../../data/site';
 import { cn } from '../../utils/cn';
 
@@ -19,6 +19,8 @@ export function Navbar() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const portalClienteUrl = `${window.location.protocol}//${window.location.hostname}:5173/login`;
 
   return (
     <header className="sticky top-0 z-50">
@@ -78,10 +80,10 @@ export function Navbar() {
             <LinkButton to="/contacto" variant="secondary" size="sm">
               Habla con nosotros
             </LinkButton>
-            <LinkButton to="/mi-cuenta" variant="primary" size="sm">
+            <AnchorButton href={portalClienteUrl} variant="primary" size="sm">
               <UserRoundIcon className="h-4 w-4" />
               Mi cuenta
-            </LinkButton>
+            </AnchorButton>
           </div>
 
           <button
@@ -130,10 +132,10 @@ export function Navbar() {
             )}
             </ul>
             <div className="space-y-3 border-t border-line p-5">
-              <LinkButton to="/mi-cuenta" className="w-full" size="md">
+              <AnchorButton href={portalClienteUrl} className="w-full" size="md">
                 <UserRoundIcon className="h-4 w-4" />
                 Mi cuenta
-              </LinkButton>
+              </AnchorButton>
               <LinkButton to="/contacto" variant="secondary" className="w-full" size="md">
                 Habla con nosotros
               </LinkButton>
