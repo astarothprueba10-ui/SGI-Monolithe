@@ -158,15 +158,15 @@ export function Projects() {
                   </p>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                  {project.activo ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4cbb17]/40 bg-[#4cbb17]/10 px-2.5 py-0.5 text-xs font-semibold text-[#2d7a0c]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#4cbb17]"></span>
-                      {project.nombreEstadoProyecto ?? 'Activo'}
-                    </span>
-                  ) : (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4cbb17]/40 bg-[#4cbb17]/10 px-2.5 py-0.5 text-xs font-semibold text-[#2d7a0c]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#4cbb17]"></span>
+                    {project.nombreEstadoProyecto ?? project.codigoEstadoProyecto ?? 'Sin estado'}
+                  </span>
+
+                  {!project.activo && (
                     <Badge tone="neutral">
-                      {project.nombreEstadoProyecto ?? 'Inactivo'}
+                      Deshabilitado
                     </Badge>
                   )}
                 </div>

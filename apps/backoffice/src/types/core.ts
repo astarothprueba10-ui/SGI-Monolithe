@@ -237,3 +237,83 @@ export interface LoteHistorialEstadoResponse {
   fechaCambio: string;
   idUsuario?: number | null;
 }
+
+export type PuntoPlano = { x: number; y: number };
+
+export interface PlanoInteractivoResponse {
+  idPlanoInteractivo: number;
+  idProyecto: number;
+  codigoProyecto?: string | null;
+  nombreProyecto?: string | null;
+  idEtapa?: number | null;
+  codigoEtapa?: string | null;
+  nombreEtapa?: string | null;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  numeroVersion: number;
+  claveArchivo: string;
+  nombreArchivoOriginal?: string | null;
+  tipoMime?: string | null;
+  hashArchivo?: string | null;
+  anchoReferencia: number;
+  altoReferencia: number;
+  vigente: boolean;
+  fechaDesde: string;
+  fechaHasta?: string | null;
+  observaciones?: string | null;
+}
+
+export interface LoteGeometriaResponse {
+  idLoteGeometria: number;
+  idProyecto: number;
+  idPlanoInteractivo: number;
+  codigoPlano?: string | null;
+  nombrePlano?: string | null;
+  idLote: number;
+  codigoLote: string;
+  numeroLote?: string | null;
+  puntos: PuntoPlano[];
+  etiquetaX?: number | null;
+  etiquetaY?: number | null;
+  rotacionEtiqueta?: number | null;
+  ordenCapa?: number | null;
+  visible: boolean;
+  interactivo: boolean;
+  observaciones?: string | null;
+  activo: boolean;
+}
+
+export interface PlanoInteractivoDetalleResponse {
+  plano: PlanoInteractivoResponse;
+  lotes: LoteGeometriaResponse[];
+}
+
+export type PlanoInteractivoRequest = {
+  idProyecto: number;
+  idEtapa?: number | null;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  claveArchivo: string;
+  nombreArchivoOriginal?: string | null;
+  tipoMime?: string | null;
+  hashArchivo?: string | null;
+  anchoReferencia: number;
+  altoReferencia: number;
+  observaciones?: string | null;
+};
+
+export type LoteGeometriaRequest = {
+  idPlanoInteractivo: number;
+  idLote: number;
+  puntos: PuntoPlano[];
+  etiquetaX?: number | null;
+  etiquetaY?: number | null;
+  rotacionEtiqueta?: number | null;
+  ordenCapa?: number | null;
+  visible?: boolean | null;
+  interactivo?: boolean | null;
+  observaciones?: string | null;
+};
+
