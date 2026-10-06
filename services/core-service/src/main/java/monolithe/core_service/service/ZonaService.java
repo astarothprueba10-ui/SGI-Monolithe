@@ -8,6 +8,7 @@ import monolithe.core_service.entity.Zona;
 import monolithe.core_service.exception.ConflictoNegocioException;
 import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
+import monolithe.core_service.repository.LoteRepository;
 import monolithe.core_service.repository.ProyectoRepository;
 import monolithe.core_service.repository.ZonaRepository;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class ZonaService {
 
     private final ZonaRepository zonaRepository;
     private final ProyectoRepository proyectoRepository;
+    private final LoteRepository loteRepository;
 
     @Transactional(readOnly = true)
     public List<ZonaResponse> listarPorProyecto(Long idProyecto) {
@@ -96,6 +98,9 @@ public class ZonaService {
         if (request.numeroOrden() != null) {
             z.setNumeroOrden(request.numeroOrden());
         }
+        if (Boolean.TRUE.equals(z.getActivo()) && Boolean.FALSE.equals(request.activo())) {
+            validarDesactivacionZona(idZona);
+        }
         if (request.activo() != null) {
             z.setActivo(request.activo());
         }
@@ -109,8 +114,15 @@ public class ZonaService {
         Zona z = obtenerZona(idZona);
 
         if (Boolean.TRUE.equals(z.getActivo())) {
+            validarDesactivacionZona(idZona);
             z.setActivo(false);
             zonaRepository.save(z);
+        }
+    }
+
+    private void validarDesactivacionZona(Long idZona) {
+        if (loteRepository.existsByZona_IdZonaAndActivoTrue(idZona)) {
+            throw new ReglaNegocioException("La zona no puede desactivarse porque tiene lotes activos asociados");
         }
     }
 

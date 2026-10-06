@@ -11,6 +11,8 @@ import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.EstadoEtapaRepository;
 import monolithe.core_service.repository.EtapaRepository;
+import monolithe.core_service.repository.LoteRepository;
+import monolithe.core_service.repository.ManzanaRepository;
 import monolithe.core_service.repository.ProyectoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ public class EtapaService {
     private final EtapaRepository etapaRepository;
     private final ProyectoRepository proyectoRepository;
     private final EstadoEtapaRepository estadoEtapaRepository;
+    private final ManzanaRepository manzanaRepository;
+    private final LoteRepository loteRepository;
 
     @Transactional(readOnly = true)
     public List<EtapaResponse> listarPorProyecto(Long idProyecto) {
@@ -110,6 +114,9 @@ public class EtapaService {
         }
         e.setFechaInicio(request.fechaInicio());
         e.setFechaFinEstimada(request.fechaFinEstimada());
+        if (Boolean.TRUE.equals(e.getActivo()) && Boolean.FALSE.equals(request.activo())) {
+            validarDesactivacionEtapa(idEtapa);
+        }
         if (request.activo() != null) {
             e.setActivo(request.activo());
         }
@@ -123,8 +130,18 @@ public class EtapaService {
         Etapa e = obtenerEtapa(idEtapa);
 
         if (Boolean.TRUE.equals(e.getActivo())) {
+            validarDesactivacionEtapa(idEtapa);
             e.setActivo(false);
             etapaRepository.save(e);
+        }
+    }
+
+    private void validarDesactivacionEtapa(Long idEtapa) {
+        if (manzanaRepository.existsByEtapa_IdEtapaAndActivoTrue(idEtapa)) {
+            throw new ReglaNegocioException("La etapa no puede desactivarse porque tiene manzanas activas");
+        }
+        if (loteRepository.existsByManzana_Etapa_IdEtapaAndActivoTrue(idEtapa)) {
+            throw new ReglaNegocioException("La etapa no puede desactivarse porque tiene lotes activos");
         }
     }
 

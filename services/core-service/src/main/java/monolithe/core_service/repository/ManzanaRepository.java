@@ -25,4 +25,7 @@ public interface ManzanaRepository extends JpaRepository<Manzana, Long> {
     List<Manzana> findByEtapa_IdEtapaAndActivoTrueOrderByNumeroOrdenAsc(
         Long idEtapa
     );
+
+    boolean existsByEtapa_IdEtapaAndActivoTrue(Long idEtapa);
+    boolean existsByEtapa_Proyecto_IdProyectoAndActivoTrue(Long idProyecto);
 }

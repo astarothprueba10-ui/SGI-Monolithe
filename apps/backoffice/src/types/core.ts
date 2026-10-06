@@ -149,6 +149,22 @@ export interface LoteResponse {
   activo: boolean;
 }
 
+export type LoteRequest = {
+  idManzana: number;
+  idZona?: number | null;
+  codigoTipoLote?: string | null;
+  codigoEstadoLote: string;
+  codigo: string;
+  numero: string;
+  areaM2: number;
+  frenteM?: number | null;
+  fondoM?: number | null;
+  lateralDerechoM?: number | null;
+  lateralIzquierdoM?: number | null;
+  observaciones?: string | null;
+  activo?: boolean | null;
+};
+
 export interface CatalogoResponse {
   id: number;
   codigo: string;
@@ -188,4 +204,36 @@ export interface LoteFiltroRequest {
   areaMin?: number;
   areaMax?: number;
   activo?: boolean;
+}
+
+export type CambiarEstadoLoteRequest = {
+  codigoNuevoEstado: string;
+  motivo: string;
+};
+
+export type CambioEstadoLoteResponse = {
+  success: boolean;
+  message?: string | null;
+  idLote?: number | null;
+  nuevoEstado?: string | null;
+};
+
+export interface LoteHistorialEstadoResponse {
+  idHistorial: number;
+
+  idLote: number;
+  codigoLote?: string | null;
+  numeroLote?: string | null;
+
+  idEstadoAnterior?: number | null;
+  codigoEstadoAnterior?: string | null;
+  nombreEstadoAnterior?: string | null;
+
+  idEstadoNuevo: number;
+  codigoEstadoNuevo?: string | null;
+  nombreEstadoNuevo?: string | null;
+
+  motivo?: string | null;
+  fechaCambio: string;
+  idUsuario?: number | null;
 }
