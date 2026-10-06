@@ -1,9 +1,13 @@
 package monolithe.auth_service.service;
 
+import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
 import monolithe.auth_service.entity.User;
+import monolithe.auth_service.exception.AccountAccessRestrictedException;
 import monolithe.auth_service.exception.AccountTemporarilyLockedException;
+import monolithe.auth_service.exception.UserDisabledException;
+import monolithe.auth_service.repository.AuthenticationContextRepository;
 import monolithe.auth_service.repository.UserRepository;
 import monolithe.auth_service.security.CustomUserDetailsService;
 import monolithe.auth_service.security.JwtService;
@@ -12,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -33,6 +38,7 @@ class AuthenticationServiceTest {
     private JwtService jwtService;
     private RefreshTokenService refreshTokenService;
     private CustomUserDetailsService customUserDetailsService;
+    private AuthenticationContextRepository authenticationContextRepository;
     private LoginSecurityService loginSecurityService;
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
@@ -47,6 +53,7 @@ class AuthenticationServiceTest {
         jwtService = mock(JwtService.class);
         refreshTokenService = mock(RefreshTokenService.class);
         customUserDetailsService = mock(CustomUserDetailsService.class);
+        authenticationContextRepository = mock(AuthenticationContextRepository.class);
         loginSecurityService = mock(LoginSecurityService.class);
         userRepository = mock(UserRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
@@ -58,6 +65,7 @@ class AuthenticationServiceTest {
                 jwtService,
                 refreshTokenService,
                 customUserDetailsService,
+                authenticationContextRepository,
                 loginSecurityService,
                 userRepository,
                 passwordEncoder,
@@ -218,6 +226,71 @@ class AuthenticationServiceTest {
                 eq("JUnit"),
                 eq("POST"),
                 eq("/api/auth/login")
+        );
+    }
+
+    @Test
+    void usuarioDesactivadoLanzaUserDisabledException() {
+        LoginRequest solicitud = crearSolicitud("usuarioInactivo", "clave123");
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new DisabledException("User is disabled"));
+        AuthenticationContext contexto = new AuthenticationContext(
+                5L,
+                "usuarioInactivo",
+                "hash",
+                false,
+                null,
+                false,
+                false,
+                List.of("ROLE_ASESOR")
+        );
+        when(authenticationContextRepository.obtenerPorLogin("usuarioInactivo"))
+                .thenReturn(Optional.of(contexto));
+
+        UserDisabledException ex = assertThrows(
+                UserDisabledException.class,
+                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
+        );
+
+        assertEquals("El usuario se encuentra desactivado.", ex.getMessage());
+        verify(auditService).registrar(
+                eq(5L),
+                eq("LOGIN_DENEGADO"),
+                eq("DENEGADO"),
+                contains("desactivada"),
+                eq("127.0.0.1"),
+                eq("JUnit"),
+                eq("POST"),
+                eq("/api/auth/login")
+        );
+    }
+
+    @Test
+    void usuarioConPasswordTemporalExpiradoLanzaAccountAccessRestrictedException() {
+        LoginRequest solicitud = crearSolicitud("usuarioTemporal", "claveTemp");
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new DisabledException("User is disabled"));
+        AuthenticationContext contexto = new AuthenticationContext(
+                6L,
+                "usuarioTemporal",
+                "hash",
+                true,
+                null,
+                true,
+                false,
+                List.of("ROLE_ASESOR")
+        );
+        when(authenticationContextRepository.obtenerPorLogin("usuarioTemporal"))
+                .thenReturn(Optional.of(contexto));
+
+        AccountAccessRestrictedException ex = assertThrows(
+                AccountAccessRestrictedException.class,
+                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
+        );
+
+        assertEquals(
+                "La contraseña temporal ha expirado. Solicita una nueva activación o recuperación de contraseña.",
+                ex.getMessage()
         );
     }
 

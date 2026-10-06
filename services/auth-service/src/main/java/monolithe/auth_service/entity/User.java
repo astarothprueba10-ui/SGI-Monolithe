@@ -47,6 +47,9 @@ public class User {
     @Column(name = "password_actualizado_en")
     private LocalDateTime passwordActualizadoEn;
 
+    @Column(name = "password_temporal_expira_en")
+    private LocalDateTime passwordTemporalExpiraEn;
+
     @Column(name = "fecha_creacion", nullable = false, insertable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 

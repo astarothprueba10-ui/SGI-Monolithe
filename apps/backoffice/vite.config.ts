@@ -101,6 +101,16 @@ export default defineConfig(({ mode }) => {
       host: true,
 
       proxy: {
+        '/api/security': {
+          target: authProxyTarget,
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+            });
+          }
+        },
+        
         '/api/auth': {
           target: authProxyTarget,
           changeOrigin: true,
