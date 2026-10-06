@@ -9,8 +9,9 @@ import {
   MapIcon,
   MapPinIcon,
   MessageCircleIcon,
-  PhoneIcon } from
-'lucide-react';
+  PhoneIcon
+} from
+  'lucide-react';
 import { PageHero } from '../components/public/PageHero';
 import { Button, AnchorButton } from '../components/ui/Button';
 import { Checkbox, Field, Input, Select, Textarea } from '../components/ui/Form';
@@ -45,7 +46,10 @@ export function Contact() {
     setErrors((e) => ({ ...e, [key]: '' }));
   }
 
-  async function submit(e: React.FormEvent) {
+
+
+
+  /*async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!values.nombres.trim()) next.nombres = 'Ingresa tus nombres';
@@ -73,7 +77,63 @@ export function Contact() {
       setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
       setState('success');
     }
+  }*/
+
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const next: Record<string, string> = {};
+
+    // Validación de Nombres y Apellidos (solo letras y espacios)
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (!values.nombres.trim()) {
+      next.nombres = 'Ingresa tus nombres';
+    } else if (!nameRegex.test(values.nombres.trim())) {
+      next.nombres = 'El nombre solo debe contener letras';
+    }
+
+    if (!values.apellidos.trim()) {
+      next.apellidos = 'Ingresa tus apellidos';
+    } else if (!nameRegex.test(values.apellidos.trim())) {
+      next.apellidos = 'El apellido solo debe contener letras';
+    }
+
+    // Validación de DNI (opcional, pero si se ingresa, deben ser 8 números exactos)
+    if (values.dni.trim() && !/^\d{8}$/.test(values.dni.trim())) {
+      next.dni = 'El DNI debe tener exactamente 8 dígitos numéricos';
+    }
+
+    // Validación de Teléfono (9 dígitos numéricos para Perú)
+    if (!/^\d{9}$/.test(values.telefono.trim())) {
+      next.telefono = 'El teléfono debe tener 9 dígitos numéricos';
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(values.correo.trim())) next.correo = 'Correo inválido';
+    if (!values.motivo) next.motivo = 'Selecciona un motivo';
+    if (!accept) next.accept = 'Debes aceptar la política de privacidad';
+
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+
+    setState('loading');
+
+    try {
+      const resp = await enviarConsulta({
+        nombre: `${values.nombres.trim()} ${values.apellidos.trim()}`.trim(),
+        telefono: values.telefono.trim(),
+        correo: values.correo.trim(),
+        asunto: values.motivo ? `[${values.motivo}] Consulta Web` : 'Contacto Web',
+        mensaje: `DNI: ${values.dni || 'N/A'}\nProyecto: ${values.proyecto || 'General'}\nMotivo: ${values.motivo}\n\n${values.mensaje.trim()}`,
+        aceptaPrivacidad: accept
+      });
+      setCodigoSeguimiento(resp.codigo);
+      setState('success');
+    } catch {
+      setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
+      setState('success');
+    }
   }
+
 
   return (
     <>
@@ -83,14 +143,14 @@ export function Contact() {
         title="Conversemos sobre tu próxima inversión"
         description="Escríbenos y un asesor de MONOLITHE te acompañará en todo el proceso, desde la primera consulta hasta la firma de tu escritura."
         image={IMAGES.heroHouse} />
-      
+
 
       <section className="bg-white py-16 lg:py-24">
         <div className="shell grid gap-12 lg:grid-cols-[1.25fr_1fr] lg:items-start">
           {/* Formulario */}
           <div className="rounded-2xl border border-line bg-white p-6 shadow-card sm:p-8">
             {state === 'success' ?
-            <div className="py-10 text-center">
+              <div className="py-10 text-center">
                 <CheckCircle2Icon className="mx-auto h-12 w-12 text-brand" />
                 <h2 className="mt-5 font-display text-3xl text-night">Solicitud enviada</h2>
                 <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted">
@@ -104,85 +164,107 @@ export function Contact() {
                     Continuar por WhatsApp
                   </AnchorButton>
                   <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setValues(initial);
-                    setAccept(false);
-                    setState('idle');
-                  }}>
-                  
+                    variant="secondary"
+                    onClick={() => {
+                      setValues(initial);
+                      setAccept(false);
+                      setState('idle');
+                    }}>
+
                     Enviar otra solicitud
                   </Button>
                 </div>
               </div> :
 
-            <form onSubmit={submit} noValidate className="space-y-5">
+              <form onSubmit={submit} noValidate className="space-y-5">
                 <SectionHeading title="Cuéntanos qué necesitas" />
 
                 {Object.keys(errors).length > 0 &&
-              <Alert tone="error" title="No pudimos enviar tu solicitud">
+                  <Alert tone="error" title="No pudimos enviar tu solicitud">
                     Revisa los campos marcados en rojo y vuelve a intentarlo.
                   </Alert>
-              }
+                }
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field label="Nombres" htmlFor="nombres" required error={errors.nombres}>
                     <Input
-                    id="nombres"
-                    value={values.nombres}
-                    error={errors.nombres}
-                    onChange={(e) => update('nombres', e.target.value)}
-                    autoComplete="given-name" />
-                  
+                      id="nombres"
+                      value={values.nombres}
+                      error={errors.nombres}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]*$/.test(val)) {
+                          update('nombres', val);
+                        }
+                      }}
+                      autoComplete="given-name" />
+
                   </Field>
                   <Field label="Apellidos" htmlFor="apellidos" required error={errors.apellidos}>
                     <Input
-                    id="apellidos"
-                    value={values.apellidos}
-                    error={errors.apellidos}
-                    onChange={(e) => update('apellidos', e.target.value)}
-                    autoComplete="family-name" />
-                  
+                      id="apellidos"
+                      value={values.apellidos}
+                      error={errors.apellidos}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]*$/.test(val)) {
+                          update('apellidos', val);
+                        }
+                      }}
+                      autoComplete="family-name" />
+
                   </Field>
-                  <Field label="DNI" htmlFor="dni" hint="Nos ayuda a preparar tu contrato.">
+                  <Field label="DNI" htmlFor="dni" hint="Nos ayuda a preparar tu contrato." error={errors.dni}>
                     <Input
-                    id="dni"
-                    value={values.dni}
-                    inputMode="numeric"
-                    maxLength={8}
-                    onChange={(e) => update('dni', e.target.value)} />
-                  
+                      id="dni"
+                      value={values.dni}
+                      error={errors.dni} // Asegúrate de que el Field padre también reciba error={errors.dni}
+                      inputMode="numeric"
+                      maxLength={8}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val) && val.length <= 8) {
+                          update('dni', val);
+                        }
+                      }} />
+
                   </Field>
                   <Field label="Teléfono" htmlFor="telefono" required error={errors.telefono}>
                     <Input
-                    id="telefono"
-                    value={values.telefono}
-                    error={errors.telefono}
-                    inputMode="tel"
-                    onChange={(e) => update('telefono', e.target.value)} />
-                  
+                      id="telefono"
+                      value={values.telefono}
+                      error={errors.telefono}
+                      inputMode="tel"
+                      maxLength={9} // Limita a 9 dígitos
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val)) {
+                          update('telefono', val);
+                        }
+                      }} />
+
                   </Field>
                   <Field label="Correo electrónico" htmlFor="correo" required error={errors.correo}>
                     <Input
-                    id="correo"
-                    type="email"
-                    value={values.correo}
-                    error={errors.correo}
-                    onChange={(e) => update('correo', e.target.value)} />
-                  
+                      id="correo"
+                      type="email"
+                      value={values.correo}
+                      error={errors.correo}
+                      onChange={(e) => update('correo', e.target.value)} />
+
                   </Field>
                   <Field label="Proyecto de interés" htmlFor="proyecto" required>
                     <Select
-                    id="proyecto"
-                    value={values.proyecto}
-                    onChange={(e) => update('proyecto', e.target.value)}>
-                    
+                      id="proyecto"
+                      value={values.proyecto}
+                      onChange={(e) => update('proyecto', e.target.value)}>
+
                       <option value="">Selecciona un proyecto</option>
                       {projects.map((p) =>
-                    <option key={p.slug} value={p.slug}>
+                        <option key={p.slug} value={p.slug}>
                           {p.name}
                         </option>
-                    )}
+                      )}
                       <option value="otro">Aún no lo decido</option>
                     </Select>
                   </Field>
@@ -190,11 +272,11 @@ export function Contact() {
 
                 <Field label="Motivo de contacto" htmlFor="motivo" required error={errors.motivo}>
                   <Select
-                  id="motivo"
-                  value={values.motivo}
-                  error={errors.motivo}
-                  onChange={(e) => update('motivo', e.target.value)}>
-                  
+                    id="motivo"
+                    value={values.motivo}
+                    error={errors.motivo}
+                    onChange={(e) => update('motivo', e.target.value)}>
+
                     <option value="">Selecciona un motivo</option>
                     <option>Quiero comprar un lote</option>
                     <option>Quiero agendar una visita</option>
@@ -206,31 +288,31 @@ export function Contact() {
 
                 <Field label="Mensaje" htmlFor="mensaje">
                   <Textarea
-                  id="mensaje"
-                  value={values.mensaje}
-                  onChange={(e) => update('mensaje', e.target.value)}
-                  placeholder="Cuéntanos qué información necesitas…" />
-                
+                    id="mensaje"
+                    value={values.mensaje}
+                    onChange={(e) => update('mensaje', e.target.value)}
+                    placeholder="Cuéntanos qué información necesitas…" />
+
                 </Field>
 
                 <Checkbox
-                id="politica"
-                checked={accept}
-                onChange={(e) => {
-                  setAccept(e.target.checked);
-                  setErrors((prev) => ({ ...prev, accept: '' }));
-                }}
-                label={
-                <span>
+                  id="politica"
+                  checked={accept}
+                  onChange={(e) => {
+                    setAccept(e.target.checked);
+                    setErrors((prev) => ({ ...prev, accept: '' }));
+                  }}
+                  label={
+                    <span>
                       Acepto la política de privacidad y el tratamiento de mis datos personales.
                       {errors.accept &&
-                  <span className="mt-1 block text-xs font-medium text-red-600">
+                        <span className="mt-1 block text-xs font-medium text-red-600">
                           {errors.accept}
                         </span>
-                  }
+                      }
                     </span>
-                } />
-              
+                  } />
+
 
                 <Button type="submit" size="lg" loading={state === 'loading'} className="w-full">
                   Enviar solicitud
@@ -253,7 +335,7 @@ export function Contact() {
                       target="_blank"
                       rel="noreferrer"
                       className="text-white/70 hover:text-gold-400">
-                      
+
                       {contactInfo.whatsapp}
                     </a>
                   </div>
@@ -265,7 +347,7 @@ export function Contact() {
                     <a
                       href={`tel:${contactInfo.phone.replace(/\s/g, '')}`}
                       className="text-white/70 hover:text-gold-400">
-                      
+
                       {contactInfo.phone}
                     </a>
                   </div>
@@ -297,12 +379,12 @@ export function Contact() {
 
               <div className="mt-7 flex gap-3 border-t border-white/10 pt-6">
                 {[FacebookIcon, InstagramIcon, LinkedinIcon].map((SocialIcon, i) =>
-                <a
-                  key={i}
-                  href="#"
-                  aria-label="Red social de MONOLITHE"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white/70 transition-colors duration-150 ease-out hover:border-gold hover:text-gold">
-                  
+                  <a
+                    key={i}
+                    href="#"
+                    aria-label="Red social de MONOLITHE"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white/70 transition-colors duration-150 ease-out hover:border-gold hover:text-gold">
+
                     <SocialIcon className="h-4 w-4" />
                   </a>
                 )}
