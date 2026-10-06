@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PlusIcon, PencilIcon } from 'lucide-react';
+import { PlusIcon, PencilIcon, History } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { SearchInput, Select } from '../../ui/Field';
@@ -10,6 +10,7 @@ import { EmptyState } from '../../ui/Feedback';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coreService } from '../../../services/coreService';
 import { LotFormModal } from '../LotFormModal';
+import { LotStatusModal } from '../LotStatusModal';
 import type {
   ProyectoResponse,
   LoteResponse,
@@ -27,26 +28,52 @@ interface Props {
 const PAGE_SIZE = 12;
 
 function LotStatusBadge({ lot }: { lot: LoteResponse }) {
+  const statusName = lot.nombreEstadoLote ?? lot.codigoEstadoLote ?? 'Desconocido';
+  
   if (lot.codigoEstadoLote === 'DISPONIBLE') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4cbb17]/40 bg-[#4cbb17]/10 px-2.5 py-0.5 text-xs font-semibold text-[#2d7a0c]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#4cbb17]"></span>
-        {lot.nombreEstadoLote ?? 'Disponible'}
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/40 bg-green-500/10 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+        {statusName}
       </span>
     );
   }
-
-  if (lot.codigoEstadoLote === 'VENDIDO') {
+  if (lot.codigoEstadoLote === 'RESERVADO') {
     return (
-      <Badge tone="neutral" className="border border-brand-200 bg-brand-100 text-brand-800">
-        {lot.nombreEstadoLote ?? 'Vendido'}
-      </Badge>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+        {statusName}
+      </span>
     );
   }
-
+  if (lot.codigoEstadoLote === 'VENDIDO') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-red-400"></span>
+        {statusName}
+      </span>
+    );
+  }
+  if (lot.codigoEstadoLote === 'BLOQUEADO') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+        {statusName}
+      </span>
+    );
+  }
+  if (lot.codigoEstadoLote === 'NO_DISPONIBLE') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-500/40 bg-gray-500/10 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500"></span>
+        {statusName}
+      </span>
+    );
+  }
+  
   return (
-    <Badge tone="accent">
-      {lot.nombreEstadoLote ?? lot.codigoEstadoLote ?? 'Reservado'}
+    <Badge tone="neutral">
+      {statusName}
     </Badge>
   );
 }
@@ -54,6 +81,7 @@ function LotStatusBadge({ lot }: { lot: LoteResponse }) {
 export function ProjectLotsTab({ project }: Props) {
   const { can } = useAuth();
   const canEdit = can('lots.edit');
+  const canViewLots = can('lots.view');
 
   // Filtros
   const [query, setQuery] = useState('');
@@ -81,6 +109,8 @@ export function ProjectLotsTab({ project }: Props) {
   // Modal
   const [formOpen, setFormOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<LoteResponse | null>(null);
+  const [statusLot, setStatusLot] = useState<LoteResponse | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   // Debounce 400ms
   useEffect(() => {
@@ -212,6 +242,15 @@ export function ProjectLotsTab({ project }: Props) {
         lotStatuses={lotStatuses}
         lotTypes={lotTypes}
         lot={editingLot}
+      />
+      
+      <LotStatusModal
+        open={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        lot={statusLot}
+        statuses={lotStatuses}
+        canEdit={canEdit}
+        onSuccess={handleFormSuccess}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -351,7 +390,7 @@ export function ProjectLotsTab({ project }: Props) {
                   <TH className="text-brand-900 font-bold bg-brand-50/80">Zona</TH>
                   <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Área</TH>
                   <TH className="text-brand-900 font-bold bg-brand-50/80">Estado</TH>
-                  {canEdit && (
+                  {(canEdit || canViewLots) && (
                     <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Acciones</TH>
                   )}
                 </>
@@ -384,16 +423,33 @@ export function ProjectLotsTab({ project }: Props) {
                   <TD>
                     <LotStatusBadge lot={lot} />
                   </TD>
-                  {canEdit && (
+                  {(canEdit || canViewLots) && (
                     <TD align="right">
-                      <Button
-                        size="sm"
-                        icon={PencilIcon}
-                        onClick={() => handleOpenEdit(lot)}
-                        className="border-brand-200 text-brand-700 hover:bg-brand-50"
-                      >
-                        Editar
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {canViewLots && (
+                          <Button
+                            size="sm"
+                            icon={History}
+                            onClick={() => {
+                              setStatusLot(lot);
+                              setStatusModalOpen(true);
+                            }}
+                            className="border-brand-200 text-brand-700 hover:bg-brand-50"
+                          >
+                            Estado
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            icon={PencilIcon}
+                            onClick={() => handleOpenEdit(lot)}
+                            className="border-brand-200 text-brand-700 hover:bg-brand-50"
+                          >
+                            Editar
+                          </Button>
+                        )}
+                      </div>
                     </TD>
                   )}
                 </TR>

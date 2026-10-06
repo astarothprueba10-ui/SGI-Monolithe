@@ -13,7 +13,10 @@ import type {
   CatalogoResponse,
   EstadoLoteResponse,
   MonedaResponse,
-  LoteFiltroRequest
+  LoteFiltroRequest,
+  CambiarEstadoLoteRequest,
+  CambioEstadoLoteResponse,
+  LoteHistorialEstadoResponse
 } from '../types/core';
 
 function buildLotSearchParams(filters: LoteFiltroRequest): string {
@@ -139,6 +142,22 @@ export const coreService = {
   },
   updateLot(idLote: number, data: LoteRequest): Promise<LoteResponse> {
     return coreApi.put<LoteResponse>(`/lotes/${idLote}`, data);
+  },
+  changeLotStatus(
+    idLote: number,
+    data: CambiarEstadoLoteRequest
+  ): Promise<CambioEstadoLoteResponse> {
+    return coreApi.patch<CambioEstadoLoteResponse>(
+      `/lotes/${idLote}/estado`,
+      data
+    );
+  },
+  getLotStatusHistory(
+    idLote: number
+  ): Promise<LoteHistorialEstadoResponse[]> {
+    return coreApi.get<LoteHistorialEstadoResponse[]>(
+      `/lotes/${idLote}/historial-estados`
+    );
   },
 
   // Catálogos

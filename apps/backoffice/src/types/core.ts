@@ -205,3 +205,35 @@ export interface LoteFiltroRequest {
   areaMax?: number;
   activo?: boolean;
 }
+
+export type CambiarEstadoLoteRequest = {
+  codigoNuevoEstado: string;
+  motivo: string;
+};
+
+export type CambioEstadoLoteResponse = {
+  success: boolean;
+  message?: string | null;
+  idLote?: number | null;
+  nuevoEstado?: string | null;
+};
+
+export interface LoteHistorialEstadoResponse {
+  idHistorial: number;
+
+  idLote: number;
+  codigoLote?: string | null;
+  numeroLote?: string | null;
+
+  idEstadoAnterior?: number | null;
+  codigoEstadoAnterior?: string | null;
+  nombreEstadoAnterior?: string | null;
+
+  idEstadoNuevo: number;
+  codigoEstadoNuevo?: string | null;
+  nombreEstadoNuevo?: string | null;
+
+  motivo?: string | null;
+  fechaCambio: string;
+  idUsuario?: number | null;
+}

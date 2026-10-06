@@ -9,7 +9,11 @@ import monolithe.core_service.exception.ConflictoNegocioException;
 import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.EstadoProyectoRepository;
+import monolithe.core_service.repository.EtapaRepository;
+import monolithe.core_service.repository.LoteRepository;
+import monolithe.core_service.repository.ManzanaRepository;
 import monolithe.core_service.repository.ProyectoRepository;
+import monolithe.core_service.repository.ZonaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +28,10 @@ public class ProyectoService {
 
     private final ProyectoRepository proyectoRepository;
     private final EstadoProyectoRepository estadoProyectoRepository;
+    private final EtapaRepository etapaRepository;
+    private final ZonaRepository zonaRepository;
+    private final ManzanaRepository manzanaRepository;
+    private final LoteRepository loteRepository;
 
     @Transactional(readOnly = true)
     public List<ProyectoResponse> listarTodos() {
@@ -113,6 +121,10 @@ public class ProyectoService {
         p.setAreaTotalM2(request.areaTotalM2());
         p.setFechaInicio(request.fechaInicio());
         p.setFechaFinEstimada(request.fechaFinEstimada());
+        if (Boolean.TRUE.equals(p.getActivo()) && Boolean.FALSE.equals(request.activo())) {
+            validarDesactivacionProyecto(idProyecto);
+        }
+
         if (request.activo() != null) {
             p.setActivo(request.activo());
         }
@@ -127,8 +139,24 @@ public class ProyectoService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proyecto no encontrado con id: " + idProyecto));
 
         if (Boolean.TRUE.equals(p.getActivo())) {
+            validarDesactivacionProyecto(idProyecto);
             p.setActivo(false);
             proyectoRepository.save(p);
+        }
+    }
+
+    private void validarDesactivacionProyecto(Long idProyecto) {
+        if (etapaRepository.existsByProyecto_IdProyectoAndActivoTrue(idProyecto)) {
+            throw new ReglaNegocioException("El proyecto no puede desactivarse porque tiene etapas activas");
+        }
+        if (zonaRepository.existsByProyecto_IdProyectoAndActivoTrue(idProyecto)) {
+            throw new ReglaNegocioException("El proyecto no puede desactivarse porque tiene zonas activas");
+        }
+        if (manzanaRepository.existsByEtapa_Proyecto_IdProyectoAndActivoTrue(idProyecto)) {
+            throw new ReglaNegocioException("El proyecto no puede desactivarse porque tiene manzanas activas");
+        }
+        if (loteRepository.existsByIdProyectoAndActivoTrue(idProyecto)) {
+            throw new ReglaNegocioException("El proyecto no puede desactivarse porque tiene lotes activos");
         }
     }
 

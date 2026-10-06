@@ -9,6 +9,7 @@ public record CambiarEstadoLoteRequest(
         @Size(max = 30)
         String codigoNuevoEstado,
 
+        @NotBlank
         @Size(max = 255)
         String motivo
 
