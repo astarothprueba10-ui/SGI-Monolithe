@@ -9,6 +9,7 @@ import type {
   ManzanaResponse,
   ManzanaRequest,
   LoteResponse,
+  LoteRequest,
   CatalogoResponse,
   EstadoLoteResponse,
   MonedaResponse,
@@ -132,6 +133,12 @@ export const coreService = {
   },
   searchLots(filters: LoteFiltroRequest = {}): Promise<LoteResponse[]> {
     return coreApi.get<LoteResponse[]>(buildLotSearchParams(filters));
+  },
+  createLot(data: LoteRequest): Promise<LoteResponse> {
+    return coreApi.post<LoteResponse>('/lotes', data);
+  },
+  updateLot(idLote: number, data: LoteRequest): Promise<LoteResponse> {
+    return coreApi.put<LoteResponse>(`/lotes/${idLote}`, data);
   },
 
   // Catálogos

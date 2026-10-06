@@ -149,6 +149,22 @@ export interface LoteResponse {
   activo: boolean;
 }
 
+export type LoteRequest = {
+  idManzana: number;
+  idZona?: number | null;
+  codigoTipoLote?: string | null;
+  codigoEstadoLote: string;
+  codigo: string;
+  numero: string;
+  areaM2: number;
+  frenteM?: number | null;
+  fondoM?: number | null;
+  lateralDerechoM?: number | null;
+  lateralIzquierdoM?: number | null;
+  observaciones?: string | null;
+  activo?: boolean | null;
+};
+
 export interface CatalogoResponse {
   id: number;
   codigo: string;
