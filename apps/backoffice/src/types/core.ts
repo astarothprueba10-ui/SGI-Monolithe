@@ -20,10 +20,7 @@ export interface ProyectoResponse {
   activo: boolean;
 }
 
-// Contrato de escritura — alineado con ProyectoRequest.java
-// Obligatorios: codigoEstadoProyecto, codigo, nombre
-// Opcionales: resto de campos
-export interface ProyectoRequest {
+export type ProyectoRequest = {
   codigoEstadoProyecto: string;
   codigo: string;
   nombre: string;
@@ -40,7 +37,7 @@ export interface ProyectoRequest {
   fechaInicio?: string | null;
   fechaFinEstimada?: string | null;
   activo?: boolean | null;
-}
+};
 
 
 export interface EtapaResponse {
@@ -59,6 +56,18 @@ export interface EtapaResponse {
   fechaFinEstimada?: string;
   activo: boolean;
 }
+
+export type EtapaRequest = {
+  idProyecto: number;
+  codigoEstadoEtapa: string;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  numeroOrden?: number | null;
+  fechaInicio?: string | null;
+  fechaFinEstimada?: string | null;
+  activo?: boolean | null;
+};
 
 export interface ZonaResponse {
   idZona: number;

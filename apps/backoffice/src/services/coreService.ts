@@ -3,6 +3,7 @@ import type {
   ProyectoResponse,
   ProyectoRequest,
   EtapaResponse,
+  EtapaRequest,
   ZonaResponse,
   ManzanaResponse,
   LoteResponse,
@@ -75,6 +76,12 @@ export const coreService = {
   },
   getStageById(idEtapa: number): Promise<EtapaResponse> {
     return coreApi.get<EtapaResponse>(`/etapas/${idEtapa}`);
+  },
+  createStage(data: EtapaRequest): Promise<EtapaResponse> {
+    return coreApi.post<EtapaResponse>('/etapas', data);
+  },
+  updateStage(idEtapa: number, data: EtapaRequest): Promise<EtapaResponse> {
+    return coreApi.put<EtapaResponse>(`/etapas/${idEtapa}`, data);
   },
 
   // Zonas

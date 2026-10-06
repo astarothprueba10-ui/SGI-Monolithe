@@ -9,7 +9,8 @@ import {
   CalendarIcon,
   Maximize2Icon,
   MapPinIcon,
-  PencilIcon
+  PencilIcon,
+  LayersIcon
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
@@ -24,6 +25,7 @@ import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { coreService } from '../services/coreService';
 import { ProjectFormModal } from '../components/projects/ProjectFormModal';
+import { StageManagementModal } from '../components/projects/StageManagementModal';
 import { number } from '../utils/format';
 import type {
   ProyectoResponse,
@@ -57,9 +59,13 @@ export function Projects() {
   const [lotsError, setLotsError] = useState<string | null>(null);
   const [hasLoadedLots, setHasLoadedLots] = useState(false);
 
-  // Modal state
+  // Project Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProyectoResponse | null>(null);
+
+  // Stage Management Modal state
+  const [stagesModalOpen, setStagesModalOpen] = useState(false);
+  const [selectedProjectForStages, setSelectedProjectForStages] = useState<ProyectoResponse | null>(null);
 
   // ---------- Debounce 400 ms ----------
   useEffect(() => {
@@ -144,6 +150,16 @@ export function Projects() {
     await loadProjects();
   }, [loadProjects]);
 
+  const handleOpenStages = (project: ProyectoResponse) => {
+    setSelectedProjectForStages(project);
+    setStagesModalOpen(true);
+  };
+
+  const handleCloseStages = () => {
+    setStagesModalOpen(false);
+    setSelectedProjectForStages(null);
+  };
+
   // ---------- Derived ----------
   const pagedLots = useMemo(() => {
     return lots.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -170,6 +186,12 @@ export function Projects() {
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
         project={editingProject}
+      />
+
+      <StageManagementModal
+        open={stagesModalOpen}
+        onClose={handleCloseStages}
+        project={selectedProjectForStages}
       />
 
       <div className="border-l-4 border-[#4cbb17] pl-3.5 mb-6">
@@ -311,6 +333,14 @@ export function Projects() {
                       <p className="text-xs text-brand-600 mb-4 line-clamp-2">{project.descripcion}</p>
                     )}
                     <div className="mt-auto flex items-center justify-end gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        icon={LayersIcon}
+                        onClick={() => handleOpenStages(project)}
+                        className="border-brand-200 text-brand-700 hover:bg-brand-50"
+                      >
+                        Etapas
+                      </Button>
                       <Link to="/plano">
                         <Button size="sm" icon={MapIcon} className="border-brand-200 text-brand-800 hover:bg-brand-50">
                           Ver plano
