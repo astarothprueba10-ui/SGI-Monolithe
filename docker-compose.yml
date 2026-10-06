@@ -16,6 +16,11 @@ services:
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@monolithe.local}
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-dummy}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-dummy}
     volumes:
       - type: bind
         source: ${JWT_PRIVATE_KEY_PATH_HOST:-./.secret/keys/jwt-private.pem}

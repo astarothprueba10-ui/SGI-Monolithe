@@ -75,6 +75,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5175,
       host: true,
+      allowedHosts: true,
 
       proxy: {
         '/cms-api': {

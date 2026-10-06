@@ -49,4 +49,6 @@ El presente documento certifica la culminacion exitosa del desarrollo, auditoria
 
 ## 4. Declaracion de Go-Live y Cierre
 
-Habiendo verificado el cumplimiento de las directrices arquitectonicas, el estandar de Clean Architecture (metodos <= 20 lineas, SRP), la politica Zero-Emoji y la no presencia de errores estaticos de compilacion, se declara el sistema **SGI-Monolithe** en estado **GO-LIVE PRODUCCION (Cerrado y Operativo)**.
+Habiendo verificado el cumplimiento de las directrices arquitectonicas, el estandar de Clean Architecture (metodos <= 20 lineas, SRP), la politica a no presencia de errores estaticos de compilacion, se declara el sistema **SGI-Monolithe** en estado **GO-LIVE PRODUCCION (Cerrado y Operativo)**.
+
+Jhonatan estuvo aquí, y no me juzguen.

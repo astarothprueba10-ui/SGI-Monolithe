@@ -20,35 +20,29 @@
 
 ---
 
-## 2. Alineación Oficial de Sprints (Cronograma Gantt Maestro)
+## 2. Alineación Oficial de Sprints (Cronograma Gantt Maestro — 5 Sprints)
 
-Este cronograma sincroniza el **Diagrama de Gantt XML** (263 tareas) con la realidad del desarrollo y la base de datos Supabase ya desplegada:
+Este cronograma sincroniza el **Diagrama de Gantt Oficial** ([Diagrama de Gantt - 5 sprints.pdf](file:///home/jhonataningesis/Documentos/Proyectos/Inmobiliaria/SGI-Monolithe/docs/Diagrama%20de%20Gantt%20-%205%20sprints.pdf) y [diagrama_gantt_sigi_monolithe.xml](file:///home/jhonataningesis/Documentos/Proyectos/Inmobiliaria/SGI-Monolithe/docs/01_gestion_proyecto/diagrama_gantt_sigi_monolithe.xml)) con la realidad del desarrollo y la base de datos Supabase ya desplegada:
 
 ```mermaid
 flowchart LR
-    S0["Sprint 0: DB & Arquitectura\n(17/08 - 26/08)"] --> S1["Sprint 1: Seguridad & Acceso\n(27/08 - 07/09)"]
-    S1 --> S2["Sprint 2: Lotes & Plano SVG\n(07/09 - 18/09)"]
-    S2 --> S3["Sprint 3: CRM & Visitas\n(21/09 - 02/10)"]
-    S3 --> S4["Sprint 4: Ventas & Separación\n(05/10 - 16/10)"]
-    S4 --> S5["Sprint 5: Pagos & Cuotas\n(19/10 - 30/10)"]
-    S5 --> S6["Sprint 6: Portal Cliente DNI\n(02/11 - 13/11)"]
-    S4 --> S7["Sprint 7: Comisiones & KPIs\n(16/11 - 27/11)"]
-    S5 --> S7
-    S6 --> S8["Sprint 8: UAT & Go-Live\n(30/11 - 04/12)"]
-    S7 --> S8
+    S0["Sprint 0: Fundamentos & Arquitectura\n(17/08 - 28/08)"] --> S1["Sprint 1: Seguridad, Web & CMS\n(04/09 - 18/09)"]
+    S1 --> S2["Sprint 2: Lotes & Plano SVG\n(18/09 - 06/10)"]
+    S2 --> S3["Sprint 3: CRM, Clientes & Ventas\n(09/10 - 28/10)"]
+    S3 --> S4["Sprint 4: Financiamiento, Vouchers & Portal\n(30/10 - 25/11)"]
+    S4 --> S5["Sprint 5: Asesores, Comisiones & KPIs\n(27/11 - 11/12)"]
+    S5 --> Cierre["Cierre Final & Entrega Académica\n(11/12 - 16/12)"]
 ```
 
-| Sprint | Fechas Oficiales | Horas | Objetivo Central y Entregables | Estado Actual |
-|---|---|---|---|---|
-| **Sprint 0** | **17/08/2026 – 26/08/2026** | 64h | **Fundamentos, Base de Datos y UX/UI:** Modelo entidad-relación de 102 tablas en Supabase, scripts de migración, catálogos iniciales y wireframes Figma. | **100% COMPLETADO** |
-| **Sprint 1** | **27/08/2026 - 07/09/2026** | 80h | **Seguridad, Autenticacion y Auditoria:** Login en las tres apps (`backoffice`, `pagina-web` y `portal-cliente`), roles RBAC (`ADMINISTRADOR`, `ASESOR`, `FINANZAS`, `CLIENTE`) y tabla `aud_eventos`. | **90% COMPLETADO** |
-| **Sprint 2** | **07/09/2026 – 18/09/2026** | 192h | **Catálogo Inmobiliario y Plano SVG:** Gestión de proyectos, manzanas y los **70 lotes**. Plano interactivo vectorial SVG con filtros por estado (`Disponible`, `Separado`, `Vendido`, `Bloqueado`). | **85% UI / 100% DB** |
-| **Sprint 3** | **21/09/2026 – 02/10/2026** | 80h | **CRM Inmobiliario y Agenda de Visitas:** Captura de prospectos (leads), embudo de conversión y módulo de agenda de visitas al terreno con validación de horarios oficiales. | **85% UI / 100% DB** |
-| **Sprint 4** | **05/10/2026 – 16/10/2026** | 88h | **Ventas y Separaciones:** Registro de separación de **S/ 500.00**, control de plazo de **7 días calendario**, generación de contrato de compraventa y formalización de clientes. | **85% UI / 100% DB** |
-| **Sprint 5** | **19/10/2026 – 30/10/2026** | 80h | **Financiamiento, Cronograma y Vouchers:** Generador de cronograma de pagos hasta **36 cuotas**, panel de tesorería para validar/rechazar comprobantes y detección de mora crítica. | **80% UI / 100% DB** |
-| **Sprint 6** | **02/11/2026 – 13/11/2026** | 80h | **Portal del Cliente (Autoservicio DNI):** Extranet para compradores autenticados por DNI. Consulta de lote, cronograma de cuotas, subida de vouchers de depósito y contacto con su asesor. | **90% UI / 100% DB** |
-| **Sprint 7** | **16/11/2026 – 27/11/2026** | 80h | **Motor de Comisiones y Dashboard:** Cálculo de comisiones (2% y 3%), balance de recaudación financiera y métricas gerenciales (KPIs). | **75% UI / 100% DB** |
-| **Sprint 8** | **30/11/2026 – 04/12/2026** | 40h | **Cierre, Pruebas UAT y Despliegue Go-Live:** Pruebas integrales de usuario con la gerencia, hardening de seguridad y puesta en producción final. | **Planificado** |
+| Sprint | Fechas Oficiales | Objetivo Central y Entregables | Estado al 05/10/2026 |
+|---|---|---|---|
+| **Sprint 0** | **17/08/2026 – 28/08/2026** | **Fundamentos, Base de Datos y UX/UI:** Modelo entidad-relación en Supabase, scripts de migración, catálogos iniciales y wireframes Figma. | **100% COMPLETADO** |
+| **Sprint 1** | **04/09/2026 – 18/09/2026** | **Seguridad, Web Pública y CMS:** Autenticación JWT administrativa, auditoría y módulo CMS: CMS público (8%), CMS administrativo (7%), CRUD del CMS (10%) y validación completa CMS (5%). | **100% Code / 36% Base** |
+| **Sprint 2** | **18/09/2026 – 06/10/2026** | **Inventario Inmobiliario, Lotes y Plano SVG:** Gestión de proyectos, manzanas y los **70 lotes**. Cálculo de precio, plano interactivo SVG con filtros por estado (`Disponible`, `Separado`, `Vendido`) y buscador. | **En Cierre (Finaliza 06/10)** |
+| **Sprint 3** | **09/10/2026 – 28/10/2026** | **CRM, Clientes, Ventas y Separaciones:** Captura y conversión de prospectos (leads), módulo de separaciones preventivas (**S/ 500.00** a 7 días), ventas al contado y financiadas. | **Próximo (Inicia 09/10)** |
+| **Sprint 4** | **30/10/2026 – 25/11/2026** | **Financiamiento, Vouchers y Portal del Cliente:** Cronograma a **36 cuotas (TEA 0%)**, validación de vouchers con hash SHA-256, cláusula resolutoria y portal autoservicio para el comprador. | **Planificado** |
+| **Sprint 5** | **27/11/2026 – 11/12/2026** | **Asesores, Comisiones y Dashboard:** Comisiones (3% contado, 2% financiado), liquidaciones, gestión de servicios TI y métricas gerenciales (KPIs). | **Planificado** |
+| **Cierre** | **11/12/2026 – 16/12/2026** | **Cierre del Proyecto y Entrega Académica:** Verificación post-despliegue, retrospectiva final y consolidación del repositorio. | **Planificado** |
 
 ---
 
