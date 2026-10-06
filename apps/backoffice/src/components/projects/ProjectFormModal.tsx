@@ -90,7 +90,7 @@ function parseOptionalString(value: string): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-function buildRequest(form: FormState): ProyectoRequest {
+function buildRequest(form: FormState, isEdit: boolean): ProyectoRequest {
   return {
     codigoEstadoProyecto: form.codigoEstadoProyecto.trim(),
     codigo: form.codigo.trim(),
@@ -107,7 +107,7 @@ function buildRequest(form: FormState): ProyectoRequest {
     areaTotalM2: parseOptionalNumber(form.areaTotalM2),
     fechaInicio: parseOptionalString(form.fechaInicio),
     fechaFinEstimada: parseOptionalString(form.fechaFinEstimada),
-    activo: form.activo
+    activo: isEdit ? form.activo : true
   };
 }
 
@@ -208,7 +208,7 @@ export function ProjectFormModal({ open, onClose, onSuccess, project }: Props) {
     initForm(project)
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  
+
   const [submitting, setSubmitting] = useReducer((_: boolean, v: boolean) => v, false);
   const [statuses, setStatuses] = useReducer(
     (_: CatalogoResponse[], v: CatalogoResponse[]) => v,
@@ -268,7 +268,7 @@ export function ProjectFormModal({ open, onClose, onSuccess, project }: Props) {
       return;
     }
 
-    const payload = buildRequest(form);
+    const payload = buildRequest(form, isEdit);
     setSubmitting(true);
     setFieldErrors({} as FieldErrors);
 
@@ -392,16 +392,18 @@ export function ProjectFormModal({ open, onClose, onSuccess, project }: Props) {
           </Select>
         </Field>
 
-        <Field id="activo" label="Activo">
-          <Select
-            id="activo"
-            value={form.activo ? 'true' : 'false'}
-            onChange={(e) => setForm({ activo: e.target.value === 'true' })}
-          >
-            <option value="true">Sí</option>
-            <option value="false">No</option>
-          </Select>
-        </Field>
+        {isEdit && (
+          <Field id="activo" label="Registro habilitado">
+            <Select
+              id="activo"
+              value={form.activo ? 'true' : 'false'}
+              onChange={(e) => setForm({ activo: e.target.value === 'true' })}
+            >
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </Select>
+          </Field>
+        )}
 
         <div className="col-span-full">
           <Field id="descripcion" label="Descripción" error={fieldErrors.descripcion}>
