@@ -22,6 +22,7 @@ export type Action =
   | 'approve'
   | 'reject'
   | 'export'
+  | 'configure'
   | 'activate'
   | 'deactivate'
   | 'assign_role'

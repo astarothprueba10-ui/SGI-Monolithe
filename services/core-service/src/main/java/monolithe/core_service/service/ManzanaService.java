@@ -12,6 +12,7 @@ import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.EstadoManzanaRepository;
 import monolithe.core_service.repository.EtapaRepository;
+import monolithe.core_service.repository.LoteRepository;
 import monolithe.core_service.repository.ManzanaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class ManzanaService {
     private final ManzanaRepository manzanaRepository;
     private final EtapaRepository etapaRepository;
     private final EstadoManzanaRepository estadoManzanaRepository;
+    private final LoteRepository loteRepository;
 
     @Transactional(readOnly = true)
     public List<ManzanaResponse> listarPorEtapa(Long idEtapa) {
@@ -107,6 +109,9 @@ public class ManzanaService {
         if (request.numeroOrden() != null) {
             m.setNumeroOrden(request.numeroOrden());
         }
+        if (Boolean.TRUE.equals(m.getActivo()) && Boolean.FALSE.equals(request.activo())) {
+            validarDesactivacionManzana(idManzana);
+        }
         if (request.activo() != null) {
             m.setActivo(request.activo());
         }
@@ -120,8 +125,15 @@ public class ManzanaService {
         Manzana m = obtenerManzana(idManzana);
 
         if (Boolean.TRUE.equals(m.getActivo())) {
+            validarDesactivacionManzana(idManzana);
             m.setActivo(false);
             manzanaRepository.save(m);
+        }
+    }
+
+    private void validarDesactivacionManzana(Long idManzana) {
+        if (loteRepository.existsByManzana_IdManzanaAndActivoTrue(idManzana)) {
+            throw new ReglaNegocioException("La manzana no puede desactivarse porque tiene lotes activos");
         }
     }
 

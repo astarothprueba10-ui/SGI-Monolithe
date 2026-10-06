@@ -35,4 +35,9 @@ public interface LoteRepository extends
     List<Lote> findByManzana_IdManzanaAndActivoTrueOrderByNumeroAsc(
         Long idManzana
     );
+
+    boolean existsByManzana_IdManzanaAndActivoTrue(Long idManzana);
+    boolean existsByManzana_Etapa_IdEtapaAndActivoTrue(Long idEtapa);
+    boolean existsByIdProyectoAndActivoTrue(Long idProyecto);
+    boolean existsByZona_IdZonaAndActivoTrue(Long idZona);
 }

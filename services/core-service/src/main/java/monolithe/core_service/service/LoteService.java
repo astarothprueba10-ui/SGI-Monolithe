@@ -70,6 +70,7 @@ public class LoteService {
         Zona zona = resolverZonaValida(request.idZona(), idProyecto);
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
         EstadoLote estado = obtenerEstadoActivo(request.codigoEstadoLote());
+        validarEstadoInicial(estado);
 
         String codigo = normalizarCodigo(request.codigo());
         String numero = normalizarCodigo(request.numero());
@@ -96,7 +97,14 @@ public class LoteService {
 
         Zona zona = resolverZonaValida(request.idZona(), idProyectoDestino);
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
-        EstadoLote estado = obtenerEstadoActivo(request.codigoEstadoLote());
+
+        EstadoLote estadoActual = lote.getEstadoLote();
+        String codigoEstadoSolicitado = normalizarCodigo(request.codigoEstadoLote());
+
+        if (estadoActual != null && !estadoActual.getCodigo().equals(codigoEstadoSolicitado)) {
+            throw new ReglaNegocioException(
+                    "El estado del lote no puede modificarse mediante la edición general. Utilice el cambio de estado del lote.");
+        }
 
         String codigo = normalizarCodigo(request.codigo());
         String numero = normalizarCodigo(request.numero());
@@ -104,9 +112,15 @@ public class LoteService {
 
         validarUnicidadActualizar(manzanaDestino.getIdManzana(), idLote, codigo, numero);
 
-        asignarValoresLote(lote, manzanaDestino, zona, lote.getIdProyecto(), tipo, estado, codigo, numero,
+        asignarValoresLote(lote, manzanaDestino, zona, lote.getIdProyecto(), tipo, estadoActual, codigo, numero,
                 observaciones, request);
         if (request.activo() != null) {
+
+            if (Boolean.TRUE.equals(lote.getActivo())
+                    && Boolean.FALSE.equals(request.activo())) {
+                validarDesactivacionLote(lote);
+            }
+
             lote.setActivo(request.activo());
         }
 
@@ -116,7 +130,10 @@ public class LoteService {
     @Transactional
     public void desactivar(Long idLote) {
         Lote lote = obtenerLote(idLote);
+
         if (Boolean.TRUE.equals(lote.getActivo())) {
+            validarDesactivacionLote(lote);
+
             lote.setActivo(false);
             loteRepository.save(lote);
         }
@@ -130,6 +147,34 @@ public class LoteService {
 
             throw new ReglaNegocioException(
                     "El área mínima no puede ser mayor que el área máxima");
+        }
+    }
+
+    private void validarEstadoInicial(EstadoLote estado) {
+        if (estado == null)
+            return;
+        String codigo = estado.getCodigo();
+        if ("RESERVADO".equals(codigo) || "VENDIDO".equals(codigo)) {
+            throw new ReglaNegocioException(
+                    "Un lote nuevo no puede crearse directamente en estado RESERVADO o VENDIDO");
+        }
+    }
+
+    private void validarDesactivacionLote(Lote lote) {
+        if (lote.getEstadoLote() == null) {
+            return;
+        }
+
+        String codigoEstado = lote.getEstadoLote().getCodigo();
+
+        if ("RESERVADO".equals(codigoEstado)) {
+            throw new ReglaNegocioException(
+                    "No se puede desactivar un lote con una reserva vigente");
+        }
+
+        if ("VENDIDO".equals(codigoEstado)) {
+            throw new ReglaNegocioException(
+                    "No se puede desactivar un lote vendido");
         }
     }
 

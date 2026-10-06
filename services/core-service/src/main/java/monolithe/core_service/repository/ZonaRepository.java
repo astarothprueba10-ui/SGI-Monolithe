@@ -21,4 +21,6 @@ public interface ZonaRepository extends JpaRepository<Zona, Long> {
 
     List<Zona> findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(
             Long idProyecto);
+
+    boolean existsByProyecto_IdProyectoAndActivoTrue(Long idProyecto);
 }

@@ -25,4 +25,6 @@ public interface EtapaRepository extends JpaRepository<Etapa, Long> {
     List<Etapa> findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(
         Long idProyecto
     );
+
+    boolean existsByProyecto_IdProyectoAndActivoTrue(Long idProyecto);
 }

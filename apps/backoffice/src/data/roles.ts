@@ -14,6 +14,8 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   advisors: 'Asesores y comisiones',
   hr: 'Trabajadores (RRHH)',
   users: 'Usuarios, roles y permisos',
+  roles: 'Roles',
+  permissions: 'Permisos',
   audit: 'Auditoría'
 };
 
@@ -24,14 +26,19 @@ export const ACTION_LABELS: Record<Action, string> = {
   delete: 'Eliminar',
   approve: 'Aprobar',
   reject: 'Rechazar',
-  export: 'Exportar'
+  export: 'Exportar',
+  configure: 'Configurar',
+  activate: 'Activar',
+  deactivate: 'Desactivar',
+  assign_role: 'Asignar rol',
+  assign_permissions: 'Asignar permisos'
 };
 
 /** Acciones que tienen sentido por módulo (la matriz de permisos solo ofrece estas). */
 export const MODULE_ACTIONS: Record<ModuleKey, Action[]> = {
   dashboard: ['view', 'export'],
   projects: ['view', 'create', 'edit', 'delete', 'export'],
-  lots: ['view', 'edit', 'export'],
+  lots: ['view', 'edit', 'configure', 'export'],
   crm: ['view', 'create', 'edit', 'delete', 'export'],
   marketing: ['view', 'create', 'edit', 'export'],
   sales: ['view', 'create', 'edit', 'approve', 'reject', 'export'],
@@ -40,6 +47,8 @@ export const MODULE_ACTIONS: Record<ModuleKey, Action[]> = {
   advisors: ['view', 'create', 'edit', 'approve', 'export'],
   hr: ['view', 'create', 'edit', 'approve', 'export'],
   users: ['view', 'create', 'edit', 'delete', 'export'],
+  roles: ['view', 'create', 'edit', 'deactivate', 'assign_permissions'],
+  permissions: ['view'],
   audit: ['view', 'export']
 };
 
