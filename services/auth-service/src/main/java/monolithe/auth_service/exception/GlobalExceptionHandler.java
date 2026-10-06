@@ -17,6 +17,28 @@ import java.time.Instant;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+        @ExceptionHandler(UserDisabledException.class)
+        public ResponseEntity<ApiErrorResponse> handleUserDisabled(
+                        UserDisabledException exception,
+                        HttpServletRequest request) {
+
+                return construirRespuesta(
+                                HttpStatus.UNAUTHORIZED,
+                                exception.getMessage(),
+                                request);
+        }
+
+        @ExceptionHandler(AccountAccessRestrictedException.class)
+        public ResponseEntity<ApiErrorResponse> handleAccountAccessRestricted(
+                        AccountAccessRestrictedException exception,
+                        HttpServletRequest request) {
+
+                return construirRespuesta(
+                                HttpStatus.UNAUTHORIZED,
+                                exception.getMessage(),
+                                request);
+        }
+
         @ExceptionHandler(BadCredentialsException.class)
         public ResponseEntity<ApiErrorResponse> handleBadCredentials(
                         BadCredentialsException exception,

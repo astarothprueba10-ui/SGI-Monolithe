@@ -38,17 +38,26 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
     description: 'Operaciones cerradas frente a separaciones registradas',
     data: SALES_TREND,
     series: [
-    { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8' },
-    { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C' }]
+      { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8' },
+      { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C' }]
 
+  },
+  Gerencia: {
+    title: 'Ventas y separaciones por mes',
+    description:'Operaciones cerradas frente a separaciones registradas',
+    data: SALES_TREND,
+    series: [
+      { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8'},
+      { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C'}
+    ]
   },
   Asesor: {
     title: 'Mi embudo comercial por mes',
     description: 'Separaciones generadas y ventas concretadas',
     data: SALES_TREND,
     series: [
-    { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8' },
-    { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C' }]
+      { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8' },
+      { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C' }]
 
   },
   Finanzas: {
@@ -56,8 +65,8 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
     description: 'Miles de soles cobrados frente al cronograma proyectado',
     data: COLLECTION_TREND,
     series: [
-    { key: 'proyectado', label: 'Proyectado', type: 'bar', color: '#C7D8E8' },
-    { key: 'cobrado', label: 'Cobrado', type: 'line', color: '#1E3A5C' }],
+      { key: 'proyectado', label: 'Proyectado', type: 'bar', color: '#C7D8E8' },
+      { key: 'cobrado', label: 'Cobrado', type: 'line', color: '#1E3A5C' }],
 
     valuePrefix: 'S/ '
   },
@@ -66,8 +75,8 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
     description: 'Volumen captado y leads convertidos a separación',
     data: LEAD_SOURCES,
     series: [
-    { key: 'leads', label: 'Leads', type: 'bar', color: '#C7D8E8' },
-    { key: 'converted', label: 'Convertidos', type: 'line', color: '#1E3A5C' }]
+      { key: 'leads', label: 'Leads', type: 'bar', color: '#C7D8E8' },
+      { key: 'converted', label: 'Convertidos', type: 'line', color: '#1E3A5C' }]
 
   },
   RRHH: {
@@ -79,8 +88,8 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
       bono: a.bonus
     })),
     series: [
-    { key: 'comision', label: 'Comisión', type: 'bar', color: '#C7D8E8' },
-    { key: 'bono', label: 'Bono', type: 'line', color: '#1E3A5C' }],
+      { key: 'comision', label: 'Comisión', type: 'bar', color: '#C7D8E8' },
+      { key: 'bono', label: 'Bono', type: 'line', color: '#1E3A5C' }],
 
     valuePrefix: 'S/ '
   }
@@ -123,7 +132,7 @@ export function Dashboard() {
         title={intro.title}
         description={intro.description}
         meta={
-        <>
+          <>
             <Badge tone="brand">{role}</Badge>
             <span className="text-[12px] text-brand-400">
               {kpis.length} indicadores habilitados para tu rol
@@ -131,7 +140,7 @@ export function Dashboard() {
           </>
         }
         actions={
-        <>
+          <>
             <Select defaultValue="ago" aria-label="Periodo" className="w-[168px]">
               <option value="ago">Agosto 2026</option>
               <option value="jul">Julio 2026</option>
@@ -145,29 +154,29 @@ export function Dashboard() {
             </Gate>
           </>
         } />
-      
+
 
       {role === 'Finanzas' ?
-      <Alert
-        tone="danger"
-        title="14 cuotas vencidas superan los 15 días de mora"
-        className="mb-5"
-        actions={
-        <Link to="/financiamiento">
+        <Alert
+          tone="danger"
+          title="14 cuotas vencidas superan los 15 días de mora"
+          className="mb-5"
+          actions={
+            <Link to="/financiamiento">
               <Button size="sm">Ver cartera</Button>
             </Link>
-        }>
-        
+          }>
+
           Representan S/ 84,120 de la cartera de Las Palmeras y Vista Alegre.
         </Alert> :
-      null}
+        null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="sm:col-span-2 xl:col-span-1 xl:row-span-2">
           <KpiCard kpi={kpis[0]} featured />
         </div>
         {kpis.slice(1).map((kpi) =>
-        <KpiCard key={kpi.id} kpi={kpi} />
+          <KpiCard key={kpi.id} kpi={kpi} />
         )}
       </div>
 
@@ -177,14 +186,14 @@ export function Dashboard() {
             title={chart.title}
             description={chart.description}
             actions={<Badge tone="neutral">Últimos 6 meses</Badge>} />
-          
+
           <div className="px-3 py-4">
             <TrendChart
               data={chart.data}
               series={chart.series}
               valuePrefix={chart.valuePrefix}
               height={280} />
-            
+
           </div>
         </Card>
 
@@ -192,40 +201,40 @@ export function Dashboard() {
           <CardHeader
             title="Operaciones pendientes"
             description="Solo lo que puedes resolver con tus permisos" />
-          
+
           <PendingOperations />
         </Card>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
         {hasModule('projects') || hasModule('lots') ?
-        <Card className="xl:col-span-2">
+          <Card className="xl:col-span-2">
             <CardHeader
-            title="Resumen de lotes por proyecto"
-            description="Distribución de disponibilidad del inventario activo"
-            actions={
-            <Gate permission="lots.view">
+              title="Resumen de lotes por proyecto"
+              description="Distribución de disponibilidad del inventario activo"
+              actions={
+                <Gate permission="lots.view">
                   <Link to="/plano">
                     <Button size="sm" icon={MapIcon}>
                       Abrir plano
                     </Button>
                   </Link>
                 </Gate>
-            } />
-          
+              } />
+
             <LotMixSummary />
           </Card> :
-        null}
+          null}
 
         <Card
           className={
-          hasModule('projects') || hasModule('lots') ? '' : 'xl:col-span-3'
+            hasModule('projects') || hasModule('lots') ? '' : 'xl:col-span-3'
           }>
-          
+
           <CardHeader
             title="Actividad reciente"
             description={`Trazabilidad visible para ${user.primaryRole}`} />
-          
+
           <ActivityFeed />
         </Card>
       </div>

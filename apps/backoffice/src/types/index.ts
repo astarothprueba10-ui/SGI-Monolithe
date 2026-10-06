@@ -1,25 +1,31 @@
 export type ModuleKey =
-  'dashboard' |
-  'projects' |
-  'lots' |
-  'crm' |
-  'marketing' |
-  'sales' |
-  'financing' |
-  'finance' |
-  'advisors' |
-  'hr' |
-  'users' |
-  'audit';
+  | 'dashboard'
+  | 'projects'
+  | 'lots'
+  | 'crm'
+  | 'marketing'
+  | 'sales'
+  | 'financing'
+  | 'finance'
+  | 'advisors'
+  | 'hr'
+  | 'users'
+  | 'roles'
+  | 'permissions'
+  | 'audit';
 
 export type Action =
-  'view' |
-  'create' |
-  'edit' |
-  'delete' |
-  'approve' |
-  'reject' |
-  'export';
+  | 'view'
+  | 'create'
+  | 'edit'
+  | 'delete'
+  | 'approve'
+  | 'reject'
+  | 'export'
+  | 'activate'
+  | 'deactivate'
+  | 'assign_role'
+  | 'assign_permissions';
 
 export type Permission = `${ModuleKey}.${Action}`;
 
