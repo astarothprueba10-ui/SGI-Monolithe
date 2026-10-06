@@ -1,9 +1,13 @@
 package monolithe.auth_service.service;
 
 import lombok.RequiredArgsConstructor;
+import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.exception.AccountAccessRestrictedException;
 import monolithe.auth_service.exception.AccountTemporarilyLockedException;
+import monolithe.auth_service.exception.UserDisabledException;
+import monolithe.auth_service.repository.AuthenticationContextRepository;
 import monolithe.auth_service.security.CustomUserDetailsService;
 import monolithe.auth_service.security.JwtService;
 import monolithe.auth_service.security.UserPrincipal;
@@ -21,11 +25,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +41,7 @@ public class AuthenticationService {
         private final JwtService jwtService;
         private final RefreshTokenService refreshTokenService;
         private final CustomUserDetailsService customUserDetailsService;
+        private final AuthenticationContextRepository authenticationContextRepository;
         private final LoginSecurityService loginSecurityService;
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
@@ -60,6 +67,8 @@ public class AuthenticationService {
 
                 } catch (LockedException e) {
                         throw procesarCuentaBloqueada(solicitud.getUsuario(), ipOrigen, userAgent);
+                } catch (DisabledException e) {
+                        throw procesarRestriccionAcceso(solicitud.getUsuario(), ipOrigen, userAgent, e);
                 } catch (BadCredentialsException e) {
                         throw procesarCredencialesInvalidas(solicitud.getUsuario(), ipOrigen, userAgent, e);
                 }
@@ -195,6 +204,7 @@ public class AuthenticationService {
                                                 solicitud.getNuevaContrasena()));
 
                 usuario.setRequiereCambioPassword(false);
+                usuario.setPasswordTemporalExpiraEn(null);
                 usuario.setPasswordActualizadoEn(
                                 LocalDateTime.now(ZoneOffset.UTC));
 
@@ -275,5 +285,65 @@ public class AuthenticationService {
                 }
 
                 return excepcionOriginal;
+        }
+
+        private RuntimeException procesarRestriccionAcceso(
+                        String login,
+                        String ipOrigen,
+                        String userAgent,
+                        DisabledException excepcionOriginal) {
+
+                Optional<AuthenticationContext> contextoOpt =
+                                authenticationContextRepository.obtenerPorLogin(login);
+
+                if (contextoOpt.isEmpty()) {
+                        return excepcionOriginal;
+                }
+
+                AuthenticationContext contexto = contextoOpt.get();
+
+                return !contexto.estadoActivo()
+                                ? procesarCuentaInactiva(contexto, ipOrigen, userAgent)
+                                : procesarAccesoNoPermitido(contexto, ipOrigen, userAgent);
+        }
+
+        private UserDisabledException procesarCuentaInactiva(
+                        AuthenticationContext contexto,
+                        String ipOrigen,
+                        String userAgent) {
+
+                auditService.registrar(
+                                contexto.idUsuario(),
+                                "LOGIN_DENEGADO",
+                                "DENEGADO",
+                                "Inicio de sesión denegado porque la cuenta está desactivada",
+                                ipOrigen,
+                                userAgent,
+                                "POST",
+                                "/api/auth/login");
+
+                return new UserDisabledException("El usuario se encuentra desactivado.");
+        }
+
+        private AccountAccessRestrictedException procesarAccesoNoPermitido(
+                        AuthenticationContext contexto,
+                        String ipOrigen,
+                        String userAgent) {
+
+                String mensaje = contexto.requiereCambioPassword()
+                                ? "La contraseña temporal ha expirado. Solicita una nueva activación o recuperación de contraseña."
+                                : "El acceso a la cuenta no está permitido en este momento.";
+
+                auditService.registrar(
+                                contexto.idUsuario(),
+                                "LOGIN_DENEGADO",
+                                "DENEGADO",
+                                "Inicio de sesión denegado: " + mensaje,
+                                ipOrigen,
+                                userAgent,
+                                "POST",
+                                "/api/auth/login");
+
+                return new AccountAccessRestrictedException(mensaje);
         }
 }

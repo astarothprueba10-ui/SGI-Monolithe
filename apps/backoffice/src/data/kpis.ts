@@ -17,7 +17,7 @@ import {
 import type { Kpi } from '../components/ui/KpiCard';
 import type { RoleName } from '../types';
 
-export const ROLE_KPIS: Record<RoleName, Kpi[]> = {
+export const BASE_ROLE_KPIS: Record<Exclude<RoleName, 'Gerencia'>, Kpi[]> = {
   Administrador: [
   {
     id: 'k1',
@@ -300,4 +300,9 @@ export const ROLE_KPIS: Record<RoleName, Kpi[]> = {
     tone: 'sky'
   }]
 
+};
+
+export const ROLE_KPIS: Record<RoleName, Kpi[]> = {
+  ...BASE_ROLE_KPIS,
+  Gerencia: BASE_ROLE_KPIS.Administrador
 };
