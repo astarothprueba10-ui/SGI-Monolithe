@@ -16,7 +16,12 @@ import type {
   LoteFiltroRequest,
   CambiarEstadoLoteRequest,
   CambioEstadoLoteResponse,
-  LoteHistorialEstadoResponse
+  LoteHistorialEstadoResponse,
+  PlanoInteractivoResponse,
+  PlanoInteractivoDetalleResponse,
+  PlanoInteractivoRequest,
+  LoteGeometriaResponse,
+  LoteGeometriaRequest
 } from '../types/core';
 
 function buildLotSearchParams(filters: LoteFiltroRequest): string {
@@ -184,5 +189,27 @@ export const coreService = {
   },
   getPriceAdjustmentTypes(): Promise<CatalogoResponse[]> {
     return coreApi.get<CatalogoResponse[]>('/catalogos/tipos-ajuste-precio');
+  },
+
+  // Planos Interactivos
+  getPlansByProject(idProyecto: number): Promise<PlanoInteractivoResponse[]> {
+    return coreApi.get<PlanoInteractivoResponse[]>(`/planos/proyecto/${idProyecto}`);
+  },
+  getCurrentPlan(idProyecto: number, idEtapa?: number): Promise<PlanoInteractivoResponse> {
+    const query = idEtapa !== undefined && idEtapa !== null ? `?idEtapa=${idEtapa}` : '';
+    return coreApi.get<PlanoInteractivoResponse>(`/planos/proyecto/${idProyecto}/vigente${query}`);
+  },
+  getCurrentPlanDetail(idProyecto: number, idEtapa?: number): Promise<PlanoInteractivoDetalleResponse> {
+    const query = idEtapa !== undefined && idEtapa !== null ? `?idEtapa=${idEtapa}` : '';
+    return coreApi.get<PlanoInteractivoDetalleResponse>(`/planos/proyecto/${idProyecto}/detalle-vigente${query}`);
+  },
+  createPlanVersion(data: PlanoInteractivoRequest): Promise<PlanoInteractivoResponse> {
+    return coreApi.post<PlanoInteractivoResponse>('/planos', data);
+  },
+  saveLotGeometry(data: LoteGeometriaRequest): Promise<LoteGeometriaResponse> {
+    return coreApi.put<LoteGeometriaResponse>('/planos/geometrias', data);
+  },
+  deleteLotGeometry(id: number): Promise<void> {
+    return coreApi.delete<void>(`/planos/geometrias/${id}`);
   }
 };
