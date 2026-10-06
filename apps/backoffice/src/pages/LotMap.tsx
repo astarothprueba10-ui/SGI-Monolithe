@@ -3,17 +3,26 @@ import { toast } from 'sonner';
 import {
   LayersIcon,
   MapPinIcon,
-  SearchIcon
+  SaveIcon,
+  SearchIcon,
+  Settings2Icon,
+  XIcon
 } from 'lucide-react';
+
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
 import { SearchInput, Select } from '../components/ui/Field';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/Feedback';
+
+import { useAuth } from '../contexts/AuthContext';
 import { coreService } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
+
 import { area as fmtArea, number } from '../utils/format';
 import { cn } from '../utils/cn';
+
 import type {
   ProyectoResponse,
   LoteResponse,
@@ -332,6 +341,12 @@ function buildDisplayGeometries(
 }
 
 export function LotMap() {
+  const { can } = useAuth();
+  const canConfigurePlan = can('lots.configure');
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [draftGeometries, setDraftGeometries] = useState<DisplayGeometria[]>([]);
+  const [savingPlan, setSavingPlan] = useState(false);
+
   const [projects, setProjects] = useState<ProyectoResponse[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [lots, setLots] = useState<LoteResponse[]>([]);
@@ -421,6 +436,102 @@ export function LotMap() {
     return buildDisplayGeometries(lots, planDetail, selectedProjectId);
   }, [lots, planDetail, selectedProjectId]);
 
+  useEffect(() => {
+    if (!isEditingPlan) {
+      setDraftGeometries([]);
+      return;
+    }
+
+    setDraftGeometries(
+      displayGeometries.map((geom) => ({
+        ...geom,
+        puntos: geom.puntos.map((p) => ({ ...p }))
+      }))
+    );
+  }, [isEditingPlan, displayGeometries]);
+
+  const renderedGeometries = isEditingPlan
+    ? draftGeometries
+    : displayGeometries;
+
+  const handleCancelPlanEditing = () => {
+    setDraftGeometries([]);
+    setIsEditingPlan(false);
+  };
+
+  const handleSavePlan = async () => {
+    if (!planDetail?.plano) {
+      toast.error(
+        'Este proyecto todavía no tiene un plano vigente para guardar la configuración.'
+      );
+      return;
+    }
+
+    const changedGeometries = draftGeometries.filter((draft) => {
+      const original = displayGeometries.find(
+        (geom) => geom.idLote === draft.idLote
+      );
+
+      if (!original) return true;
+
+      return (
+        JSON.stringify(draft.puntos) !== JSON.stringify(original.puntos) ||
+        draft.etiquetaX !== original.etiquetaX ||
+        draft.etiquetaY !== original.etiquetaY ||
+        draft.rotacionEtiqueta !== original.rotacionEtiqueta
+      );
+    });
+
+    if (changedGeometries.length === 0) {
+      toast.info('No hay cambios en la distribución del plano.');
+      return;
+    }
+
+    setSavingPlan(true);
+
+    try {
+      await Promise.all(
+        changedGeometries.map((geom) =>
+          coreService.saveLotGeometry({
+            idPlanoInteractivo: planDetail.plano.idPlanoInteractivo,
+            idLote: geom.idLote,
+            puntos: geom.puntos,
+            etiquetaX: geom.etiquetaX ?? null,
+            etiquetaY: geom.etiquetaY ?? null,
+            rotacionEtiqueta: geom.rotacionEtiqueta ?? 0,
+            ordenCapa: geom.ordenCapa ?? 1,
+            visible: geom.visible,
+            interactivo: geom.interactivo,
+            observaciones: geom.observaciones ?? null
+          })
+        )
+      );
+
+      if (selectedProjectId) {
+        const refreshedPlan =
+          await coreService.getCurrentPlanDetail(selectedProjectId);
+
+        setPlanDetail(refreshedPlan);
+      }
+
+      setIsEditingPlan(false);
+      setDraftGeometries([]);
+
+      toast.success(
+        `${changedGeometries.length} lote(s) actualizados correctamente.`
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo guardar la configuración del plano.';
+
+      toast.error(message);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   const { persistedCount, autoCount } = useMemo(() => {
     let p = 0;
     let a = 0;
@@ -438,7 +549,7 @@ export function LotMap() {
     let maxX = 920;
     let maxY = 720;
 
-    displayGeometries.forEach((g) => {
+    renderedGeometries.forEach((g) => {
       g.puntos.forEach((p) => {
         if (p.x + 40 > maxX) maxX = Math.ceil(p.x + 40);
         if (p.y + 40 > maxY) maxY = Math.ceil(p.y + 40);
@@ -456,12 +567,12 @@ export function LotMap() {
       width: Math.max(920, maxX),
       height: Math.max(720, maxY)
     };
-  }, [displayGeometries, planDetail]);
+  }, [renderedGeometries, planDetail]);
 
   const manzanaLabels = useMemo(() => {
     const rows = new Map<string, number[]>();
 
-    displayGeometries.forEach((geom) => {
+    renderedGeometries.forEach((geom) => {
       const lote = lots.find((l) => l.idLote === geom.idLote);
       const manzanaCode = lote?.nombreManzana || lote?.codigoManzana;
 
@@ -480,7 +591,7 @@ export function LotMap() {
         y: ys.reduce((sum, value) => sum + value, 0) / ys.length
       }))
       .sort((a, b) => a.y - b.y);
-  }, [displayGeometries, lots]);
+  }, [renderedGeometries, lots]);
 
   const planSubtitleText = useMemo(() => {
     if (planDetail?.plano) {
@@ -558,12 +669,53 @@ export function LotMap() {
       <div>
         <PageHeader
           title="Plano interactivo"
-          description="Consulta la disponibilidad del inventario por etapa y manzana."
-        />
-        <EmptyState
-          title="Sin proyectos activos"
-          description="No se encontraron proyectos activos registrados en el sistema."
-          icon={MapPinIcon}
+          description="Consulta la disponibilidad del inventario por etapa y manzana. Selecciona un lote para ver su información comercial."
+          meta={
+            currentProject ? (
+              <>
+                <Badge tone="brand">{currentProject.nombre}</Badge>
+                <span className="text-[12px] text-brand-400">
+                  {number(lots.length)} lotes ·{' '}
+                  {currentProject.distrito ||
+                    currentProject.provincia ||
+                    'Ubicación n/d'}
+                </span>
+              </>
+            ) : undefined
+          }
+          actions={
+            canConfigurePlan ? (
+              isEditingPlan ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    icon={XIcon}
+                    onClick={handleCancelPlanEditing}
+                    disabled={savingPlan}
+                    className="border-brand-200 text-brand-700 hover:bg-brand-50"
+                  >
+                    Cancelar
+                  </Button>
+
+                  <Button
+                    icon={SaveIcon}
+                    onClick={handleSavePlan}
+                    disabled={savingPlan}
+                    className="bg-brand-900 text-white hover:bg-brand-800"
+                  >
+                    {savingPlan ? 'Guardando...' : 'Guardar cambios'}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  icon={Settings2Icon}
+                  onClick={() => setIsEditingPlan(true)}
+                  className="border-brand-200 text-brand-800 hover:bg-brand-50"
+                >
+                  Configurar plano
+                </Button>
+              )
+            ) : undefined
+          }
         />
       </div>
     );
@@ -582,6 +734,39 @@ export function LotMap() {
                 {number(lots.length)} lotes · {currentProject.distrito || currentProject.provincia || 'Ubicación n/d'}
               </span>
             </>
+          ) : undefined
+        }
+        actions={
+          canConfigurePlan ? (
+            isEditingPlan ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  icon={XIcon}
+                  onClick={handleCancelPlanEditing}
+                  disabled={savingPlan}
+                  className="border-brand-200 text-brand-700 hover:bg-brand-50"
+                >
+                  Cancelar
+                </Button>
+
+                <Button
+                  icon={SaveIcon}
+                  onClick={handleSavePlan}
+                  disabled={savingPlan}
+                  className="bg-brand-900 text-white hover:bg-brand-800"
+                >
+                  {savingPlan ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                icon={Settings2Icon}
+                onClick={() => setIsEditingPlan(true)}
+                className="border-brand-200 text-brand-800 hover:bg-brand-50"
+              >
+                Configurar plano
+              </Button>
+            )
           ) : undefined
         }
       />
@@ -737,7 +922,7 @@ export function LotMap() {
                     ))}
 
                     {/* Lotes */}
-                    {displayGeometries.map((geom) => {
+                    {renderedGeometries.map((geom: DisplayGeometria) => {
                       const lote = lots.find((l) => l.idLote === geom.idLote);
                       const isMatch = filteredLotIds.has(geom.idLote);
                       const isSelected = selectedLotId === geom.idLote;

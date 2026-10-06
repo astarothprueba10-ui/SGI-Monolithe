@@ -23,76 +23,63 @@ import java.util.List;
 @Validated
 public class PlanoInteractivoController {
 
-    private final PlanoInteractivoService planoInteractivoService;
+        private final PlanoInteractivoService planoInteractivoService;
 
-    @PostMapping
-    @PreAuthorize("hasAuthority('lots.edit')")
-    public ResponseEntity<PlanoInteractivoResponse> crearVersion(
-            @Valid @RequestBody PlanoInteractivoRequest request
-    ) {
-        PlanoInteractivoResponse response =
-                planoInteractivoService.crearVersion(request);
+        @PostMapping
+        @PreAuthorize("hasAuthority('lots.configure')")
+        public ResponseEntity<PlanoInteractivoResponse> crearVersion(
+                        @Valid @RequestBody PlanoInteractivoRequest request) {
+                PlanoInteractivoResponse response = planoInteractivoService.crearVersion(request);
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
-    }
+                return ResponseEntity
+                                .status(HttpStatus.CREATED)
+                                .body(response);
+        }
 
-    @GetMapping("/proyecto/{idProyecto}")
-    @PreAuthorize("hasAuthority('lots.view')")
-    public ResponseEntity<List<PlanoInteractivoResponse>> listarPorProyecto(
-            @PathVariable @Positive Long idProyecto
-    ) {
-        return ResponseEntity.ok(
-                planoInteractivoService.listarPorProyecto(idProyecto)
-        );
-    }
+        @GetMapping("/proyecto/{idProyecto}")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<List<PlanoInteractivoResponse>> listarPorProyecto(
+                        @PathVariable @Positive Long idProyecto) {
+                return ResponseEntity.ok(
+                                planoInteractivoService.listarPorProyecto(idProyecto));
+        }
 
-    @GetMapping("/proyecto/{idProyecto}/vigente")
-    @PreAuthorize("hasAuthority('lots.view')")
-    public ResponseEntity<PlanoInteractivoResponse> obtenerVigente(
-            @PathVariable @Positive Long idProyecto,
-            @RequestParam(required = false) @Positive Long idEtapa
-    ) {
-        return ResponseEntity.ok(
-                planoInteractivoService.obtenerVigente(
-                        idProyecto,
-                        idEtapa
-                )
-        );
-    }
+        @GetMapping("/proyecto/{idProyecto}/vigente")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<PlanoInteractivoResponse> obtenerVigente(
+                        @PathVariable @Positive Long idProyecto,
+                        @RequestParam(required = false) @Positive Long idEtapa) {
+                return ResponseEntity.ok(
+                                planoInteractivoService.obtenerVigente(
+                                                idProyecto,
+                                                idEtapa));
+        }
 
-    @GetMapping("/proyecto/{idProyecto}/detalle-vigente")
-    @PreAuthorize("hasAuthority('lots.view')")
-    public ResponseEntity<PlanoInteractivoDetalleResponse> obtenerDetalleVigente(
-            @PathVariable @Positive Long idProyecto,
-            @RequestParam(required = false) @Positive Long idEtapa
-    ) {
-        return ResponseEntity.ok(
-                planoInteractivoService.obtenerDetalleVigente(
-                        idProyecto,
-                        idEtapa
-                )
-        );
-    }
+        @GetMapping("/proyecto/{idProyecto}/detalle-vigente")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<PlanoInteractivoDetalleResponse> obtenerDetalleVigente(
+                        @PathVariable @Positive Long idProyecto,
+                        @RequestParam(required = false) @Positive Long idEtapa) {
+                return ResponseEntity.ok(
+                                planoInteractivoService.obtenerDetalleVigente(
+                                                idProyecto,
+                                                idEtapa));
+        }
 
-    @PutMapping("/geometrias")
-    @PreAuthorize("hasAuthority('lots.edit')")
-    public ResponseEntity<LoteGeometriaResponse> guardarGeometria(
-            @Valid @RequestBody LoteGeometriaRequest request
-    ) {
-        return ResponseEntity.ok(
-                planoInteractivoService.guardarGeometria(request)
-        );
-    }
+        @PutMapping("/geometrias")
+        @PreAuthorize("hasAuthority('lots.configure')")
+        public ResponseEntity<LoteGeometriaResponse> guardarGeometria(
+                        @Valid @RequestBody LoteGeometriaRequest request) {
+                return ResponseEntity.ok(
+                                planoInteractivoService.guardarGeometria(request));
+        }
 
-    @DeleteMapping("/geometrias/{idLoteGeometria}")
-    @PreAuthorize("hasAuthority('lots.edit')")
-    public ResponseEntity<Void> desactivarGeometria(
-            @PathVariable @Positive Long idLoteGeometria
-    ) {
-        planoInteractivoService.desactivarGeometria(idLoteGeometria);
+        @DeleteMapping("/geometrias/{idLoteGeometria}")
+@PreAuthorize("hasAuthority('lots.configure')")
+        public ResponseEntity<Void> desactivarGeometria(
+                        @PathVariable @Positive Long idLoteGeometria) {
+                planoInteractivoService.desactivarGeometria(idLoteGeometria);
 
-        return ResponseEntity.noContent().build();
-    }
+                return ResponseEntity.noContent().build();
+        }
 }
