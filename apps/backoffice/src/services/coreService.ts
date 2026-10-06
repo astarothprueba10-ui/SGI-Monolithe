@@ -1,6 +1,7 @@
 import { coreApi } from '../lib/apiClient';
 import type {
   ProyectoResponse,
+  ProyectoRequest,
   EtapaResponse,
   ZonaResponse,
   ManzanaResponse,
@@ -57,6 +58,12 @@ export const coreService = {
   },
   getProjectById(idProyecto: number): Promise<ProyectoResponse> {
     return coreApi.get<ProyectoResponse>(`/proyectos/${idProyecto}`);
+  },
+  createProject(data: ProyectoRequest): Promise<ProyectoResponse> {
+    return coreApi.post<ProyectoResponse>('/proyectos', data);
+  },
+  updateProject(idProyecto: number, data: ProyectoRequest): Promise<ProyectoResponse> {
+    return coreApi.put<ProyectoResponse>(`/proyectos/${idProyecto}`, data);
   },
 
   // Etapas

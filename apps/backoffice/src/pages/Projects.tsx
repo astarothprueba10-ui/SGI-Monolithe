@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DownloadIcon, MapIcon, PlusIcon, SlidersHorizontalIcon, Building2Icon, CalendarIcon, Maximize2Icon, MapPinIcon } from 'lucide-react';
+import {
+  DownloadIcon,
+  MapIcon,
+  PlusIcon,
+  SlidersHorizontalIcon,
+  Building2Icon,
+  CalendarIcon,
+  Maximize2Icon,
+  MapPinIcon,
+  PencilIcon
+} from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button, IconButton } from '../components/ui/Button';
@@ -13,6 +23,7 @@ import { EmptyState } from '../components/ui/Feedback';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { coreService } from '../services/coreService';
+import { ProjectFormModal } from '../components/projects/ProjectFormModal';
 import { number } from '../utils/format';
 import type {
   ProyectoResponse,
@@ -25,6 +36,8 @@ const PAGE_SIZE = 12;
 export function Projects() {
   const { can } = useAuth();
   const canViewLots = can('lots.view');
+  const canCreate = can('projects.create');
+  const canEdit = can('projects.edit');
 
   const [tab, setTab] = useState('proyectos');
   const [query, setQuery] = useState('');
@@ -44,41 +57,37 @@ export function Projects() {
   const [lotsError, setLotsError] = useState<string | null>(null);
   const [hasLoadedLots, setHasLoadedLots] = useState(false);
 
-  // 1. Debounce de búsqueda (400 ms)
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProyectoResponse | null>(null);
+
+  // ---------- Debounce 400 ms ----------
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(query);
     }, 400);
-
-    return () => {
-      clearTimeout(handler);
-    };
+    return () => clearTimeout(handler);
   }, [query]);
 
-  // Carga inicial de proyectos
-  useEffect(() => {
-    let mounted = true;
-    async function loadProjects() {
-      setProjectsLoading(true);
-      setProjectsError(null);
-      try {
-        const res = await coreService.getProjects();
-        if (mounted) setProjects(res);
-      } catch (err: any) {
-        if (mounted) {
-          setProjectsError(err.message || 'Error al cargar proyectos desde core-service');
-        }
-      } finally {
-        if (mounted) setProjectsLoading(false);
-      }
+  // ---------- Cargar proyectos ----------
+  const loadProjects = useCallback(async () => {
+    setProjectsLoading(true);
+    setProjectsError(null);
+    try {
+      const res = await coreService.getProjects();
+      setProjects(res);
+    } catch (err: any) {
+      setProjectsError(err.message || 'Error al cargar proyectos desde core-service');
+    } finally {
+      setProjectsLoading(false);
     }
-    loadProjects();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
-  // Carga y búsqueda de lotes usando debouncedQuery
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  // ---------- Cargar lotes ----------
   useEffect(() => {
     let mounted = true;
     if (tab !== 'lotes' || !canViewLots) return;
@@ -115,23 +124,35 @@ export function Projects() {
     };
   }, [tab, canViewLots, projectId, statusId, debouncedQuery]);
 
+  // ---------- Handlers ----------
+  const handleOpenCreate = () => {
+    setEditingProject(null);
+    setModalOpen(true);
+  };
+
+  const handleOpenEdit = (project: ProyectoResponse) => {
+    setEditingProject(project);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setEditingProject(null);
+  };
+
+  const handleModalSuccess = useCallback(async () => {
+    await loadProjects();
+  }, [loadProjects]);
+
+  // ---------- Derived ----------
   const pagedLots = useMemo(() => {
     return lots.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [lots, page]);
 
   const tabItems = useMemo(() => {
-    const items: Array<{
-      id: string;
-      label: string;
-      count?: number;
-    }> = [
-      {
-        id: 'proyectos',
-        label: 'Proyectos',
-        count: projects.length
-      }
+    const items: Array<{ id: string; label: string; count?: number }> = [
+      { id: 'proyectos', label: 'Proyectos', count: projects.length }
     ];
-
     if (canViewLots) {
       items.push({
         id: 'lotes',
@@ -139,12 +160,18 @@ export function Projects() {
         count: hasLoadedLots ? lots.length : undefined
       });
     }
-
     return items;
   }, [projects.length, canViewLots, hasLoadedLots, lots.length]);
 
   return (
     <div>
+      <ProjectFormModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+        project={editingProject}
+      />
+
       <div className="border-l-4 border-[#4cbb17] pl-3.5 mb-6">
         <PageHeader
           title="Proyectos y lotes"
@@ -161,14 +188,15 @@ export function Projects() {
                   Exportar
                 </Button>
               </Gate>
-              <Gate permission="projects.create">
+              {canCreate && (
                 <Button
                   icon={PlusIcon}
+                  onClick={handleOpenCreate}
                   className="bg-brand-900 text-white hover:bg-brand-800 border border-[#4cbb17]/40 shadow-sm"
                 >
                   Nuevo proyecto
                 </Button>
-              </Gate>
+              )}
             </>
           }
         />
@@ -235,7 +263,9 @@ export function Projects() {
                           {project.nombreEstadoProyecto ?? 'Activo'}
                         </span>
                       ) : (
-                        <Badge tone="neutral">Inactivo</Badge>
+                        <Badge tone="neutral">
+                          {project.nombreEstadoProyecto ?? 'Inactivo'}
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -286,11 +316,16 @@ export function Projects() {
                           Ver plano
                         </Button>
                       </Link>
-                      <Gate permission="projects.edit">
-                        <Button size="sm" variant="secondary" className="border-brand-200 text-brand-800 hover:bg-brand-50">
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          icon={PencilIcon}
+                          onClick={() => handleOpenEdit(project)}
+                          className="border-brand-700 text-brand-700 hover:bg-brand-50"
+                        >
                           Editar
                         </Button>
-                      </Gate>
+                      )}
                     </div>
                   </div>
                 </Card>
