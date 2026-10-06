@@ -1,253 +1,239 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { DownloadIcon, MapIcon, PlusIcon, SlidersHorizontalIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  DownloadIcon,
+  MapIcon,
+  PlusIcon,
+  Building2Icon,
+  CalendarIcon,
+  Maximize2Icon,
+  MapPinIcon,
+  PencilIcon
+} from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
-import { Card, CardHeader } from '../components/ui/Card';
-import { Button, IconButton } from '../components/ui/Button';
-import { SearchInput, Select } from '../components/ui/Field';
-import { Table, TD, TH, TR } from '../components/ui/Table';
-import { StatusBadge, Badge } from '../components/ui/Badge';
-import { Tabs } from '../components/ui/Tabs';
-import { Pagination } from '../components/ui/Pagination';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/Feedback';
 import { Gate } from '../components/auth/PermissionRoute';
-import { LOTS, PROJECTS } from '../data/projects';
-import { lotsService } from '../services/lotsService';
-import { currency, number } from '../utils/format';
-import type { Lot, LotStatus, Project } from '../types';
-
-const PAGE_SIZE = 12;
+import { useAuth } from '../contexts/AuthContext';
+import { coreService } from '../services/coreService';
+import { ProjectFormModal } from '../components/projects/ProjectFormModal';
+import { number } from '../utils/format';
+import type { ProyectoResponse } from '../types/core';
 
 export function Projects() {
-  const [tab, setTab] = useState('proyectos');
-  const [query, setQuery] = useState('');
-  const [projectId, setProjectId] = useState('all');
-  const [status, setStatus] = useState<'all' | LotStatus>('all');
-  const [page, setPage] = useState(1);
-  const [allLots, setAllLots] = useState<Lot[]>(LOTS);
-  const [allProjects, setAllProjects] = useState<Project[]>(PROJECTS);
+  const navigate = useNavigate();
+  const { can } = useAuth();
+  const canCreate = can('projects.create');
+  const canEdit = can('projects.edit');
 
-  useEffect(() => {
-    lotsService.getLots().then((liveLots) => {
-      if (liveLots.length > 0) setAllLots(liveLots);
-    });
-    lotsService.getProjects().then((liveProjects) => {
-      if (liveProjects.length > 0) setAllProjects(liveProjects);
-    });
+  const [projects, setProjects] = useState<ProyectoResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Project Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProyectoResponse | null>(null);
+
+  const loadProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await coreService.getProjects();
+      setProjects(res);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar proyectos desde core-service');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const lots = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return allLots.filter((lot) => {
-      const byProject = projectId === 'all' || lot.projectId === projectId;
-      const byStatus = status === 'all' || lot.status === status;
-      const byQuery =
-      q.length === 0 ||
-      lot.code.toLowerCase().includes(q) ||
-      lot.block.toLowerCase().includes(q) ||
-      (lot.client ?? '').toLowerCase().includes(q);
-      return byProject && byStatus && byQuery;
-    });
-  }, [allLots, query, projectId, status]);
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
-  const paged = lots.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const handleOpenCreate = () => {
+    setEditingProject(null);
+    setModalOpen(true);
+  };
+
+  const handleOpenEdit = (e: React.MouseEvent, project: ProyectoResponse) => {
+    e.stopPropagation();
+    setEditingProject(project);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setEditingProject(null);
+  };
+
+  const handleModalSuccess = useCallback(async () => {
+    await loadProjects();
+  }, [loadProjects]);
+
+  const handleCardClick = (idProyecto: number) => {
+    navigate(`/proyectos/${idProyecto}`);
+  };
 
   return (
     <div>
-      <PageHeader
-        title="Proyectos y lotes"
-        description="Administra proyectos, etapas, manzanas, tipos de lote, precios y estados de disponibilidad."
-        actions={
-        <>
-            <Link to="/plano">
-              <Button icon={MapIcon}>Plano interactivo</Button>
-            </Link>
-            <Gate permission="projects.export">
-              <Button icon={DownloadIcon}>Exportar</Button>
-            </Gate>
-            <Gate permission="projects.create">
-              <Button icon={PlusIcon} variant="primary">
-                Nuevo proyecto
-              </Button>
-            </Gate>
-          </>
-        } />
-      
+      <ProjectFormModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+        project={editingProject}
+      />
 
-      <Tabs
-        className="mb-5"
-        active={tab}
-        onChange={(id) => {
-          setTab(id);
-          setPage(1);
-        }}
-        items={[
-        { id: 'proyectos', label: 'Proyectos', count: PROJECTS.length },
-        { id: 'lotes', label: 'Lotes', count: LOTS.length }]
-        } />
-      
-
-      {tab === 'proyectos' ?
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {allProjects.map((project) => {
-          const soldPct = Math.round(project.sold / project.totalLots * 100);
-          return (
-            <Card key={project.id} className="flex flex-col">
-                <CardHeader
-                title={project.name}
-                description={`${project.district} · ${project.stages} etapas · ${project.blocks} manzanas`}
-                actions={<StatusBadge status={project.status} />} />
-              
-                <div className="grid grid-cols-4 divide-x divide-brand-50 border-b border-brand-100">
-                  {[
-                { label: 'Total', value: number(project.totalLots) },
-                { label: 'Disponibles', value: number(project.available) },
-                { label: 'Separados', value: number(project.reserved) },
-                { label: 'Vendidos', value: number(project.sold) }].
-                map((item) =>
-                <div key={item.label} className="px-4 py-3">
-                      <p className="text-[11px] text-brand-400">{item.label}</p>
-                      <p className="mt-0.5 text-[16px] font-semibold tabular text-brand-900">
-                        {item.value}
-                      </p>
-                    </div>
-                )}
-                </div>
-                <div className="flex flex-1 flex-col px-5 py-4">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[12px] text-brand-400">Avance de venta</p>
-                    <p className="text-[13px] font-semibold tabular text-brand-800">{soldPct}%</p>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-brand-50">
-                    <span
-                    className="block h-full rounded-full bg-brand-700"
-                    style={{ width: `${soldPct}%` }} />
-                  
-                  </div>
-                  <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-                    <div>
-                      <p className="text-[11px] text-brand-400">Precio desde</p>
-                      <p className="text-[15px] font-semibold tabular text-brand-900">
-                        {currency(project.priceFrom)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link to="/plano">
-                        <Button size="sm" icon={MapIcon}>
-                          Ver plano
-                        </Button>
-                      </Link>
-                      <Gate permission="projects.edit">
-                        <Button size="sm" variant="secondary">
-                          Editar
-                        </Button>
-                      </Gate>
-                    </div>
-                  </div>
-                </div>
-              </Card>);
-
-        })}
-        </div> :
-
-      <Card>
-          <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
-            <SearchInput
-            value={query}
-            onValueChange={(v) => {
-              setQuery(v);
-              setPage(1);
-            }}
-            placeholder="Buscar por lote, manzana o titular…"
-            className="w-full sm:w-72" />
-          
-            <Select
-            value={projectId}
-            onChange={(e) => {
-              setProjectId(e.target.value);
-              setPage(1);
-            }}
-            aria-label="Filtrar por proyecto"
-            className="w-[180px]">
-            
-              <option value="all">Todos los proyectos</option>
-              {allProjects.map((p) =>
-            <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-            )}
-            </Select>
-            <Select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as 'all' | LotStatus);
-              setPage(1);
-            }}
-            aria-label="Filtrar por estado"
-            className="w-[160px]">
-            
-              <option value="all">Todos los estados</option>
-              <option value="Disponible">Disponible</option>
-              <option value="Separado">Separado</option>
-              <option value="Vendido">Vendido</option>
-            </Select>
-            <IconButton
-            icon={SlidersHorizontalIcon}
-            label="Más filtros"
-            className="ml-auto border border-brand-200" />
-          
-          </div>
-
-          {paged.length === 0 ?
-        <EmptyState
-          title="Sin resultados"
-          description="No encontramos lotes con los filtros aplicados." /> :
-
-
-        <>
-              <Table
-            head={
+      <div className="border-l-4 border-[#4cbb17] pl-3.5 mb-6">
+        <PageHeader
+          title="Proyectos"
+          description="Consulta y gestiona los proyectos de habilitación urbana."
+          actions={
             <>
-                    <TH>Lote</TH>
-                    <TH>Proyecto</TH>
-                    <TH>Etapa / Manzana</TH>
-                    <TH>Tipo</TH>
-                    <TH align="right">Área</TH>
-                    <TH align="right">Precio</TH>
-                    <TH>Titular</TH>
-                    <TH>Estado</TH>
-                  </>
-            }>
-            
-                {paged.map((lot) =>
-            <TR key={lot.id}>
-                    <TD className="font-medium text-brand-900">{lot.code}</TD>
-                    <TD>{PROJECTS.find((p) => p.id === lot.projectId)?.name}</TD>
-                    <TD className="text-brand-500">
-                      {lot.stage} · {lot.block}
-                    </TD>
-                    <TD>
-                      <Badge tone="neutral">{lot.type}</Badge>
-                    </TD>
-                    <TD align="right">{lot.area} m²</TD>
-                    <TD align="right">{currency(lot.price)}</TD>
-                    <TD className="text-brand-500">{lot.client ?? '—'}</TD>
-                    <TD>
-                      <StatusBadge status={lot.status} />
-                    </TD>
-                  </TR>
-            )}
-              </Table>
-              <Pagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={lots.length}
-            onPageChange={setPage} />
-          
+              <Link to="/plano">
+                <Button icon={MapIcon} className="border-brand-200 text-brand-800 hover:bg-brand-50">
+                  Plano interactivo
+                </Button>
+              </Link>
+              <Gate permission="projects.export">
+                <Button icon={DownloadIcon} className="border-brand-200 text-brand-800 hover:bg-brand-50">
+                  Exportar
+                </Button>
+              </Gate>
+              {canCreate && (
+                <Button
+                  icon={PlusIcon}
+                  onClick={handleOpenCreate}
+                  className="bg-brand-900 text-white hover:bg-brand-800 border border-[#4cbb17]/40 shadow-sm"
+                >
+                  Nuevo proyecto
+                </Button>
+              )}
             </>
-        }
-        </Card>
-      }
-    </div>);
+          }
+        />
+      </div>
 
+      {error && (
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-semibold">Error al cargar proyectos:</p>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-brand-100 bg-white">
+          <p className="text-sm font-medium text-brand-600">Cargando proyectos desde core-service...</p>
+        </div>
+      ) : projects.length === 0 ? (
+        <EmptyState
+          title="Sin proyectos"
+          description="No se encontraron proyectos disponibles en el sistema."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {projects.map((project) => (
+            <Card
+              key={project.idProyecto}
+              onClick={() => handleCardClick(project.idProyecto)}
+              className="flex flex-col border-[#4cbb17] shadow-card bg-white cursor-pointer transition-all hover:shadow-md hover:border-brand-400 group"
+              style={{ borderColor: '#4cbb17' }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brand-100 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Building2Icon className="h-4 w-4 text-brand-600 shrink-0 group-hover:text-brand-900 transition-colors" />
+                    <h3 className="text-base font-semibold text-brand-900 truncate group-hover:text-brand-700 transition-colors">
+                      {project.nombre}
+                    </h3>
+                    <span className="inline-flex items-center rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                      {project.codigo}
+                    </span>
+                  </div>
+                  <p className="mt-1 flex items-center gap-1 text-[13px] text-brand-500">
+                    <MapPinIcon className="h-3.5 w-3.5 text-brand-400 shrink-0" />
+                    {project.distrito ?? '—'}{project.provincia ? `, ${project.provincia}` : ''}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  {project.activo ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4cbb17]/40 bg-[#4cbb17]/10 px-2.5 py-0.5 text-xs font-semibold text-[#2d7a0c]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4cbb17]"></span>
+                      {project.nombreEstadoProyecto ?? 'Activo'}
+                    </span>
+                  ) : (
+                    <Badge tone="neutral">
+                      {project.nombreEstadoProyecto ?? 'Inactivo'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-b border-brand-100 px-5 py-3.5 sm:grid-cols-4 bg-brand-50/40">
+                <div>
+                  <p className="text-[11px] font-medium text-brand-500 flex items-center gap-1">
+                    <Maximize2Icon className="h-3 w-3 text-brand-400" />
+                    Área total
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-semibold text-brand-900">
+                    {project.areaTotalM2 ? `${number(project.areaTotalM2)} m²` : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-brand-500">Departamento</p>
+                  <p className="mt-0.5 text-[14px] font-semibold text-brand-900">
+                    {project.departamento ?? '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-brand-500 flex items-center gap-1">
+                    <CalendarIcon className="h-3 w-3 text-brand-400" />
+                    Inicio
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-semibold text-brand-900">
+                    {project.fechaInicio ?? '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-brand-500 flex items-center gap-1">
+                    <CalendarIcon className="h-3 w-3 text-brand-400" />
+                    Fin Est.
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-semibold text-brand-900">
+                    {project.fechaFinEstimada ?? '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-1 flex-col px-5 py-4">
+                {project.descripcion && (
+                  <p className="text-xs text-brand-600 mb-4 line-clamp-2">{project.descripcion}</p>
+                )}
+                <div className="mt-auto flex items-center justify-end gap-2 pt-2">
+                  <Link to="/plano" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" icon={MapIcon} className="border-brand-200 text-brand-800 hover:bg-brand-50">
+                      Ver plano
+                    </Button>
+                  </Link>
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      icon={PencilIcon}
+                      onClick={(e) => handleOpenEdit(e, project)}
+                      className="border-brand-700 text-brand-700 hover:bg-brand-50"
+                    >
+                      Editar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
