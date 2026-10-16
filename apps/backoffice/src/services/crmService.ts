@@ -112,6 +112,8 @@ function mapRawToLead(raw: RawProspecto): Lead {
     stage: stageMap[raw.estado_codigo] || 'Nuevo',
     score: raw.puntuacion || 'Medio',
     advisor: raw.asesor_nombre,
+    personaId: Number(raw.id_persona),
+    advisorId: raw.id_asesor ? Number(raw.id_asesor) : null,
     createdAt: new Date(raw.fecha_registro).toLocaleDateString('es-PE'),
     lastContact: raw.ultimo_contacto
   };

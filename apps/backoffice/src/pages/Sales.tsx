@@ -15,7 +15,8 @@ import { SALES } from '../data/sales';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
 import { lotsService } from '../services/lotsService';
-import type { Sale, Lot } from '../types';
+import { crmService } from '../services/crmService';
+import type { Sale, Lot, Lead } from '../types';
 
 export function Sales() {
   const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
@@ -26,12 +27,16 @@ export function Sales() {
   const [loading, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [opType, setOpType] = useState<'Separacion' | 'Venta'>('Separacion');
   const [availableLots, setAvailableLots] = useState<Lot[]>([]);
+  const [leadsList, setLeadsList] = useState<Lead[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState('');
   const [formLotId, setFormLotId] = useState('');
   const [formModality, setFormModality] = useState<'Contado' | 'Financiado'>('Contado');
   const [formTotal, setFormTotal] = useState('108000');
   const [formInitial, setFormInitial] = useState('21600');
   const [formInstallments, setFormInstallments] = useState('36');
+  const [formObservations, setFormObservations] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSalesData = async () => {
@@ -52,12 +57,20 @@ export function Sales() {
     }
   };
 
-  const loadLotsForSale = async () => {
+  const loadFormData = async () => {
     try {
-      const lots = await lotsService.getLots();
-      setAvailableLots(lots.filter((l) => l.status === 'Disponible'));
+      const [lots, leads] = await Promise.all([
+        lotsService.getLots(),
+        crmService.getLeads()
+      ]);
+      setAvailableLots(lots.filter((l) => l.status === 'Disponible' || l.status === 'Separado'));
+      const validLeads = leads.filter((l) => l.personaId);
+      setLeadsList(validLeads.length > 0 ? validLeads : leads);
+      if (validLeads.length > 0) {
+        setSelectedLeadId(validLeads[0].id);
+      }
     } catch (err: any) {
-      console.error('Error al cargar lotes:', err.message);
+      console.error('Error al cargar datos del formulario:', err.message);
     }
   };
 
@@ -66,8 +79,17 @@ export function Sales() {
   }, []);
 
   const handleOpenModal = () => {
-    loadLotsForSale();
+    loadFormData();
     setIsModalOpen(true);
+  };
+
+  const handleSelectLot = (lotIdStr: string) => {
+    setFormLotId(lotIdStr);
+    const found = availableLots.find((l) => l.id === lotIdStr);
+    if (found && found.price) {
+      setFormTotal(found.price.toString());
+      setFormInitial((found.price * 0.2).toFixed(0));
+    }
   };
 
   const handleExpireOverdue = async () => {
@@ -80,37 +102,63 @@ export function Sales() {
     }
   };
 
-  const handleFormalizeSale = async (e: React.FormEvent) => {
+  const submitSeparation = async (lotIdNum: number, personaId: number) => {
+    const res = await salesService.registerSeparation({
+      lotId: lotIdNum,
+      personaId,
+      observations: formObservations || 'Separacion registrada desde Backoffice'
+    });
+    toast.success(`Separacion registrada exitosamente (#${res.id_reserva}). Vigencia: 7 dias.`);
+  };
+
+  const submitCashSale = async (lotIdNum: number, personaId: number, advisorId?: number | null) => {
+    const res = await salesService.formalizeCashSale({
+      lotId: lotIdNum,
+      personaId,
+      advisorId,
+      totalAmount: parseFloat(formTotal),
+      observations: formObservations || 'Venta al contado formalizada'
+    });
+    toast.success(`Venta al contado formalizada: ${res.codigo_venta}`);
+  };
+
+  const submitFinancedSale = async (lotIdNum: number, personaId: number, advisorId?: number | null) => {
+    const res = await salesService.formalizeFinancedSale({
+      lotId: lotIdNum,
+      personaId,
+      advisorId,
+      totalAmount: parseFloat(formTotal),
+      downPayment: parseFloat(formInitial),
+      installmentsCount: parseInt(formInstallments, 10),
+      observations: formObservations || 'Venta financiada formalizada'
+    });
+    toast.success(`Venta financiada: ${res.codigo_venta} (${res.numero_cuotas} cuotas)`);
+  };
+
+  const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formLotId) {
       toast.error('Por favor seleccione un lote');
       return;
     }
+    const lead = leadsList.find((l) => l.id === selectedLeadId);
+    const personaId = lead?.personaId || 13;
+    const advisorId = lead?.advisorId || null;
+    const lotIdNum = parseInt(formLotId, 10);
+
     setSubmitting(true);
     try {
-      const lotIdNum = parseInt(formLotId, 10);
-      const totalNum = parseFloat(formTotal);
-      if (formModality === 'Contado') {
-        await salesService.formalizeCashSale({
-          lotId: lotIdNum,
-          personaId: 13,
-          totalAmount: totalNum
-        });
-        toast.success('Venta al contado formalizada exitosamente');
+      if (opType === 'Separacion') {
+        await submitSeparation(lotIdNum, personaId);
+      } else if (formModality === 'Contado') {
+        await submitCashSale(lotIdNum, personaId, advisorId);
       } else {
-        await salesService.formalizeFinancedSale({
-          lotId: lotIdNum,
-          personaId: 13,
-          totalAmount: totalNum,
-          downPayment: parseFloat(formInitial),
-          installmentsCount: parseInt(formInstallments, 10)
-        });
-        toast.success('Venta financiada y cronograma generados exitosamente');
+        await submitFinancedSale(lotIdNum, personaId, advisorId);
       }
       setIsModalOpen(false);
       await fetchSalesData();
     } catch (err: any) {
-      toast.error('Error al formalizar: ' + err.message);
+      toast.error('Error al procesar operacion: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -289,31 +337,62 @@ export function Sales() {
         ) : null}
       </Modal>
 
-      {/* Modal Formalizar Nueva Operacion */}
+      {/* Modal Operación Inmobiliaria: Separación o Venta */}
       <Modal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Formalización de Venta / Separación"
-        description="Formaliza una venta con contrato de compraventa y cronograma en Supabase."
+        title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
+        description="Selecciona prospecto, lote y condiciones comerciales para registrar en Supabase."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" disabled={submitting} onClick={handleFormalizeSale}>
-              {submitting ? 'Procesando…' : 'Formalizar Operación'}
+            <Button variant="primary" disabled={submitting} onClick={handleProcessOperation}>
+              {submitting ? 'Procesando…' : opType === 'Separacion' ? 'Registrar Separación' : 'Formalizar Venta'}
             </Button>
           </div>
         }
       >
-        <form onSubmit={handleFormalizeSale} className="space-y-4">
+        <form onSubmit={handleProcessOperation} className="space-y-4">
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">Lote</label>
-            <Select value={formLotId} onChange={(e) => setFormLotId(e.target.value)}>
-              <option value="">Seleccione un lote disponible…</option>
-              {availableLots.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.code} ({l.block}) - {l.area}m² - {currency(l.price || 108000)}
+            <label className="mb-1 block text-[12px] font-medium text-brand-700">
+              Tipo de Operación
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setOpType('Separacion')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
+                  opType === 'Separacion'
+                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                }`}
+              >
+                Separación (S/ 500)
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpType('Venta')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
+                  opType === 'Venta'
+                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                }`}
+              >
+                Venta (Contado / Financiada)
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-brand-700">
+              Prospecto / Comprador (CRM)
+            </label>
+            <Select value={selectedLeadId} onChange={(e) => setSelectedLeadId(e.target.value)}>
+              {leadsList.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.name} {lead.document ? `(DNI/RUC: ${lead.document})` : ''} - {lead.status}
                 </option>
               ))}
             </Select>
@@ -321,56 +400,93 @@ export function Sales() {
 
           <div>
             <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Modalidad de Venta
+              Lote Seleccionado
             </label>
-            <Select
-              value={formModality}
-              onChange={(e) => setFormModality(e.target.value as any)}
-            >
-              <option value="Contado">Al Contado</option>
-              <option value="Financiado">Financiamiento Directo</option>
+            <Select value={formLotId} onChange={(e) => handleSelectLot(e.target.value)}>
+              <option value="">Seleccione un lote disponible o reservado…</option>
+              {availableLots.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} ({l.block}) - {l.area}m² - {currency(l.price || 108000)} [{l.status}]
+                </option>
+              ))}
             </Select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Monto Total (PEN)
-            </label>
-            <Input
-              type="number"
-              value={formTotal}
-              onChange={(e) => setFormTotal(e.target.value)}
-            />
-          </div>
-
-          {formModality === 'Financiado' && (
-            <div className="grid grid-cols-2 gap-3">
+          {opType === 'Separacion' ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
+              <p className="font-semibold text-amber-950">Condiciones de Separación:</p>
+              <p>Monto reglamentario: <span className="font-bold">S/ 500.00 PEN</span></p>
+              <p>Plazo de vigencia: <span className="font-bold">7 días calendario</span> (vence automáticamente si no se formaliza venta).</p>
+              <p>El lote cambiará a estado <span className="font-bold text-amber-800">RESERVADO</span> en el mapa interactivo.</p>
+            </div>
+          ) : (
+            <>
               <div>
                 <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                  Cuota Inicial (PEN)
+                  Modalidad de Venta
+                </label>
+                <Select
+                  value={formModality}
+                  onChange={(e) => setFormModality(e.target.value as any)}
+                >
+                  <option value="Contado">Al Contado</option>
+                  <option value="Financiado">Financiamiento Directo</option>
+                </Select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                  Monto Total (PEN)
                 </label>
                 <Input
                   type="number"
-                  value={formInitial}
-                  onChange={(e) => setFormInitial(e.target.value)}
+                  value={formTotal}
+                  onChange={(e) => setFormTotal(e.target.value)}
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                  Número de Cuotas
-                </label>
-                <Select
-                  value={formInstallments}
-                  onChange={(e) => setFormInstallments(e.target.value)}
-                >
-                  <option value="12">12 meses</option>
-                  <option value="24">24 meses</option>
-                  <option value="36">36 meses</option>
-                  <option value="48">48 meses</option>
-                </Select>
-              </div>
-            </div>
+
+              {formModality === 'Financiado' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                      Cuota Inicial (PEN)
+                    </label>
+                    <Input
+                      type="number"
+                      value={formInitial}
+                      onChange={(e) => setFormInitial(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                      Número de Cuotas
+                    </label>
+                    <Select
+                      value={formInstallments}
+                      onChange={(e) => setFormInstallments(e.target.value)}
+                    >
+                      <option value="12">12 meses</option>
+                      <option value="24">24 meses</option>
+                      <option value="36">36 meses</option>
+                      <option value="48">48 meses</option>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </>
           )}
+
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-brand-700">
+              Observaciones (Opcional)
+            </label>
+            <Input
+              type="text"
+              placeholder="Detalle o nota interna..."
+              value={formObservations}
+              onChange={(e) => setFormObservations(e.target.value)}
+            />
+          </div>
         </form>
       </Modal>
     </div>

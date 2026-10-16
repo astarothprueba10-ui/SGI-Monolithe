@@ -102,6 +102,8 @@ export interface Lead {
   stage: 'Nuevo' | 'Contactado' | 'Visita' | 'Negociación' | 'Convertido' | 'Perdido';
   score: 'Alto' | 'Medio' | 'Bajo';
   advisor: string;
+  personaId?: number;
+  advisorId?: number | null;
   createdAt: string;
   lastContact: string;
 }
