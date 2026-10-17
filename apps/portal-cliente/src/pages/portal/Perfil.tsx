@@ -1,4 +1,3 @@
-import React from 'react';
 import { ShieldCheckIcon, UserRoundIcon } from 'lucide-react';
 import { PageHeader } from '../../components/portal/PageHeader';
 import { Card, CardHeader } from '../../components/ui/Card';

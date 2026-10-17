@@ -1,4 +1,3 @@
-import React from 'react';
 import { manzanaLotes } from '../../data/portal';
 
 const fills: Record<string, string> = {

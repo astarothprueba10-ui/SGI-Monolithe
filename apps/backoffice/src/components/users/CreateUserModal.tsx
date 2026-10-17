@@ -45,7 +45,20 @@ function derivarTipoPersona(user: SecurityUser): TipoPersona {
 }
 
 function extraerPrefijo(usuarioLogin: string): string {
-  return usuarioLogin.replace(/@.*$/, '');
+  return usuarioLogin;
+}
+
+function etiquetaEstadoDocumento(persona: AvailablePerson): string | null {
+  if (!persona.tipoDocumento || !persona.numeroDocumento) {
+    return 'Sin documento principal registrado';
+  }
+  if (!persona.documentoActivo) {
+    return 'Documento inactivo';
+  }
+  if (!persona.documentoVerificado) {
+    return 'Documento pendiente de verificacion';
+  }
+  return null;
 }
 
 async function ejecutarFlujoCreacion(
@@ -178,11 +191,7 @@ export function CreateUserModal({
     setIdPersona('');
     setBusqueda('');
     setCodigoRol('');
-  };
-
-  const handleUsuarioLocalChange = (val: string) => {
-    const clean = val.toLowerCase().replace(/\s+/g, '').replace(/@.*$/, '');
-    setUsuarioLocal(clean);
+    setUsuarioLocal('');
   };
 
   const handleCorreoChange = (val: string) => {
@@ -205,6 +214,16 @@ export function CreateUserModal({
     ? true
     : Boolean(personaSeleccionada?.elegible);
 
+  const documentoListo = modoEdicion
+    ? true
+    : Boolean(personaSeleccionada?.documentoListo);
+
+  const alertaDocumento = personaSeleccionada
+    ? etiquetaEstadoDocumento(personaSeleccionada)
+    : null;
+
+  const loginDerivado = personaSeleccionada?.numeroDocumento ?? '';
+
   const correoValido = correo.length > 0 && validarFormatoCorreo(correo);
 
   const codigoRolEfectivo =
@@ -220,24 +239,43 @@ export function CreateUserModal({
       toast.error('Selecciona una persona elegible.');
       return;
     }
-    if (!usuarioLocal || !rolSeleccionadoValido || !correoValido) {
+
+    if (!modoEdicion && !documentoListo) {
+      toast.error('La documentacion de esta persona no esta lista para crear una cuenta.');
+      return;
+    }
+
+    if (!modoEdicion && !loginDerivado) {
+      toast.error('No se pudo obtener el documento principal de la persona seleccionada.');
+      return;
+    }
+
+    const loginEfectivo = modoEdicion
+      ? usuarioLocal.trim().toLowerCase()
+      : loginDerivado;
+
+    if (modoEdicion && (!/^[a-z0-9._-]{3,120}$/.test(loginEfectivo) || !rolSeleccionadoValido || !correoValido)) {
+      toast.error('Por favor completa todos los campos requeridos con valores validos.');
+      return;
+    }
+
+    if (!modoEdicion && (!rolSeleccionadoValido || !correoValido)) {
       toast.error('Por favor completa todos los campos requeridos con valores validos.');
       return;
     }
 
     setSubmitting(true);
-    const usuarioLogin = `${usuarioLocal.trim()}@monolithe.pe`;
 
     try {
       if (modoEdicion && user) {
-        await ejecutarFlujoEdicion(user, usuarioLogin, correo, codigoRolEfectivo);
+        await ejecutarFlujoEdicion(user, loginEfectivo, correo, codigoRolEfectivo);
         toast.success('Usuario actualizado', {
           description: 'Los cambios se guardaron correctamente.'
         });
       } else {
         await ejecutarFlujoCreacion(
           Number(idPersona),
-          usuarioLogin,
+          loginEfectivo,
           codigoRolEfectivo,
           correo
         );
@@ -284,11 +322,10 @@ export function CreateUserModal({
     }
   };
 
-  const puedeEnviar =
-    !submitting &&
+  const puedeEnviar = !submitting &&
     (modoEdicion || Boolean(idPersona)) &&
     esElegible &&
-    Boolean(usuarioLocal.trim()) &&
+    (modoEdicion ? /^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) : documentoListo) &&
     rolSeleccionadoValido &&
     correoValido;
 
@@ -416,6 +453,13 @@ export function CreateUserModal({
                           </span>
                         )}
 
+                        {p.tipoDocumento && p.numeroDocumento && (
+                          <span className="text-[11px] text-brand-500">
+                            {p.tipoDocumento}: {p.numeroDocumento}
+                            {p.documentoListo ? '' : ' (pendiente)'}
+                          </span>
+                        )}
+
                         {!p.elegible && (
                           <span className="text-[11px] text-rose-500">
                             No elegible
@@ -440,26 +484,50 @@ export function CreateUserModal({
           )}
         </div>
 
-        {/* Usuario corporativo */}
-        <div>
-          <FieldLabel htmlFor="usuarioLocalInput">Usuario corporativo *</FieldLabel>
-          <div className="flex items-center">
-            <Input
-              id="usuarioLocalInput"
-              value={usuarioLocal}
-              onChange={(e) => handleUsuarioLocalChange(e.target.value)}
-              placeholder="nombre.apellido"
-              disabled={submitting}
-              className="rounded-r-none border-r-0"
-            />
-            <span className="inline-flex h-9 items-center rounded-r-md border border-brand-200 bg-brand-50 px-3 text-[13px] text-brand-600 font-medium">
-              @monolithe.pe
-            </span>
+        {/* Documento principal (solo creacion) */}
+        {!modoEdicion && personaSeleccionada && (
+          <div>
+            <FieldLabel>Documento principal</FieldLabel>
+            {alertaDocumento ? (
+              <div className="flex h-9 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-[13px] text-amber-700">
+                <span className="font-medium">Pendiente:</span>
+                <span>{alertaDocumento}</span>
+              </div>
+            ) : (
+              <div className="flex h-9 items-center rounded-md border border-brand-200 bg-brand-50 px-3 text-[13px] text-brand-700 font-medium">
+                {personaSeleccionada.tipoDocumento}: {personaSeleccionada.numeroDocumento}
+                <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  Verificado
+                </span>
+              </div>
+            )}
+            {alertaDocumento && (
+              <p className="mt-1 text-[11px] text-amber-600">
+                No es posible crear la cuenta hasta que la documentacion este completa y verificada.
+              </p>
+            )}
           </div>
-          <p className="mt-1 text-[11px] text-brand-400">
-            Ingresa unicamente el prefijo. El dominio se asigna automaticamente.
-          </p>
-        </div>
+        )}
+
+        {/* Nombre de usuario: solo edicion (en creacion es el numero de documento) */}
+        {modoEdicion && (
+          <div>
+            <FieldLabel htmlFor="usuarioLocalInput">Nombre de usuario *</FieldLabel>
+            <div className="flex items-center">
+              <Input
+                id="usuarioLocalInput"
+                value={usuarioLocal}
+                onChange={(e) => setUsuarioLocal(e.target.value.toLowerCase())}
+                placeholder="nombre.apellido"
+                disabled={submitting}
+                maxLength={120}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-brand-400">
+              Usa entre 3 y 120 letras, numeros, puntos, guiones o guiones bajos. Sin espacios ni dominio.
+            </p>
+          </div>
+        )}
 
         {/* Rol inicial */}
         <div>
@@ -503,7 +571,7 @@ export function CreateUserModal({
           )}
           <p className="mt-1 text-[11px] text-brand-400">
             {modoEdicion
-              ? 'Este correo recibirá notificaciones del sistema.'
+              ? 'Este correo recibira notificaciones del sistema.'
               : 'Este correo recibira las credenciales temporales de acceso.'}
           </p>
         </div>

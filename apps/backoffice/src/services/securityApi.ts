@@ -56,6 +56,11 @@ export interface AvailablePerson {
   correoVerificado: boolean;
   tipoPersona: 'TRABAJADOR' | 'CLIENTE';
   elegible: boolean;
+  tipoDocumento: string | null;
+  numeroDocumento: string | null;
+  documentoVerificado: boolean;
+  documentoActivo: boolean;
+  documentoListo: boolean;
 }
 
 export interface SecurityOperationResponse {

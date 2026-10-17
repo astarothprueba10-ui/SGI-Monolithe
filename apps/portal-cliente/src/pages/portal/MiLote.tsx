@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { DownloadIcon, LayoutPanelLeftIcon, RulerIcon } from 'lucide-react';
 import { PageHeader } from '../../components/portal/PageHeader';

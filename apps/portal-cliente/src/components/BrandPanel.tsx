@@ -1,4 +1,3 @@
-import React from 'react';
 import { BuildingIcon, FileTextIcon, WalletIcon } from 'lucide-react';
 import { Logo } from './Logo';
 
