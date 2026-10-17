@@ -7,6 +7,11 @@ import lombok.Getter;
 @AllArgsConstructor
 public class RefreshTokenResponse {
 
+    private Long idUsuario;
+    private String usuario;
+    private java.util.List<String> autoridades;
+    private boolean requiereCambioPassword;
+    private boolean accesoBackoffice;
     private String accessToken;
     private String refreshToken;
     private String tokenType;

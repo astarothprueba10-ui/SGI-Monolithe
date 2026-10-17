@@ -1,4 +1,4 @@
-import type { Action, ModuleKey, Permission, Role, RoleName, SessionUser } from '../types';
+import type { Action, ModuleKey, Permission, Role, BuiltinRoleName, SessionUser } from '../types';
 
 const ALL_ACTIONS: Action[] = ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'export'];
 
@@ -59,7 +59,7 @@ const adminPermissions: Permission[] = (Object.keys(MODULE_ACTIONS) as ModuleKey
   perms(m, MODULE_ACTIONS[m].filter((a) => ALL_ACTIONS.includes(a)))
 );
 
-export const ROLES: Record<RoleName, Role> = {
+export const ROLES: Record<BuiltinRoleName, Role> = {
   Administrador: {
     name: 'Administrador',
     description: 'Acceso transversal a todos los módulos, configuración y auditoría.',
@@ -125,7 +125,7 @@ export const ROLES: Record<RoleName, Role> = {
   }
 };
 
-export const DEMO_USERS: Record<RoleName, SessionUser> = {
+export const DEMO_USERS: Record<BuiltinRoleName, SessionUser> = {
   Administrador: {
     id: 'U-001',
     name: 'Rodrigo Salazar',

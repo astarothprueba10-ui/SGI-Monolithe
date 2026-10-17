@@ -51,6 +51,12 @@ public class AuthenticationService {
         @Value("${security.jwt.access-token-expiration}")
         private long accessTokenExpiration;
 
+        private boolean puedeAccederBackoffice(UserPrincipal principal) {
+                return principal.isEnabled() && principal.isAccountNonLocked()
+                        && authenticationContextRepository.tieneRolInternoActivo(
+                                principal.getIdUsuario());
+        }
+
         public LoginResponse autenticar(
                         LoginRequest solicitud,
                         String ipOrigen,
@@ -105,6 +111,7 @@ public class AuthenticationService {
                                 principal.getUsername(),
                                 autoridades,
                                 principal.isRequiereCambioPassword(),
+                                puedeAccederBackoffice(principal),
                                 accessToken,
                                 refreshToken,
                                 "Bearer",
@@ -126,6 +133,9 @@ public class AuthenticationService {
                                 .loadUserByUsername(
                                                 rotacion.usuarioLogin());
 
+                if (!principal.isEnabled() || !principal.isAccountNonLocked()) {
+                        throw new BadCredentialsException("La cuenta no permite renovar la sesion.");
+                }
                 String nuevoAccessToken = jwtService.generarAccessToken(principal);
 
                 auditService.registrar(
@@ -138,6 +148,12 @@ public class AuthenticationService {
                                 "POST",
                                 "/api/auth/refresh");
                 return new RefreshTokenResponse(
+                                principal.getIdUsuario(),
+                                principal.getUsername(),
+                                principal.getAuthorities().stream()
+                                        .map(authority -> authority.getAuthority()).toList(),
+                                principal.isRequiereCambioPassword(),
+                                puedeAccederBackoffice(principal),
                                 nuevoAccessToken,
                                 rotacion.refreshToken(),
                                 "Bearer",

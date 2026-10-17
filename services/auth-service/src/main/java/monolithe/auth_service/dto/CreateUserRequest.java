@@ -1,5 +1,7 @@
 package monolithe.auth_service.dto;
 
+import java.util.Locale;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -25,15 +27,15 @@ public class CreateUserRequest {
             message = "El usuario debe tener entre 3 y 120 caracteres"
     )
     @Pattern(
-            regexp = "^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]+)$",
-            message = "Ingresa un usuario válido"
+            regexp = "^[a-zA-Z0-9._-]{3,120}$",
+            message = "Usa entre 3 y 120 letras, números, puntos, guiones o guiones bajos"
     )
     private String usuarioLogin;
 
     public void setUsuarioLogin(String usuarioLogin) {
         this.usuarioLogin =
                 usuarioLogin != null
-                        ? usuarioLogin.trim()
+                        ? usuarioLogin.trim().toLowerCase(Locale.ROOT)
                         : null;
     }
 }

@@ -1,5 +1,7 @@
 package monolithe.auth_service.dto;
 
+import java.util.Locale;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -15,7 +17,7 @@ public class LoginRequest {
     @NotBlank(message = "El usuario es obligatorio")
     @Size(max = 120, message = "El usuario no debe exceder 120 caracteres")
     @Pattern(
-            regexp = "^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]+)$",
+            regexp = "^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]{3,120})$",
             message = "Ingresa un usuario válido"
     )
     private String usuario;
@@ -29,6 +31,6 @@ public class LoginRequest {
     private String contrasena;
 
     public void setUsuario(String usuario) {
-        this.usuario = usuario != null ? usuario.trim() : null;
+        this.usuario = usuario != null ? usuario.trim().toLowerCase(Locale.ROOT) : null;
     }
 }

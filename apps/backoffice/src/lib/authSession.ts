@@ -5,6 +5,7 @@ export interface StoredAuthUser {
     usuario: string;
     autoridades: string[];
     requiereCambioPassword: boolean;
+    accesoBackoffice: boolean;
 }
 
 const ROLE_MAP: Record<string, RoleName> = {
@@ -13,7 +14,8 @@ const ROLE_MAP: Record<string, RoleName> = {
     ROLE_MARKETING: 'Marketing',
     ROLE_ASESOR: 'Asesor',
     ROLE_FINANZAS: 'Finanzas',
-    ROLE_RRHH: 'RRHH'
+    ROLE_RRHH: 'RRHH',
+    ROLE_CLIENTE: 'Cliente'
 };
 
 export function getStoredAuthUser(): StoredAuthUser | null {
@@ -33,9 +35,9 @@ export function getStoredAuthUser(): StoredAuthUser | null {
 export function getSessionRoles(
     autoridades: string[]
 ): RoleName[] {
-    return autoridades
-        .map((authority) => ROLE_MAP[authority])
-        .filter((role): role is RoleName => Boolean(role));
+    return [...new Set(autoridades
+        .filter((authority) => authority.startsWith('ROLE_') && authority.length > 5)
+        .map((authority) => ROLE_MAP[authority] ?? authority.slice(5)))];
 }
 
 export function getSessionPermissions(
@@ -137,4 +139,31 @@ export function updateStoredTokens(
     );
 
     return true;
+}
+
+export function updateStoredAuthUser(user: StoredAuthUser): void {
+    const storage = localStorage.getItem('monolithe_refresh_token') !== null
+        ? localStorage : sessionStorage;
+    storage.setItem('monolithe_user', JSON.stringify({
+        idUsuario: user.idUsuario,
+        usuario: user.usuario,
+        autoridades: user.autoridades,
+        requiereCambioPassword: user.requiereCambioPassword,
+        accesoBackoffice: user.accesoBackoffice
+    }));
+    window.dispatchEvent(new Event('monolithe-session-updated'));
+}
+
+export function subscribeAuthSession(listener: () => void): () => void {
+    window.addEventListener('monolithe-session-updated', listener);
+    window.addEventListener('storage', listener);
+    return () => {
+        window.removeEventListener('monolithe-session-updated', listener);
+        window.removeEventListener('storage', listener);
+    };
+}
+
+export function getAuthSessionSnapshot(): string | null {
+    return localStorage.getItem('monolithe_user')
+        ?? sessionStorage.getItem('monolithe_user');
 }

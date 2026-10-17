@@ -45,7 +45,7 @@ function derivarTipoPersona(user: SecurityUser): TipoPersona {
 }
 
 function extraerPrefijo(usuarioLogin: string): string {
-  return usuarioLogin.replace(/@.*$/, '');
+  return usuarioLogin;
 }
 
 async function ejecutarFlujoCreacion(
@@ -181,7 +181,7 @@ export function CreateUserModal({
   };
 
   const handleUsuarioLocalChange = (val: string) => {
-    const clean = val.toLowerCase().replace(/\s+/g, '').replace(/@.*$/, '');
+    const clean = val.toLowerCase();
     setUsuarioLocal(clean);
   };
 
@@ -220,13 +220,13 @@ export function CreateUserModal({
       toast.error('Selecciona una persona elegible.');
       return;
     }
-    if (!usuarioLocal || !rolSeleccionadoValido || !correoValido) {
+    if (!/^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) || !rolSeleccionadoValido || !correoValido) {
       toast.error('Por favor completa todos los campos requeridos con valores validos.');
       return;
     }
 
     setSubmitting(true);
-    const usuarioLogin = `${usuarioLocal.trim()}@monolithe.pe`;
+    const usuarioLogin = usuarioLocal.trim().toLowerCase();
 
     try {
       if (modoEdicion && user) {
@@ -288,7 +288,7 @@ export function CreateUserModal({
     !submitting &&
     (modoEdicion || Boolean(idPersona)) &&
     esElegible &&
-    Boolean(usuarioLocal.trim()) &&
+    /^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) &&
     rolSeleccionadoValido &&
     correoValido;
 
@@ -440,9 +440,9 @@ export function CreateUserModal({
           )}
         </div>
 
-        {/* Usuario corporativo */}
+        {/* Nombre de usuario */}
         <div>
-          <FieldLabel htmlFor="usuarioLocalInput">Usuario corporativo *</FieldLabel>
+          <FieldLabel htmlFor="usuarioLocalInput">Nombre de usuario *</FieldLabel>
           <div className="flex items-center">
             <Input
               id="usuarioLocalInput"
@@ -450,14 +450,11 @@ export function CreateUserModal({
               onChange={(e) => handleUsuarioLocalChange(e.target.value)}
               placeholder="nombre.apellido"
               disabled={submitting}
-              className="rounded-r-none border-r-0"
+              maxLength={120}
             />
-            <span className="inline-flex h-9 items-center rounded-r-md border border-brand-200 bg-brand-50 px-3 text-[13px] text-brand-600 font-medium">
-              @monolithe.pe
-            </span>
           </div>
           <p className="mt-1 text-[11px] text-brand-400">
-            Ingresa unicamente el prefijo. El dominio se asigna automaticamente.
+            Usa entre 3 y 120 letras, números, puntos, guiones o guiones bajos. Sin espacios ni dominio.
           </p>
         </div>
 

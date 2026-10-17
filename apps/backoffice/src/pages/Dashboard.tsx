@@ -21,7 +21,7 @@ import { LEAD_SOURCES } from '../data/crm';
 import { ADVISORS } from '../data/people';
 import { commissionsService } from '../services/commissionsService';
 import type { ManagerialKpis } from '../services/commissionsService';
-import type { RoleName } from '../types';
+import type { BuiltinRoleName } from '../types';
 import type { Kpi } from '../components/ui/KpiCard';
 
 interface ChartConfig {
@@ -32,7 +32,7 @@ interface ChartConfig {
   valuePrefix?: string;
 }
 
-const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
+const CHART_BY_ROLE: Record<BuiltinRoleName, ChartConfig> = {
   Administrador: {
     title: 'Ventas y separaciones por mes',
     description: 'Operaciones cerradas frente a separaciones registradas',
@@ -113,18 +113,31 @@ function buildDynamicKpis(baseKpis: Kpi[], data: ManagerialKpis | null): Kpi[] {
 }
 
 export function Dashboard() {
-  const { role, user, hasModule } = useAuth();
+  const { role, user, hasModule, can } = useAuth();
   const [managerialKpis, setManagerialKpis] = React.useState<ManagerialKpis | null>(null);
 
   React.useEffect(() => {
+    if (!can('dashboard.view') || !Object.prototype.hasOwnProperty.call(CHART_BY_ROLE, role)) return;
     commissionsService.getManagerialKpis().then((res) => {
       if (res) setManagerialKpis(res);
     });
-  }, []);
+  }, [role, can]);
 
-  const kpis = buildDynamicKpis(ROLE_KPIS[role], managerialKpis);
-  const intro = DASHBOARD_INTRO[role];
-  const chart = CHART_BY_ROLE[role];
+  if (!can('dashboard.view') || !Object.prototype.hasOwnProperty.call(CHART_BY_ROLE, role)) {
+    return (
+      <div>
+        <PageHeader title={`Bienvenido, ${user.name}`} description="Accede desde el menú a los módulos habilitados para tu cuenta." />
+        <Card className="p-5">
+          <Badge tone="brand">{role}</Badge>
+          <p className="mt-3 text-sm">Tu sesión está activa. Las opciones disponibles dependen de tus permisos.</p>
+        </Card>
+      </div>
+    );
+  }
+  const builtinRole = role as BuiltinRoleName;
+  const kpis = buildDynamicKpis(ROLE_KPIS[builtinRole], managerialKpis);
+  const intro = DASHBOARD_INTRO[builtinRole];
+  const chart = CHART_BY_ROLE[builtinRole];
 
   return (
     <div>

@@ -70,6 +70,7 @@ class LoginSecurityValidationTest {
                 "admin@sigi.pe",
                 List.of("ROLE_ADMINISTRADOR"),
                 false,
+                true,
                 "access-token",
                 "refresh-token",
                 "Bearer",

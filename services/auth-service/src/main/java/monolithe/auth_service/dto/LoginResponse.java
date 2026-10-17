@@ -14,6 +14,7 @@ public class LoginResponse {
     private List<String> autoridades;
 
     private boolean requiereCambioPassword;
+    private boolean accesoBackoffice;
     
     private String accessToken;
     private String refreshToken;

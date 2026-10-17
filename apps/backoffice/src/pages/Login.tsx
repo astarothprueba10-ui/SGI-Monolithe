@@ -18,21 +18,13 @@ type LoginResponse = {
     usuario: string;
     autoridades: string[];
     requiereCambioPassword: boolean;
+    accesoBackoffice: boolean;
     accessToken: string;
     refreshToken: string;
     tokenType: string;
     expiresIn: number;
     mensaje: string;
 };
-
-const INTERNAL_ROLES = new Set([
-    'ROLE_ADMINISTRADOR',
-    'ROLE_GERENCIA',
-    'ROLE_MARKETING',
-    'ROLE_ASESOR',
-    'ROLE_FINANZAS',
-    'ROLE_RRHH'
-]);
 
 function resolverMensajeErrorLogin(error: ApiError): string {
     if (error.status === 423) {
@@ -55,12 +47,12 @@ function resolverMensajeErrorLogin(error: ApiError): string {
     return error.message;
 }
 
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,120}$/;
 const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
 
 function validarCredencialesLogin(usuario: string, contrasena: string): string | null {
     const usuarioLimpio = usuario.trim();
-    if (!usuarioLimpio || usuarioLimpio.length > 120 || !EMAIL_REGEX.test(usuarioLimpio)) {
+    if (!usuarioLimpio || usuarioLimpio.length > 120 || !USERNAME_REGEX.test(usuarioLimpio)) {
         return 'Ingresa un usuario válido';
     }
     if (!contrasena) {
@@ -103,15 +95,11 @@ export function Login() {
 
         try {
             const data = await authApi.post<LoginResponse>('/login', {
-                usuario: usuario.trim(),
+                usuario: usuario.trim().toLowerCase(),
                 contrasena: password
             });
 
-            const tieneRolInterno = data.autoridades.some((authority) =>
-                INTERNAL_ROLES.has(authority)
-            );
-
-            if (!tieneRolInterno) {
+            if (data.accesoBackoffice !== true) {
                 try {
                     await authApi.post<void>('/logout', {
                         refreshToken: data.refreshToken
@@ -151,7 +139,8 @@ export function Login() {
                     idUsuario: data.idUsuario,
                     usuario: data.usuario,
                     autoridades: data.autoridades,
-                    requiereCambioPassword: data.requiereCambioPassword
+                    requiereCambioPassword: data.requiereCambioPassword,
+                    accesoBackoffice: data.accesoBackoffice
                 })
             );
 
@@ -238,7 +227,7 @@ export function Login() {
                                     setUsuario(event.target.value)
                                 }
                                 maxLength={120}
-                                placeholder="usuario@monolithe.pe"
+                                placeholder="nombre.apellido"
                                 autoComplete="username"
                                 disabled={loading}
                             />

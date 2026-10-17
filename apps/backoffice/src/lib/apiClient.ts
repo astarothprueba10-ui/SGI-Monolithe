@@ -2,6 +2,8 @@ import {
   clearStoredSession,
   getAccessToken,
   getRefreshToken,
+  updateStoredAuthUser,
+  type StoredAuthUser,
   updateStoredTokens
 } from './authSession';
 
@@ -20,7 +22,7 @@ interface ApiClientOptions extends Omit<RequestInit, 'body'> {
   body?: BodyInit | Record<string, unknown> | null;
 }
 
-type RefreshTokenResponse = {
+type RefreshTokenResponse = StoredAuthUser & {
   accessToken: string;
   refreshToken: string;
   tokenType: string;
@@ -216,10 +218,14 @@ async function refreshSession(): Promise<boolean> {
       const data =
         (await response.json()) as RefreshTokenResponse;
 
-      return updateStoredTokens(
-        data.accessToken,
-        data.refreshToken
-      );
+      if (data.accesoBackoffice !== true) {
+        clearStoredSession();
+        window.location.replace('/login');
+        return false;
+      }
+      const updated = updateStoredTokens(data.accessToken, data.refreshToken);
+      if (updated) updateStoredAuthUser(data);
+      return updated;
     } catch {
       return false;
     } finally {

@@ -15,9 +15,9 @@ import {
   UsersIcon } from
 'lucide-react';
 import type { Kpi } from '../components/ui/KpiCard';
-import type { RoleName } from '../types';
+import type { BuiltinRoleName } from '../types';
 
-export const BASE_ROLE_KPIS: Record<Exclude<RoleName, 'Gerencia'>, Kpi[]> = {
+export const BASE_ROLE_KPIS: Record<Exclude<BuiltinRoleName, 'Gerencia'>, Kpi[]> = {
   Administrador: [
   {
     id: 'k1',
@@ -302,7 +302,7 @@ export const BASE_ROLE_KPIS: Record<Exclude<RoleName, 'Gerencia'>, Kpi[]> = {
 
 };
 
-export const ROLE_KPIS: Record<RoleName, Kpi[]> = {
+export const ROLE_KPIS: Record<BuiltinRoleName, Kpi[]> = {
   ...BASE_ROLE_KPIS,
   Gerencia: BASE_ROLE_KPIS.Administrador
 };

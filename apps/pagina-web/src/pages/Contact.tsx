@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { ConfirmacionConsulta } from '../components/public/ConfirmacionConsulta';
+import { EstadoCatalogoProyectos } from '../components/public/EstadoCatalogoProyectos';
+import React from 'react';
 import {
-  CheckCircle2Icon,
   ClockIcon,
   FacebookIcon,
   InstagramIcon,
@@ -12,68 +13,16 @@ import {
   PhoneIcon } from
 'lucide-react';
 import { PageHero } from '../components/public/PageHero';
-import { Button, AnchorButton } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
 import { Checkbox, Field, Input, Select, Textarea } from '../components/ui/Form';
 import { Alert } from '../components/ui/Feedback';
 import { SectionHeading } from '../components/ui/Primitives';
 import { contactInfo } from '../data/site';
-import { IMAGES, projects } from '../data/projects';
-import { enviarConsulta } from '../services/api';
-
-type State = 'idle' | 'loading' | 'success';
-
-const initial = {
-  nombres: '',
-  apellidos: '',
-  dni: '',
-  telefono: '',
-  correo: '',
-  proyecto: '',
-  motivo: '',
-  mensaje: ''
-};
+import { IMAGES } from '../data/projects';
+import { useCaptacionPublica } from '../hooks/useCaptacionPublica';
 
 export function Contact() {
-  const [values, setValues] = useState(initial);
-  const [accept, setAccept] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [state, setState] = useState<State>('idle');
-  const [codigoSeguimiento, setCodigoSeguimiento] = useState<string>('CW-2026-001');
-
-  function update(key: keyof typeof initial, value: string) {
-    setValues((v) => ({ ...v, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: '' }));
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const next: Record<string, string> = {};
-    if (!values.nombres.trim()) next.nombres = 'Ingresa tus nombres';
-    if (!values.apellidos.trim()) next.apellidos = 'Ingresa tus apellidos';
-    if (!/^[0-9+\s]{9,15}$/.test(values.telefono.trim())) next.telefono = 'Teléfono inválido';
-    if (!/^\S+@\S+\.\S+$/.test(values.correo.trim())) next.correo = 'Correo inválido';
-    if (!values.motivo) next.motivo = 'Selecciona un motivo';
-    if (!accept) next.accept = 'Debes aceptar la política de privacidad';
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
-    setState('loading');
-
-    try {
-      const resp = await enviarConsulta({
-        nombre: `${values.nombres.trim()} ${values.apellidos.trim()}`.trim(),
-        telefono: values.telefono.trim(),
-        correo: values.correo.trim(),
-        asunto: values.motivo ? `[${values.motivo}] Consulta Web` : 'Contacto Web',
-        mensaje: `DNI: ${values.dni || 'N/A'}\nProyecto: ${values.proyecto || 'General'}\nMotivo: ${values.motivo}\n\n${values.mensaje.trim()}`,
-        aceptaPrivacidad: accept
-      });
-      setCodigoSeguimiento(resp.codigo);
-      setState('success');
-    } catch {
-      setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
-      setState('success');
-    }
-  }
+  const { values, accept, setAccept, errors, setErrors, state, codigoSeguimiento, projects, projectsLoading, projectsError, reloadProjects, update, submit, reset } = useCaptacionPublica();
 
   return (
     <>
@@ -90,38 +39,14 @@ export function Contact() {
           {/* Formulario */}
           <div className="rounded-2xl border border-line bg-white p-6 shadow-card sm:p-8">
             {state === 'success' ?
-            <div className="py-10 text-center">
-                <CheckCircle2Icon className="mx-auto h-12 w-12 text-brand" />
-                <h2 className="mt-5 font-display text-3xl text-night">Solicitud enviada</h2>
-                <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted">
-                  Gracias {values.nombres}. Registramos tu consulta con el código{' '}
-                  <span className="font-semibold text-night">{codigoSeguimiento}</span>. Un asesor te
-                  contactará al {values.telefono} dentro de las próximas 24 horas hábiles.
-                </p>
-                <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                  <AnchorButton href={contactInfo.whatsappUrl} target="_blank">
-                    <MessageCircleIcon className="h-4 w-4" />
-                    Continuar por WhatsApp
-                  </AnchorButton>
-                  <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setValues(initial);
-                    setAccept(false);
-                    setState('idle');
-                  }}>
-                  
-                    Enviar otra solicitud
-                  </Button>
-                </div>
-              </div> :
+            <ConfirmacionConsulta nombre={values.nombres} referencia={codigoSeguimiento} reset={reset} /> :
 
             <form onSubmit={submit} noValidate className="space-y-5">
                 <SectionHeading title="Cuéntanos qué necesitas" />
 
-                {Object.keys(errors).length > 0 &&
+                {Object.values(errors).some(Boolean) &&
               <Alert tone="error" title="No pudimos enviar tu solicitud">
-                    Revisa los campos marcados en rojo y vuelve a intentarlo.
+                    {errors.envio || errors.catalogo || "Revisa los campos marcados y vuelve a intentarlo."}
                   </Alert>
               }
 
@@ -135,22 +60,23 @@ export function Contact() {
                     autoComplete="given-name" />
                   
                   </Field>
-                  <Field label="Apellidos" htmlFor="apellidos" required error={errors.apellidos}>
+                  <Field label="Apellidos" htmlFor="apellidos" required error={errors.apellidoPaterno}>
                     <Input
                     id="apellidos"
-                    value={values.apellidos}
-                    error={errors.apellidos}
-                    onChange={(e) => update('apellidos', e.target.value)}
+                    value={values.apellidoPaterno}
+                    error={errors.apellidoPaterno}
+                    onChange={(e) => update('apellidoPaterno', e.target.value)}
                     autoComplete="family-name" />
                   
                   </Field>
-                  <Field label="DNI" htmlFor="dni" hint="Nos ayuda a preparar tu contrato.">
+                  <Field label="DNI" htmlFor="dni" hint="Opcional durante la solicitud de información." error={errors.numeroDocumento}>
                     <Input
                     id="dni"
-                    value={values.dni}
+                    error={errors.numeroDocumento}
+                    value={values.numeroDocumento}
                     inputMode="numeric"
                     maxLength={8}
-                    onChange={(e) => update('dni', e.target.value)} />
+                    onChange={(e) => update('numeroDocumento', e.target.value)} />
                   
                   </Field>
                   <Field label="Teléfono" htmlFor="telefono" required error={errors.telefono}>
@@ -171,40 +97,40 @@ export function Contact() {
                     onChange={(e) => update('correo', e.target.value)} />
                   
                   </Field>
-                  <Field label="Proyecto de interés" htmlFor="proyecto" required>
+                  <Field label="Proyecto de interés" htmlFor="proyecto" required error={errors.idProyecto}>
                     <Select
                     id="proyecto"
-                    value={values.proyecto}
-                    onChange={(e) => update('proyecto', e.target.value)}>
+                    disabled={projectsLoading || !projects.length}
+                    value={values.idProyecto}
+                    onChange={(e) => update('idProyecto', e.target.value)}>
                     
                       <option value="">Selecciona un proyecto</option>
                       {projects.map((p) =>
-                    <option key={p.slug} value={p.slug}>
-                          {p.name}
+                    <option key={p.idProyecto} value={p.idProyecto}>
+                          {p.nombre}
                         </option>
                     )}
-                      <option value="otro">Aún no lo decido</option>
                     </Select>
                   </Field>
                 </div>
 
-                <Field label="Motivo de contacto" htmlFor="motivo" required error={errors.motivo}>
+                <EstadoCatalogoProyectos loading={projectsLoading} error={projectsError} empty={!projects.length} retry={() => void reloadProjects()} />
+                <p className="text-sm text-muted">Si ya eres cliente y necesitas soporte, contáctanos por WhatsApp, teléfono o correo.</p>
+                <Field label="Motivo de contacto" htmlFor="motivo" required error={errors.motivoContacto}>
                   <Select
                   id="motivo"
-                  value={values.motivo}
-                  error={errors.motivo}
-                  onChange={(e) => update('motivo', e.target.value)}>
+                  value={values.motivoContacto}
+                  error={errors.motivoContacto}
+                  onChange={(e) => update('motivoContacto', e.target.value)}>
                   
                     <option value="">Selecciona un motivo</option>
                     <option>Quiero comprar un lote</option>
                     <option>Quiero agendar una visita</option>
                     <option>Consulta sobre financiamiento</option>
-                    <option>Consulta legal o documentaria</option>
-                    <option>Soy cliente y necesito soporte</option>
                   </Select>
                 </Field>
 
-                <Field label="Mensaje" htmlFor="mensaje">
+                <Field label="Mensaje" htmlFor="mensaje" error={errors.mensaje}>
                   <Textarea
                   id="mensaje"
                   value={values.mensaje}
@@ -232,7 +158,7 @@ export function Contact() {
                 } />
               
 
-                <Button type="submit" size="lg" loading={state === 'loading'} className="w-full">
+                <Button type="submit" size="lg" loading={state === 'loading'} disabled={state === 'loading' || projectsLoading || !projects.length} className="w-full">
                   Enviar solicitud
                 </Button>
               </form>

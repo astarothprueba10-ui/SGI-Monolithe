@@ -1,4 +1,4 @@
-import type { RoleName } from '../types';
+import type { BuiltinRoleName } from '../types';
 
 export const SALES_TREND = [
   { month: 'Mar', ventas: 18, separaciones: 26 },
@@ -86,7 +86,7 @@ export interface PendingOp {
   tone: 'warning' | 'danger' | 'info';
 }
 
-export const BASE_DASHBOARD_INTRO: Record<Exclude<RoleName, 'Gerencia'>, { title: string; description: string }> = {
+export const BASE_DASHBOARD_INTRO: Record<Exclude<BuiltinRoleName, 'Gerencia'>, { title: string; description: string }> = {
   Administrador: {
     title: 'Dashboard general',
     description:
@@ -110,7 +110,7 @@ export const BASE_DASHBOARD_INTRO: Record<Exclude<RoleName, 'Gerencia'>, { title
   }
 };
 
-export const DASHBOARD_INTRO: Record<RoleName,{ title: string; description: string }> = {
+export const DASHBOARD_INTRO: Record<BuiltinRoleName,{ title: string; description: string }> = {
   ...BASE_DASHBOARD_INTRO,
   Gerencia: {
     title: 'Dashboard gerencial',

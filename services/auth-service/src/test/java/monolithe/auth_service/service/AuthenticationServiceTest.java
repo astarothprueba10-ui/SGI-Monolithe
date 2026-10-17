@@ -34,278 +34,318 @@ import static org.mockito.Mockito.*;
 
 class AuthenticationServiceTest {
 
-    private AuthenticationManager authenticationManager;
-    private JwtService jwtService;
-    private RefreshTokenService refreshTokenService;
-    private CustomUserDetailsService customUserDetailsService;
-    private AuthenticationContextRepository authenticationContextRepository;
-    private LoginSecurityService loginSecurityService;
-    private UserRepository userRepository;
-    private PasswordEncoder passwordEncoder;
-    private PasswordPolicyService passwordPolicyService;
-    private AuditService auditService;
+        private AuthenticationManager authenticationManager;
+        private JwtService jwtService;
+        private RefreshTokenService refreshTokenService;
+        private CustomUserDetailsService customUserDetailsService;
+        private AuthenticationContextRepository authenticationContextRepository;
+        private LoginSecurityService loginSecurityService;
+        private UserRepository userRepository;
+        private PasswordEncoder passwordEncoder;
+        private PasswordPolicyService passwordPolicyService;
+        private AuditService auditService;
 
-    private AuthenticationService authenticationService;
+        private AuthenticationService authenticationService;
 
-    @BeforeEach
-    void setUp() {
-        authenticationManager = mock(AuthenticationManager.class);
-        jwtService = mock(JwtService.class);
-        refreshTokenService = mock(RefreshTokenService.class);
-        customUserDetailsService = mock(CustomUserDetailsService.class);
-        authenticationContextRepository = mock(AuthenticationContextRepository.class);
-        loginSecurityService = mock(LoginSecurityService.class);
-        userRepository = mock(UserRepository.class);
-        passwordEncoder = mock(PasswordEncoder.class);
-        passwordPolicyService = mock(PasswordPolicyService.class);
-        auditService = mock(AuditService.class);
+        @BeforeEach
+        void setUp() {
+                authenticationManager = mock(AuthenticationManager.class);
+                jwtService = mock(JwtService.class);
+                refreshTokenService = mock(RefreshTokenService.class);
+                customUserDetailsService = mock(CustomUserDetailsService.class);
+                authenticationContextRepository = mock(AuthenticationContextRepository.class);
+                loginSecurityService = mock(LoginSecurityService.class);
+                userRepository = mock(UserRepository.class);
+                passwordEncoder = mock(PasswordEncoder.class);
+                passwordPolicyService = mock(PasswordPolicyService.class);
+                auditService = mock(AuditService.class);
 
-        authenticationService = new AuthenticationService(
-                authenticationManager,
-                jwtService,
-                refreshTokenService,
-                customUserDetailsService,
-                authenticationContextRepository,
-                loginSecurityService,
-                userRepository,
-                passwordEncoder,
-                passwordPolicyService,
-                auditService
-        );
-    }
+                authenticationService = new AuthenticationService(
+                                authenticationManager,
+                                jwtService,
+                                refreshTokenService,
+                                customUserDetailsService,
+                                authenticationContextRepository,
+                                loginSecurityService,
+                                userRepository,
+                                passwordEncoder,
+                                passwordPolicyService,
+                                auditService);
+        }
 
-    @Test
-    void intentoFallidoNormalNoBloqueaYDevuelveBadCredentials() {
-        LoginRequest solicitud = crearSolicitud("usuario1", "claveIncorrecta");
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
-        when(userRepository.findByUsuarioLogin("usuario1"))
-                .thenReturn(Optional.of(crearUsuario(1L, "usuario1")));
-        when(loginSecurityService.registrarIntentoFallido("usuario1"))
-                .thenReturn(null);
+        @Test
+        void intentoFallidoNormalNoBloqueaYDevuelveBadCredentials() {
+                LoginRequest solicitud = crearSolicitud("usuario1", "claveIncorrecta");
+                when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                                .thenThrow(new BadCredentialsException("Bad credentials"));
+                when(userRepository.findByUsuarioLogin("usuario1"))
+                                .thenReturn(Optional.of(crearUsuario(1L, "usuario1")));
+                when(loginSecurityService.registrarIntentoFallido("usuario1"))
+                                .thenReturn(null);
 
-        assertThrows(BadCredentialsException.class, () ->
-                authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
-        );
+                assertThrows(BadCredentialsException.class,
+                                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit"));
 
-        verify(auditService).registrar(
-                eq(1L),
-                eq("LOGIN_FALLIDO"),
-                eq("FALLIDO"),
-                anyString(),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-        verify(auditService, never()).registrar(
-                anyLong(),
-                eq("USUARIO_BLOQUEADO"),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString()
-        );
-    }
+                verify(auditService).registrar(
+                                eq(1L),
+                                eq("LOGIN_FALLIDO"),
+                                eq("FALLIDO"),
+                                anyString(),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+                verify(auditService, never()).registrar(
+                                anyLong(),
+                                eq("USUARIO_BLOQUEADO"),
+                                anyString(),
+                                anyString(),
+                                anyString(),
+                                anyString(),
+                                anyString(),
+                                anyString());
+        }
 
-    @Test
-    void intentoQueAlcanzaElMaximoGeneraBloqueoTemporalConMinutos() {
-        LoginRequest solicitud = crearSolicitud("usuario1", "claveIncorrecta");
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
-        when(userRepository.findByUsuarioLogin("usuario1"))
-                .thenReturn(Optional.of(crearUsuario(1L, "usuario1")));
-        when(loginSecurityService.registrarIntentoFallido("usuario1"))
-                .thenReturn(1L);
-        when(loginSecurityService.getLockDurationMinutes())
-                .thenReturn(15L);
+        @Test
+        void intentoQueAlcanzaElMaximoGeneraBloqueoTemporalConMinutos() {
+                LoginRequest solicitud = crearSolicitud("usuario1", "claveIncorrecta");
+                when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                                .thenThrow(new BadCredentialsException("Bad credentials"));
+                when(userRepository.findByUsuarioLogin("usuario1"))
+                                .thenReturn(Optional.of(crearUsuario(1L, "usuario1")));
+                when(loginSecurityService.registrarIntentoFallido("usuario1"))
+                                .thenReturn(1L);
+                when(loginSecurityService.getLockDurationMinutes())
+                                .thenReturn(15L);
 
-        AccountTemporarilyLockedException ex = assertThrows(
-                AccountTemporarilyLockedException.class,
-                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
-        );
+                AccountTemporarilyLockedException ex = assertThrows(
+                                AccountTemporarilyLockedException.class,
+                                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit"));
 
-        assertEquals(15L, ex.getMinutosRestantes());
-        assertTrue(ex.getMinutosRestantes() > 0);
-        assertEquals(
-                "Usuario bloqueado temporalmente por 15 minutos debido a múltiples intentos fallidos.",
-                ex.getMessage()
-        );
+                assertEquals(15L, ex.getMinutosRestantes());
+                assertTrue(ex.getMinutosRestantes() > 0);
+                assertEquals(
+                                "Usuario bloqueado temporalmente por 15 minutos debido a múltiples intentos fallidos.",
+                                ex.getMessage());
 
-        verify(auditService).registrar(
-                eq(1L),
-                eq("LOGIN_FALLIDO"),
-                eq("FALLIDO"),
-                anyString(),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-        verify(auditService).registrar(
-                eq(1L),
-                eq("USUARIO_BLOQUEADO"),
-                eq("EXITOSO"),
-                anyString(),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-    }
+                verify(auditService).registrar(
+                                eq(1L),
+                                eq("LOGIN_FALLIDO"),
+                                eq("FALLIDO"),
+                                anyString(),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+                verify(auditService).registrar(
+                                eq(1L),
+                                eq("USUARIO_BLOQUEADO"),
+                                eq("EXITOSO"),
+                                anyString(),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+        }
 
-    @Test
-    void cuentaYaBloqueadaDevuelveBloqueoTemporalConTiempoRestante() {
-        LoginRequest solicitud = crearSolicitud("usuarioBloqueado", "cualquierClave");
-        User usuario = crearUsuario(2L, "usuarioBloqueado");
-        usuario.setBloqueadoHasta(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10));
+        @Test
+        void cuentaYaBloqueadaDevuelveBloqueoTemporalConTiempoRestante() {
+                LoginRequest solicitud = crearSolicitud("usuarioBloqueado", "cualquierClave");
+                User usuario = crearUsuario(2L, "usuarioBloqueado");
+                usuario.setBloqueadoHasta(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10));
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new LockedException("Locked"));
-        when(userRepository.findByUsuarioLogin("usuarioBloqueado"))
-                .thenReturn(Optional.of(usuario));
-        when(loginSecurityService.calcularMinutosRestantes(any()))
-                .thenReturn(10L);
+                when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                                .thenThrow(new LockedException("Locked"));
+                when(userRepository.findByUsuarioLogin(solicitud.getUsuario()))
+                                .thenReturn(Optional.of(usuario));
+                when(loginSecurityService.calcularMinutosRestantes(any()))
+                                .thenReturn(10L);
 
-        AccountTemporarilyLockedException ex = assertThrows(
-                AccountTemporarilyLockedException.class,
-                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
-        );
+                AccountTemporarilyLockedException ex = assertThrows(
+                                AccountTemporarilyLockedException.class,
+                                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit"));
 
-        assertEquals(10L, ex.getMinutosRestantes());
-        assertTrue(ex.getMinutosRestantes() > 0);
-        assertEquals(
-                "Usuario bloqueado temporalmente por 10 minutos debido a múltiples intentos fallidos.",
-                ex.getMessage()
-        );
+                assertEquals(10L, ex.getMinutosRestantes());
+                assertTrue(ex.getMinutosRestantes() > 0);
+                assertEquals(
+                                "Usuario bloqueado temporalmente por 10 minutos debido a múltiples intentos fallidos.",
+                                ex.getMessage());
 
-        verify(auditService).registrar(
-                eq(2L),
-                eq("LOGIN_DENEGADO"),
-                eq("DENEGADO"),
-                anyString(),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-    }
+                verify(auditService).registrar(
+                                eq(2L),
+                                eq("LOGIN_DENEGADO"),
+                                eq("DENEGADO"),
+                                anyString(),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+        }
 
-    @Test
-    void debeAutenticarExitosamenteCuandoCredencialesSonCorrectas() {
-        LoginRequest solicitud = crearSolicitud("usuarioOk", "claveValida");
-        UserPrincipal principal = new UserPrincipal(
-                3L,
-                "usuarioOk",
-                "hash",
-                List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR")),
-                true,
-                true,
-                false
-        );
-        Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(principal);
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
-        when(jwtService.generarAccessToken(principal)).thenReturn("mockJwt");
-        when(refreshTokenService.crearSesion(eq(3L), anyString(), anyString())).thenReturn("mockRefresh");
+        @Test
+        void debeAutenticarExitosamenteCuandoCredencialesSonCorrectas() {
+                LoginRequest solicitud = crearSolicitud("usuarioOk", "claveValida");
+                UserPrincipal principal = new UserPrincipal(
+                                3L,
+                                "usuarioOk",
+                                "hash",
+                                List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR")),
+                                true,
+                                true,
+                                false);
+                Authentication auth = mock(Authentication.class);
+                when(auth.getPrincipal()).thenReturn(principal);
+                when(authenticationManager.authenticate(any())).thenReturn(auth);
+                when(jwtService.generarAccessToken(principal)).thenReturn("mockJwt");
+                when(refreshTokenService.crearSesion(eq(3L), anyString(), anyString())).thenReturn("mockRefresh");
 
-        LoginResponse resp = authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit");
+                LoginResponse resp = authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit");
 
-        assertNotNull(resp);
-        assertEquals("mockJwt", resp.getAccessToken());
-        assertEquals("mockRefresh", resp.getRefreshToken());
-        verify(loginSecurityService).registrarAccesoExitoso(3L);
-        verify(auditService).registrar(
-                eq(3L),
-                eq("LOGIN_EXITOSO"),
-                eq("EXITOSO"),
-                anyString(),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-    }
+                assertNotNull(resp);
+                assertEquals("mockJwt", resp.getAccessToken());
+                assertEquals("mockRefresh", resp.getRefreshToken());
+                verify(loginSecurityService).registrarAccesoExitoso(3L);
+                verify(auditService).registrar(
+                                eq(3L),
+                                eq("LOGIN_EXITOSO"),
+                                eq("EXITOSO"),
+                                anyString(),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+        }
 
-    @Test
-    void usuarioDesactivadoLanzaUserDisabledException() {
-        LoginRequest solicitud = crearSolicitud("usuarioInactivo", "clave123");
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new DisabledException("User is disabled"));
-        AuthenticationContext contexto = new AuthenticationContext(
-                5L,
-                "usuarioInactivo",
-                "hash",
-                false,
-                null,
-                false,
-                false,
-                List.of("ROLE_ASESOR")
-        );
-        when(authenticationContextRepository.obtenerPorLogin("usuarioInactivo"))
-                .thenReturn(Optional.of(contexto));
+        @Test
+        void usuarioDesactivadoLanzaUserDisabledException() {
+                LoginRequest solicitud = crearSolicitud("usuarioInactivo", "clave123");
+                when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                                .thenThrow(new DisabledException("User is disabled"));
+                AuthenticationContext contexto = new AuthenticationContext(
+                                5L,
+                                "usuarioInactivo",
+                                "hash",
+                                false,
+                                null,
+                                false,
+                                false,
+                                List.of("ROLE_ASESOR"));
+                when(authenticationContextRepository.obtenerPorLogin(solicitud.getUsuario()))
+                                .thenReturn(Optional.of(contexto));
 
-        UserDisabledException ex = assertThrows(
-                UserDisabledException.class,
-                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
-        );
+                UserDisabledException ex = assertThrows(
+                                UserDisabledException.class,
+                                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit"));
 
-        assertEquals("El usuario se encuentra desactivado.", ex.getMessage());
-        verify(auditService).registrar(
-                eq(5L),
-                eq("LOGIN_DENEGADO"),
-                eq("DENEGADO"),
-                contains("desactivada"),
-                eq("127.0.0.1"),
-                eq("JUnit"),
-                eq("POST"),
-                eq("/api/auth/login")
-        );
-    }
+                assertEquals("El usuario se encuentra desactivado.", ex.getMessage());
+                verify(auditService).registrar(
+                                eq(5L),
+                                eq("LOGIN_DENEGADO"),
+                                eq("DENEGADO"),
+                                contains("desactivada"),
+                                eq("127.0.0.1"),
+                                eq("JUnit"),
+                                eq("POST"),
+                                eq("/api/auth/login"));
+        }
 
-    @Test
-    void usuarioConPasswordTemporalExpiradoLanzaAccountAccessRestrictedException() {
-        LoginRequest solicitud = crearSolicitud("usuarioTemporal", "claveTemp");
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new DisabledException("User is disabled"));
-        AuthenticationContext contexto = new AuthenticationContext(
-                6L,
-                "usuarioTemporal",
-                "hash",
-                true,
-                null,
-                true,
-                false,
-                List.of("ROLE_ASESOR")
-        );
-        when(authenticationContextRepository.obtenerPorLogin("usuarioTemporal"))
-                .thenReturn(Optional.of(contexto));
+        @Test
+        void usuarioConPasswordTemporalExpiradoLanzaAccountAccessRestrictedException() {
+                LoginRequest solicitud = crearSolicitud("usuarioTemporal", "claveTemp");
+                when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                                .thenThrow(new DisabledException("User is disabled"));
+                AuthenticationContext contexto = new AuthenticationContext(
+                                6L,
+                                "usuarioTemporal",
+                                "hash",
+                                true,
+                                null,
+                                true,
+                                false,
+                                List.of("ROLE_ASESOR"));
+                when(authenticationContextRepository.obtenerPorLogin(solicitud.getUsuario()))
+                                .thenReturn(Optional.of(contexto));
 
-        AccountAccessRestrictedException ex = assertThrows(
-                AccountAccessRestrictedException.class,
-                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit")
-        );
+                AccountAccessRestrictedException ex = assertThrows(
+                                AccountAccessRestrictedException.class,
+                                () -> authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit"));
 
-        assertEquals(
-                "La contraseña temporal ha expirado. Solicita una nueva activación o recuperación de contraseña.",
-                ex.getMessage()
-        );
-    }
+                assertEquals(
+                                "La contraseña temporal ha expirado. Solicita una nueva activación o recuperación de contraseña.",
+                                ex.getMessage());
+        }
 
-    private LoginRequest crearSolicitud(String usuario, String contrasena) {
-        LoginRequest req = new LoginRequest();
-        req.setUsuario(usuario);
-        req.setContrasena(contrasena);
-        return req;
-    }
+        private LoginRequest crearSolicitud(String usuario, String contrasena) {
+                LoginRequest req = new LoginRequest();
+                req.setUsuario(usuario);
+                req.setContrasena(contrasena);
+                return req;
+        }
 
-    private User crearUsuario(Long id, String login) {
-        User u = new User();
-        u.setIdUsuario(id);
-        u.setUsuarioLogin(login);
-        u.setIntentosFallidos(0);
-        return u;
-    }
+        private User crearUsuario(Long id, String login) {
+                User u = new User();
+                u.setIdUsuario(id);
+                u.setUsuarioLogin(login);
+                u.setIntentosFallidos(0);
+                return u;
+        }
+
+        private UserPrincipal prepararRolPersonalizado(boolean interno) {
+                UserPrincipal principal = new UserPrincipal(10L, "diego", "hash",
+                                List.of(new SimpleGrantedAuthority("ROLE_LOGISTICA"),
+                                                new SimpleGrantedAuthority("lots.view")),
+                                true, true, false);
+                Authentication auth = mock(Authentication.class);
+                when(auth.getPrincipal()).thenReturn(principal);
+                when(authenticationManager.authenticate(any())).thenReturn(auth);
+                when(authenticationContextRepository.tieneRolInternoActivo(10L)).thenReturn(interno);
+                when(jwtService.generarAccessToken(principal)).thenReturn("jwt");
+                when(refreshTokenService.crearSesion(eq(10L), anyString(), anyString())).thenReturn("refresh");
+                return principal;
+        }
+
+        @Test
+        void rolPersonalizadoInternoConservaAutoridadesYAccede() {
+                prepararRolPersonalizado(true);
+                LoginResponse respuesta = authenticationService.autenticar(
+                                crearSolicitud("diego", "clave"), "127.0.0.1", "JUnit");
+                assertTrue(respuesta.isAccesoBackoffice());
+                assertEquals(List.of("ROLE_LOGISTICA", "lots.view"), respuesta.getAutoridades());
+        }
+
+        @Test
+        void autoridadDeRolPorSiSolaNoConcedeAccesoInterno() {
+                prepararRolPersonalizado(false);
+                LoginResponse respuesta = authenticationService.autenticar(
+                                crearSolicitud("diego", "clave"), "127.0.0.1", "JUnit");
+                assertFalse(respuesta.isAccesoBackoffice());
+        }
+
+        private void prepararRenovacion(UserPrincipal principal) {
+                when(refreshTokenService.rotarRefreshToken(anyString(), anyString(), anyString()))
+                                .thenReturn(new monolithe.auth_service.security.RefreshTokenRotation(
+                                                10L, "diego", "refresh-nuevo"));
+                when(customUserDetailsService.loadUserByUsername("diego")).thenReturn(principal);
+        }
+
+        @Test
+        void renovarSesionDevuelveAutoridadesYAccesoActuales() {
+                prepararRenovacion(prepararRolPersonalizado(true));
+                var solicitud = new monolithe.auth_service.dto.RefreshTokenRequest();
+                solicitud.setRefreshToken("refresh");
+                var respuesta = authenticationService.renovarToken(solicitud, "127.0.0.1", "JUnit");
+                assertTrue(respuesta.isAccesoBackoffice());
+                assertEquals(List.of("ROLE_LOGISTICA", "lots.view"), respuesta.getAutoridades());
+                assertEquals("refresh-nuevo", respuesta.getRefreshToken());
+        }
+
+        @Test
+        void renovarTrasRevocarRolInternoDevuelveAccesoDenegado() {
+                prepararRenovacion(prepararRolPersonalizado(false));
+                var solicitud = new monolithe.auth_service.dto.RefreshTokenRequest();
+                solicitud.setRefreshToken("refresh");
+                var respuesta = authenticationService.renovarToken(solicitud, "127.0.0.1", "JUnit");
+                assertFalse(respuesta.isAccesoBackoffice());
+        }
+
 }

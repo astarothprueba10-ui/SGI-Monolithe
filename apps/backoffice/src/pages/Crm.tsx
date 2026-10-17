@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { IdentidadEnvio, validarCaptacion } from '../lib/captacion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CalendarIcon, CheckCircleIcon, DownloadIcon, PhoneIcon, PlusIcon, UserPlusIcon, XCircleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -11,9 +12,9 @@ import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
-import { LEADS as INITIAL_LEADS, LEAD_SOURCES } from '../data/crm';
+import { LEAD_SOURCES } from '../data/crm';
 import { SALES } from '../data/sales';
-import { crmService, type Advisor, type CreateLeadInput, type Visit } from '../services/crmService';
+import { crmService, datosLead, type CrmProject, type Advisor, type CreateLeadInput, type Visit } from '../services/crmService';
 import { cn } from '../utils/cn';
 import { currency, percent } from '../utils/format';
 import type { Lead } from '../types';
@@ -38,11 +39,10 @@ const FUNNEL: Array<{ stage: Lead['stage']; label: string }> = [
 const INITIAL_FORM: CreateLeadInput = {
   names: '',
   paternalSurname: '',
-  maternalSurname: '',
   phone: '',
   email: '',
   sourceCode: 'WEB',
-  interest: 'Los Jardines de Lurin · Mz. A',
+  projectId: 0,
   notes: ''
 };
 
@@ -56,7 +56,12 @@ export function Crm() {
   const [isNewVisitOpen, setIsNewVisitOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CreateLeadInput>(INITIAL_FORM);
-  const [leadsList, setLeadsList] = useState<Lead[]>(INITIAL_LEADS);
+  const [leadsList, setLeadsList] = useState<Lead[]>([]);
+  const identity = useRef(new IdentidadEnvio()), captureBusy = useRef(false);
+  const [projectsList, setProjectsList] = useState<CrmProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [advisorsList, setAdvisorsList] = useState<Advisor[]>([]);
   const [visitsList, setVisitsList] = useState<Visit[]>([]);
 
@@ -70,21 +75,23 @@ export function Crm() {
   });
 
   const loadData = async () => {
-    try {
-      const [leads, advisors, visits] = await Promise.all([
-        crmService.getLeads(),
-        crmService.getAdvisors(),
-        crmService.getVisits()
-      ]);
-      if (leads.length > 0) setLeadsList(leads);
-      if (advisors.length > 0) {
-        setAdvisorsList(advisors);
-        setSelectedAdvisorId(advisors[0].id);
-      }
-      if (visits.length > 0) setVisitsList(visits);
-    } catch (err) {
-      console.warn('Cargando con datos locales fallback:', err);
-    }
+    const [leads, advisors, visits] = await Promise.allSettled([
+      crmService.getLeads(), crmService.getAdvisors(), crmService.getVisits()
+    ]);
+    setLeadsList(leads.status === 'fulfilled' ? leads.value : []);
+    setLoadError(leads.status === 'rejected' ? 'No se pudo cargar el listado de leads. Reintenta la carga.' : '');
+    setAdvisorsList(advisors.status === 'fulfilled' ? advisors.value : []);
+    setVisitsList(visits.status === 'fulfilled' ? visits.value : []);
+    if (advisors.status === 'fulfilled' && advisors.value.length) setSelectedAdvisorId(advisors.value[0].id);
+  };
+  const cargarProyectosCaptacion = async () => {
+    setProjectsLoading(true); setProjectsError('');
+    try { setProjectsList(await crmService.getProjects()); }
+    catch (error) { setProjectsList([]); setProjectsError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo de proyectos.'); }
+    finally { setProjectsLoading(false); }
+  };
+  const abrirCaptacion = async () => {
+    setIsNewLeadOpen(true); await cargarProyectosCaptacion();
   };
 
   useEffect(() => {
@@ -122,26 +129,24 @@ export function Crm() {
     }
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.names || !form.paternalSurname) {
-      toast.error('Campos requeridos', { description: 'Ingrese nombres y apellido paterno.' });
-      return;
-    }
-    setIsSubmitting(true);
+  const confirmarLead = async () => {
+    captureBusy.current = true; setIsSubmitting(true);
     try {
-      await crmService.createLead(form);
-      toast.success('Lead registrado', {
-        description: `${form.names} ${form.paternalSurname} registrado en el embudo comercial.`
-      });
-      setIsNewLeadOpen(false);
-      setForm(INITIAL_FORM);
-      await loadData();
-    } catch (err: any) {
-      toast.error('Error al registrar lead', { description: err.message });
-    } finally {
-      setIsSubmitting(false);
-    }
+      const result = await crmService.createLead(form, identity.current);
+      if (result.estado !== 'REGISTRADO') {
+        toast.warning(`Solicitud guardada para revisión #${result.idCaptacion}`, { description: result.mensaje }); return;
+      }
+      toast.success('Lead registrado', { description: `Prospecto #${result.idProspecto}, captación #${result.idCaptacion}.` });
+      setIsNewLeadOpen(false); setForm(INITIAL_FORM); identity.current.reiniciar(); await loadData();
+    } catch (err) { toast.error('No se confirmó el registro', { description: err instanceof Error ? err.message : 'Reintenta el envío.' }); }
+    finally { captureBusy.current = false; setIsSubmitting(false); }
+  };
+  const handleCreateSubmit = async (e: React.SyntheticEvent) => {
+    e.preventDefault(); if (captureBusy.current) return;
+    const errors = validarCaptacion({ ...datosLead(form), telefono: form.phone });
+    if (!projectsList.some(p => p.idProyecto === form.projectId)) errors.idProyecto = 'Selecciona un proyecto disponible';
+    if (Object.keys(errors).length) { toast.error('Revisa los datos', { description: Object.values(errors).join('. ') }); return; }
+    await confirmarLead();
   };
 
   const handleScheduleVisitSubmit = async (e: React.FormEvent) => {
@@ -203,7 +208,7 @@ export function Crm() {
               <Button icon={DownloadIcon}>Exportar</Button>
             </Gate>
             <Gate permission="crm.create">
-              <Button icon={PlusIcon} variant="primary" onClick={() => setIsNewLeadOpen(true)}>
+              <Button icon={PlusIcon} variant="primary" onClick={() => void abrirCaptacion()}>
                 Nuevo lead
               </Button>
             </Gate>
@@ -211,6 +216,7 @@ export function Crm() {
         }
       />
 
+      {loadError && <div role="alert" className="mb-4 text-red-700">{loadError} <Button onClick={() => void loadData()}>Reintentar</Button></div>}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
         {FUNNEL.map((step) => {
           const count = leadsList.filter((l) => l.stage === step.stage).length;
@@ -602,7 +608,7 @@ export function Crm() {
             value={selectedAdvisorId || undefined}
             onChange={(e) => setSelectedAdvisorId(Number(e.target.value))}
           >
-            {advisorsList.map((a) => (
+            {advisorsList.filter(a => a.active).map((a) => (
               <option key={a.id} value={a.id}>
                 {a.code} - {a.name} ({a.activeLeads} activos)
               </option>
@@ -625,7 +631,7 @@ export function Crm() {
             <Button onClick={() => setIsNewLeadOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting}>
+            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting || projectsLoading || !projectsList.length}>
               {isSubmitting ? 'Guardando...' : 'Registrar lead'}
             </Button>
           </>
@@ -643,19 +649,19 @@ export function Crm() {
               />
             </div>
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Apellido paterno *</label>
+              <label className="text-[12px] font-medium text-brand-700">Apellidos *</label>
               <Input
                 required
                 value={form.paternalSurname}
                 onChange={(e) => setForm({ ...form, paternalSurname: e.target.value })}
-                placeholder="Ej. Perez"
+                placeholder="Ej. Pérez Sánchez"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Telefono / WhatsApp</label>
+              <label className="text-[12px] font-medium text-brand-700">Telefono / WhatsApp *</label>
               <Input
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -663,7 +669,7 @@ export function Crm() {
               />
             </div>
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Correo electronico</label>
+              <label className="text-[12px] font-medium text-brand-700">Correo electronico *</label>
               <Input
                 type="email"
                 value={form.email}
@@ -694,8 +700,8 @@ export function Crm() {
                 value={form.advisorId || ''}
                 onChange={(e) => setForm({ ...form, advisorId: e.target.value ? Number(e.target.value) : undefined })}
               >
-                <option value="">Sin asignar (Rotativo)</option>
-                {advisorsList.map((a) => (
+                <option value="">Sin asignar</option>
+                {advisorsList.filter(a => a.active).map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
                   </option>
@@ -705,12 +711,16 @@ export function Crm() {
           </div>
 
           <div>
-            <label className="text-[12px] font-medium text-brand-700">Interes inicial / Proyecto</label>
-            <Input
-              value={form.interest}
-              onChange={(e) => setForm({ ...form, interest: e.target.value })}
-              placeholder="Ej. Los Jardines de Lurin · Mz. B"
-            />
+            <label className="text-[12px] font-medium text-brand-700">Proyecto de interés *</label>
+            <Select value={form.projectId || ''} disabled={projectsLoading || !projectsList.length}
+              onChange={e => setForm({ ...form, projectId: Number(e.target.value) })}>
+              <option value="">{projectsLoading ? 'Cargando proyectos…' : 'Selecciona un proyecto'}</option>
+              {projectsList.map(p => <option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+            </Select>
+            {!projectsLoading && (projectsError || !projectsList.length) && <div role="alert" className="mt-2 text-[12px] text-brand-700">
+              <p>{projectsError || 'No hay proyectos activos disponibles para registrar el lead.'}</p>
+              <button type="button" className="mt-1 underline" onClick={() => void cargarProyectosCaptacion()}>Volver a cargar proyectos</button>
+            </div>}
           </div>
         </form>
       </Modal>
@@ -753,7 +763,7 @@ export function Crm() {
               value={visitForm.advisorId || ''}
               onChange={(e) => setVisitForm({ ...visitForm, advisorId: Number(e.target.value) })}
             >
-              {advisorsList.map((a) => (
+              {advisorsList.filter(a => a.active).map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.code})
                 </option>

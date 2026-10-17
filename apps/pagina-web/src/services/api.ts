@@ -1,16 +1,10 @@
+import type { CaptacionDatos } from '../lib/captacion';
 import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082';
 
-export interface ConsultaPayload {
-  nombre: string;
-  correo?: string;
-  telefono?: string;
-  idProyecto?: number;
-  idPagina?: number;
-  asunto?: string;
-  mensaje: string;
-  aceptaPrivacidad?: boolean;
+export interface ConsultaPayload extends CaptacionDatos {
+  idSolicitud: string; idPagina?: number; aceptaPrivacidad: boolean;
 }
 
 export interface ConsultaResponse {
@@ -54,75 +48,17 @@ export interface ProyectoDto {
   activo: boolean;
 }
 
-/**
- * Registra una consulta o lead comercial desde la web pública.
- * Soporta envío directo por API REST Spring Boot o Supabase BaaS.
- */
+/** Guarda exclusivamente mediante Java; una respuesta fallida nunca confirma el envío. */
 export async function enviarConsulta(payload: ConsultaPayload): Promise<ConsultaResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/public/consultas`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch {
-  }
-
-  return enviarConsultaDirectoSupabase(payload);
-}
-
-async function enviarConsultaDirectoSupabase(payload: ConsultaPayload): Promise<ConsultaResponse> {
-  const codigo = generarCodigoSeguimiento();
-  const fechaRecepcion = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from('cms_consultas_web')
-    .insert([
-      {
-        id_estado_consulta_web: 6,
-        codigo: codigo,
-        nombres: payload.nombre.trim(),
-        correo: payload.correo?.trim() || null,
-        telefono: payload.telefono?.trim() || null,
-        asunto: payload.asunto?.trim() || 'Consulta Web',
-        mensaje: payload.mensaje.trim(),
-        acepta_privacidad: Boolean(payload.aceptaPrivacidad),
-        id_proyecto: payload.idProyecto || null,
-        id_pagina: payload.idPagina || null,
-        fecha_recepcion: fechaRecepcion
-      }
-    ])
-    .select('id_consulta_web, codigo, nombres, correo, telefono, id_proyecto, fecha_recepcion')
-    .single();
-
-  if (error) {
-    throw new Error('No se pudo registrar la consulta: ' + error.message);
-  }
-
-  return {
-    idConsulta: Number(data.id_consulta_web),
-    codigo: data.codigo,
-    nombre: data.nombres,
-    correo: data.correo || undefined,
-    telefono: data.telefono || undefined,
-    idProyecto: data.id_proyecto ? Number(data.id_proyecto) : undefined,
-    fechaRecepcion: data.fecha_recepcion,
-    mensaje: '¡Gracias por contactarnos! Tu consulta ha sido recibida con éxito.'
-  };
-}
-
-function generarCodigoSeguimiento(): string {
-  const now = new Date();
-  const fecha = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `CW-${fecha}-${rand}`;
+  const response = await fetch(`${API_BASE_URL}/api/public/consultas`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.message || 'No se confirmó el envío. Intenta nuevamente.');
+  if (!Number.isSafeInteger(data?.idConsulta) || data.idConsulta <= 0 || typeof data.codigo !== 'string' || !data.codigo)
+    throw new Error('No se recibió una confirmación válida. Intenta nuevamente.');
+  return data;
 }
 
 /**
@@ -136,7 +72,7 @@ export async function obtenerProyectosPublicos(): Promise<ProyectoDto[]> {
 
     if (response.ok) {
       const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data;
       }
     }
@@ -147,7 +83,7 @@ export async function obtenerProyectosPublicos(): Promise<ProyectoDto[]> {
     .from('inm_proyectos')
     .select('id_proyecto, codigo, nombre, descripcion, direccion, ubicacion_referencia, distrito, provincia, departamento, area_total_m2, latitud, longitud, activo')
     .eq('activo', true)
-    .order('nombre', { ascending: true });
+    .order('nombre', { ascending: true }).limit(200);
 
   if (error || !data) {
     return [];
@@ -205,4 +141,25 @@ export async function obtenerPaginasPublicadas(): Promise<PaginaDto[]> {
     mostrarMenu: Boolean(p.mostrar_menu),
     activo: Boolean(p.activo)
   }));
+}
+
+
+export interface ProyectoCaptacion { idProyecto: number; nombre: string }
+async function paginaProyectosCaptacion(despues: number): Promise<ProyectoCaptacion[]> {
+  const response = await fetch(`${API_BASE_URL}/api/public/captacion/proyectos?despues=${despues}`, {
+    headers: { Accept: 'application/json' }
+  });
+  if (!response.ok) throw new Error('No se pudo cargar el catálogo de proyectos. Reintenta la carga.');
+  const data: unknown = await response.json();
+  if (!Array.isArray(data) || data.some(p => !Number.isSafeInteger(p?.idProyecto) || p.idProyecto <= despues || typeof p.nombre !== 'string'))
+    throw new Error('El catálogo de proyectos devolvió una respuesta inválida.');
+  return data;
+}
+export async function obtenerProyectosCaptacion(): Promise<ProyectoCaptacion[]> {
+  const rows: ProyectoCaptacion[] = []; let despues = 0;
+  while (true) {
+    const page = await paginaProyectosCaptacion(despues);
+    rows.push(...page); if (page.length < 200) return rows;
+    despues = page[page.length - 1].idProyecto;
+  }
 }

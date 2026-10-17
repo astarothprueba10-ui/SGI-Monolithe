@@ -17,14 +17,16 @@ import { Workers } from './pages/Workers';
 import { UsersAndRoles } from './pages/UsersAndRoles';
 import { Audit } from './pages/Audit';
 import { Unauthorized } from './pages/Unauthorized';
-import type { ReactElement } from 'react';
+import { useSyncExternalStore, type ReactElement } from 'react';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { ForgotPassword } from './pages/ForgotPassword';
 import {
   getSessionRoles,
-  getStoredAuthUser
+  getStoredAuthUser,
+  subscribeAuthSession,
+  getAuthSessionSnapshot
 } from './lib/authSession';
 
 console.log('ENV CHECK:', {
@@ -38,9 +40,10 @@ function RequireBackofficeAuth({
 }: {
   children: ReactElement;
 }) {
+  useSyncExternalStore(subscribeAuthSession, getAuthSessionSnapshot);
   const authUser = getStoredAuthUser();
 
-  if (!authUser || getSessionRoles(authUser.autoridades).length === 0) {
+  if (!authUser || authUser.accesoBackoffice !== true || getSessionRoles(authUser.autoridades).length === 0) {
     return <Navigate to="/login" replace />;
   }
 
@@ -56,9 +59,10 @@ function RequirePasswordChange({
 }: {
   children: ReactElement;
 }) {
+  useSyncExternalStore(subscribeAuthSession, getAuthSessionSnapshot);
   const authUser = getStoredAuthUser();
 
-  if (!authUser || getSessionRoles(authUser.autoridades).length === 0) {
+  if (!authUser || authUser.accesoBackoffice !== true || getSessionRoles(authUser.autoridades).length === 0) {
     return <Navigate to="/login" replace />;
   }
 
@@ -111,9 +115,7 @@ export function App({
             <Route
               index
               element={
-                <PermissionRoute permission="dashboard.view">
-                  <Dashboard />
-                </PermissionRoute>
+                <Dashboard />
               }
             />
 

@@ -1,3 +1,5 @@
+import { cmsApi } from '../lib/apiClient';
+import { IdentidadEnvio, normalizarCaptacion, validarCaptacion } from '../lib/captacion';
 import { supabase } from '../lib/supabase';
 import type { Lead } from '../types';
 
@@ -14,11 +16,10 @@ export interface Advisor {
 export interface CreateLeadInput {
   names: string;
   paternalSurname: string;
-  maternalSurname?: string;
   phone: string;
   email: string;
   sourceCode: string;
-  interest: string;
+  projectId: number;
   advisorId?: number;
   notes?: string;
 }
@@ -119,14 +120,32 @@ function mapRawToLead(raw: RawProspecto): Lead {
   };
 }
 
+export interface CrmProject { idProyecto: number; nombre: string }
+export interface CaptacionResult { estado: string; mensaje?: string; idCaptacion: number; idPersona?: number; idProspecto?: number }
+export function datosLead(input: CreateLeadInput) {
+  return normalizarCaptacion({ nombres: input.names, apellidoPaterno: input.paternalSurname,
+    apellidoMaterno: null, telefono: input.phone, correo: input.email,
+    idProyecto: input.projectId, motivoContacto: 'Registro interno de lead', mensaje: input.notes,
+    tipoDocumento: null, numeroDocumento: null });
+}
 export const crmService = {
   async getLeads(): Promise<Lead[]> {
-    const { data, error } = await supabase.rpc('sp_listar_prospectos');
-    if (error) {
-      console.error('Error al listar prospectos:', error);
-      throw new Error(`Fallo consulta de prospectos: ${error.message}`);
+    const rows: RawProspecto[] = []; let antes: number | undefined;
+    while (true) {
+      const page = await cmsApi.get<RawProspecto[]>(`/crm/prospectos${antes ? `?antes=${antes}` : ''}`);
+      rows.push(...page); if (page.length < 200) break;
+      antes = Number(page[page.length - 1].id_prospecto);
     }
-    return ((data as RawProspecto[]) || []).map(mapRawToLead);
+    return rows.map(mapRawToLead);
+  },
+  async getProjects(): Promise<CrmProject[]> {
+    const rows: CrmProject[] = []; let despues = 0;
+    while (true) {
+      const page = await cmsApi.get<CrmProject[]>(`/crm/proyectos?despues=${despues}`);
+      rows.push(...page); if (page.length < 200) break;
+      despues = Number(page[page.length - 1].idProyecto);
+    }
+    return rows;
   },
 
   async getAdvisors(): Promise<Advisor[]> {
@@ -172,23 +191,14 @@ export const crmService = {
     return Boolean(data?.success);
   },
 
-  async createLead(input: CreateLeadInput): Promise<boolean> {
-    const { data, error } = await supabase.rpc('sp_crear_prospecto', {
-      p_nombres: input.names,
-      p_apellido_paterno: input.paternalSurname,
-      p_apellido_materno: input.maternalSurname || '',
-      p_telefono: input.phone,
-      p_email: input.email,
-      p_origen_codigo: input.sourceCode,
-      p_interes: input.interest,
-      p_id_asesor: input.advisorId || null,
-      p_observaciones: input.notes || null
-    });
-    if (error) {
-      console.error('Error al registrar prospecto:', error);
-      throw new Error(`Fallo creacion de prospecto: ${error.message}`);
-    }
-    return Boolean(data?.success);
+  async createLead(input: CreateLeadInput, identity: IdentidadEnvio): Promise<CaptacionResult> {
+    const errors = validarCaptacion({ ...datosLead(input), telefono: input.phone });
+    if (Object.keys(errors).length) throw new Error(Object.values(errors).join('. '));
+    const datos = { ...datosLead(input), origenCodigo: input.sourceCode, idAsesor: input.advisorId || null };
+    const result = await cmsApi.post<CaptacionResult>('/crm/captaciones', { ...datos, idSolicitud: identity.para(datos) });
+    if (!result?.idCaptacion || !result.estado || (result.estado === 'REGISTRADO' && (!result.idPersona || !result.idProspecto)))
+      throw new Error('No se recibió una confirmación válida. Reintenta el mismo envío.');
+    return result;
   },
 
   async getVisits(): Promise<Visit[]> {

@@ -24,8 +24,10 @@ import java.util.Optional;
 public class AuthenticationContextRepository {
 
     private final SimpleJdbcCall jdbcCall;
+    private final JdbcTemplate jdbcTemplate;
 
     public AuthenticationContextRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
         this.jdbcCall = new SimpleJdbcCall(jdbcTemplate)
                 .withSchemaName("public")
                 .withProcedureName("sp_obtener_contexto_autenticacion")
@@ -40,6 +42,12 @@ public class AuthenticationContextRepository {
                         new SqlOutParameter("p_estado_activo", Types.BOOLEAN),
                         new SqlOutParameter("p_permite_acceso", Types.BOOLEAN),
                         new SqlOutParameter("p_authorities", Types.ARRAY));
+    }
+
+    public boolean tieneRolInternoActivo(Long idUsuario) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "SELECT public.fn_usuario_tiene_rol_interno_activo(?)",
+                Boolean.class, idUsuario));
     }
 
     public Optional<AuthenticationContext> obtenerPorLogin(String login) {

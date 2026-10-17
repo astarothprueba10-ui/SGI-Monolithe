@@ -30,13 +30,15 @@ export type Action =
 
 export type Permission = `${ModuleKey}.${Action}`;
 
-export type RoleName =
+export type BuiltinRoleName =
   | 'Administrador'
   | 'Gerencia'
   | 'Asesor'
   | 'Finanzas'
   | 'Marketing'
   | 'RRHH';
+
+export type RoleName = BuiltinRoleName | (string & {});
 
 export interface Role {
   name: RoleName;

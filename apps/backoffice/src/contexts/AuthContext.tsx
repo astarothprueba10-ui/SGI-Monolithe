@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useMemo,
+  useSyncExternalStore,
   type ReactNode
 } from 'react';
 
@@ -9,6 +10,8 @@ import {
   getSessionPermissions,
   getSessionRoles,
   getStoredAuthUser,
+  subscribeAuthSession,
+  getAuthSessionSnapshot,
   toSessionUser
 } from '../lib/authSession';
 
@@ -36,10 +39,11 @@ export function AuthProvider({
 }: {
   children: ReactNode;
 }) {
+  const snapshot = useSyncExternalStore(subscribeAuthSession, getAuthSessionSnapshot);
   const value = useMemo<AuthValue | null>(() => {
     const storedAuthUser = getStoredAuthUser();
 
-    if (!storedAuthUser) {
+    if (!storedAuthUser || storedAuthUser.accesoBackoffice !== true) {
       return null;
     }
 
@@ -78,7 +82,7 @@ export function AuthProvider({
       hasModule: (module) =>
         can(`${module}.view` as Permission)
     };
-  }, []);
+  }, [snapshot]);
 
   return (
     <AuthContext.Provider value={value}>
