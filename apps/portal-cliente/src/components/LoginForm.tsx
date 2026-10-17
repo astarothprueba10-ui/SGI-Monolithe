@@ -16,6 +16,8 @@ import { TextField } from './TextField';
 type LoginResponse = {
   idUsuario: number;
   usuario: string;
+  nombreMostrar: string | null;
+  iniciales: string | null;
   autoridades: string[];
   requiereCambioPassword: boolean;
   accessToken: string;
@@ -23,6 +25,22 @@ type LoginResponse = {
   tokenType: string;
   expiresIn: number;
   mensaje: string;
+};
+
+type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
+
+const TIPOS_DOCUMENTO: { value: TipoDocumento; label: string }[] = [
+  { value: 'DNI', label: 'DNI' },
+  { value: 'CE', label: 'CE' },
+  { value: 'PASAPORTE', label: 'PAS' },
+  { value: 'RUC', label: 'RUC' }
+];
+
+const DOC_REGEX: Record<TipoDocumento, RegExp> = {
+  DNI: /^\d{8}$/,
+  CE: /^[a-zA-Z0-9]{8,12}$/,
+  PASAPORTE: /^[a-zA-Z0-9]{6,20}$/,
+  RUC: /^\d{11}$/
 };
 
 function resolverMensajeErrorLogin(error: ApiError): string {
@@ -40,32 +58,48 @@ function resolverMensajeErrorLogin(error: ApiError): string {
     (error.message === 'No fue posible autenticar al usuario' ||
       /credencial|autenticar|bad credentials/i.test(error.message))
   ) {
-    return 'Usuario o contraseña incorrectos';
+    return 'Documento o contrasena incorrectos';
   }
 
   return error.message;
 }
 
-const PORTAL_USUARIO_REGEX = /^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{8}|[a-zA-Z0-9._-]{3,50})$/;
 const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
 
-function validarCredencialesPortal(usuario: string, contrasena: string): string | null {
-  const usuarioLimpio = usuario.trim();
-  if (!usuarioLimpio || usuarioLimpio.length > 120 || !PORTAL_USUARIO_REGEX.test(usuarioLimpio)) {
-    return 'Ingresa un usuario válido';
+
+function validarFormularioPortal(
+  tipoDocumento: TipoDocumento,
+  usuario: string,
+  contrasena: string
+): string | null {
+  const numeroDocumento = usuario.trim();
+
+  if (!numeroDocumento) {
+    return 'Ingresa tu número de documento';
   }
+
+  if (!DOC_REGEX[tipoDocumento].test(numeroDocumento)) {
+    return `Formato incorrecto para ${tipoDocumento}`;
+  }
+
   if (!contrasena) {
     return 'Ingresa tu contraseña';
   }
-  if (contrasena.length > 128 || CONTROL_CHARS_REGEX.test(contrasena)) {
+
+  if (
+    contrasena.length > 128 ||
+    CONTROL_CHARS_REGEX.test(contrasena)
+  ) {
     return 'La contraseña contiene caracteres no permitidos';
   }
+
   return null;
 }
 
+
 export function LoginForm() {
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('DNI'); const [password, setPassword] = useState('');
   const [usuario, setUsuario] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,13 +108,28 @@ export function LoginForm() {
   const usuarioRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  const placeholderDocumento = tipoDocumento === 'DNI'
+    ? 'Ingresa tu DNI (8 digitos)'
+    : tipoDocumento === 'RUC'
+      ? 'Ingresa tu RUC (11 digitos)'
+      : tipoDocumento === 'CE'
+        ? 'Ingresa tu CE'
+        : 'Ingresa tu numero de pasaporte';
+
+  function handleTipoDocumentoChange(tipo: TipoDocumento) {
+    setTipoDocumento(tipo);
+    setUsuario('');
+    setError(null);
+    usuarioRef.current?.focus();
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading) return;
 
     setError(null);
 
-    const errorValidacion = validarCredencialesPortal(usuario, password);
+    const errorValidacion = validarFormularioPortal(tipoDocumento, usuario, password);
     if (errorValidacion) {
       setError(errorValidacion);
       usuarioRef.current?.focus();
@@ -92,6 +141,7 @@ export function LoginForm() {
     try {
       const data = await authApi.post<LoginResponse>('/login', {
         usuario: usuario.trim(),
+        tipoDocumento,
         contrasena: password
       });
 
@@ -104,7 +154,7 @@ export function LoginForm() {
           });
         } catch {
           console.warn(
-            'No fue posible revocar la sesión de un usuario sin acceso al Portal Cliente.'
+            'No fue posible revocar la sesion de un usuario sin acceso al Portal Cliente.'
           );
         }
 
@@ -129,6 +179,8 @@ export function LoginForm() {
         JSON.stringify({
           idUsuario: data.idUsuario,
           usuario: data.usuario,
+          nombreMostrar: data.nombreMostrar,
+          iniciales: data.iniciales,
           autoridades: data.autoridades,
           requiereCambioPassword: data.requiereCambioPassword
         })
@@ -144,7 +196,7 @@ export function LoginForm() {
         setError(resolverMensajeErrorLogin(error));
       } else {
         setError(
-          'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.'
+          'No pudimos conectar con el servicio de autenticacion. Intentalo nuevamente.'
         );
       }
 
@@ -161,7 +213,7 @@ export function LoginForm() {
           <div role="alert" className="flex gap-3 rounded-field border border-danger-200 bg-danger-50 px-3.5 py-3">
             <AlertCircleIcon className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger-500" aria-hidden="true" />
             <div>
-              <p className="text-[13px] font-semibold text-danger-700">No pudimos iniciar tu sesión</p>
+              <p className="text-[13px] font-semibold text-danger-700">No pudimos iniciar tu sesion</p>
               <p className="mt-0.5 text-[13px] leading-relaxed text-danger-700/85">{error}</p>
             </div>
           </div>
@@ -170,29 +222,78 @@ export function LoginForm() {
         {signedIn ? (
           <div role="status" className="flex gap-3 rounded-field border border-slateux-200 bg-slateux-50 px-3.5 py-3">
             <ShieldCheckIcon className="mt-0.5 h-[18px] w-[18px] shrink-0 text-brass-500" aria-hidden="true" />
-            <p className="text-[13px] leading-relaxed text-ink-700">Sesión verificada. Serás redirigido a tu panel.</p>
+            <p className="text-[13px] leading-relaxed text-ink-700">Sesion verificada. Seras redirigido a tu panel.</p>
           </div>
         ) : null}
       </div>
 
-      <TextField
-        ref={usuarioRef}
-        id="usuario"
-        label="DNI o usuario"
-        type="text"
-        icon={UserIcon}
-        autoComplete="username"
-        placeholder="Ingresa tu DNI o usuario"
-        value={usuario}
-        maxLength={120}
-        invalid={Boolean(error)}
-        disabled={loading}
-        onChange={(e) => setUsuario(e.target.value)}
-      />
+
+      {/* Tipo y número de documento */}
+      <div className="flex items-end gap-2">
+
+        {/* Selector de tipo de documento */}
+        <div className="w-28 shrink-0">
+          <label
+            htmlFor="tipo-documento"
+            className="mb-1.5 block text-[13px] font-medium text-ink-700"
+          >
+            Tipo
+          </label>
+
+          <select
+            id="tipo-documento"
+            value={tipoDocumento}
+            onChange={(e) =>
+              handleTipoDocumentoChange(
+                e.target.value as TipoDocumento
+              )
+            }
+            disabled={loading}
+            className="w-full rounded-field border border-slateux-200 bg-white px-3 py-2.5 text-[13px] font-medium text-ink-700"
+          >
+            {TIPOS_DOCUMENTO.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Número de documento */}
+        <div className="min-w-0 flex-1">
+          <TextField
+            ref={usuarioRef}
+            id="usuario"
+            label="Número de documento"
+            type="text"
+            icon={UserIcon}
+            autoComplete="username"
+            placeholder={placeholderDocumento}
+            value={usuario}
+            maxLength={
+              tipoDocumento === 'DNI'
+                ? 8
+                : tipoDocumento === 'CE'
+                  ? 12
+                  : tipoDocumento === 'RUC'
+                    ? 11
+                    : 20
+            }
+            inputMode={
+              tipoDocumento === 'DNI' || tipoDocumento === 'RUC'
+                ? 'numeric'
+                : 'text'
+            }
+            invalid={Boolean(error)}
+            disabled={loading}
+            onChange={(e) => setUsuario(e.target.value)}
+          />
+        </div>
+      </div>
 
       <TextField
         id="password"
-        label="Contraseña"
+        label="Contrasena"
         type={showPassword ? 'text' : 'password'}
         icon={LockIcon}
         autoComplete="current-password"
@@ -207,14 +308,14 @@ export function LoginForm() {
             to="/recuperar-contrasena"
             className="rounded text-[13px] font-medium text-ink-600 underline-offset-4 outline-none transition-colors hover:text-ink-800 hover:underline"
           >
-            ¿Olvidaste tu contraseña?
+            Olvidaste tu contrasena?
           </Link>
         }
         trailing={
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
             aria-pressed={showPassword}
             className="flex h-8 w-8 items-center justify-center rounded-md text-slateux-400 outline-none transition-colors hover:bg-slateux-100 hover:text-ink-700"
           >
@@ -245,10 +346,10 @@ export function LoginForm() {
         {loading ? (
           <>
             <LoaderCircleIcon className="h-[18px] w-[18px] animate-spin" aria-hidden="true" />
-            Verificando credenciales…
+            Verificando credenciales...
           </>
         ) : (
-          'Iniciar sesión'
+          'Iniciar sesion'
         )}
       </button>
     </form>

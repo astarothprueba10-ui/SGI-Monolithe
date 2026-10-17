@@ -3,6 +3,8 @@ import type { Permission, RoleName, SessionUser } from '../types';
 export interface StoredAuthUser {
     idUsuario: number;
     usuario: string;
+    nombreMostrar?: string | null;
+    iniciales?: string | null;
     autoridades: string[];
     requiereCambioPassword: boolean;
 }
@@ -59,14 +61,12 @@ export function toSessionUser(
     }
 
     const username = authUser.usuario;
-    const displayName = username.includes('@')
-        ? username.split('@')[0]
-        : username;
 
-    const initials = displayName
-        .replace(/[^a-zA-Z0-9]/g, '')
-        .slice(0, 2)
-        .toUpperCase();
+    const displayName =
+        authUser.nombreMostrar?.trim() || 'Usuario';
+
+    const initials =
+        authUser.iniciales?.trim().toUpperCase() || 'US';
 
     return {
         id: String(authUser.idUsuario),

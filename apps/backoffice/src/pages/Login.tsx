@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FormEvent, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useRef, useState } from 'react';
 import {
     EyeIcon,
     EyeOffIcon,
@@ -11,11 +11,13 @@ import {
 import { ApiError, authApi } from '../lib/apiClient';
 import { Alert } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
-import { FieldLabel, Input } from '../components/ui/Field';
+import { FieldLabel, Input, Select } from '../components/ui/Field';
 
 type LoginResponse = {
     idUsuario: number;
     usuario: string;
+    nombreMostrar: string | null;
+    iniciales: string | null;
     autoridades: string[];
     requiereCambioPassword: boolean;
     accessToken: string;
@@ -24,6 +26,15 @@ type LoginResponse = {
     expiresIn: number;
     mensaje: string;
 };
+
+type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
+
+const TIPOS_DOCUMENTO: { value: TipoDocumento; label: string }[] = [
+    { value: 'DNI', label: 'DNI' },
+    { value: 'CE', label: 'CE' },
+    { value: 'PASAPORTE', label: 'PASAPORTE' },
+    { value: 'RUC', label: 'RUC' }
+];
 
 const INTERNAL_ROLES = new Set([
     'ROLE_ADMINISTRADOR',
@@ -49,19 +60,44 @@ function resolverMensajeErrorLogin(error: ApiError): string {
         (error.message === 'No fue posible autenticar al usuario' ||
             /credencial|autenticar|bad credentials/i.test(error.message))
     ) {
-        return 'Usuario o contraseña incorrectos';
+        return 'Documento o contraseña incorrectos';
     }
 
     return error.message;
 }
 
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F]/;
+const DOC_REGEX: Record<TipoDocumento, RegExp> = {
+    DNI: /^\d{8}$/,
+    CE: /^[a-zA-Z0-9]{8,12}$/,
+    PASAPORTE: /^[a-zA-Z0-9]{6,20}$/,
+    RUC: /^\d{11}$/
+};
 
-function validarCredencialesLogin(usuario: string, contrasena: string): string | null {
-    const usuarioLimpio = usuario.trim();
-    if (!usuarioLimpio || usuarioLimpio.length > 120 || !EMAIL_REGEX.test(usuarioLimpio)) {
-        return 'Ingresa un usuario válido';
+function obtenerMaxLength(tipo: TipoDocumento): number {
+    switch (tipo) {
+        case 'DNI':
+            return 8;
+        case 'CE':
+            return 12;
+        case 'PASAPORTE':
+            return 20;
+        case 'RUC':
+            return 11;
+    }
+}
+
+function validarFormulario(
+    tipoDocumento: TipoDocumento,
+    usuario: string,
+    contrasena: string
+): string | null {
+    const valorLimpio = usuario.trim();
+    if (!valorLimpio) {
+        return 'Ingresa el número de documento';
+    }
+    if (!DOC_REGEX[tipoDocumento].test(valorLimpio)) {
+        return `Formato incorrecto para ${tipoDocumento}`;
     }
     if (!contrasena) {
         return 'Ingresa tu contraseña';
@@ -74,6 +110,7 @@ function validarCredencialesLogin(usuario: string, contrasena: string): string |
 
 export function Login() {
 
+    const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('DNI');
     const [usuario, setUsuario] = useState('');
     const [password, setPassword] = useState('');
     const [remember, setRemember] = useState(true);
@@ -84,6 +121,21 @@ export function Login() {
 
     const usuarioRef = useRef<HTMLInputElement>(null);
 
+    const placeholderDocumento = tipoDocumento === 'DNI'
+        ? '12345678'
+        : tipoDocumento === 'RUC'
+            ? '20123456789'
+            : tipoDocumento === 'CE'
+                ? 'AB123456'
+                : 'PA1234567';
+
+    function handleTipoDocumentoChange(event: ChangeEvent<HTMLSelectElement>) {
+        setTipoDocumento(event.target.value as TipoDocumento);
+        setUsuario('');
+        setError(null);
+        usuarioRef.current?.focus();
+    }
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
@@ -92,7 +144,7 @@ export function Login() {
         setError(null);
         setSuccess(false);
 
-        const errorValidacion = validarCredencialesLogin(usuario, password);
+        const errorValidacion = validarFormulario(tipoDocumento, usuario, password);
         if (errorValidacion) {
             setError(errorValidacion);
             usuarioRef.current?.focus();
@@ -101,11 +153,14 @@ export function Login() {
 
         setLoading(true);
 
+        const payload = {
+            usuario: usuario.trim(),
+            tipoDocumento,
+            contrasena: password
+        };
+
         try {
-            const data = await authApi.post<LoginResponse>('/login', {
-                usuario: usuario.trim(),
-                contrasena: password
-            });
+            const data = await authApi.post<LoginResponse>('/login', payload);
 
             const tieneRolInterno = data.autoridades.some((authority) =>
                 INTERNAL_ROLES.has(authority)
@@ -150,6 +205,8 @@ export function Login() {
                 JSON.stringify({
                     idUsuario: data.idUsuario,
                     usuario: data.usuario,
+                    nombreMostrar: data.nombreMostrar,
+                    iniciales: data.iniciales,
                     autoridades: data.autoridades,
                     requiereCambioPassword: data.requiereCambioPassword
                 })
@@ -225,23 +282,47 @@ export function Login() {
                     ) : null}
 
                     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+
                         <div>
                             <FieldLabel htmlFor="usuario">
-                                Usuario
+                                Número de documento
                             </FieldLabel>
 
-                            <Input
-                                ref={usuarioRef}
-                                id="usuario"
-                                value={usuario}
-                                onChange={(event) =>
-                                    setUsuario(event.target.value)
-                                }
-                                maxLength={120}
-                                placeholder="usuario@monolithe.pe"
-                                autoComplete="username"
-                                disabled={loading}
-                            />
+                            <div className="flex gap-2">
+                                <Select
+                                    id="tipo-documento"
+                                    value={tipoDocumento}
+                                    onChange={handleTipoDocumentoChange}
+                                    disabled={loading}
+                                    aria-label="Tipo de documento"
+                                    className="w-32 shrink-0 font-medium text-brand-700"
+                                >
+                                    {TIPOS_DOCUMENTO.map(({ value, label }) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </Select>
+
+                                <Input
+                                    ref={usuarioRef}
+                                    id="usuario"
+                                    value={usuario}
+                                    onChange={(event) =>
+                                        setUsuario(event.target.value)
+                                    }
+                                    maxLength={obtenerMaxLength(tipoDocumento)}
+                                    placeholder={placeholderDocumento}
+                                    autoComplete="off"
+                                    disabled={loading}
+                                    inputMode={
+                                        tipoDocumento === 'DNI' || tipoDocumento === 'RUC'
+                                            ? 'numeric'
+                                            : 'text'
+                                    }
+                                    className="flex-1"
+                                />
+                            </div>
                         </div>
 
                         <div>

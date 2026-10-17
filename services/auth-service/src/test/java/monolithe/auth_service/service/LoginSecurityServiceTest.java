@@ -1,14 +1,15 @@
+
 package monolithe.auth_service.service;
 
-import monolithe.auth_service.entity.User;
 import monolithe.auth_service.repository.UserRepository;
+import monolithe.auth_service.repository.LoginAttemptProcedureRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -16,6 +17,7 @@ import static org.mockito.Mockito.*;
 class LoginSecurityServiceTest {
 
     private UserRepository userRepository;
+    private LoginAttemptProcedureRepository loginAttemptProcedureRepository;
     private LoginSecurityService loginSecurityService;
 
     @BeforeEach
@@ -23,8 +25,13 @@ class LoginSecurityServiceTest {
 
         userRepository = mock(UserRepository.class);
 
-        loginSecurityService =
-                new LoginSecurityService(userRepository);
+        loginAttemptProcedureRepository =
+                mock(LoginAttemptProcedureRepository.class);
+
+        loginSecurityService = new LoginSecurityService(
+                userRepository,
+                loginAttemptProcedureRepository
+        );
 
         ReflectionTestUtils.setField(
                 loginSecurityService,
@@ -40,69 +47,77 @@ class LoginSecurityServiceTest {
     }
 
     @Test
-    void debeIncrementarIntentosFallidosSinBloquearAntesDelLimite() {
+    void debeDelegarIntentoFallidoSinBloqueoAlProcedimiento() {
 
-        User usuario = crearUsuario();
-        usuario.setIntentosFallidos(3);
-
-        when(userRepository.findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
+        when(loginAttemptProcedureRepository.registrarIntentoFallido(
+                "admin",
+                5,
+                900L
+        )).thenReturn(null);
 
         Long idBloqueado =
                 loginSecurityService.registrarIntentoFallido("admin");
 
         assertNull(idBloqueado);
-        assertEquals(4, usuario.getIntentosFallidos());
-        assertNull(usuario.getBloqueadoHasta());
 
-        verify(userRepository).save(usuario);
+        verify(loginAttemptProcedureRepository)
+                .registrarIntentoFallido(
+                        "admin",
+                        5,
+                        900L
+                );
+
+        verifyNoInteractions(userRepository);
     }
 
     @Test
-    void debeBloquearUsuarioAlAlcanzarMaximoDeIntentos() {
+    void debeRetornarIdCuandoProcedimientoBloqueaUsuario() {
 
-        User usuario = crearUsuario();
-        usuario.setIntentosFallidos(4);
-
-        when(userRepository.findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
+        when(loginAttemptProcedureRepository.registrarIntentoFallido(
+                "admin",
+                5,
+                900L
+        )).thenReturn(1L);
 
         Long idBloqueado =
                 loginSecurityService.registrarIntentoFallido("admin");
 
         assertEquals(1L, idBloqueado);
-        assertEquals(5, usuario.getIntentosFallidos());
 
-        assertNotNull(usuario.getBloqueadoHasta());
-        assertTrue(
-                usuario.getBloqueadoHasta()
-                        .isAfter(LocalDateTime.now())
-        );
+        verify(loginAttemptProcedureRepository)
+                .registrarIntentoFallido(
+                        "admin",
+                        5,
+                        900L
+                );
 
-        verify(userRepository).save(usuario);
+        verifyNoInteractions(userRepository);
     }
 
     @Test
-    void debeReiniciarIntentosSiBloqueoAnteriorYaExpiro() {
+    void debeDelegarDocumentoAlfanumericoSinModificarlo() {
 
-        User usuario = crearUsuario();
+        String documento = "AB123456";
 
-        usuario.setIntentosFallidos(5);
-        usuario.setBloqueadoHasta(
-                LocalDateTime.now().minusMinutes(1)
-        );
-
-        when(userRepository.findByUsuarioLogin("admin"))
-                .thenReturn(Optional.of(usuario));
+        when(loginAttemptProcedureRepository.registrarIntentoFallido(
+                documento,
+                5,
+                900L
+        )).thenReturn(null);
 
         Long idBloqueado =
-                loginSecurityService.registrarIntentoFallido("admin");
+                loginSecurityService.registrarIntentoFallido(documento);
 
         assertNull(idBloqueado);
-        assertEquals(1, usuario.getIntentosFallidos());
-        assertNull(usuario.getBloqueadoHasta());
 
-        verify(userRepository).save(usuario);
+        verify(loginAttemptProcedureRepository)
+                .registrarIntentoFallido(
+                        documento,
+                        5,
+                        900L
+                );
+
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -110,14 +125,19 @@ class LoginSecurityServiceTest {
 
         loginSecurityService.registrarAccesoExitoso(1L);
 
-        verify(userRepository).registrarAccesoExitoso(1L);
+        verify(userRepository)
+                .registrarAccesoExitoso(1L);
+
         verifyNoMoreInteractions(userRepository);
+
+        verifyNoInteractions(loginAttemptProcedureRepository);
     }
 
     @Test
     void debeCalcularDuracionDeBloqueoEnMinutos() {
 
-        long minutos = loginSecurityService.getLockDurationMinutes();
+        long minutos =
+                loginSecurityService.getLockDurationMinutes();
 
         assertEquals(15L, minutos);
     }
@@ -125,29 +145,33 @@ class LoginSecurityServiceTest {
     @Test
     void debeCalcularMinutosRestantesUsandoUtcYRedondearHaciaArriba() {
 
-        LocalDateTime ahoraUtc = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime ahoraUtc =
+                LocalDateTime.now(ZoneOffset.UTC);
 
-        long minutosCortos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.plusSeconds(30));
+        long minutosCortos =
+                loginSecurityService.calcularMinutosRestantes(
+                        ahoraUtc.plusSeconds(30)
+                );
+
         assertEquals(1L, minutosCortos);
 
-        long minutosLargos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.plusMinutes(14).plusSeconds(10));
+        long minutosLargos =
+                loginSecurityService.calcularMinutosRestantes(
+                        ahoraUtc.plusMinutes(14).plusSeconds(10)
+                );
+
         assertEquals(15L, minutosLargos);
 
-        long minutosNulo = loginSecurityService.calcularMinutosRestantes(null);
+        long minutosNulo =
+                loginSecurityService.calcularMinutosRestantes(null);
+
         assertEquals(15L, minutosNulo);
 
-        long minutosVencidos = loginSecurityService.calcularMinutosRestantes(ahoraUtc.minusSeconds(10));
+        long minutosVencidos =
+                loginSecurityService.calcularMinutosRestantes(
+                        ahoraUtc.minusSeconds(10)
+                );
+
         assertEquals(1L, minutosVencidos);
-    }
-
-    private User crearUsuario() {
-
-        User usuario = new User();
-
-        usuario.setIdUsuario(1L);
-        usuario.setUsuarioLogin("admin");
-        usuario.setIntentosFallidos(0);
-
-        return usuario;
     }
 }

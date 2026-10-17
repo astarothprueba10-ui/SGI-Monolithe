@@ -1,6 +1,7 @@
 package monolithe.auth_service.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
@@ -17,6 +18,8 @@ import monolithe.auth_service.security.RefreshTokenRotation;
 import monolithe.auth_service.dto.ChangePasswordRequest;
 import monolithe.auth_service.entity.User;
 import monolithe.auth_service.repository.UserRepository;
+import monolithe.auth_service.repository.DocumentLoginProcedureRepository;
+import monolithe.auth_service.repository.UserVisualIdentityRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthenticationService {
 
         private final AuthenticationManager authenticationManager;
@@ -43,10 +47,12 @@ public class AuthenticationService {
         private final CustomUserDetailsService customUserDetailsService;
         private final AuthenticationContextRepository authenticationContextRepository;
         private final LoginSecurityService loginSecurityService;
+        private final DocumentLoginProcedureRepository documentLoginProcedureRepository;
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
         private final PasswordPolicyService passwordPolicyService;
         private final AuditService auditService;
+        private final UserVisualIdentityRepository userVisualIdentityRepository;
 
         @Value("${security.jwt.access-token-expiration}")
         private long accessTokenExpiration;
@@ -56,21 +62,24 @@ public class AuthenticationService {
                         String ipOrigen,
                         String userAgent) {
 
+                String loginEfectivo = resolverLoginEfectivo(
+                                solicitud, ipOrigen, userAgent);
+
                 Authentication authentication;
 
                 try {
 
                         authentication = authenticationManager.authenticate(
                                         new UsernamePasswordAuthenticationToken(
-                                                        solicitud.getUsuario(),
+                                                        loginEfectivo,
                                                         solicitud.getContrasena()));
 
                 } catch (LockedException e) {
-                        throw procesarCuentaBloqueada(solicitud.getUsuario(), ipOrigen, userAgent);
+                        throw procesarCuentaBloqueada(loginEfectivo, ipOrigen, userAgent);
                 } catch (DisabledException e) {
-                        throw procesarRestriccionAcceso(solicitud.getUsuario(), ipOrigen, userAgent, e);
+                        throw procesarRestriccionAcceso(loginEfectivo, ipOrigen, userAgent, e);
                 } catch (BadCredentialsException e) {
-                        throw procesarCredencialesInvalidas(solicitud.getUsuario(), ipOrigen, userAgent, e);
+                        throw procesarCredencialesInvalidas(loginEfectivo, ipOrigen, userAgent, e);
                 }
 
                 UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
@@ -100,9 +109,15 @@ public class AuthenticationService {
                                 .map(authority -> authority.getAuthority())
                                 .toList();
 
+                UserVisualIdentityRepository.IdentidadVisual identidad = userVisualIdentityRepository
+                                .obtenerPorIdUsuario(
+                                                principal.getIdUsuario());
+
                 return new LoginResponse(
                                 principal.getIdUsuario(),
                                 principal.getUsername(),
+                                identidad.nombreMostrar(),
+                                identidad.iniciales(),
                                 autoridades,
                                 principal.isRequiereCambioPassword(),
                                 accessToken,
@@ -228,8 +243,13 @@ public class AuthenticationService {
                         String ipOrigen,
                         String userAgent) {
 
-                User usuario = userRepository.findByUsuarioLogin(login).orElse(null);
-                Long idUsuario = usuario != null ? usuario.getIdUsuario() : null;
+                AuthenticationContext contexto = authenticationContextRepository
+                                .obtenerPorLogin(login)
+                                .orElse(null);
+
+                Long idUsuario = contexto != null
+                                ? contexto.idUsuario()
+                                : null;
 
                 auditService.registrar(
                                 idUsuario,
@@ -241,8 +261,8 @@ public class AuthenticationService {
                                 "POST",
                                 "/api/auth/login");
 
-                LocalDateTime bloqueadoHasta = usuario != null
-                                ? usuario.getBloqueadoHasta()
+                LocalDateTime bloqueadoHasta = contexto != null
+                                ? contexto.bloqueadoHasta()
                                 : null;
                 long minutos = loginSecurityService.calcularMinutosRestantes(bloqueadoHasta);
 
@@ -255,8 +275,13 @@ public class AuthenticationService {
                         String userAgent,
                         BadCredentialsException excepcionOriginal) {
 
-                User usuario = userRepository.findByUsuarioLogin(login).orElse(null);
-                Long idUsuario = usuario != null ? usuario.getIdUsuario() : null;
+                AuthenticationContext contexto = authenticationContextRepository
+                                .obtenerPorLogin(login)
+                                .orElse(null);
+
+                Long idUsuario = contexto != null
+                                ? contexto.idUsuario()
+                                : null;
 
                 Long idBloqueado = loginSecurityService.registrarIntentoFallido(login);
 
@@ -264,7 +289,7 @@ public class AuthenticationService {
                                 idUsuario,
                                 "LOGIN_FALLIDO",
                                 "FALLIDO",
-                                "Intento de inicio de sesión con credenciales inválidas para el usuario: " + login,
+                                "Intento de inicio de sesión con credenciales inválidas",
                                 ipOrigen,
                                 userAgent,
                                 "POST",
@@ -293,8 +318,7 @@ public class AuthenticationService {
                         String userAgent,
                         DisabledException excepcionOriginal) {
 
-                Optional<AuthenticationContext> contextoOpt =
-                                authenticationContextRepository.obtenerPorLogin(login);
+                Optional<AuthenticationContext> contextoOpt = authenticationContextRepository.obtenerPorLogin(login);
 
                 if (contextoOpt.isEmpty()) {
                         return excepcionOriginal;
@@ -345,5 +369,40 @@ public class AuthenticationService {
                                 "/api/auth/login");
 
                 return new AccountAccessRestrictedException(mensaje);
+        }
+
+        private String resolverLoginEfectivo(
+                        LoginRequest solicitud,
+                        String ipOrigen,
+                        String userAgent) {
+
+                String tipoDocumento = solicitud.getTipoDocumento();
+
+                if (tipoDocumento == null || tipoDocumento.isBlank()) {
+                        throw rechazarResolucionDocumental(ipOrigen, userAgent);
+                }
+
+                log.debug("Resolviendo login por documento tipo={}", tipoDocumento);
+
+                return documentLoginProcedureRepository
+                                .resolverLogin(tipoDocumento, solicitud.getUsuario())
+                                .orElseThrow(() -> rechazarResolucionDocumental(ipOrigen, userAgent));
+        }
+
+        private BadCredentialsException rechazarResolucionDocumental(
+                        String ipOrigen,
+                        String userAgent) {
+
+                auditService.registrar(
+                                null,
+                                "LOGIN_FALLIDO",
+                                "FALLIDO",
+                                "Documento no encontrado o sin cuenta asociada",
+                                ipOrigen,
+                                userAgent,
+                                "POST",
+                                "/api/auth/login");
+
+                return new BadCredentialsException("No fue posible autenticar al usuario");
         }
 }

@@ -11,10 +11,12 @@ public class LoginResponse {
 
     private Long idUsuario;
     private String usuario;
+    private String nombreMostrar;
+    private String iniciales;
     private List<String> autoridades;
 
     private boolean requiereCambioPassword;
-    
+
     private String accessToken;
     private String refreshToken;
     private String tokenType;
@@ -22,5 +24,4 @@ public class LoginResponse {
 
     private String mensaje;
 
-    
 }

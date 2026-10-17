@@ -8,6 +8,7 @@ import monolithe.auth_service.service.PasswordResetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,8 +40,7 @@ class LoginSecurityValidationTest {
         AuthController authController = new AuthController(
                 authenticationService,
                 passwordResetService,
-                auditService
-        );
+                auditService);
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -48,9 +48,14 @@ class LoginSecurityValidationTest {
     }
 
     private String aJson(String usuario, String contrasena) {
+        return aJson(usuario, contrasena, "DNI");
+    }
+
+    private String aJson(String usuario, String contrasena, String tipoDocumento) {
         String u = usuario == null ? "null" : "\"" + escapeJson(usuario) + "\"";
         String c = contrasena == null ? "null" : "\"" + escapeJson(contrasena) + "\"";
-        return "{\"usuario\":" + u + ",\"contrasena\":" + c + "}";
+        String t = tipoDocumento == null ? "null" : "\"" + escapeJson(tipoDocumento) + "\"";
+        return "{\"usuario\":" + u + ",\"contrasena\":" + c + ",\"tipoDocumento\":" + t + "}";
     }
 
     private String escapeJson(String valor) {
@@ -68,14 +73,25 @@ class LoginSecurityValidationTest {
         return new LoginResponse(
                 1L,
                 "admin@sigi.pe",
+                "Admin S.",
+                "AS",
                 List.of("ROLE_ADMINISTRADOR"),
                 false,
                 "access-token",
                 "refresh-token",
                 "Bearer",
                 900L,
-                "Login exitoso"
-        );
+                "Login exitoso");
+    }
+
+    private void assertDocumentoInvalidoResponde400(String tipoDocumento, String numeroDocumento) throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson(numeroDocumento, "Password123!", tipoDocumento)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"));
+
+        verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
     }
 
     @ParameterizedTest
@@ -90,11 +106,10 @@ class LoginSecurityValidationTest {
     })
     void usuarioConPayloadInseguroResponde400YNuncaAutentica(String usuarioMalicioso) throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson(usuarioMalicioso, "Password123!")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson(usuarioMalicioso, "Password123!")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Bad Request"))
-                .andExpect(jsonPath("$.message").value("Ingresa un usuario válido"));
+                .andExpect(jsonPath("$.error").value("Bad Request"));
 
         verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
     }
@@ -102,8 +117,8 @@ class LoginSecurityValidationTest {
     @Test
     void usuarioConByteNuloResponde400YNuncaAutentica() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"usuario\":\"admin\\u0000@sigi.pe\",\"contrasena\":\"Password123!\"}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"usuario\":\"1234\\u0000567\",\"contrasena\":\"Password123!\",\"tipoDocumento\":\"DNI\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
 
@@ -112,11 +127,11 @@ class LoginSecurityValidationTest {
 
     @Test
     void usuarioExcesivamenteLargoResponde400YNuncaAutentica() throws Exception {
-        String usuarioLargo = "a".repeat(121) + "@sigi.pe";
+        String usuarioLargo = "1".repeat(21);
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson(usuarioLargo, "Password123!")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson(usuarioLargo, "Password123!")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
 
@@ -126,12 +141,80 @@ class LoginSecurityValidationTest {
     @Test
     void usuarioVacioResponde400YNuncaAutentica() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson("   ", "Password123!")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("   ", "Password123!")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
 
         verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
+    }
+
+    @Test
+    void dniCon7DigitosResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("DNI", "1234567");
+    }
+
+    @Test
+    void dniCon9DigitosResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("DNI", "123456789");
+    }
+
+    @Test
+    void dniConLetrasResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("DNI", "1234567A");
+    }
+
+    @Test
+    void rucCon10DigitosResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("RUC", "1023456789");
+    }
+
+    @Test
+    void rucCon12DigitosResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("RUC", "102345678901");
+    }
+
+    @Test
+    void ceConMenosDe8CaracteresResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("CE", "1234567");
+    }
+
+    @Test
+    void ceConMasDe12CaracteresResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("CE", "1234567890123");
+    }
+
+    @Test
+    void pasaporteConMenosDe6CaracteresResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("PASAPORTE", "12345");
+    }
+
+    @Test
+    void pasaporteConMasDe20CaracteresResponde400YNuncaAutentica() throws Exception {
+        assertDocumentoInvalidoResponde400("PASAPORTE", "123456789012345678901");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "DNI, 12345678",
+            "DNI, 87654321",
+            "CE, 12345678",
+            "CE, ABC123456789",
+            "RUC, 20123456789",
+            "PASAPORTE, AB1234",
+            "PASAPORTE, PASSPORT123456789012"
+    })
+    void formatosValidosLleganAlServicioDeAutenticacion(String tipo, String documento) throws Exception {
+        when(authenticationService.autenticar(any(), any(), any()))
+                .thenReturn(crearRespuestaExitosa());
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson(documento, "Password123!", tipo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idUsuario").value(1L));
+
+        verify(authenticationService).autenticar(any(), any(), any());
     }
 
     @Test
@@ -140,8 +223,8 @@ class LoginSecurityValidationTest {
                 .thenReturn(crearRespuestaExitosa());
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson("admin@sigi.pe", "Abc!@#$%_+-123")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", "Abc!@#$%_+-123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.idUsuario").value(1L));
 
@@ -151,8 +234,8 @@ class LoginSecurityValidationTest {
     @Test
     void contrasenaConCaracteresDeControlResponde400() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson("admin@sigi.pe", "Abc\t123!")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", "Abc\t123!")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La contraseña contiene caracteres no permitidos"));
 
@@ -162,8 +245,8 @@ class LoginSecurityValidationTest {
     @Test
     void contrasenaConByteNuloResponde400YNuncaAutentica() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"usuario\":\"admin@sigi.pe\",\"contrasena\":\"Abc\\u0000123!\"}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"usuario\":\"12345678\",\"contrasena\":\"Abc\\u0000123!\",\"tipoDocumento\":\"DNI\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"));
 
@@ -175,31 +258,56 @@ class LoginSecurityValidationTest {
         String claveLarga = "P".repeat(129);
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson("admin@sigi.pe", claveLarga)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", claveLarga)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La contraseña no debe exceder 128 caracteres"));
 
         verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "admin@sigi.pe",
-            "cmendoza@sigi.pe",
-            "45872103",
-            "usuario1",
-            "diego.alvarado"
-    })
-    void identificadoresLegitimosSonAceptadosPorValidacion(String loginValido) throws Exception {
-        when(authenticationService.autenticar(any(), any(), any()))
-                .thenReturn(crearRespuestaExitosa());
-
+    @Test
+    void tipoDocumentoAusenteResponde400YNuncaAutentica() throws Exception {
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(aJson(loginValido, "Abc!@#$%_+-123")))
-                .andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"usuario\":\"12345678\",\"contrasena\":\"Password123!\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("El tipo de documento es obligatorio"));
 
-        verify(authenticationService).autenticar(any(), any(), any());
+        verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
+    }
+
+    @Test
+    void tipoDocumentoVacioResponde400YNuncaAutentica() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", "Password123!", "   ")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"));
+
+        verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
+    }
+
+    @Test
+    void tipoDocumentoNuloResponde400YNuncaAutentica() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", "Password123!", null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("El tipo de documento es obligatorio"));
+
+        verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "CEDULA", "INVALIDO", "OTRO", "123" })
+    void tipoDocumentoInvalidoResponde400YNuncaAutentica(String tipoInvalido) throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(aJson("12345678", "Password123!", tipoInvalido)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Selecciona un tipo de documento válido"));
+
+        verify(authenticationService, never()).autenticar(any(), anyString(), anyString());
     }
 }

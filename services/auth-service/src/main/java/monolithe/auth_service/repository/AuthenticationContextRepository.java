@@ -74,11 +74,8 @@ public class AuthenticationContextRepository {
                     toStringList(rawAuthorities)));
         } catch (Exception e) {
             log.error(
-                    "ERROR AUTH CONTEXT ejecutando sp_obtener_contexto_autenticacion para login={}: {}",
-                    login,
-                    e.getMessage(),
-                    e
-            );
+                    "Error al obtener el contexto de autenticación. Tipo de error: {}",
+                    e.getClass().getSimpleName());
             throw e;
         }
     }

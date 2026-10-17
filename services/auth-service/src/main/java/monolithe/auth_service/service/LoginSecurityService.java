@@ -1,11 +1,11 @@
 package monolithe.auth_service.service;
 
 import lombok.RequiredArgsConstructor;
-import monolithe.auth_service.entity.User;
 import monolithe.auth_service.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import monolithe.auth_service.repository.LoginAttemptProcedureRepository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 public class LoginSecurityService {
 
         private final UserRepository userRepository;
+        private final LoginAttemptProcedureRepository loginAttemptProcedureRepository;
 
         @Value("${security.auth.max-failed-attempts}")
         private int maxFailedAttempts;
@@ -26,45 +27,10 @@ public class LoginSecurityService {
         @Transactional
         public Long registrarIntentoFallido(String usuarioLogin) {
 
-                User usuario = userRepository.findByUsuarioLogin(usuarioLogin)
-                                .orElse(null);
-
-                if (usuario == null) {
-                        return null;
-                }
-
-                LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
-
-                int intentosActuales = usuario.getIntentosFallidos() != null
-                                ? usuario.getIntentosFallidos()
-                                : 0;
-
-                if (usuario.getBloqueadoHasta() != null
-                                && !usuario.getBloqueadoHasta().isAfter(ahora)) {
-
-                        intentosActuales = 0;
-                        usuario.setBloqueadoHasta(null);
-                }
-
-                int nuevosIntentos = intentosActuales + 1;
-
-                usuario.setIntentosFallidos(nuevosIntentos);
-
-                boolean bloqueadoAhora = false;
-
-                if (nuevosIntentos >= maxFailedAttempts) {
-
-                        usuario.setBloqueadoHasta(
-                                        ahora.plusSeconds(lockDuration));
-
-                        bloqueadoAhora = true;
-                }
-
-                userRepository.save(usuario);
-
-                return bloqueadoAhora
-                                ? usuario.getIdUsuario()
-                                : null;
+                return loginAttemptProcedureRepository.registrarIntentoFallido(
+                                usuarioLogin,
+                                maxFailedAttempts,
+                                lockDuration);
         }
 
         @Transactional
