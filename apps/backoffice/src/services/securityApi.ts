@@ -1,6 +1,8 @@
 import { getAccessToken } from '../lib/authSession';
 
-const BASE_URL = '/api/security';
+const BASE_URL = (
+  import.meta.env.VITE_AUTH_API_URL ?? '/api/auth'
+).replace(/\/auth\/?$/, '/security');
 
 export interface SecurityUserRole {
   idRol: number;
