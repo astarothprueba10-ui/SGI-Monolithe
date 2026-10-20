@@ -16,7 +16,8 @@ chmod -R 600 "${PROJECT_DIR}/.secret" 2>/dev/null || true
 
 echo "Rebuilding and starting docker containers..."
 docker compose down || true
-docker compose up -d --build --remove-orphans
+docker rm -f sgi-auth-service sgi-core-service sgi-portal-cliente sgi-backoffice sgi-pagina-web-backend sgi-pagina-web-frontend 2>/dev/null || true
+docker compose up -d --remove-orphans
 
 echo "Pruning dangling images to save disk space..."
 docker image prune -f
