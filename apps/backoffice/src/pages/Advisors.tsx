@@ -90,8 +90,8 @@ export function Advisors() {
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           { label: 'Asesores activos', value: number(ADVISORS.filter((a) => a.status === 'Activo').length) },
-          { label: 'Comisiones generadas', value: currency(totalCommissionsCalculated || 5010) },
-          { label: 'Comisiones aprobadas (devengadas)', value: currency(totalCommissionsApproved || 2160) }
+          { label: 'Comisiones generadas', value: currency(totalCommissionsCalculated || 0) },
+          { label: 'Comisiones aprobadas (devengadas)', value: currency(totalCommissionsApproved || 0) }
         ].map((item) => (
           <Card key={item.label} className="p-5">
             <p className="text-[12px] text-brand-400">{item.label}</p>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { NotFound } from './pages/NotFound';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { Home } from './pages/Home';
 import { About } from './pages/About';
@@ -44,7 +45,7 @@ export function App() {
           <Route path="publicaciones" element={<CmsPublications />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>);
 

@@ -17,6 +17,7 @@ import { Workers } from './pages/Workers';
 import { UsersAndRoles } from './pages/UsersAndRoles';
 import { Audit } from './pages/Audit';
 import { Unauthorized } from './pages/Unauthorized';
+import { NotFound } from './pages/NotFound';
 import type { ReactElement } from 'react';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
@@ -227,10 +228,7 @@ export function App({
 
             <Route path="/no-autorizado" element={<Unauthorized />} />
 
-            <Route
-              path="*"
-              element={<Navigate to="/no-autorizado" replace />}
-            />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
 
