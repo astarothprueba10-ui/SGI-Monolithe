@@ -31,8 +31,8 @@ function buscarPersona(persona: AvailablePerson, q: string): boolean {
   const lower = q.toLowerCase();
   return (
     persona.nombres.toLowerCase().includes(lower) ||
-    persona.apellidoPaterno.toLowerCase().includes(lower) ||
-    persona.apellidoMaterno.toLowerCase().includes(lower) ||
+    (persona.apellidoPaterno ?? '').toLowerCase().includes(lower) ||
+    (persona.apellidoMaterno ?? '').toLowerCase().includes(lower) ||
     persona.nombreCompleto.toLowerCase().includes(lower) ||
     (persona.correo ?? '').toLowerCase().includes(lower)
   );
