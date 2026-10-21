@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -18,80 +19,92 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(RecursoNoEncontradoException.class)
-    public ResponseEntity<ErrorResponse> manejarRecursoNoEncontrado(
-            RecursoNoEncontradoException ex,
-            HttpServletRequest request
-    ) {
-        ErrorResponse response = buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-    }
-
-    @ExceptionHandler(ConflictoNegocioException.class)
-    public ResponseEntity<ErrorResponse> manejarConflictoNegocio(
-            ConflictoNegocioException ex,
-            HttpServletRequest request
-    ) {
-        ErrorResponse response = buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
-    }
-
-    @ExceptionHandler(ReglaNegocioException.class)
-    public ResponseEntity<ErrorResponse> manejarReglaNegocio(
-            ReglaNegocioException ex,
-            HttpServletRequest request
-    ) {
-        ErrorResponse response = buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> manejarValidaciones(
-            MethodArgumentNotValidException ex,
-            HttpServletRequest request
-    ) {
-        Map<String, String> errores = new LinkedHashMap<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            errores.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
+        @ExceptionHandler(RecursoNoEncontradoException.class)
+        public ResponseEntity<ErrorResponse> manejarRecursoNoEncontrado(
+                        RecursoNoEncontradoException ex,
+                        HttpServletRequest request) {
+                ErrorResponse response = buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
 
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-        ValidationErrorResponse response = new ValidationErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
-                "Existen errores de validación en la solicitud",
-                request.getRequestURI(),
-                errores
-        );
+        @ExceptionHandler(ConflictoNegocioException.class)
+        public ResponseEntity<ErrorResponse> manejarConflictoNegocio(
+                        ConflictoNegocioException ex,
+                        HttpServletRequest request) {
+                ErrorResponse response = buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
 
-        return ResponseEntity.status(status).body(response);
-    }
+        @ExceptionHandler(ReglaNegocioException.class)
+        public ResponseEntity<ErrorResponse> manejarReglaNegocio(
+                        ReglaNegocioException ex,
+                        HttpServletRequest request) {
+                ErrorResponse response = buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> manejarMensajeNoLectura(
-            HttpMessageNotReadableException ex,
-            HttpServletRequest request
-    ) {
-        ErrorResponse response = buildError(
-                HttpStatus.BAD_REQUEST,
-                "El cuerpo de la solicitud no es válido",
-                request
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
+        @ExceptionHandler(MethodArgumentNotValidException.class)
+        public ResponseEntity<ValidationErrorResponse> manejarValidaciones(
+                        MethodArgumentNotValidException ex,
+                        HttpServletRequest request) {
+                Map<String, String> errores = new LinkedHashMap<>();
+                for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+                        errores.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
+                }
 
-    private ErrorResponse buildError(
-            HttpStatus status,
-            String message,
-            HttpServletRequest request
-    ) {
-        return new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
-                message,
-                request.getRequestURI()
-        );
-    }
+                HttpStatus status = HttpStatus.BAD_REQUEST;
+                ValidationErrorResponse response = new ValidationErrorResponse(
+                                Instant.now(),
+                                status.value(),
+                                status.getReasonPhrase(),
+                                "Existen errores de validación en la solicitud",
+                                request.getRequestURI(),
+                                errores);
+
+                return ResponseEntity.status(status).body(response);
+        }
+
+        @ExceptionHandler(HttpMessageNotReadableException.class)
+        public ResponseEntity<ErrorResponse> manejarMensajeNoLectura(
+                        HttpMessageNotReadableException ex,
+                        HttpServletRequest request) {
+                ErrorResponse response = buildError(
+                                HttpStatus.BAD_REQUEST,
+                                "El cuerpo de la solicitud no es válido",
+                                request);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        @ExceptionHandler(ResponseStatusException.class)
+        public ResponseEntity<ErrorResponse> manejarEstadoHttp(
+                        ResponseStatusException ex,
+                        HttpServletRequest request) {
+                HttpStatus status = HttpStatus.valueOf(
+                                ex.getStatusCode().value());
+
+                String mensaje = ex.getReason();
+
+                if (mensaje == null || mensaje.isBlank()) {
+                        mensaje = "No se pudo completar la operación.";
+                }
+
+                ErrorResponse response = buildError(
+                                status,
+                                mensaje,
+                                request);
+
+                return ResponseEntity.status(status).body(response);
+        }
+
+        private ErrorResponse buildError(
+                        HttpStatus status,
+                        String message,
+                        HttpServletRequest request) {
+                return new ErrorResponse(
+                                Instant.now(),
+                                status.value(),
+                                status.getReasonPhrase(),
+                                message,
+                                request.getRequestURI());
+        }
 }

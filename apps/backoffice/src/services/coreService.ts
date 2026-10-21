@@ -1,4 +1,5 @@
 import { coreApi } from '../lib/apiClient';
+import type { TrabajadorResponse, CatalogosTrabajadorResponse } from '../types/workers';
 import type {
   ProyectoResponse,
   ProyectoRequest,
@@ -21,8 +22,11 @@ import type {
   PlanoInteractivoDetalleResponse,
   PlanoInteractivoRequest,
   LoteGeometriaResponse,
-  LoteGeometriaRequest
+  LoteGeometriaRequest,
+  UbicacionGeograficaResponse
 } from '../types/core';
+
+export type { UbicacionGeograficaResponse };
 
 function buildLotSearchParams(filters: LoteFiltroRequest): string {
   const params = new URLSearchParams();
@@ -61,6 +65,30 @@ function buildLotSearchParams(filters: LoteFiltroRequest): string {
 }
 
 export const coreService = {
+  // RECURSOS HUMANOS - TRABAJADORES
+  getWorkers(): Promise<TrabajadorResponse[]> {
+    return coreApi.get<TrabajadorResponse[]>('/trabajadores');
+  },
+
+  getWorkerCatalogs(): Promise<CatalogosTrabajadorResponse> {
+    return coreApi.get<CatalogosTrabajadorResponse>(
+      '/trabajadores/catalogos'
+    );
+  },
+
+  createWorker(data: Record<string, unknown>): Promise<unknown> {
+    return coreApi.post<unknown>(
+      '/trabajadores',
+      data
+    );
+  },
+
+  // UBICACIONES GEOGRAFICAS
+  getUbicaciones(padreId?: number | null): Promise<UbicacionGeograficaResponse[]> {
+    const query = padreId !== undefined && padreId !== null ? `?padreId=${padreId}` : '';
+    return coreApi.get<UbicacionGeograficaResponse[]>(`/ubicaciones${query}`);
+  },
+
   // Proyectos
   getProjects(): Promise<ProyectoResponse[]> {
     return coreApi.get<ProyectoResponse[]>('/proyectos');

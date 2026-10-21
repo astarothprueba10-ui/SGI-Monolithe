@@ -317,3 +317,10 @@ export type LoteGeometriaRequest = {
   observaciones?: string | null;
 };
 
+export interface UbicacionGeograficaResponse {
+  idUbicacion: number;
+  idUbicacionPadre?: number | null;
+  tipo: string;
+  codigo: string;
+  nombre: string;
+}
