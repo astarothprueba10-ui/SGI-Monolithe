@@ -3,6 +3,7 @@ package monolithe.core_service.service;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.ProyectoRequest;
 import monolithe.core_service.dto.ProyectoResponse;
+import monolithe.core_service.dto.UbigeoResponse;
 import monolithe.core_service.entity.EstadoProyecto;
 import monolithe.core_service.entity.Proyecto;
 import monolithe.core_service.exception.ConflictoNegocioException;
@@ -17,7 +18,6 @@ import monolithe.core_service.repository.ZonaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +32,7 @@ public class ProyectoService {
     private final ZonaRepository zonaRepository;
     private final ManzanaRepository manzanaRepository;
     private final LoteRepository loteRepository;
+    private final ValidacionProyectoService validacionProyectoService;
 
     @Transactional(readOnly = true)
     public List<ProyectoResponse> listarTodos() {
@@ -57,80 +58,57 @@ public class ProyectoService {
         return toResponse(proyecto);
     }
 
+    /** Crea un proyecto después de validar su ubicación y cronología. */
     @Transactional
     public ProyectoResponse crear(ProyectoRequest request) {
         String codigo = normalizarCodigo(request.codigo());
-        String nombre = normalizarTexto(request.nombre());
-        EstadoProyecto estado = obtenerEstadoActivo(request.codigoEstadoProyecto());
-
         if (proyectoRepository.existsByCodigo(codigo)) {
             throw new ConflictoNegocioException("Ya existe un proyecto con el código: " + codigo);
         }
-
-        validarFechas(request.fechaInicio(), request.fechaFinEstimada());
-
         Proyecto p = new Proyecto();
-        p.setEstadoProyecto(estado);
-        p.setCodigo(codigo);
-        p.setNombre(nombre);
-        p.setDescripcion(request.descripcion());
-        p.setDireccion(normalizarTexto(request.direccion()));
-        p.setUbicacionReferencia(normalizarTexto(request.ubicacionReferencia()));
-        p.setDistrito(normalizarTexto(request.distrito()));
-        p.setProvincia(normalizarTexto(request.provincia()));
-        p.setDepartamento(normalizarTexto(request.departamento()));
-        p.setPais(resolverPais(request.pais()));
-        p.setLatitud(request.latitud());
-        p.setLongitud(request.longitud());
-        p.setAreaTotalM2(request.areaTotalM2());
-        p.setFechaInicio(request.fechaInicio());
-        p.setFechaFinEstimada(request.fechaFinEstimada());
+        aplicarDatos(p, request);
         p.setActivo(request.activo() != null ? request.activo() : true);
-
-        Proyecto guardado = proyectoRepository.save(p);
-        return toResponse(guardado);
+        return toResponse(proyectoRepository.save(p));
     }
 
+    /** Actualiza un proyecto aplicando las mismas reglas geográficas y de fechas que el alta. */
     @Transactional
     public ProyectoResponse actualizar(Long idProyecto, ProyectoRequest request) {
         Proyecto p = proyectoRepository.findById(idProyecto)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proyecto no encontrado con id: " + idProyecto));
-
         String codigo = normalizarCodigo(request.codigo());
-        String nombre = normalizarTexto(request.nombre());
-        EstadoProyecto estado = obtenerEstadoActivo(request.codigoEstadoProyecto());
-
         if (proyectoRepository.existsByCodigoAndIdProyectoNot(codigo, idProyecto)) {
             throw new ConflictoNegocioException("Ya existe otro proyecto con el código: " + codigo);
         }
-
-        validarFechas(request.fechaInicio(), request.fechaFinEstimada());
-
-        p.setEstadoProyecto(estado);
-        p.setCodigo(codigo);
-        p.setNombre(nombre);
-        p.setDescripcion(request.descripcion());
-        p.setDireccion(normalizarTexto(request.direccion()));
-        p.setUbicacionReferencia(normalizarTexto(request.ubicacionReferencia()));
-        p.setDistrito(normalizarTexto(request.distrito()));
-        p.setProvincia(normalizarTexto(request.provincia()));
-        p.setDepartamento(normalizarTexto(request.departamento()));
-        p.setPais(resolverPais(request.pais()));
-        p.setLatitud(request.latitud());
-        p.setLongitud(request.longitud());
-        p.setAreaTotalM2(request.areaTotalM2());
-        p.setFechaInicio(request.fechaInicio());
-        p.setFechaFinEstimada(request.fechaFinEstimada());
+        aplicarDatos(p, request);
         if (Boolean.TRUE.equals(p.getActivo()) && Boolean.FALSE.equals(request.activo())) {
             validarDesactivacionProyecto(idProyecto);
         }
+        if (request.activo() != null) p.setActivo(request.activo());
+        return toResponse(proyectoRepository.save(p));
+    }
 
-        if (request.activo() != null) {
-            p.setActivo(request.activo());
-        }
+    private void aplicarDatos(Proyecto proyecto, ProyectoRequest request) {
+        UbigeoResponse ubicacion = validacionProyectoService.validar(request);
+        proyecto.setEstadoProyecto(obtenerEstadoActivo(request.codigoEstadoProyecto()));
+        proyecto.setCodigo(normalizarCodigo(request.codigo()));
+        proyecto.setNombre(normalizarTexto(request.nombre()));
+        proyecto.setDescripcion(request.descripcion());
+        aplicarUbicacion(proyecto, request, ubicacion);
+        proyecto.setLatitud(request.latitud());
+        proyecto.setLongitud(request.longitud());
+        proyecto.setAreaTotalM2(request.areaTotalM2());
+        proyecto.setFechaInicio(request.fechaInicio());
+        proyecto.setFechaFinEstimada(request.fechaFinEstimada());
+    }
 
-        Proyecto actualizado = proyectoRepository.save(p);
-        return toResponse(actualizado);
+    private void aplicarUbicacion(Proyecto proyecto, ProyectoRequest request, UbigeoResponse ubicacion) {
+        proyecto.setDireccion(normalizarTexto(request.direccion()));
+        proyecto.setUbicacionReferencia(normalizarTexto(request.ubicacionReferencia()));
+        proyecto.setDepartamento(ubicacion.departamento());
+        proyecto.setProvincia(ubicacion.provincia());
+        proyecto.setDistrito(ubicacion.distrito());
+        proyecto.setPais("Perú");
     }
 
     @Transactional
@@ -192,13 +170,6 @@ public class ProyectoService {
         return texto != null ? texto.trim() : null;
     }
 
-    private String resolverPais(String pais) {
-        if (pais == null || pais.isBlank()) {
-            return "Perú";
-        }
-        return pais.trim();
-    }
-
     private EstadoProyecto obtenerEstadoActivo(String codigoEstadoProyecto) {
         String codigoNormalizado = normalizarCodigo(codigoEstadoProyecto);
         EstadoProyecto ep = estadoProyectoRepository.findByCodigo(codigoNormalizado)
@@ -210,9 +181,4 @@ public class ProyectoService {
         return ep;
     }
 
-    private void validarFechas(LocalDate fechaInicio, LocalDate fechaFinEstimada) {
-        if (fechaInicio != null && fechaFinEstimada != null && fechaFinEstimada.isBefore(fechaInicio)) {
-            throw new ReglaNegocioException("La fecha fin estimada no puede ser anterior a la fecha de inicio");
-        }
-    }
 }

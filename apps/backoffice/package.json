@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:projects": "node --test tests/projectForm.test.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "vite preview"
   },
