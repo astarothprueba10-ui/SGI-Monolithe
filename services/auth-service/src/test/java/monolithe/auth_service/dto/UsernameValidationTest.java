@@ -15,6 +15,7 @@ class UsernameValidationTest {
         CreateUserRequest create = new CreateUserRequest();
         create.setIdPersona(1L);
         create.setUsuarioLogin(value);
+        create.setCodigosRol(java.util.List.of("CLIENTE"));
         UpdateUserRequest update = new UpdateUserRequest();
         update.setUsuarioLogin(value);
         assertTrue(validator.validate(create).isEmpty());
@@ -29,6 +30,7 @@ class UsernameValidationTest {
         CreateUserRequest create = new CreateUserRequest();
         create.setIdPersona(1L);
         create.setUsuarioLogin(value);
+        create.setCodigosRol(java.util.List.of("CLIENTE"));
         UpdateUserRequest update = new UpdateUserRequest();
         update.setUsuarioLogin(value);
         assertFalse(validator.validate(create).isEmpty());

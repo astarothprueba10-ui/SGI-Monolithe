@@ -3,6 +3,7 @@ package monolithe.auth_service.security;
 import lombok.RequiredArgsConstructor;
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.repository.AuthenticationContextRepository;
+import monolithe.auth_service.repository.UserRepository;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -18,6 +19,7 @@ import java.util.List;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final AuthenticationContextRepository authenticationContextRepository;
+    private final UserRepository userRepository;
 
     @Override
     public UserDetails loadUserByUsername(String username)
@@ -42,6 +44,10 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .map(SimpleGrantedAuthority::new)
                 .toList();
 
+        Long versionSesiones = userRepository
+                .findVersionSesionesByIdUsuario(contexto.idUsuario())
+                .orElse(0L);
+
         return new UserPrincipal(
                 contexto.idUsuario(),
                 contexto.usuarioLogin(),
@@ -49,6 +55,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 authorities,
                 enabled,
                 accountNonLocked,
-                contexto.requiereCambioPassword());
+                contexto.requiereCambioPassword(),
+                versionSesiones);
     }
 }

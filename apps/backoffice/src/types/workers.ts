@@ -83,3 +83,43 @@ export interface CatalogosTrabajadorResponse {
     nombre: string;
   }[];
 }
+
+export interface SolicitudCorreccionDocumentoRequest {
+  idTipoDocumento: number;
+  numeroDocumento: string;
+  motivo: string;
+}
+
+export interface SolicitudCorreccionDocumentoResponse {
+  idSolicitud: number;
+  estado?: string;
+  mensaje?: string;
+}
+
+export interface CorreccionDocumentalItem {
+  idSolicitud: number;
+  idTrabajador: number;
+  codigoTrabajador?: string;
+  nombres?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string | null;
+  trabajador?: string;
+  idTipoDocumentoActual?: number | null;
+  tipoDocumentoActual?: string;
+  numeroDocumentoActual?: string;
+  idTipoDocumentoPropuesto?: number;
+  tipoDocumentoPropuesto?: string;
+  numeroDocumentoPropuesto?: string;
+  motivo?: string;
+  fechaSolicitud?: string;
+  estado?: string;
+  tieneEvidencia?: boolean;
+  idEvidencia?: number | null;
+  storagePath?: string | null;
+  idActorSolicitante?: number;
+}
+
+export interface ResolverCorreccionRequest {
+  decision: 'APROBAR' | 'RECHAZAR';
+  motivo?: string | null;
+}

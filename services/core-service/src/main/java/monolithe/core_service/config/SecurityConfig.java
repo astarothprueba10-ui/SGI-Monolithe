@@ -50,7 +50,8 @@ public class SecurityConfig {
                                                                 "/actuator/health",
                                                                 "/actuator/health/**",
                                                                 "/actuator/info",
-                                                                "/error")
+                                                                "/error",
+                                                                "/api/core/trabajadores/confirmar-cambio-correo")
                                                 .permitAll()
                                                 .requestMatchers("/api/core/**")
                                                 .access((authentication, context) ->

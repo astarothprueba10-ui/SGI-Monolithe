@@ -1,6 +1,7 @@
 package monolithe.auth_service.service;
 
 import lombok.RequiredArgsConstructor;
+import monolithe.auth_service.entity.Estado;
 import monolithe.auth_service.entity.Session;
 import monolithe.auth_service.entity.User;
 import monolithe.auth_service.repository.SessionRepository;
@@ -8,6 +9,7 @@ import monolithe.auth_service.repository.UserRepository;
 import monolithe.auth_service.security.RefreshTokenRotation;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ public class RefreshTokenService {
 
         private final SessionRepository sessionRepository;
         private final UserRepository userRepository;
+        private final JdbcTemplate jdbcTemplate;
 
         @Value("${security.jwt.refresh-token-expiration}")
         private long refreshTokenExpiration;
@@ -143,28 +146,50 @@ public class RefreshTokenService {
                         User usuario,
                         LocalDateTime ahora) {
 
-                if (usuario.getEstadoUsuario() == null) {
-                        throw new IllegalArgumentException(
-                                        "El usuario no tiene un estado válido");
+                validarAccesoAdministrativo(usuario, ahora);
+                validarAccesoLaboral(usuario.getIdPersona());
+        }
+
+        private void validarAccesoAdministrativo(
+                        User usuario,
+                        LocalDateTime ahora) {
+
+                validarEstadoUsuario(usuario.getEstadoUsuario());
+                validarBloqueoUsuario(usuario.getBloqueadoHasta(), ahora);
+        }
+
+        private void validarEstadoUsuario(Estado estado) {
+                if (estado == null) {
+                        throw new IllegalArgumentException("El usuario no tiene un estado válido");
                 }
-
-                if (!Boolean.TRUE.equals(
-                                usuario.getEstadoUsuario().getActivo())) {
-                        throw new IllegalArgumentException(
-                                        "Usuario inactivo");
+                if (!"ACTIVO".equals(estado.getCodigo()) || !Boolean.TRUE.equals(estado.getActivo())) {
+                        throw new IllegalArgumentException("Usuario inactivo");
                 }
-
-                if (!Boolean.TRUE.equals(
-                                usuario.getEstadoUsuario().getPermiteAcceso())) {
-                        throw new IllegalArgumentException(
-                                        "El usuario no tiene permitido el acceso");
+                if (!Boolean.TRUE.equals(estado.getPermiteAcceso())) {
+                        throw new IllegalArgumentException("El usuario no tiene permitido el acceso");
                 }
+        }
 
-                if (usuario.getBloqueadoHasta() != null
-                                && usuario.getBloqueadoHasta().isAfter(ahora)) {
+        private void validarBloqueoUsuario(LocalDateTime bloqueadoHasta, LocalDateTime ahora) {
+                if (bloqueadoHasta != null && bloqueadoHasta.isAfter(ahora)) {
+                        throw new IllegalArgumentException("Usuario bloqueado temporalmente");
+                }
+        }
 
-                        throw new IllegalArgumentException(
-                                        "Usuario bloqueado temporalmente");
+        private void validarAccesoLaboral(Long idPersona) {
+                if (idPersona == null) {
+                        throw new IllegalArgumentException("Usuario sin persona asociada");
+                }
+                try {
+                        String sql = "SELECT public.fn_seguridad_acceso_laboral_permitido(?)";
+                        Boolean permitido = jdbcTemplate.queryForObject(sql, Boolean.class, idPersona);
+                        if (!Boolean.TRUE.equals(permitido)) {
+                                throw new IllegalArgumentException("Acceso laboral no permitido");
+                        }
+                } catch (IllegalArgumentException e) {
+                        throw e;
+                } catch (Exception e) {
+                        throw new IllegalArgumentException("No fue posible validar el acceso laboral", e);
                 }
         }
 

@@ -21,7 +21,7 @@ public class RolePermissionController {
     private final RolePermissionService service;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('roles.create')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.create')")
     public ResponseEntity<SecurityOperationResult> crearRol(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateRoleRequest request) {
@@ -47,7 +47,7 @@ public class RolePermissionController {
     }
 
     @PutMapping("/{codigoRol}/permissions")
-    @PreAuthorize("hasAuthority('roles.assign_permissions')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.assign_permissions')")
     public ResponseEntity<SecurityOperationResult> actualizarPermisos(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String codigoRol,

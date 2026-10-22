@@ -2,16 +2,18 @@
 package monolithe.core_service.controller;
 
 import lombok.RequiredArgsConstructor;
-import monolithe.core_service.dto.TrabajadorResponse;
+import monolithe.core_service.dto.*;
 import monolithe.core_service.service.TrabajadorService;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.validation.Valid;
 import tools.jackson.databind.JsonNode;
 
 import java.util.List;
@@ -77,6 +79,44 @@ public class TrabajadorController {
         return trabajadorService.registrarTrabajador(
                 idActor,
                 datos);
+    }
+
+    @PutMapping("/{idTrabajador}")
+    @PreAuthorize("hasAuthority('hr.edit')")
+    public JsonNode actualizarTrabajador(
+            @PathVariable Long idTrabajador,
+            @RequestBody @Valid ActualizarTrabajadorRequest solicitud,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return trabajadorService.actualizarTrabajador(
+                idActor,
+                idTrabajador,
+                solicitud);
+    }
+
+    @PostMapping("/{idTrabajador}/solicitar-cambio-correo")
+    @PreAuthorize("hasAuthority('hr.edit')")
+    public ResponseEntity<SolicitudCambioCorreoResponse> solicitarCambioCorreo(
+            @PathVariable Long idTrabajador,
+            @RequestBody @Valid SolicitudCambioCorreoRequest solicitud,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+        String tokenJwt = jwt.getTokenValue();
+
+        return ResponseEntity.ok(trabajadorService.solicitarCambioCorreo(
+                idActor,
+                idTrabajador,
+                solicitud.correoNuevo(),
+                tokenJwt));
+    }
+
+    @PostMapping("/confirmar-cambio-correo")
+    public ResponseEntity<ConfirmacionCambioCorreoResponse> confirmarCambioCorreo(
+            @RequestBody @Valid ConfirmarCambioCorreoRequest solicitud) {
+
+        return ResponseEntity.ok(trabajadorService.confirmarCambioCorreo(
+                solicitud.token()));
     }
 
     private Long obtenerIdActor(Jwt jwt) {

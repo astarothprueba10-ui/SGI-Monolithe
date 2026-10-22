@@ -3,12 +3,23 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { FieldLabel, Input, Select } from '../ui/Field';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   securityApi,
   type AvailablePerson,
   type SecurityRole,
   type SecurityUser
 } from '../../services/securityApi';
+import {
+  CODIGO_ROL_CLIENTE,
+  alternarRolSeleccionado,
+  correoPrincipalValido,
+  debeMostrarAdvertenciaCorreoFaltante,
+  evaluarRolesIniciales,
+  personaElegibleParaSeleccion,
+  personasUnicasPorId,
+  puedeAsignarRolesInternosProtegidos
+} from './createUserPolicy';
 
 interface CreateUserModalProps {
   open: boolean;
@@ -16,14 +27,6 @@ interface CreateUserModalProps {
   roles: SecurityRole[];
   onSuccess: () => Promise<void>;
   user?: SecurityUser | null;
-}
-
-type TipoPersona = 'TRABAJADOR' | 'CLIENTE';
-
-const CODIGO_ROL_CLIENTE = 'CLIENTE';
-
-function validarFormatoCorreo(valor: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
 }
 
 function buscarPersona(persona: AvailablePerson, q: string): boolean {
@@ -38,49 +41,30 @@ function buscarPersona(persona: AvailablePerson, q: string): boolean {
   );
 }
 
-function derivarTipoPersona(user: SecurityUser): TipoPersona {
-  return user.roles.some((r) => r.codigo === CODIGO_ROL_CLIENTE)
-    ? 'CLIENTE'
-    : 'TRABAJADOR';
+function tieneRolCliente(user: SecurityUser): boolean {
+  return user.roles.some((r) => r.codigo === CODIGO_ROL_CLIENTE);
 }
 
 function extraerPrefijo(usuarioLogin: string): string {
   return usuarioLogin;
 }
 
-function etiquetaEstadoDocumento(persona: AvailablePerson): string | null {
-  if (!persona.tipoDocumento || !persona.numeroDocumento) {
-    return 'Sin documento principal registrado';
-  }
-  if (!persona.documentoActivo) {
-    return 'Documento inactivo';
-  }
-  if (!persona.documentoVerificado) {
-    return 'Documento pendiente de verificacion';
-  }
-  return null;
-}
-
 async function ejecutarFlujoCreacion(
   idPersona: number,
   usuarioLogin: string,
-  codigoRol: string,
-  correo: string
+  codigosRol: string[]
 ): Promise<void> {
-  const resultadoCorreo = await securityApi.asociarCorreoPersona(idPersona, correo);
-  if (resultadoCorreo.estado !== 'OK') {
-    throw new Error(`CORREO_FAIL:${resultadoCorreo.mensaje}`);
+  const creado = await securityApi.crearUsuario({
+    idPersona,
+    usuarioLogin,
+    codigosRol
+  });
+
+  if (creado.estado !== 'CREADO' || !creado.idUsuario) {
+    throw new Error(creado.mensaje || 'No se pudo crear la cuenta y asignar sus roles.');
   }
 
-  const creado = await securityApi.crearUsuario({ idPersona, usuarioLogin });
   const idUsuario = creado.idUsuario;
-
-  try {
-    await securityApi.asignarRol(idUsuario, codigoRol);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Error al asignar rol.';
-    throw new Error(`CREAR_OK_ROL_FAIL:${msg}`);
-  }
 
   try {
     await securityApi.activarUsuario(idUsuario);
@@ -93,26 +77,16 @@ async function ejecutarFlujoCreacion(
 async function ejecutarFlujoEdicion(
   user: SecurityUser,
   nuevoLogin: string,
-  nuevoCorroo: string,
   nuevoRol: string
 ): Promise<void> {
   const loginActual = user.usuarioLogin.toLowerCase().trim();
   const loginNuevo = nuevoLogin.toLowerCase().trim();
-  const correoActual = (user.correo ?? '').toLowerCase().trim();
-  const correoNuevo = nuevoCorroo.toLowerCase().trim();
   const rolActual = user.roles[0]?.codigo ?? '';
 
   if (loginNuevo !== loginActual) {
     const r = await securityApi.actualizarUsuario(user.idUsuario, loginNuevo);
     if (r.estado !== 'ACTUALIZADO') {
       throw new Error(`LOGIN_FAIL:${r.mensaje}`);
-    }
-  }
-
-  if (correoNuevo && correoNuevo !== correoActual) {
-    const r = await securityApi.asociarCorreoPersona(user.idPersona, correoNuevo);
-    if (r.estado !== 'OK') {
-      throw new Error(`CORREO_FAIL:${r.mensaje}`);
     }
   }
 
@@ -143,29 +117,35 @@ export function CreateUserModal({
   user = null
 }: CreateUserModalProps) {
   const modoEdicion = Boolean(user);
+  const { user: usuarioActual, permissions } = useAuth();
+  const puedeAsignarRolesProtegidos = puedeAsignarRolesInternosProtegidos(
+    usuarioActual.roles,
+    permissions
+  );
 
   const [personas, setPersonas] = useState<AvailablePerson[]>([]);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
-  const [tipoPersona, setTipoPersona] = useState<TipoPersona>('TRABAJADOR');
   const [busqueda, setBusqueda] = useState('');
   const [selectorPersonaAbierto, setSelectorPersonaAbierto] = useState(false);
   const [idPersona, setIdPersona] = useState<number | ''>('');
   const [usuarioLocal, setUsuarioLocal] = useState('');
   const [codigoRol, setCodigoRol] = useState('');
-  const [correo, setCorreo] = useState('');
+  const [codigosRoles, setCodigosRoles] = useState<string[]>([]);
+  const [rolesMenuOpen, setRolesMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setRolesMenuOpen(false);
+      return;
+    }
 
     if (modoEdicion && user) {
-      const tipo = derivarTipoPersona(user);
-      setTipoPersona(tipo);
       setIdPersona(user.idPersona);
       setBusqueda(user.nombreCompleto);
       setUsuarioLocal(extraerPrefijo(user.usuarioLogin));
       setCodigoRol(user.roles[0]?.codigo ?? '');
-      setCorreo(user.correo ?? '');
+      setCodigosRoles(user.roles.map((r) => r.codigo));
       return;
     }
 
@@ -174,63 +154,77 @@ export function CreateUserModal({
       .then(setPersonas)
       .catch(() => toast.error('No se pudieron cargar las personas disponibles'))
       .finally(() => setLoadingPersonas(false));
-  }, [open]);
+  }, [open, modoEdicion, user]);
 
   const limpiarFormulario = () => {
-    setTipoPersona('TRABAJADOR');
     setBusqueda('');
     setSelectorPersonaAbierto(false);
     setIdPersona('');
     setUsuarioLocal('');
     setCodigoRol('');
-    setCorreo('');
+    setCodigosRoles([]);
+    setRolesMenuOpen(false);
   };
 
-  const handleTipoPersonaChange = (tipo: TipoPersona) => {
-    setTipoPersona(tipo);
-    setIdPersona('');
-    setBusqueda('');
-    setCodigoRol('');
-    setUsuarioLocal('');
-  };
-
-  const handleCorreoChange = (val: string) => {
-    setCorreo(val.trim().toLowerCase());
-  };
+  const personasUnicas = useMemo(
+    () => personasUnicasPorId(personas),
+    [personas]
+  );
 
   const personasFiltradas = useMemo(
-    () =>
-      personas
-        .filter((p) => p.tipoPersona === tipoPersona)
-        .filter((p) => buscarPersona(p, busqueda)),
-    [personas, tipoPersona, busqueda]
+    () => personasUnicas.filter((p) => buscarPersona(p, busqueda)),
+    [personasUnicas, busqueda]
   );
 
   const personaSeleccionada = modoEdicion
     ? null
-    : personas.find((p) => p.idPersona === Number(idPersona));
+    : personasUnicas.find((p) => p.idPersona === Number(idPersona));
 
   const esElegible = modoEdicion
     ? true
     : Boolean(personaSeleccionada?.elegible);
 
-  const documentoListo = modoEdicion
-    ? true
-    : Boolean(personaSeleccionada?.documentoListo);
-
-  const alertaDocumento = personaSeleccionada
-    ? etiquetaEstadoDocumento(personaSeleccionada)
-    : null;
+  const relaciones = personaSeleccionada?.relaciones ?? [];
+  const politicaRoles = evaluarRolesIniciales(
+    relaciones,
+    codigosRoles,
+    roles,
+    puedeAsignarRolesProtegidos
+  );
+  const {
+    esTrabajador,
+    esCliente,
+    relacionesValidas,
+    rolesInternosDisponibles,
+    rolesInternosSeleccionados,
+    rolClienteDisponible,
+    codigosRolesEfectivos
+  } = politicaRoles;
+  const esClienteEnEdicion = modoEdicion && user ? tieneRolCliente(user) : false;
 
   const loginDerivado = personaSeleccionada?.numeroDocumento ?? '';
 
-  const correoValido = correo.length > 0 && validarFormatoCorreo(correo);
-
-  const codigoRolEfectivo =
-    tipoPersona === 'CLIENTE' ? CODIGO_ROL_CLIENTE : codigoRol;
+  const correoEfectivo = modoEdicion ? user?.correo ?? '' : personaSeleccionada?.correo ?? '';
+  const correoValido = correoPrincipalValido(correoEfectivo);
 
   const rolSeleccionadoValido =
-    tipoPersona === 'CLIENTE' || Boolean(codigoRol);
+    modoEdicion
+      ? esClienteEnEdicion || Boolean(codigoRol)
+      : politicaRoles.rolesValidos;
+
+  const alternarRolInterno = (codigo: string) => {
+    setCodigosRoles((seleccionados) => alternarRolSeleccionado(seleccionados, codigo));
+  };
+
+  const cambiarPersona = (persona: AvailablePerson) => {
+    if (!personaElegibleParaSeleccion(persona)) return;
+
+    setIdPersona(persona.idPersona);
+    setBusqueda(persona.nombreCompleto);
+    setCodigosRoles([]);
+    setSelectorPersonaAbierto(false);
+    setRolesMenuOpen(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,8 +234,8 @@ export function CreateUserModal({
       return;
     }
 
-    if (!modoEdicion && !documentoListo) {
-      toast.error('La documentacion de esta persona no esta lista para crear una cuenta.');
+    if (!modoEdicion && !relacionesValidas) {
+      toast.error('No se pudieron confirmar las relaciones de la persona desde el backend.');
       return;
     }
 
@@ -254,13 +248,13 @@ export function CreateUserModal({
       ? usuarioLocal.trim().toLowerCase()
       : loginDerivado;
 
-    if (modoEdicion && (!/^[a-z0-9._-]{3,120}$/.test(loginEfectivo) || !rolSeleccionadoValido || !correoValido)) {
+    if (modoEdicion && (!/^[a-z0-9._-]{3,120}$/.test(loginEfectivo) || !rolSeleccionadoValido)) {
       toast.error('Por favor completa todos los campos requeridos con valores validos.');
       return;
     }
 
     if (!modoEdicion && (!rolSeleccionadoValido || !correoValido)) {
-      toast.error('Por favor completa todos los campos requeridos con valores validos.');
+      toast.error('Verifica que la persona tenga un correo principal activo válido y selecciona los roles requeridos.');
       return;
     }
 
@@ -268,7 +262,11 @@ export function CreateUserModal({
 
     try {
       if (modoEdicion && user) {
-        await ejecutarFlujoEdicion(user, loginEfectivo, correo, codigoRolEfectivo);
+        await ejecutarFlujoEdicion(
+          user,
+          loginEfectivo,
+          esClienteEnEdicion ? CODIGO_ROL_CLIENTE : codigoRol
+        );
         toast.success('Usuario actualizado', {
           description: 'Los cambios se guardaron correctamente.'
         });
@@ -276,8 +274,7 @@ export function CreateUserModal({
         await ejecutarFlujoCreacion(
           Number(idPersona),
           loginEfectivo,
-          codigoRolEfectivo,
-          correo
+          codigosRolesEfectivos
         );
         toast.success('Usuario creado y activado', {
           description: 'Las credenciales temporales fueron enviadas al correo registrado.'
@@ -291,21 +288,13 @@ export function CreateUserModal({
       await onSuccess();
       const rawMsg = error instanceof Error ? error.message : 'Ocurrio un error inesperado.';
 
-      if (rawMsg.startsWith('CORREO_FAIL:')) {
-        toast.error('No se pudo actualizar el correo', {
-          description: rawMsg.replace('CORREO_FAIL:', '')
-        });
-      } else if (rawMsg.startsWith('LOGIN_FAIL:')) {
+      if (rawMsg.startsWith('LOGIN_FAIL:')) {
         toast.error('No se pudo actualizar el usuario', {
           description: rawMsg.replace('LOGIN_FAIL:', '')
         });
       } else if (rawMsg.startsWith('ROL_FAIL:')) {
         toast.error('No se pudo actualizar el rol', {
           description: rawMsg.replace('ROL_FAIL:', '')
-        });
-      } else if (rawMsg.startsWith('CREAR_OK_ROL_FAIL:')) {
-        toast.error('Usuario creado pero no se pudo asignar el rol', {
-          description: rawMsg.replace('CREAR_OK_ROL_FAIL:', '')
         });
       } else if (rawMsg.startsWith('CREAR_ROL_OK_ACT_FAIL:')) {
         toast.error('La cuenta fue creada, pero no pudo activarse.', {
@@ -325,19 +314,21 @@ export function CreateUserModal({
   const puedeEnviar = !submitting &&
     (modoEdicion || Boolean(idPersona)) &&
     esElegible &&
-    (modoEdicion ? /^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) : documentoListo) &&
+    (modoEdicion ? /^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) : relacionesValidas) &&
     rolSeleccionadoValido &&
-    correoValido;
+    (modoEdicion || correoValido);
 
   return (
     <Modal
       open={open}
-      onClose={submitting ? () => { } : onClose}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
       title={modoEdicion ? 'Editar usuario' : 'Nuevo usuario'}
       description={
         modoEdicion
           ? 'Actualiza la informacion de la cuenta seleccionada.'
-          : 'Registra una nueva cuenta de usuario y asigna su rol inicial.'
+          : 'Registra una nueva cuenta de usuario y asigna sus roles iniciales.'
       }
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -357,30 +348,6 @@ export function CreateUserModal({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-
-        {/* Selector tipo persona */}
-        <div>
-          <FieldLabel>Tipo de persona *</FieldLabel>
-          <div className="flex gap-2">
-            {(['TRABAJADOR', 'CLIENTE'] as TipoPersona[]).map((tipo) => (
-              <button
-                key={tipo}
-                type="button"
-                disabled={submitting || modoEdicion}
-                onClick={() => handleTipoPersonaChange(tipo)}
-                className={[
-                  'flex-1 rounded-md border px-3 py-2 text-[13px] font-medium transition-colors duration-150',
-                  tipoPersona === tipo
-                    ? 'border-brand-700 bg-brand-900 text-white'
-                    : 'border-brand-200 bg-white text-brand-700 hover:bg-brand-50',
-                  modoEdicion ? 'cursor-default opacity-70' : ''
-                ].join(' ')}
-              >
-                {tipo === 'TRABAJADOR' ? 'Trabajador' : 'Cliente'}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Persona vinculada */}
         <div className="relative">
@@ -424,21 +391,23 @@ export function CreateUserModal({
               {selectorPersonaAbierto && (
                 <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-brand-200 bg-white shadow-lg">
                   {personasFiltradas.length > 0 ? (
-                    personasFiltradas.map((p) => (
+                    personasFiltradas.map((p) => {
+                      const relacionesPersona = p.relaciones ?? [];
+                      const personaSeleccionable = personaElegibleParaSeleccion(p);
+                      const tieneRelacionConocida = relacionesPersona.some((relacion) =>
+                        relacion === 'TRABAJADOR' || relacion === 'CLIENTE'
+                      );
+
+                      return (
                       <button
                         key={p.idPersona}
                         type="button"
-                        disabled={!p.elegible}
+                        disabled={!personaSeleccionable}
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          if (!p.elegible) return;
-                          setIdPersona(p.idPersona);
-                          setBusqueda(p.nombreCompleto);
-                          setSelectorPersonaAbierto(false);
-                        }}
+                        onClick={() => cambiarPersona(p)}
                         className={[
                           'flex w-full flex-col px-3 py-2 text-left transition-colors',
-                          p.elegible
+                          personaSeleccionable
                             ? 'hover:bg-brand-50'
                             : 'cursor-not-allowed bg-slate-50 opacity-50'
                         ].join(' ')}
@@ -456,9 +425,18 @@ export function CreateUserModal({
                         {p.tipoDocumento && p.numeroDocumento && (
                           <span className="text-[11px] text-brand-500">
                             {p.tipoDocumento}: {p.numeroDocumento}
-                            {p.documentoListo ? '' : ' (pendiente)'}
                           </span>
                         )}
+
+                        <span className="text-[11px] text-brand-500">
+                          {tieneRelacionConocida
+                            ? relacionesPersona.filter((relacion) =>
+                              relacion === 'TRABAJADOR' || relacion === 'CLIENTE'
+                            ).map((relacion) =>
+                              relacion === 'TRABAJADOR' ? 'Trabajador' : 'Cliente'
+                            ).join(' · ')
+                            : 'Relaciones no disponibles'}
+                        </span>
 
                         {!p.elegible && (
                           <span className="text-[11px] text-rose-500">
@@ -466,7 +444,8 @@ export function CreateUserModal({
                           </span>
                         )}
                       </button>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="px-3 py-3 text-xs text-brand-400">
                       No se encontraron personas.
@@ -482,30 +461,29 @@ export function CreateUserModal({
               Esta persona no es elegible para crear una cuenta de usuario.
             </p>
           )}
+          {personaSeleccionada && esElegible && !relacionesValidas && (
+            <p className="mt-1 text-xs text-rose-600">
+              El backend no devolvió una relación válida para esta persona.
+            </p>
+          )}
+          {personaSeleccionada && relacionesValidas && (
+            <p className="mt-1 text-xs text-brand-500">
+              Relaciones detectadas: {[...(esTrabajador ? ['Trabajador'] : []), ...(esCliente ? ['Cliente'] : [])].join(' · ')}
+            </p>
+          )}
         </div>
 
         {/* Documento principal (solo creacion) */}
         {!modoEdicion && personaSeleccionada && (
           <div>
             <FieldLabel>Documento principal</FieldLabel>
-            {alertaDocumento ? (
-              <div className="flex h-9 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-[13px] text-amber-700">
-                <span className="font-medium">Pendiente:</span>
-                <span>{alertaDocumento}</span>
-              </div>
-            ) : (
-              <div className="flex h-9 items-center rounded-md border border-brand-200 bg-brand-50 px-3 text-[13px] text-brand-700 font-medium">
-                {personaSeleccionada.tipoDocumento}: {personaSeleccionada.numeroDocumento}
-                <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  Verificado
-                </span>
-              </div>
-            )}
-            {alertaDocumento && (
-              <p className="mt-1 text-[11px] text-amber-600">
-                No es posible crear la cuenta hasta que la documentacion este completa y verificada.
-              </p>
-            )}
+            <div className="flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-[13px] text-brand-700">
+              <span className="font-medium">
+                {personaSeleccionada.tipoDocumento && personaSeleccionada.numeroDocumento
+                  ? `${personaSeleccionada.tipoDocumento}: ${personaSeleccionada.numeroDocumento}`
+                  : 'No disponible'}
+              </span>
+            </div>
           </div>
         )}
 
@@ -529,14 +507,14 @@ export function CreateUserModal({
           </div>
         )}
 
-        {/* Rol inicial */}
+        {/* Roles iniciales */}
         <div>
-          <FieldLabel htmlFor="rolInicialSelect">Rol inicial *</FieldLabel>
-          {tipoPersona === 'CLIENTE' ? (
-            <div className="flex h-9 items-center rounded-md border border-brand-200 bg-brand-50 px-3 text-[13px] text-brand-600 font-medium">
-              Cliente
+          <FieldLabel>{modoEdicion ? 'Rol' : 'Roles iniciales *'}</FieldLabel>
+          {modoEdicion && esClienteEnEdicion ? (
+            <div className="flex h-9 items-center rounded-md border border-brand-200 bg-brand-50 px-3 text-[13px] font-medium text-brand-600">
+              CLIENTE
             </div>
-          ) : (
+          ) : modoEdicion ? (
             <Select
               id="rolInicialSelect"
               value={codigoRol}
@@ -550,6 +528,100 @@ export function CreateUserModal({
                 </option>
               ))}
             </Select>
+          ) : (
+            <div className="space-y-2">
+              {esCliente && !rolClienteDisponible && (
+                <p className="text-xs text-rose-600">
+                  Tu perfil no está autorizado para asignar el rol CLIENTE.
+                </p>
+              )}
+
+              {esTrabajador && rolesInternosDisponibles.length > 0 && (
+                <div className="space-y-2">
+                  {esCliente && (
+                    <p className="text-xs text-brand-500">
+                      Los roles internos son opcionales para personas con ambas relaciones.
+                    </p>
+                  )}
+                  <details
+                    className="relative"
+                    open={rolesMenuOpen}
+                    onToggle={(event) => setRolesMenuOpen(event.currentTarget.open)}
+                  >
+                    <summary
+                      className="flex h-9 cursor-pointer list-none items-center justify-between rounded-md border border-brand-200 bg-white px-3 text-[13px] text-brand-500 [&::-webkit-details-marker]:hidden"
+                      aria-label="Seleccionar roles internos"
+                    >
+                      <span>Selecciona uno o más roles...</span>
+                      <span aria-hidden="true">▾</span>
+                    </summary>
+                    <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-brand-200 bg-white p-1 shadow-lg">
+                      {rolesInternosDisponibles.map((rol) => (
+                        <label
+                          key={rol.idRol}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-[13px] text-brand-700 hover:bg-brand-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={rolesInternosSeleccionados.includes(rol.codigo)}
+                            onChange={() => alternarRolInterno(rol.codigo)}
+                            disabled={submitting}
+                          />
+                          <span>{rol.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                  <div className="flex flex-wrap gap-2" aria-label="Roles seleccionados">
+                    {codigosRolesEfectivos.map((codigo) => {
+                      const rol = roles.find((actual) => actual.codigo === codigo);
+                      const esClienteObligatorio = codigo === CODIGO_ROL_CLIENTE && esCliente;
+                      return (
+                        <span
+                          key={codigo}
+                          className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs text-brand-700"
+                        >
+                          {rol?.nombre ?? codigo}
+                          {esClienteObligatorio ? (
+                            <span className="text-[10px] text-brand-500">obligatorio</span>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={`Quitar rol ${rol?.nombre ?? codigo}`}
+                              onClick={() => alternarRolInterno(codigo)}
+                              disabled={submitting}
+                              className="ml-1 rounded-full px-1 font-semibold hover:bg-brand-100 disabled:opacity-50"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {esCliente && !esTrabajador && rolClienteDisponible && (
+                <div className="flex flex-wrap gap-2" aria-label="Roles seleccionados">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs text-brand-700">
+                    CLIENTE <span className="text-[10px] text-brand-500">obligatorio</span>
+                  </span>
+                </div>
+              )}
+
+              {esTrabajador && rolesInternosDisponibles.length === 0 && (
+                <p className="text-xs text-rose-600">
+                  No hay roles internos autorizados disponibles para asignar.
+                </p>
+              )}
+
+              {esTrabajador && !esCliente && (
+                <p className="text-xs text-brand-500">
+                  Selecciona al menos un rol interno autorizado.
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -559,19 +631,38 @@ export function CreateUserModal({
           <Input
             id="correoInput"
             type="email"
-            value={correo}
-            onChange={(e) => handleCorreoChange(e.target.value)}
-            placeholder="usuario@gmail.com"
-            disabled={submitting}
+            value={correoEfectivo}
+            placeholder={
+              modoEdicion
+                ? 'usuario@gmail.com'
+                : personaSeleccionada
+                  ? 'Sin correo principal activo'
+                  : 'Selecciona una persona para cargar su correo'
+            }
+            readOnly
+            disabled={submitting || (!modoEdicion && !personaSeleccionada)}
           />
-          {correo.length > 0 && !correoValido && (
+          {modoEdicion && !correoEfectivo && (
+            <p className="mt-1 text-xs text-amber-700">
+              El correo se modifica desde el flujo de actualización de datos personales con confirmación mediante enlace.
+            </p>
+          )}
+          {!modoEdicion && personaSeleccionada && correoEfectivo.length > 0 && !correoValido && (
             <p className="mt-1 text-xs text-rose-600">
-              Ingresa un correo electronico valido.
+              El correo principal debe estar activo y tener formato válido.
+            </p>
+          )}
+          {!modoEdicion && debeMostrarAdvertenciaCorreoFaltante(
+            Boolean(personaSeleccionada),
+            personaSeleccionada?.correo
+          ) && (
+            <p className="mt-1 text-xs text-amber-700">
+              Esta persona no tiene un correo principal activo. Actualiza sus datos personales antes de crear la cuenta.
             </p>
           )}
           <p className="mt-1 text-[11px] text-brand-400">
             {modoEdicion
-              ? 'Este correo recibira notificaciones del sistema.'
+              ? 'Este correo recibira notificaciones del sistema. Para cambiarlo se requiere confirmación por enlace.'
               : 'Este correo recibira las credenciales temporales de acceso.'}
           </p>
         </div>

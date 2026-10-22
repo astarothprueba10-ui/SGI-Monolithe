@@ -9,7 +9,7 @@ import { Dropdown, DropdownItem } from '../components/ui/Dropdown';
 import { Table, TD, TH, TR } from '../components/ui/Table';
 import { StatusBadge, Badge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
-import { Gate } from '../components/auth/PermissionRoute';
+import { AccountAdminGate } from '../components/auth/PermissionRoute';
 import { PermissionMatrix } from '../components/users/PermissionMatrix';
 import { CreateUserModal } from '../components/users/CreateUserModal';
 import { ManageUserRolesModal } from '../components/users/ManageUserRolesModal';
@@ -131,7 +131,7 @@ export function UsersAndRoles() {
         description="Administra las cuentas de los trabajadores, asigna roles y define qué módulos y acciones puede usar cada rol."
         actions={
           tab === 'usuarios' ? (
-            <Gate permission="users.create">
+            <AccountAdminGate permissions={['users.create', 'users.assign_role']}>
               <Button
                 icon={PlusIcon}
                 variant="primary"
@@ -142,9 +142,9 @@ export function UsersAndRoles() {
               >
                 Nuevo usuario
               </Button>
-            </Gate>
+            </AccountAdminGate>
           ) : (
-            <Gate permission="roles.create">
+            <AccountAdminGate permissions="roles.create">
               <Button
                 icon={PlusIcon}
                 variant="primary"
@@ -152,7 +152,7 @@ export function UsersAndRoles() {
               >
                 Nuevo rol
               </Button>
-            </Gate>
+            </AccountAdminGate>
           )
         }
       />
@@ -344,7 +344,7 @@ export function UsersAndRoles() {
 
                 <TD align="right">
                   <div className="flex justify-end gap-1.5">
-                    <Gate permission="users.edit">
+                    <AccountAdminGate permissions="users.edit">
                       <Button
                         size="sm"
                         icon={PencilIcon}
@@ -361,9 +361,9 @@ export function UsersAndRoles() {
                           setCreateUserModalOpen(true);
                         }}
                       />
-                    </Gate>
+                    </AccountAdminGate>
 
-                    <Gate permission="users.assign_role">
+                    <AccountAdminGate permissions="users.assign_role">
                       <Button
                         size="sm"
                         icon={ShieldCheckIcon}
@@ -380,10 +380,10 @@ export function UsersAndRoles() {
                           setRolesModalOpen(true);
                         }}
                       />
-                    </Gate>
+                    </AccountAdminGate>
 
                     {user.estado === 'ACTIVO' ? (
-                      <Gate permission="users.deactivate">
+                      <AccountAdminGate permissions="users.deactivate">
                         <Button
                           size="sm"
                           variant="danger"
@@ -392,9 +392,9 @@ export function UsersAndRoles() {
                         >
                           {updatingUserId === user.idUsuario ? 'Procesando...' : 'Desactivar'}
                         </Button>
-                      </Gate>
+                      </AccountAdminGate>
                     ) : (
-                      <Gate permission="users.activate">
+                      <AccountAdminGate permissions="users.activate">
                         <Button
                           size="sm"
                           variant="success"
@@ -403,7 +403,7 @@ export function UsersAndRoles() {
                         >
                           {updatingUserId === user.idUsuario ? 'Procesando...' : 'Activar'}
                         </Button>
-                      </Gate>
+                      </AccountAdminGate>
                     )}
                   </div>
                 </TD>

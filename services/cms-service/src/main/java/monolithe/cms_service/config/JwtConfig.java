@@ -1,8 +1,13 @@
 package monolithe.cms_service.config;
 
+import monolithe.cms_service.security.JwtSessionVersionValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -46,15 +51,23 @@ public class JwtConfig {
     @Bean
     public JwtDecoder jwtDecoder(
             RSAPublicKey publicKey,
-            @Value("${security.jwt.issuer}") String issuer) {
+            @Value("${security.jwt.issuer}") String issuer,
+            JdbcTemplate jdbcTemplate) {
 
         NimbusJwtDecoder decoder =
                 NimbusJwtDecoder
                         .withPublicKey(publicKey)
                         .build();
 
+        OAuth2TokenValidator<Jwt> defaultValidator =
+                JwtValidators.createDefaultWithIssuer(issuer);
+        OAuth2TokenValidator<Jwt> sessionValidator =
+                new JwtSessionVersionValidator(jdbcTemplate);
+
         decoder.setJwtValidator(
-                JwtValidators.createDefaultWithIssuer(issuer));
+                new DelegatingOAuth2TokenValidator<>(
+                        defaultValidator,
+                        sessionValidator));
 
         return decoder;
     }

@@ -94,6 +94,10 @@ class JwtServiceTest {
                 claims.getClaim(
                         "password_change_required"));
 
+        assertEquals(
+                0L,
+                claims.<Number>getClaim("session_version").longValue());
+
         assertNotNull(
                 claims.getId());
 

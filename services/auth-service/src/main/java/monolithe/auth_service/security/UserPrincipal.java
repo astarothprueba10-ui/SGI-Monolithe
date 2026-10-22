@@ -14,6 +14,7 @@ public class UserPrincipal implements UserDetails {
     private final boolean enabled;
     private final boolean accountNonLocked;
     private final boolean requiereCambioPassword;
+    private final Long versionSesiones;
 
     public UserPrincipal(
             Long idUsuario,
@@ -24,6 +25,20 @@ public class UserPrincipal implements UserDetails {
             boolean accountNonLocked,
             boolean requiereCambioPassword
     ) {
+        this(idUsuario, username, password, authorities, enabled,
+                accountNonLocked, requiereCambioPassword, 0L);
+    }
+
+    public UserPrincipal(
+            Long idUsuario,
+            String username,
+            String password,
+            Collection<? extends GrantedAuthority> authorities,
+            boolean enabled,
+            boolean accountNonLocked,
+            boolean requiereCambioPassword,
+            Long versionSesiones
+    ) {
         this.idUsuario = idUsuario;
         this.username = username;
         this.password = password;
@@ -31,10 +46,15 @@ public class UserPrincipal implements UserDetails {
         this.enabled = enabled;
         this.accountNonLocked = accountNonLocked;
         this.requiereCambioPassword = requiereCambioPassword;
+        this.versionSesiones = versionSesiones != null ? versionSesiones : 0L;
     }
 
     public Long getIdUsuario() {
         return idUsuario;
+    }
+
+    public Long getVersionSesiones() {
+        return versionSesiones;
     }
 
     public boolean isRequiereCambioPassword() {

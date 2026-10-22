@@ -13,6 +13,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.jdbc.core.JdbcTemplate;
+import monolithe.auth_service.security.JwtSessionVersionValidator;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -90,14 +95,22 @@ public class JwtConfig {
         @Bean
         public JwtDecoder jwtDecoder(
                         RSAPublicKey publicKey,
-                        @Value("${security.jwt.issuer}") String issuer) {
+                        @Value("${security.jwt.issuer}") String issuer,
+                        JdbcTemplate jdbcTemplate) {
 
                 NimbusJwtDecoder decoder = NimbusJwtDecoder
                                 .withPublicKey(publicKey)
                                 .build();
 
+                OAuth2TokenValidator<Jwt> defaultValidator =
+                                JwtValidators.createDefaultWithIssuer(issuer);
+                OAuth2TokenValidator<Jwt> sessionValidator =
+                                new JwtSessionVersionValidator(jdbcTemplate);
+
                 decoder.setJwtValidator(
-                                JwtValidators.createDefaultWithIssuer(issuer));
+                                new DelegatingOAuth2TokenValidator<>(
+                                                defaultValidator,
+                                                sessionValidator));
 
                 return decoder;
         }

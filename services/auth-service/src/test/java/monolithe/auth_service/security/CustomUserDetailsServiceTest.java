@@ -2,6 +2,7 @@ package monolithe.auth_service.security;
 
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.repository.AuthenticationContextRepository;
+import monolithe.auth_service.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -15,14 +16,19 @@ import static org.mockito.Mockito.*;
 class CustomUserDetailsServiceTest {
 
     private AuthenticationContextRepository authenticationContextRepository;
+    private UserRepository userRepository;
     private CustomUserDetailsService userDetailsService;
 
     @BeforeEach
     void setUp() {
         authenticationContextRepository =
                 mock(AuthenticationContextRepository.class);
+        userRepository =
+                mock(UserRepository.class);
         userDetailsService =
-                new CustomUserDetailsService(authenticationContextRepository);
+                new CustomUserDetailsService(
+                        authenticationContextRepository,
+                        userRepository);
     }
 
     @Test

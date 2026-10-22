@@ -1,5 +1,12 @@
 import { coreApi } from '../lib/apiClient';
-import type { TrabajadorResponse, CatalogosTrabajadorResponse } from '../types/workers';
+import type {
+  TrabajadorResponse,
+  CatalogosTrabajadorResponse,
+  SolicitudCorreccionDocumentoRequest,
+  SolicitudCorreccionDocumentoResponse,
+  CorreccionDocumentalItem,
+  ResolverCorreccionRequest
+} from '../types/workers';
 import type {
   ProyectoResponse,
   ProyectoRequest,
@@ -64,6 +71,17 @@ function buildLotSearchParams(filters: LoteFiltroRequest): string {
   return str ? `/lotes/buscar?${str}` : '/lotes/buscar';
 }
 
+export interface PersonaIdentificadaResponse {
+  idPersona: number;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string | null;
+  fechaNacimiento: string | null;
+  documentoVerificado: boolean;
+  correoElectronico: string | null;
+  correoVerificado: boolean;
+}
+
 export const coreService = {
   // RECURSOS HUMANOS - TRABAJADORES
   getWorkers(): Promise<TrabajadorResponse[]> {
@@ -76,9 +94,76 @@ export const coreService = {
     );
   },
 
+  identifyWorkerPerson(
+    idTipoDocumento: number,
+    numeroDocumento: string
+  ): Promise<PersonaIdentificadaResponse> {
+    return coreApi.post<PersonaIdentificadaResponse>(
+      '/trabajadores/identificar-persona',
+      {
+        idTipoDocumento,
+        numeroDocumento
+      }
+    );
+  },
+
+
   createWorker(data: Record<string, unknown>): Promise<unknown> {
     return coreApi.post<unknown>(
       '/trabajadores',
+      data
+    );
+  },
+
+  // CORRECCION DOCUMENTAL
+  solicitarCorreccionDocumento(
+    idTrabajador: number,
+    data: SolicitudCorreccionDocumentoRequest
+  ): Promise<SolicitudCorreccionDocumentoResponse> {
+    return coreApi.post<SolicitudCorreccionDocumentoResponse>(
+      `/correcciones-documento/trabajadores/${idTrabajador}`,
+      data
+    );
+  },
+
+  adjuntarEvidenciaCorreccion(
+    idSolicitud: number,
+    archivo: File
+  ): Promise<unknown> {
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    return coreApi.post<unknown>(
+      `/correcciones-documento/${idSolicitud}/evidencia`,
+      formData
+    );
+  },
+
+  listarCorreccionesDocumentales(): Promise<CorreccionDocumentalItem[]> {
+    return coreApi.get<CorreccionDocumentalItem[]>('/correcciones-documento');
+  },
+
+  obtenerDetalleCorreccionDocumental(
+    idSolicitud: number
+  ): Promise<CorreccionDocumentalItem> {
+    return coreApi.get<CorreccionDocumentalItem>(
+      `/correcciones-documento/${idSolicitud}`
+    );
+  },
+
+  obtenerUrlFirmadaEvidencia(
+    idSolicitud: number
+  ): Promise<{ url: string }> {
+    return coreApi.get<{ url: string }>(
+      `/correcciones-documento/${idSolicitud}/evidencia/url-firmada`
+    );
+  },
+
+  resolverCorreccionDocumental(
+    idSolicitud: number,
+    data: ResolverCorreccionRequest
+  ): Promise<unknown> {
+    return coreApi.post<unknown>(
+      `/correcciones-documento/${idSolicitud}/resolver`,
       data
     );
   },

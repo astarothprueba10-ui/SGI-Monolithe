@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
+
 @Repository
 @RequiredArgsConstructor
 public class TrabajadorProcedureRepository {
@@ -93,6 +95,53 @@ public class TrabajadorProcedureRepository {
                                 idActor);
         }
 
+        public ResultadoProcedimiento actualizarTrabajador(
+                        Long idActor,
+                        Long idTrabajador,
+                        String datosJson) {
+                String sql = """
+                                CALL public.sp_rrhh_actualizar_trabajador(
+                                    ?, ?, CAST(? AS jsonb), NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                datosJson);
+        }
+
+        public ResultadoProcedimiento solicitarCorreccionDocumento(
+                        Long idActor,
+                        Long idTrabajador,
+                        Integer idTipoDocumento,
+                        String numeroDocumento,
+                        String motivo) {
+
+                String sql = """
+                                CALL public.sp_rrhh_solicitar_correccion_documento(
+                                    ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                idTipoDocumento,
+                                numeroDocumento,
+                                motivo);
+        }
+
         public ResultadoProcedimiento identificarPersona(
                         Long idActor,
                         int idTipoDocumento,
@@ -113,6 +162,153 @@ public class TrabajadorProcedureRepository {
                                 idActor,
                                 idTipoDocumento,
                                 numeroDocumento);
+        }
+
+        public ResultadoProcedimiento solicitarCambioCorreo(
+                        Long idActor,
+                        Long idTrabajador,
+                        String correoNuevo,
+                        String tokenHash,
+                        OffsetDateTime fechaExpiracion) {
+                String sql = """
+                                CALL public.sp_rrhh_solicitar_cambio_correo(
+                                    ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                correoNuevo,
+                                tokenHash,
+                                fechaExpiracion);
+        }
+
+        public ResultadoProcedimiento confirmarCambioCorreo(String tokenHash) {
+                String sql = """
+                                CALL public.sp_rrhh_confirmar_cambio_correo(
+                                    ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                tokenHash);
+        }
+
+        public ResultadoProcedimiento listarSolicitudesCorreccion(Long idActor) {
+                String sql = """
+                                CALL public.sp_core_listar_solicitudes_correccion(
+                                    ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor);
+        }
+
+        public ResultadoProcedimiento obtenerDetalleCorreccion(
+                        Long idActor,
+                        Long idSolicitud) {
+
+                String sql = """
+                                CALL public.sp_core_obtener_detalle_correccion(
+                                    ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idSolicitud);
+        }
+
+        public String obtenerRutaEvidenciaCorreccion(
+                        Long idActor,
+                        Long idSolicitud) {
+
+                String sql = """
+                                SELECT evidencia_storage_path
+                                FROM public.core_solicitudes_correccion_identidad
+                                WHERE id_solicitud = ?
+                                  AND estado = 'PENDIENTE'
+                                  AND id_usuario_solicitante <> ?
+                                  AND evidencia_storage_path IS NOT NULL
+                                """;
+
+                return jdbcTemplate.query(
+                                sql,
+                                (rs, rowNum) -> rs.getString("evidencia_storage_path"),
+                                idSolicitud,
+                                idActor).stream().findFirst().orElse(null);
+        }
+
+        public ResultadoProcedimiento resolverCorreccionIdentidad(
+                        Long idActor,
+                        Long idSolicitud,
+                        String decision,
+                        String motivo) {
+
+                String sql = """
+                                CALL public.sp_core_resolver_correccion_identidad(
+                                    ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idSolicitud,
+                                decision,
+                                motivo);
+        }
+
+        public ResultadoProcedimiento adjuntarEvidenciaCorreccion(
+                        Long idActor,
+                        Long idSolicitud,
+                        String storagePath,
+                        String nombreArchivo,
+                        String tipoMime) {
+
+                String sql = """
+                                CALL public.sp_core_adjuntar_evidencia_correccion(
+                                    ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idSolicitud,
+                                storagePath,
+                                nombreArchivo,
+                                tipoMime);
         }
 
         private ResultadoProcedimiento mapearResultado(

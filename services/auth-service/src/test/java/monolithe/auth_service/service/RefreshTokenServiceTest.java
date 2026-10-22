@@ -7,13 +7,14 @@ import monolithe.auth_service.exception.InvalidTokenException;
 import monolithe.auth_service.repository.SessionRepository;
 import monolithe.auth_service.repository.UserRepository;
 import monolithe.auth_service.security.RefreshTokenRotation;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -21,6 +22,7 @@ class RefreshTokenServiceTest {
 
     private SessionRepository sessionRepository;
     private UserRepository userRepository;
+    private JdbcTemplate jdbcTemplate;
     private RefreshTokenService refreshTokenService;
 
     @BeforeEach
@@ -28,10 +30,12 @@ class RefreshTokenServiceTest {
 
         sessionRepository = mock(SessionRepository.class);
         userRepository = mock(UserRepository.class);
+        jdbcTemplate = mock(JdbcTemplate.class);
 
         refreshTokenService = new RefreshTokenService(
                 sessionRepository,
-                userRepository
+                userRepository,
+                jdbcTemplate
         );
 
         ReflectionTestUtils.setField(
@@ -107,6 +111,12 @@ class RefreshTokenServiceTest {
                         )
                 ))
                 .thenReturn(Optional.of(sesionActual));
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT public.fn_seguridad_acceso_laboral_permitido(?)"),
+                eq(Boolean.class),
+                eq(10L)))
+                .thenReturn(Boolean.TRUE);
 
         RefreshTokenRotation rotacion =
                 refreshTokenService.rotarRefreshToken(
@@ -239,15 +249,82 @@ class RefreshTokenServiceTest {
                 .save(any(Session.class));
     }
 
+    @Test
+    void debeRechazarRotacionSiEstadoNoTieneCodigoActivo() {
+        User usuario = crearUsuarioActivo();
+        usuario.getEstadoUsuario().setCodigo("SUSPENDIDO");
+
+        String token = "refresh-token-inactivo";
+        Session sesion = new Session();
+        sesion.setUsuario(usuario);
+        sesion.setFechaExpiracion(LocalDateTime.now().plusDays(1));
+
+        when(sessionRepository.findByRefreshTokenHashAndFechaRevocacionIsNull(
+                refreshTokenService.calcularSha256(token)))
+                .thenReturn(Optional.of(sesion));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                refreshTokenService.rotarRefreshToken(token, "127.0.0.1", "JUnit"));
+        verify(sessionRepository, never()).save(any(Session.class));
+    }
+
+    @Test
+    void debeRechazarRotacionSiTrabajadorCesadoOEnVerificacion() {
+        User usuario = crearUsuarioActivo();
+
+        String token = "refresh-token-laboral";
+        Session sesion = new Session();
+        sesion.setUsuario(usuario);
+        sesion.setFechaExpiracion(LocalDateTime.now().plusDays(1));
+
+        when(sessionRepository.findByRefreshTokenHashAndFechaRevocacionIsNull(
+                refreshTokenService.calcularSha256(token)))
+                .thenReturn(Optional.of(sesion));
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT public.fn_seguridad_acceso_laboral_permitido(?)"),
+                eq(Boolean.class),
+                eq(10L)))
+                .thenReturn(Boolean.FALSE);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                refreshTokenService.rotarRefreshToken(token, "127.0.0.1", "JUnit"));
+        verify(sessionRepository, never()).save(any(Session.class));
+    }
+
+    @Test
+    void debeRechazarRotacionSiErrorDeBaseDeDatosEnAccesoLaboral() {
+        User usuario = crearUsuarioActivo();
+
+        String token = "refresh-token-db-error";
+        Session sesion = new Session();
+        sesion.setUsuario(usuario);
+        sesion.setFechaExpiracion(LocalDateTime.now().plusDays(1));
+
+        when(sessionRepository.findByRefreshTokenHashAndFechaRevocacionIsNull(
+                refreshTokenService.calcularSha256(token)))
+                .thenReturn(Optional.of(sesion));
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT public.fn_seguridad_acceso_laboral_permitido(?)"),
+                eq(Boolean.class),
+                eq(10L)))
+                .thenThrow(new RuntimeException("DB down"));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                refreshTokenService.rotarRefreshToken(token, "127.0.0.1", "JUnit"));
+        verify(sessionRepository, never()).save(any(Session.class));
+    }
+
     private User crearUsuarioActivo() {
 
         Estado estado = new Estado();
+        estado.setCodigo("ACTIVO");
         estado.setActivo(true);
         estado.setPermiteAcceso(true);
 
         User usuario = new User();
 
         usuario.setIdUsuario(1L);
+        usuario.setIdPersona(10L);
         usuario.setUsuarioLogin("admin");
         usuario.setEstadoUsuario(estado);
         usuario.setBloqueadoHasta(null);

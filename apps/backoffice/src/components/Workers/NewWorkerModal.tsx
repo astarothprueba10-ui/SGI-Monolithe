@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { Input, Select, FieldLabel } from '../ui/Field';
 import { Button } from '../ui/Button';
-import { coreService } from '../../services/coreService';
+import { coreService, type PersonaIdentificadaResponse } from '../../services/coreService';
 import { ApiError } from '../../lib/apiClient';
 import { GeoLocationSelector, type GeoLocationValue } from '../geo/GeoLocationSelector';
 
@@ -209,6 +209,26 @@ function mensajeDeError(err: unknown): string {
   return 'Ocurrio un error inesperado al registrar el trabajador.';
 }
 
+function clasificarErrorIdentificacion(err: unknown): { mensaje: string; es404: boolean } {
+  if (err instanceof ApiError) {
+    if (err.status === 404) {
+      return { mensaje: 'Documento no registrado. Puedes continuar registrando una persona nueva.', es404: true };
+    }
+    if (err.status === 409) {
+      return { mensaje: `Trabajador ya registrado: ${err.message}`, es404: false };
+    }
+    if (err.status === 400) {
+      return { mensaje: `Identidad inactiva o documento inválido: ${err.message}`, es404: false };
+    }
+    return { mensaje: `Error del servidor (${err.status}): ${err.message}`, es404: false };
+  }
+  const esRed = err instanceof TypeError || (err instanceof Error && /fetch|network/i.test(err.message));
+  const msg = esRed
+    ? 'Error de conexión: No se pudo verificar el documento con el servidor.'
+    : 'No se pudo verificar el documento debido a un error inesperado.';
+  return { mensaje: msg, es404: false };
+}
+
 export function NewWorkerModal({
   open,
   onClose,
@@ -225,7 +245,18 @@ export function NewWorkerModal({
   const [errores, setErrores] = useState<FormErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
   const [submitting, setSubmitting] = useState(false);
+  const [personaIdentificada, setPersonaIdentificada] =
+    useState<PersonaIdentificadaResponse | null>(null);
+  const [personaConfirmada, setPersonaConfirmada] = useState<number | null>(null);
+  const [buscandoPersona, setBuscandoPersona] = useState(false);
+  const [errorIdentificacion, setErrorIdentificacion] = useState<string | null>(null);
+  const [infoIdentificacion, setInfoIdentificacion] = useState<string | null>(null);
+  const busquedaPersonaRef = useRef(0);
   const hoyRef = useRef(new Date().toISOString().split('T')[0]);
+
+  const camposPersonaBloqueados =
+    personaIdentificada !== null &&
+    personaConfirmada === personaIdentificada.idPersona;
 
   // Cargar catalogos al abrir
   useEffect(() => {
@@ -267,6 +298,13 @@ export function NewWorkerModal({
   // Limpiar formulario al cerrar
   useEffect(() => {
     if (!open) {
+      busquedaPersonaRef.current += 1;
+      setPersonaIdentificada(null);
+      setPersonaConfirmada(null);
+      setBuscandoPersona(false);
+      setErrorIdentificacion(null);
+      setInfoIdentificacion(null);
+
       setForm(estadoInicial());
       setErrores({});
       setTouched({});
@@ -299,7 +337,101 @@ export function NewWorkerModal({
     setErrores((prev) => ({ ...prev, [key]: errorBlur }));
   }
 
+  async function buscarPersonaPorDocumento() {
+    if (!tipoDocSeleccionado || !form.idTipoDocumento) {
+      setErrorIdentificacion('Selecciona un tipo de documento.');
+      setInfoIdentificacion(null);
+      return;
+    }
+
+    const errorDocumento = validarDocumento(
+      form.numeroDocumento,
+      tipoDocSeleccionado
+    );
+
+    if (errorDocumento) {
+      setErrorIdentificacion(errorDocumento);
+      setInfoIdentificacion(null);
+      return;
+    }
+
+    const idBusqueda = ++busquedaPersonaRef.current;
+
+    setBuscandoPersona(true);
+    setPersonaIdentificada(null);
+    setPersonaConfirmada(null);
+    setErrorIdentificacion(null);
+    setInfoIdentificacion(null);
+
+    try {
+      const persona = await coreService.identifyWorkerPerson(
+        Number(form.idTipoDocumento),
+        form.numeroDocumento.trim()
+      );
+
+      if (idBusqueda !== busquedaPersonaRef.current) return;
+
+      setPersonaIdentificada(persona);
+    } catch (err) {
+      if (idBusqueda !== busquedaPersonaRef.current) return;
+
+      const clasificado = clasificarErrorIdentificacion(err);
+      if (clasificado.es404) {
+        setInfoIdentificacion(clasificado.mensaje);
+      } else {
+        setErrorIdentificacion(clasificado.mensaje);
+      }
+    } finally {
+      if (idBusqueda === busquedaPersonaRef.current) {
+        setBuscandoPersona(false);
+      }
+    }
+  }
+
+  function limpiarIdentificacion() {
+    busquedaPersonaRef.current += 1;
+    setPersonaIdentificada(null);
+    setPersonaConfirmada(null);
+    setErrorIdentificacion(null);
+    setInfoIdentificacion(null);
+    setBuscandoPersona(false);
+  }
+
+
+  function confirmarPersona() {
+    if (!personaIdentificada) return;
+
+    setForm((prev) => ({
+      ...prev,
+      nombres: personaIdentificada.nombres,
+      apellidoPaterno: personaIdentificada.apellidoPaterno || '',
+      apellidoMaterno: personaIdentificada.apellidoMaterno || '',
+      fechaNacimiento: personaIdentificada.fechaNacimiento || '',
+      correoElectronico:
+        personaIdentificada.correoElectronico ??
+        prev.correoElectronico
+    }));
+
+    setPersonaConfirmada(personaIdentificada.idPersona);
+
+    setErrores((prev) => ({
+      ...prev,
+      nombres: undefined,
+      apellidoPaterno: undefined,
+      apellidoMaterno: undefined,
+      fechaNacimiento: undefined,
+      correoElectronico: undefined
+    }));
+  }
+
+
+  function cancelarSeleccionPersona() {
+    setPersonaConfirmada(null);
+  }
+
+
   function handleTipoDocumentoChange(valor: string) {
+    limpiarIdentificacion();
     setForm((prev) => ({ ...prev, idTipoDocumento: valor, numeroDocumento: '' }));
     setErrores((prev) => ({
       ...prev,
@@ -310,6 +442,7 @@ export function NewWorkerModal({
   }
 
   function handleNumeroDocumentoChange(raw: string) {
+    limpiarIdentificacion();
     if (!tipoDocSeleccionado) return;
     const soloNum = esTipoSoloNumerico(tipoDocSeleccionado);
     const filtrado = filtrarCaracteresDocumento(raw, soloNum);
@@ -377,8 +510,16 @@ export function NewWorkerModal({
   }
 
   function construirPayloadTrabajador(): Record<string, unknown> {
+    const esPersonaConfirmadaValida =
+      personaIdentificada !== null &&
+      personaConfirmada !== null &&
+      personaConfirmada === personaIdentificada.idPersona;
+
     return {
       informacionPersonal: {
+        ...(esPersonaConfirmadaValida
+          ? { idPersona: personaConfirmada }
+          : {}),
         idTipoDocumento: Number(form.idTipoDocumento),
         numeroDocumento: form.numeroDocumento.trim(),
         nombres: form.nombres.trim(),
@@ -406,6 +547,29 @@ export function NewWorkerModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!catalogos) return;
+
+    if (buscandoPersona) {
+      toast.error('Hay una búsqueda de persona en curso. Espera a que termine.');
+      return;
+    }
+
+    if (
+      personaIdentificada &&
+      personaConfirmada !== personaIdentificada.idPersona
+    ) {
+      toast.error(
+        'Debes confirmar la persona encontrada antes de registrar al trabajador.'
+      );
+      return;
+    }
+
+    if (errorIdentificacion) {
+      toast.error(
+        'Corrige el problema con la identificación del documento antes de registrar.'
+      );
+      return;
+    }
+
     const todosTocados: TouchedFields = {};
     (Object.keys(estadoInicial()) as FormKey[]).forEach((k) => { todosTocados[k] = true; });
     setTouched(todosTocados);
@@ -415,12 +579,14 @@ export function NewWorkerModal({
       toast.error('Revisa los campos antes de continuar.');
       return;
     }
+
     setSubmitting(true);
     try {
       await coreService.createWorker(construirPayloadTrabajador());
       toast.success('Trabajador registrado', {
         description: 'El trabajador fue registrado correctamente.'
       });
+      limpiarIdentificacion();
       setForm(estadoInicial());
       setErrores({});
       setTouched({});
@@ -463,7 +629,14 @@ export function NewWorkerModal({
           <Button
             variant="primary"
             onClick={handleSubmit}
-            disabled={submitting || loadingCatalogos || Boolean(errorCatalogos)}
+            disabled={
+              submitting ||
+              loadingCatalogos ||
+              Boolean(errorCatalogos) ||
+              buscandoPersona ||
+              Boolean(errorIdentificacion) ||
+              (personaIdentificada !== null && personaConfirmada !== personaIdentificada.idPersona)
+            }
           >
             {submitting ? 'Guardando...' : 'Guardar trabajador'}
           </Button>
@@ -549,7 +722,109 @@ export function NewWorkerModal({
                   inputMode={docInputMode}
                 />
                 <FieldError mensaje={errores.numeroDocumento} />
+
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void buscarPersonaPorDocumento()}
+                    disabled={
+                      submitting ||
+                      buscandoPersona ||
+                      !tipoDocSeleccionado ||
+                      Boolean(validarDocumento(form.numeroDocumento, tipoDocSeleccionado))
+                    }
+                  >
+                    {buscandoPersona ? 'Buscando persona...' : 'Buscar persona'}
+                  </Button>
+                </div>
+
+                {infoIdentificacion && (
+                  <p className="mt-2 text-xs font-medium text-emerald-700">
+                    {infoIdentificacion}
+                  </p>
+                )}
+
+                {errorIdentificacion && (
+                  <p className="mt-2 text-xs font-medium text-rose-700">
+                    {errorIdentificacion}
+                  </p>
+                )}
               </div>
+
+
+              {/* Confirmación de persona existente */}
+              {personaIdentificada && (
+                <div className="sm:col-span-2 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-blue-900">
+                      Persona encontrada en el sistema
+                    </h4>
+                    {personaConfirmada === personaIdentificada.idPersona && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                        Confirmada
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-sm text-blue-900">
+                    <strong>Nombre completo:</strong>{' '}
+                    {[
+                      personaIdentificada.nombres,
+                      personaIdentificada.apellidoPaterno,
+                      personaIdentificada.apellidoMaterno
+                    ].filter(Boolean).join(' ')}
+                  </p>
+
+                  <p className="mt-1 text-sm text-blue-800">
+                    <strong>Fecha de nacimiento:</strong>{' '}
+                    {personaIdentificada.fechaNacimiento || 'No registrada'}
+                  </p>
+
+                  <p className="mt-1 text-sm text-blue-800">
+                    <strong>Documento:</strong>{' '}
+                    {personaIdentificada.documentoVerificado
+                      ? 'Verificado en el sistema'
+                      : 'Pendiente de verificación'}
+                  </p>
+
+                  {personaConfirmada === personaIdentificada.idPersona ? (
+                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-blue-200 pt-3">
+                      <p className="text-sm font-semibold text-emerald-700">
+                        Persona seleccionada para el expediente laboral.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={submitting}
+                        onClick={cancelarSeleccionPersona}
+                      >
+                        Cancelar selección
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex items-center gap-2 border-t border-blue-200 pt-3">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        disabled={submitting || buscandoPersona}
+                        onClick={confirmarPersona}
+                      >
+                        Confirmar esta persona
+                      </Button>
+                    </div>
+                  )}
+
+                  <p className="mt-3 text-xs text-blue-700">
+                    Confirma únicamente si los datos corresponden a la persona
+                    que deseas registrar. Esta acción no verifica oficialmente
+                    su identidad ni modifica sus datos.
+                  </p>
+                </div>
+              )}
 
               {/* Nombres */}
               <div>
@@ -562,7 +837,7 @@ export function NewWorkerModal({
                     marcarTocado('nombres', validarNombreCampo(form.nombres, 'Los nombres', true))
                   }
                   placeholder="Nombres completos"
-                  disabled={submitting}
+                  disabled={submitting || camposPersonaBloqueados}
                 />
                 <FieldError mensaje={errores.nombres} />
               </div>
@@ -580,7 +855,7 @@ export function NewWorkerModal({
                     marcarTocado('apellidoPaterno', validarNombreCampo(form.apellidoPaterno, 'El apellido paterno', false))
                   }
                   placeholder="Apellido paterno"
-                  disabled={submitting}
+                  disabled={submitting || camposPersonaBloqueados}
                 />
                 <FieldError mensaje={errores.apellidoPaterno} />
               </div>
@@ -598,7 +873,7 @@ export function NewWorkerModal({
                     marcarTocado('apellidoMaterno', validarNombreCampo(form.apellidoMaterno, 'El apellido materno', false))
                   }
                   placeholder="Apellido materno"
-                  disabled={submitting}
+                  disabled={submitting || camposPersonaBloqueados}
                 />
                 <FieldError mensaje={errores.apellidoMaterno} />
               </div>
@@ -626,7 +901,7 @@ export function NewWorkerModal({
                     )
                   }
                   max={hoy}
-                  disabled={submitting}
+                  disabled={submitting || camposPersonaBloqueados}
                 />
                 <FieldError mensaje={errores.fechaNacimiento} />
               </div>
@@ -650,7 +925,11 @@ export function NewWorkerModal({
                   }
                   placeholder="persona@correo.com"
                   autoComplete="email"
-                  disabled={submitting}
+                  disabled={
+                    submitting ||
+                    (camposPersonaBloqueados &&
+                      Boolean(personaIdentificada?.correoElectronico))
+                  }
                 />
                 {!touched.correoElectronico && form.correoElectronico && (
                   <p className="mt-1 text-[11px] text-brand-400">

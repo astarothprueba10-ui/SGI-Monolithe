@@ -7,11 +7,15 @@ import { SearchInput, Select } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/Feedback';
+import { Tabs } from '../components/ui/Tabs';
 import { coreService } from '../services/coreService';
-import type { TrabajadorResponse } from '../types/workers';
-import { PlusIcon } from 'lucide-react';
+import type { TrabajadorResponse, CatalogosTrabajadorResponse } from '../types/workers';
+import { PlusIcon, FileTextIcon } from 'lucide-react';
 import { Gate } from '../components/auth/PermissionRoute';
+import { useAuth } from '../contexts/AuthContext';
 import { NewWorkerModal } from '../components/Workers/NewWorkerModal';
+import { SolicitarCorreccionModal } from '../components/Workers/SolicitarCorreccionModal';
+import { CorreccionesPendientesPanel } from '../components/Workers/CorreccionesPendientesPanel';
 
 function nombreCompleto(trabajador: TrabajadorResponse): string {
   const persona = trabajador.informacionPersonal;
@@ -33,8 +37,11 @@ function obtenerIniciales(nombre: string): string {
 }
 
 export function Workers() {
+  const { can } = useAuth();
+  const [activeTab, setActiveTab] = useState<'trabajadores' | 'correcciones'>('trabajadores');
   const [trabajadores, setTrabajadores] =
     useState<TrabajadorResponse[]>([]);
+  const [catalogos, setCatalogos] = useState<CatalogosTrabajadorResponse | null>(null);
 
   const [query, setQuery] = useState('');
   const [areaFilter, setAreaFilter] = useState('all');
@@ -42,6 +49,20 @@ export function Workers() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [newWorkerOpen, setNewWorkerOpen] = useState(false);
+  const [correccionModalOpen, setCorreccionModalOpen] = useState(false);
+  const [trabajadorParaCorreccion, setTrabajadorParaCorreccion] = useState<TrabajadorResponse | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    coreService.getWorkerCatalogs()
+      .then((cats) => {
+        if (activo) setCatalogos(cats);
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
+  }, []);
 
   useEffect(() => {
     let activo = true;
@@ -145,6 +166,11 @@ export function Workers() {
     });
   }, [trabajadores, query, areaFilter]);
 
+  const tabs = useMemo(() => [
+    { id: 'trabajadores', label: 'Listado de trabajadores', count: trabajadores.length },
+    ...(can('hr.approve') ? [{ id: 'correcciones', label: 'Correcciones pendientes' }] : [])
+  ], [trabajadores.length, can]);
+
   // --- INTERFAZ ---
 
   return (
@@ -153,19 +179,34 @@ export function Workers() {
         title="Trabajadores"
         description="Gestión de trabajadores, información laboral, áreas, cargos y estados."
         actions={
-          <Gate permission="hr.create">
-            <Button
-              icon={PlusIcon}
-              variant="primary"
-              onClick={() => setNewWorkerOpen(true)}
-            >
-              Nuevo trabajador
-            </Button>
-          </Gate>
+          activeTab === 'trabajadores' ? (
+            <Gate permission="hr.create">
+              <Button
+                icon={PlusIcon}
+                variant="primary"
+                onClick={() => setNewWorkerOpen(true)}
+              >
+                Nuevo trabajador
+              </Button>
+            </Gate>
+          ) : null
         }
       />
 
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <Tabs
+        items={tabs}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as 'trabajadores' | 'correcciones')}
+        className="mb-5"
+      />
+
+      {activeTab === 'correcciones' ? (
+        <CorreccionesPendientesPanel
+          onSuccessAction={() => setReloadKey((k) => k + 1)}
+        />
+      ) : (
+        <>
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {indicadores.map((item) => (
           <Card key={item.label} className="p-5">
             <p className="text-[12px] text-brand-400">
@@ -241,6 +282,7 @@ export function Workers() {
                 <TH>Horario</TH>
                 <TH>Fecha de ingreso</TH>
                 <TH>Estado</TH>
+                <TH className="text-right">Acciones</TH>
               </>
             }
           >
@@ -292,9 +334,34 @@ export function Workers() {
                   </TD>
 
                   <TD>
-                    <Badge tone="neutral">
+                    <Badge
+                      tone={
+                        laboral.codigoEstadoTrabajador === 'ACTIVO'
+                          ? 'brand'
+                          : laboral.codigoEstadoTrabajador === 'EN_VERIFICACION'
+                          ? 'accent'
+                          : 'neutral'
+                      }
+                    >
                       {laboral.estadoTrabajador}
                     </Badge>
+                  </TD>
+
+                  <TD className="text-right">
+                    <Gate permission="hr.edit">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setTrabajadorParaCorreccion(trabajador);
+                          setCorreccionModalOpen(true);
+                        }}
+                        icon={FileTextIcon}
+                        className="text-brand-700 hover:bg-brand-50"
+                      >
+                        Solicitar corrección
+                      </Button>
+                    </Gate>
                   </TD>
                 </TR>
               );
@@ -302,6 +369,8 @@ export function Workers() {
           </Table>
         )}
       </Card>
+      </>
+      )}
 
       <NewWorkerModal
         open={newWorkerOpen}
@@ -310,6 +379,17 @@ export function Workers() {
           setNewWorkerOpen(false);
           setReloadKey((k) => k + 1);
         }}
+      />
+
+      <SolicitarCorreccionModal
+        open={correccionModalOpen}
+        onClose={() => setCorreccionModalOpen(false)}
+        onSuccess={() => {
+          setCorreccionModalOpen(false);
+          setReloadKey((k) => k + 1);
+        }}
+        trabajador={trabajadorParaCorreccion}
+        tiposDocumento={catalogos?.tiposDocumento ?? []}
       />
     </div>
   );

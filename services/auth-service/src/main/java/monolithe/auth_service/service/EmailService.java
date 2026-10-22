@@ -115,6 +115,76 @@ public class EmailService {
     }
   }
 
+  public void enviarConfirmacionCambioCorreo(
+      String destinatario,
+      String urlConfirmacion,
+      long minutosExpiracion) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, true, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(destinatario);
+      helper.setSubject("Confirmación de cambio de correo - MONOLITHE");
+      helper.setText(
+          construirCuerpoConfirmacionCambioCorreoHtml(urlConfirmacion, minutosExpiracion),
+          true);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      log.error("Error al construir el correo de confirmación de cambio de correo");
+      throw new MailException("Error al preparar el correo de confirmación", e) {};
+    }
+  }
+
+  private String construirCuerpoConfirmacionCambioCorreoHtml(
+      String urlConfirmacion,
+      long minutosExpiracion) {
+    return """
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;">
+          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 0;">
+            <tr>
+              <td align="center">
+                <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
+                  <tr>
+                    <td style="background:#1a2e4a;padding:28px 40px;">
+                      <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">MONOLITHE</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:36px 40px 20px;">
+                      <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#1a2e4a;">Confirmación de nuevo correo</h1>
+                      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4a5568;">Se ha solicitado registrar esta dirección de correo electrónico para su expediente laboral en MONOLITHE.</p>
+                      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4a5568;">Para confirmar y activar este correo, haga clic en el siguiente enlace:</p>
+                      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                        <tr>
+                          <td style="background:#2b6cb0;border-radius:6px;">
+                            <a href="%s" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Confirmar Correo Electrónico</a>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#718096;">Este enlace expirará en <strong>%d minutos</strong> y solo puede ser utilizado una vez.</p>
+                      <p style="margin:0;font-size:13px;line-height:1.5;color:#718096;">Si usted no solicitó este cambio, puede ignorar este mensaje.</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+                      <p style="margin:0;font-size:12px;color:#a0aec0;text-align:center;">MONOLITHE &mdash; Sistema de Gestión Integrado</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """.formatted(urlConfirmacion, minutosExpiracion);
+  }
+
   private String construirCuerpoHtml(
       String urlRecuperacion,
       long minutosExpiracion) {

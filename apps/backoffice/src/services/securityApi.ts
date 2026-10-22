@@ -37,6 +37,8 @@ export interface SecurityRole {
   cantidadUsuarios: number;
 }
 
+export type PersonaRelacion = 'TRABAJADOR' | 'CLIENTE';
+
 export interface SecurityPermission {
   idPermiso: number;
   codigo: string;
@@ -54,15 +56,18 @@ export interface AvailablePerson {
   apellidoPaterno: string;
   apellidoMaterno: string;
   nombreCompleto: string;
+  /** Correo principal activo de la persona; null cuando no existe. */
   correo: string | null;
+  /** Dato informativo; la verificación no condiciona la creación inicial de cuenta. */
   correoVerificado: boolean;
-  tipoPersona: 'TRABAJADOR' | 'CLIENTE';
+  /** Relaciones vigentes obtenidas por Supabase; una persona puede tener ambas. */
+  relaciones: PersonaRelacion[];
+  /** Elegibilidad general calculada por Supabase; el frontend no debe recomputarla. */
   elegible: boolean;
   tipoDocumento: string | null;
   numeroDocumento: string | null;
   documentoVerificado: boolean;
   documentoActivo: boolean;
-  documentoListo: boolean;
 }
 
 export interface SecurityOperationResponse {
@@ -158,10 +163,14 @@ export const securityApi = {
       `/roles/${encodeURIComponent(codigoRol)}/permissions`
     ),
 
-  listarPersonasDisponibles: () =>
+  listarPersonasDisponibles: (): Promise<AvailablePerson[]> =>
     request<AvailablePerson[]>('/people/available'),
 
-  crearUsuario: (payload: { idPersona: number; usuarioLogin: string }) =>
+  crearUsuario: (payload: {
+    idPersona: number;
+    usuarioLogin: string;
+    codigosRol: string[];
+  }) =>
     request<CreatedUserResponse>('/users', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -195,15 +204,6 @@ export const securityApi = {
     request<SecurityOperationResponse>(
       `/users/${idUsuario}/deactivate`,
       { method: 'PATCH' }
-    ),
-
-  asociarCorreoPersona: (idPersona: number, correo: string) =>
-    request<SecurityOperationResponse>(
-      `/people/${idPersona}/email`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ correo })
-      }
     ),
 
   revocarRol: (idUsuario: number, codigoRol: string) =>

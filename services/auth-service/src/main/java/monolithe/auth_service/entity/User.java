@@ -50,6 +50,9 @@ public class User {
     @Column(name = "password_temporal_expira_en")
     private LocalDateTime passwordTemporalExpiraEn;
 
+    @Column(name = "version_sesiones", nullable = false)
+    private Long versionSesiones = 0L;
+
     @Column(name = "fecha_creacion", nullable = false, insertable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
