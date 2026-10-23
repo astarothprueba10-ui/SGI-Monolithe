@@ -1,0 +1,73 @@
+-- PROPUESTA DE MIGRACION: ampliar public.sp_core_listar_solicitudes_correccion.
+-- NO APLICAR hasta conciliarla con la definicion desplegada en Supabase.
+-- Las migraciones locales no contienen este procedimiento y la version remota
+-- incluye cambios posteriores que no estan disponibles en este repositorio.
+
+-- Paso previo de solo lectura en Supabase para recuperar la firma y el cuerpo:
+-- SELECT p.oid::regprocedure AS firma, pg_get_functiondef(p.oid) AS definicion
+-- FROM pg_proc p
+-- JOIN pg_namespace n ON n.oid = p.pronamespace
+-- WHERE n.nspname = 'public'
+--   AND p.proname = 'sp_core_listar_solicitudes_correccion';
+
+-- Fusionar este objeto JSONB en el objeto existente de cada solicitud. Deben
+-- conservarse los campos que ya devuelve el procedimiento, en especial
+-- idSolicitud, motivo, fechaSolicitud y estado.
+--
+-- objeto_existente || jsonb_build_object(
+--     'idPersona', s.id_persona,
+--     'idTrabajador', trabajador.id_trabajador,
+--     'codigoTrabajador', trabajador.codigo,
+--     'nombreCompleto', NULLIF(
+--         CONCAT_WS(
+--             ' ',
+--             NULLIF(BTRIM(persona.nombres), ''),
+--             NULLIF(BTRIM(persona.apellido_paterno), ''),
+--             NULLIF(BTRIM(persona.apellido_materno), '')
+--         ),
+--         ''
+--     ),
+--     'tipoDocumentoActual', tipo_actual.codigo,
+--     'numeroDocumentoActual', documento_actual.numero_documento,
+--     'tipoDocumentoPropuesto', tipo_propuesto.codigo,
+--     'numeroDocumentoPropuesto', s.valor_propuesto,
+--     'valorAnterior', s.valor_anterior,
+--     'valorPropuesto', s.valor_propuesto,
+--     'tieneEvidencia',
+--         NULLIF(BTRIM(s.evidencia_storage_path), '') IS NOT NULL
+-- )
+--
+-- Incorporar los JOIN siguientes en la consulta de solicitudes existente,
+-- adaptando el alias de la tabla de solicitudes a su nombre en el cuerpo remoto:
+-- LEFT JOIN public.core_personas persona
+--     ON persona.id_persona = s.id_persona
+-- Si el cuerpo desplegado ya identifica el registro de trabajador asociado,
+-- reutilizar esa relacion. Si existen varios historicos por persona, confirmar
+-- el criterio laboral vigente antes de integrar la resolucion siguiente.
+-- LEFT JOIN LATERAL (
+--     SELECT t.id_trabajador, t.codigo
+--     FROM public.rrhh_trabajadores t
+--     WHERE t.id_persona = s.id_persona
+--     ORDER BY t.id_trabajador
+--     LIMIT 1
+-- ) trabajador ON TRUE
+-- LEFT JOIN LATERAL (
+--     SELECT d.id_tipo_documento, d.numero_documento
+--     FROM public.core_personas_documentos d
+--     WHERE d.id_persona = s.id_persona
+--       AND d.principal = TRUE
+--       AND d.activo = TRUE
+--     ORDER BY d.fecha_actualizacion DESC NULLS LAST,
+--              d.id_persona_documento DESC
+--     LIMIT 1
+-- ) documento_actual ON TRUE
+-- LEFT JOIN public.cfg_tipos_documento tipo_actual
+--     ON tipo_actual.id_tipo_documento = documento_actual.id_tipo_documento
+-- LEFT JOIN public.cfg_tipos_documento tipo_propuesto
+--     ON tipo_propuesto.id_tipo_documento = s.id_tipo_documento_propuesto
+--
+-- Al integrar la propuesta, preservar literalmente las verificaciones,
+-- restricciones y filtros de la definicion desplegada: permiso hr.approve,
+-- rol Gerencia/Jefe de RRHH, exclusion de solicitudes propias y estado pendiente.
+-- No cambiar la firma OUT ni el formato de resultado/estado/mensaje consumido
+-- por TrabajadorProcedureRepository.
