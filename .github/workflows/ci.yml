@@ -75,3 +75,19 @@ jobs:
           test -d database/migrations || exit 1
           ls -la database/migrations/*.sql
           echo "All migrations found and valid."
+
+  deploy-oracle:
+    name: Deploy to Oracle Cloud
+    needs: [frontend-validation, backend-validation, database-validation]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger remote deployment via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USERNAME }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_PORT || 22 }}
+          script: |
+            bash /home/ubuntu/SGI-Monolithe/scripts/deploy_oracle.sh

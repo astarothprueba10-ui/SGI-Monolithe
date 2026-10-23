@@ -22,6 +22,26 @@ function loadSecretEnv(secretFile: string): Record<string, string> {
   return result;
 }
 
+/**
+ * Intercepts incoming requests and rejects malformed URI encoding without crashing.
+ */
+function safeUriPlugin() {
+  return {
+    name: 'safe-uri-middleware',
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        try {
+          decodeURI(req.url || '');
+          next();
+        } catch {
+          res.statusCode = 400;
+          res.end('Bad Request: Malformed URI');
+        }
+      });
+    }
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const secretDir = path.resolve(__dirname, '../../.secret');
@@ -92,13 +112,25 @@ export default defineConfig(({ mode }) => {
     '';
 
   return {
-    plugins: [react()],
+    plugins: [react(), safeUriPlugin()],
 
     envDir: secretDir,
 
     server: {
-      port: 5173,
+      port: 5174,
       host: true,
+      hmr: {
+        overlay: false
+      },
+      fs: {
+        deny: [
+          '**/Dockerfile*',
+          '**/docker-compose*',
+          '**/.env*',
+          '**/package.json',
+          '**/package-lock.json'
+        ]
+      },
 
       proxy: {
         '/api/security': {

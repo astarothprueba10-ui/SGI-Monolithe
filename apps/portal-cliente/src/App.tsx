@@ -12,6 +12,7 @@ import { MiLote } from './pages/portal/MiLote';
 import { Pagos } from './pages/portal/Pagos';
 import { Perfil } from './pages/portal/Perfil';
 import { Soporte } from './pages/portal/Soporte';
+import { NotFound } from './pages/NotFound';
 
 
 function tieneSesion() {
@@ -57,7 +58,7 @@ export function App() {
           <Route path="soporte" element={<Soporte />} />
           <Route path="perfil" element={<Perfil />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
