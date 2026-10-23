@@ -7,8 +7,22 @@ import { Button } from '../ui/Button';
 import { coreService, type PersonaIdentificadaResponse } from '../../services/coreService';
 import { ApiError } from '../../lib/apiClient';
 import { GeoLocationSelector, type GeoLocationValue } from '../geo/GeoLocationSelector';
-
 import type { CatalogosTrabajadorResponse } from '../../types/workers';
+import {
+  createInitialWorkerForm as estadoInicial,
+  esTipoSoloNumerico,
+  filtrarCaracteresDocumento,
+  filtrarCaracteresNombre,
+  filtrarTelefono,
+  validarCorreo,
+  validarDocumento,
+  validarNombreCampo,
+  validarTelefono,
+  type WorkerFormErrors as FormErrors,
+  type WorkerFormKey as FormKey,
+  type WorkerFormState as FormState,
+  type WorkerTouchedFields as TouchedFields
+} from './workerForm';
 
 interface NewWorkerModalProps {
   open: boolean;
@@ -16,120 +30,10 @@ interface NewWorkerModalProps {
   onSuccess: () => void;
 }
 
-// Regex permitidos
-const RE_SOLO_NOMBRE = /^[A-Za-z\u00C0-\u024F\s-]*$/;
-const RE_SOLO_NUMEROS = /^\d*$/;
-const RE_ALFANUMERICO = /^[A-Za-z0-9]*$/;
-const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type TipoDoc = CatalogosTrabajadorResponse['tiposDocumento'][number];
-
-function esTipoSoloNumerico(tipo: TipoDoc | undefined): boolean {
-  if (!tipo) return false;
-  const codigo = (tipo.codigo || '').toUpperCase();
-  const nombre = (tipo.nombre || '').toLowerCase();
-  if (codigo === 'DNI' || codigo === '01' || codigo === 'RUC' || codigo === '06') return true;
-  if (codigo === 'CE' || codigo === '04' || nombre.includes('extranjer')) return true;
-  return Boolean(tipo.soloNumerico);
-}
-
-function filtrarCaracteresDocumento(valor: string, soloNumerico: boolean): string {
-  return soloNumerico ? valor.replace(/\D/g, '') : valor.replace(/[^A-Za-z0-9]/g, '');
-}
-
-function filtrarCaracteresNombre(valor: string): string {
-  return valor.replace(/[^A-Za-z\u00C0-\u024F\s-]/g, '');
-}
-
-function filtrarTelefono(valor: string): string {
-  return valor.replace(/\D/g, '').slice(0, 15);
-}
-
-function validarDocumento(valor: string, tipo: TipoDoc | undefined): string | undefined {
-  if (!valor.trim()) return 'El numero de documento es obligatorio.';
-  if (!tipo) return undefined;
-  const doc = valor.trim();
-  const soloNum = esTipoSoloNumerico(tipo);
-  if (soloNum && !RE_SOLO_NUMEROS.test(doc)) {
-    return `El documento ${tipo.nombre} solo admite digitos numericos.`;
-  }
-  if (!soloNum && !RE_ALFANUMERICO.test(doc)) {
-    return `El documento ${tipo.nombre} solo admite letras y numeros, sin espacios.`;
-  }
-  if (tipo.longitudMinima !== null && doc.length < tipo.longitudMinima) {
-    return `El documento debe tener al menos ${tipo.longitudMinima} caracteres.`;
-  }
-  if (tipo.longitudMaxima !== null && doc.length > tipo.longitudMaxima) {
-    return `El documento no puede superar ${tipo.longitudMaxima} caracteres.`;
-  }
-  return undefined;
-}
-
-function validarNombreCampo(valor: string, etiqueta: string, requerido: boolean): string | undefined {
-  if (requerido && !valor.trim()) return `${etiqueta} es obligatorio.`;
-  if (valor.trim() && !RE_SOLO_NOMBRE.test(valor)) {
-    return `${etiqueta} solo debe contener letras, tildes, \u00f1 y guiones.`;
-  }
-  return undefined;
-}
-
-function validarCorreo(valor: string): string | undefined {
-  if (!valor.trim()) return undefined;
-  if (!RE_CORREO.test(valor.trim())) {
-    return 'Ingresa un correo valido (ej: persona@correo.com).';
-  }
-  return undefined;
-}
-
-function validarTelefono(valor: string): string | undefined {
-  if (!valor.trim()) return undefined;
-  if (!/^\d{7,15}$/.test(valor.trim())) {
-    return 'El telefono debe contener entre 7 y 15 digitos.';
-  }
-  return undefined;
-}
-
 function FieldError({ mensaje }: { mensaje?: string }) {
   if (!mensaje) return null;
   return <p className="mt-1 text-xs text-rose-600">{mensaje}</p>;
 }
-
-function estadoInicial() {
-  return {
-    idTipoDocumento: '',
-    numeroDocumento: '',
-    nombres: '',
-    apellidoPaterno: '',
-    apellidoMaterno: '',
-    fechaNacimiento: '',
-    correoElectronico: '',
-    telefono: '',
-    direccion: '',
-    referencia: '',
-    idPais: null as number | null,
-    pais: '',
-    idDepartamento: null as number | null,
-    codigoDepartamento: '',
-    departamento: '',
-    idProvincia: null as number | null,
-    codigoProvincia: '',
-    provincia: '',
-    idDistrito: null as number | null,
-    codigoDistrito: '',
-    distrito: '',
-    idArea: '',
-    idCargo: '',
-    idHorario: '',
-    idTipoVinculoLaboral: '',
-    fechaIngreso: '',
-    observaciones: ''
-  };
-}
-
-type FormState = ReturnType<typeof estadoInicial>;
-type FormKey = keyof FormState;
-type FormErrors = Partial<Record<FormKey, string>>;
-type TouchedFields = Partial<Record<FormKey, boolean>>;
 
 function validarUbicacion(form: FormState, errores: FormErrors): void {
   if (!form.idPais || !form.pais.trim()) errores.pais = 'El pais es obligatorio.';
@@ -610,10 +514,15 @@ export function NewWorkerModal({
   const docInputMode: React.InputHTMLAttributes<HTMLInputElement>['inputMode'] =
     soloNumDoc ? 'numeric' : 'text';
 
+  function handleModalClose() {
+    if (submitting) return;
+    onClose();
+  }
+
   return (
     <Modal
       open={open}
-      onClose={submitting ? () => { } : onClose}
+      onClose={handleModalClose}
       title="Nuevo trabajador"
       description="Completa la informacion personal y laboral del trabajador."
       width="max-w-3xl"

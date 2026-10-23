@@ -47,6 +47,81 @@ class TrabajadorServiceActualizarTest {
     }
 
     @Test
+    void debePreservarElPayloadParcialEnLaRutaJsonDeActualizacion() throws Exception {
+        when(repository.actualizarTrabajador(anyLong(), anyLong(), anyString()))
+                .thenReturn(new ResultadoProcedimiento(jsonMapper.createObjectNode(), "OK", null));
+        JsonNode solicitud = jsonMapper.readTree("""
+                {"informacionPersonal":{"telefono":"987654321"}}
+                """);
+
+        service.actualizarTrabajador(1L, 10L, solicitud);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(repository).actualizarTrabajador(eq(1L), eq(10L), captor.capture());
+        JsonNode enviado = jsonMapper.readTree(captor.getValue());
+        assertEquals("987654321", enviado.get("informacionPersonal").get("telefono").asString());
+        assertFalse(enviado.get("informacionPersonal").has("correoElectronico"));
+        assertFalse(enviado.get("informacionPersonal").has("numeroDocumento"));
+    }
+
+    @Test
+    void debeRechazarDocumentoEnPayloadJsonParcial() throws Exception {
+        JsonNode solicitud = jsonMapper.readTree("""
+                {"informacionPersonal":{"numeroDocumento":"00123456"}}
+                """);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> service.actualizarTrabajador(1L, 10L, solicitud));
+
+        assertEquals(400, ex.getStatusCode().value());
+        verify(repository, never()).actualizarTrabajador(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void debeRechazarClavesDeDocumentoAunqueLleguenConValorNull() throws Exception {
+        JsonNode solicitud = jsonMapper.readTree("""
+                {"informacionPersonal":{"numeroDocumento":null}}
+                """);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> service.actualizarTrabajador(1L, 10L, solicitud));
+
+        assertEquals(400, ex.getStatusCode().value());
+        verify(repository, never()).actualizarTrabajador(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void debeRechazarCambioDirectoDeCorreoEnPayloadJsonParcial() throws Exception {
+        JsonNode solicitud = jsonMapper.readTree("""
+                {"informacionPersonal":{"correoElectronico":"nuevo@example.test"}}
+                """);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> service.actualizarTrabajador(1L, 10L, solicitud));
+
+        assertEquals(400, ex.getStatusCode().value());
+        assertTrue(ex.getReason().contains("confirmación por enlace"));
+        verify(repository, never()).actualizarTrabajador(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void debeRechazarEstadoEnVerificacionAunqueElIdLlegaComoTexto() throws Exception {
+        JsonNode solicitud = jsonMapper.readTree("""
+                {"informacionLaboral":{"idEstadoTrabajador":"5"}}
+                """);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> service.actualizarTrabajador(1L, 10L, solicitud));
+
+        assertEquals(400, ex.getStatusCode().value());
+        verify(repository, never()).actualizarTrabajador(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
     void debeRechazarSolicitudSinInformacionLaboral() {
         ActualizarTrabajadorRequest solicitud = new ActualizarTrabajadorRequest(null);
 

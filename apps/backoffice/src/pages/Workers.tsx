@@ -1,21 +1,31 @@
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { SearchInput, Select } from '../components/ui/Field';
+import { SearchInput } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/Feedback';
 import { Tabs } from '../components/ui/Tabs';
 import { coreService } from '../services/coreService';
-import type { TrabajadorResponse, CatalogosTrabajadorResponse } from '../types/workers';
-import { PlusIcon, FileTextIcon } from 'lucide-react';
+import type { CatalogosTrabajadorResponse, MetricasTrabajadoresResponse, TrabajadorResponse } from '../types/workers';
+import { EyeIcon, PencilIcon, PlusIcon, UserCheckIcon } from 'lucide-react';
+import { IconButton } from '../components/ui/Button';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { NewWorkerModal } from '../components/Workers/NewWorkerModal';
-import { SolicitarCorreccionModal } from '../components/Workers/SolicitarCorreccionModal';
+import { EditWorkerModal } from '../components/Workers/EditWorkerModal';
+import { WorkerDetailModal } from '../components/Workers/WorkerDetailModal';
+import { ReincorporarWorkerModal } from '../components/Workers/ReincorporarWorkerModal';
 import { CorreccionesPendientesPanel } from '../components/Workers/CorreccionesPendientesPanel';
+import { ReincorporacionesPanel } from '../components/Workers/ReincorporacionesPanel';
+import { HistorialTrabajadoresPanel } from '../components/Workers/HistorialTrabajadoresPanel';
+import { FilterBar } from '../components/ui/filters/FilterBar';
+import { FilterSelect } from '../components/ui/filters/FilterSelect';
+import { FilterDateRange } from '../components/ui/filters/FilterDateRange';
+import { formatWorkerDate } from '../components/Workers/workerForm';
 
 function nombreCompleto(trabajador: TrabajadorResponse): string {
   const persona = trabajador.informacionPersonal;
@@ -38,29 +48,44 @@ function obtenerIniciales(nombre: string): string {
 
 export function Workers() {
   const { can } = useAuth();
-  const [activeTab, setActiveTab] = useState<'trabajadores' | 'correcciones'>('trabajadores');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'trabajadores' | 'correcciones' | 'reincorporaciones' | 'historial'>(() => {
+    if (tabParam === 'reincorporaciones' || tabParam === 'correcciones' || tabParam === 'historial') return tabParam;
+    return 'trabajadores';
+  });
   const [trabajadores, setTrabajadores] =
     useState<TrabajadorResponse[]>([]);
+  const [pendingReincIds, setPendingReincIds] = useState<Set<number>>(new Set());
   const [catalogos, setCatalogos] = useState<CatalogosTrabajadorResponse | null>(null);
+  const [metricas, setMetricas] = useState<MetricasTrabajadoresResponse | null>(null);
 
   const [query, setQuery] = useState('');
   const [areaFilter, setAreaFilter] = useState('all');
+  const [cargoFilter, setCargoFilter] = useState('all');
+  const [estadoFilter, setEstadoFilter] = useState('all');
+  const [fechaDesdeFilter, setFechaDesdeFilter] = useState('');
+  const [fechaHastaFilter, setFechaHastaFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorMetricas, setErrorMetricas] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [newWorkerOpen, setNewWorkerOpen] = useState(false);
-  const [correccionModalOpen, setCorreccionModalOpen] = useState(false);
-  const [trabajadorParaCorreccion, setTrabajadorParaCorreccion] = useState<TrabajadorResponse | null>(null);
+  const [workerDetailId, setWorkerDetailId] = useState<number | null>(null);
+  const [workerEditId, setWorkerEditId] = useState<number | null>(null);
+  const [reincorporarWorker, setReincorporarWorker] = useState<TrabajadorResponse | null>(null);
 
   useEffect(() => {
-    let activo = true;
+    let active = true;
     coreService.getWorkerCatalogs()
-      .then((cats) => {
-        if (activo) setCatalogos(cats);
+      .then((data) => {
+        if (active) setCatalogos(data);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setCatalogos(null);
+      });
     return () => {
-      activo = false;
+      active = false;
     };
   }, []);
 
@@ -70,12 +95,27 @@ export function Workers() {
     async function cargarTrabajadores() {
       setLoading(true);
       setError(null);
+      setErrorMetricas(null);
 
       try {
-        const resultado = await coreService.getWorkers();
+        const [resultado, resReinc, resMetricas] = await Promise.all([
+          coreService.getWorkers(),
+          coreService.listarReincorporaciones({ estado: 'PENDIENTE' }).catch(() => ({
+            solicitudes: [],
+            totalMostrado: 0
+          })),
+          coreService.getMetricasTrabajadores().catch((err) => {
+            if (activo) {
+              setErrorMetricas(err instanceof Error ? err.message : 'No se pudieron obtener las metricas.');
+            }
+            return null;
+          })
+        ]);
 
         if (activo) {
           setTrabajadores(resultado);
+          setPendingReincIds(new Set(resReinc.solicitudes.map((s) => s.idTrabajador)));
+          setMetricas(resMetricas);
         }
       } catch (err) {
         if (activo) {
@@ -102,29 +142,25 @@ export function Workers() {
   }, [reloadKey]);
 
   // =========================================
-  // 2. INDICADORES REALES
+  // 2. INDICADORES REALES (sin fallbacks inventados)
   // =========================================
-
-  const trabajadoresActivos = trabajadores.filter(
-    (t) =>
-      t.informacionLaboral.codigoEstadoTrabajador === 'ACTIVO'
-  ).length;
-
-  const trabajadoresNoActivos =
-    trabajadores.length - trabajadoresActivos;
 
   const indicadores = [
     {
-      label: 'Trabajadores registrados',
-      value: trabajadores.length
+      label: 'Nuevos trabajadores',
+      value: loading ? '—' : metricas ? String(metricas.nuevosTrabajadores) : errorMetricas ? 'Error' : '—'
     },
     {
-      label: 'Trabajadores activos',
-      value: trabajadoresActivos
+      label: 'Reincorporaciones aprobadas',
+      value: loading ? '—' : metricas ? String(metricas.reincorporacionesAprobadas) : errorMetricas ? 'Error' : '—'
     },
     {
-      label: 'Otros estados',
-      value: trabajadoresNoActivos
+      label: 'Suspendidos actuales',
+      value: loading ? '—' : metricas ? String(metricas.suspendidosActuales) : errorMetricas ? 'Error' : '—'
+    },
+    {
+      label: 'Ceses registrados',
+      value: loading ? '—' : metricas ? String(metricas.cesesRegistrados) : errorMetricas ? 'Error' : '—'
     }
   ];
 
@@ -142,6 +178,16 @@ export function Workers() {
     ).sort();
   }, [trabajadores]);
 
+  const cargos = useMemo(() => {
+    return Array.from(
+      new Set(
+        trabajadores.map(
+          (t) => t.informacionLaboral.cargo
+        )
+      )
+    ).sort();
+  }, [trabajadores]);
+
   const rows = useMemo(() => {
     const texto = query.trim().toLowerCase();
 
@@ -153,6 +199,25 @@ export function Workers() {
         areaFilter === 'all' ||
         laboral.area === areaFilter;
 
+      const coincideCargo =
+        cargoFilter === 'all' ||
+        laboral.cargo === cargoFilter;
+
+      const coincideEstado =
+        estadoFilter === 'all' ||
+        laboral.codigoEstadoTrabajador === estadoFilter;
+
+      let coincideFecha = true;
+      if (fechaDesdeFilter || fechaHastaFilter) {
+        const fechaIngreso = laboral.fechaIngreso ? laboral.fechaIngreso.slice(0, 10) : '';
+        if (!fechaIngreso) {
+          coincideFecha = false;
+        } else {
+          if (fechaDesdeFilter && fechaIngreso < fechaDesdeFilter) coincideFecha = false;
+          if (fechaHastaFilter && fechaIngreso > fechaHastaFilter) coincideFecha = false;
+        }
+      }
+
       const coincideBusqueda =
         texto.length === 0 ||
         nombreCompleto(trabajador)
@@ -162,14 +227,55 @@ export function Workers() {
         trabajador.codigo.toLowerCase().includes(texto) ||
         (personal.numeroDocumento ?? '').includes(texto);
 
-      return coincideArea && coincideBusqueda;
+      return coincideArea && coincideCargo && coincideEstado && coincideFecha && coincideBusqueda;
     });
-  }, [trabajadores, query, areaFilter]);
+  }, [trabajadores, query, areaFilter, cargoFilter, estadoFilter, fechaDesdeFilter, fechaHastaFilter]);
+
+  const hayFiltrosActivos = query !== '' || areaFilter !== 'all' || cargoFilter !== 'all' || estadoFilter !== 'all' || fechaDesdeFilter !== '' || fechaHastaFilter !== '';
+
+  function limpiarFiltros() {
+    setQuery('');
+    setAreaFilter('all');
+    setCargoFilter('all');
+    setEstadoFilter('all');
+    setFechaDesdeFilter('');
+    setFechaHastaFilter('');
+  }
+
+  const estadosDisponibles = useMemo(() => {
+    const codigos = Array.from(new Set(trabajadores.map((t) => t.informacionLaboral.codigoEstadoTrabajador)));
+    return codigos.map((codigo) => {
+      const t = trabajadores.find((w) => w.informacionLaboral.codigoEstadoTrabajador === codigo);
+      return { value: codigo, label: t?.informacionLaboral.estadoTrabajador ?? codigo };
+    }).sort((a, b) => a.label.localeCompare(b.label));
+  }, [trabajadores]);
 
   const tabs = useMemo(() => [
     { id: 'trabajadores', label: 'Listado de trabajadores', count: trabajadores.length },
-    ...(can('hr.approve') ? [{ id: 'correcciones', label: 'Correcciones pendientes' }] : [])
+    ...(can('hr.approve') ? [{ id: 'correcciones', label: 'Correcciones pendientes' }] : []),
+    ...(can('hr.view') ? [{ id: 'reincorporaciones', label: 'Reincorporaciones' }] : []),
+    ...(can('hr.view') ? [{ id: 'historial', label: 'Historial' }] : [])
   ], [trabajadores.length, can]);
+
+  useEffect(() => {
+    if (tabParam === 'reincorporaciones' || tabParam === 'correcciones' || tabParam === 'trabajadores' || tabParam === 'historial') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  function handleTabChange(id: string) {
+    const newTab = id as 'trabajadores' | 'correcciones' | 'reincorporaciones' | 'historial';
+    setActiveTab(newTab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (newTab === 'trabajadores') {
+        next.delete('tab');
+      } else {
+        next.set('tab', newTab);
+      }
+      return next;
+    });
+  }
 
   // --- INTERFAZ ---
 
@@ -196,7 +302,7 @@ export function Workers() {
       <Tabs
         items={tabs}
         active={activeTab}
-        onChange={(id) => setActiveTab(id as 'trabajadores' | 'correcciones')}
+        onChange={handleTabChange}
         className="mb-5"
       />
 
@@ -204,46 +310,93 @@ export function Workers() {
         <CorreccionesPendientesPanel
           onSuccessAction={() => setReloadKey((k) => k + 1)}
         />
+      ) : activeTab === 'reincorporaciones' ? (
+        <ReincorporacionesPanel
+          onSuccessAction={() => setReloadKey((k) => k + 1)}
+        />
+      ) : activeTab === 'historial' ? (
+        <HistorialTrabajadoresPanel trabajadores={trabajadores} />
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {indicadores.map((item) => (
-          <Card key={item.label} className="p-5">
-            <p className="text-[12px] text-brand-400">
-              {item.label}
-            </p>
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {indicadores.map((item) => (
+              <Card key={item.label} className="p-5">
+                <p className="text-[12px] text-brand-400">
+                  {item.label}
+                </p>
 
-            <p className="mt-1.5 text-[22px] font-semibold tabular text-brand-900">
-              {loading ? '—' : item.value}
-            </p>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
-          <SearchInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Buscar nombre, DNI, código o cargo..."
-            className="w-full sm:w-72"
-          />
-
-          <Select
-            value={areaFilter}
-            onChange={(e) => setAreaFilter(e.target.value)}
-            aria-label="Filtrar por área"
-            className="w-[180px]"
-          >
-            <option value="all">Todas las áreas</option>
-
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area}
-              </option>
+                <p className="mt-1.5 text-[22px] font-semibold tabular text-brand-900">
+                  {loading ? '—' : item.value}
+                </p>
+              </Card>
             ))}
-          </Select>
-        </div>
+          </div>
+
+          {errorMetricas ? (
+            <p className="mb-4 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5">
+              No se pudieron actualizar las métricas: {errorMetricas}
+            </p>
+          ) : null}
+
+          <Card>
+            <FilterBar>
+              <SearchInput
+                value={query}
+                onValueChange={setQuery}
+                placeholder="Buscar nombre, DNI, código o cargo..."
+                className="w-full sm:w-72"
+              />
+
+              <FilterSelect
+                id="filtro-area"
+                label="Área"
+                value={areaFilter}
+                onChange={setAreaFilter}
+                options={[
+                  { value: 'all', label: 'Todas las áreas' },
+                  ...areas.map((area) => ({ value: area, label: area }))
+                ]}
+              />
+
+              <FilterSelect
+                id="filtro-cargo"
+                label="Cargo"
+                value={cargoFilter}
+                onChange={setCargoFilter}
+                options={[
+                  { value: 'all', label: 'Todos los cargos' },
+                  ...cargos.map((cargo) => ({ value: cargo, label: cargo }))
+                ]}
+              />
+
+              <FilterSelect
+                id="filtro-estado"
+                label="Estado"
+                value={estadoFilter}
+                onChange={setEstadoFilter}
+                options={[
+                  { value: 'all', label: 'Todos los estados' },
+                  ...estadosDisponibles
+                ]}
+              />
+
+              <FilterDateRange
+                idDesde="filtro-ingreso-desde"
+                idHasta="filtro-ingreso-hasta"
+                labelDesde="Ingreso desde"
+                labelHasta="Hasta"
+                desde={fechaDesdeFilter}
+                hasta={fechaHastaFilter}
+                onChangeDesde={setFechaDesdeFilter}
+                onChangeHasta={setFechaHastaFilter}
+              />
+
+              {hayFiltrosActivos ? (
+                <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+                  Limpiar filtros
+                </Button>
+              ) : null}
+            </FilterBar>
 
         {loading ? (
           <div className="p-8 text-center text-brand-500">
@@ -275,14 +428,15 @@ export function Workers() {
           <Table
             head={
               <>
+                <TH>Fecha de creación</TH>
+                <TH>Fecha de ingreso</TH>
                 <TH>Trabajador</TH>
+                <TH>Documento</TH>
                 <TH>Área</TH>
                 <TH>Cargo</TH>
-                <TH>Contrato</TH>
-                <TH>Horario</TH>
-                <TH>Fecha de ingreso</TH>
+                <TH className="text-center">Ficha</TH>
                 <TH>Estado</TH>
-                <TH className="text-right">Acciones</TH>
+                <TH className="text-center">Acciones</TH>
               </>
             }
           >
@@ -290,9 +444,14 @@ export function Workers() {
               const personal = trabajador.informacionPersonal;
               const laboral = trabajador.informacionLaboral;
               const nombre = nombreCompleto(trabajador);
+              const tipoDocumento = catalogos?.tiposDocumento.find(
+                (tipo) => tipo.idTipoDocumento === personal.idTipoDocumento
+              );
 
               return (
                 <TR key={trabajador.idTrabajador}>
+                  <TD className="whitespace-nowrap">{formatWorkerDate(trabajador.fechaCreacion)}</TD>
+                  <TD className="whitespace-nowrap">{formatWorkerDate(laboral.fechaIngreso)}</TD>
                   <TD>
                     <div className="flex items-center gap-2.5">
                       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-600">
@@ -306,11 +465,18 @@ export function Workers() {
 
                         <span className="block text-[11px] text-brand-300">
                           {trabajador.codigo}
-                          {' · '}
-                          {personal.numeroDocumento ?? 'Sin documento'}
                         </span>
                       </span>
                     </div>
+                  </TD>
+
+                  <TD>
+                    <span className="block text-[11px] text-brand-400">
+                      {tipoDocumento?.codigo || tipoDocumento?.nombre || '—'}
+                    </span>
+                    <span className="font-mono text-[13px] text-brand-800">
+                      {personal.numeroDocumento || '—'}
+                    </span>
                   </TD>
 
                   <TD className="text-brand-500">
@@ -319,49 +485,55 @@ export function Workers() {
 
                   <TD>{laboral.cargo}</TD>
 
-                  <TD>
-                    <Badge tone="neutral">
-                      {laboral.tipoVinculoLaboral}
-                    </Badge>
-                  </TD>
-
-                  <TD className="text-brand-500">
-                    {laboral.horario ?? 'Sin asignar'}
-                  </TD>
-
-                  <TD>
-                    {laboral.fechaIngreso ?? '—'}
-                  </TD>
-
-                  <TD>
-                    <Badge
-                      tone={
-                        laboral.codigoEstadoTrabajador === 'ACTIVO'
-                          ? 'brand'
-                          : laboral.codigoEstadoTrabajador === 'EN_VERIFICACION'
-                          ? 'accent'
-                          : 'neutral'
-                      }
-                    >
-                      {laboral.estadoTrabajador}
-                    </Badge>
-                  </TD>
-
-                  <TD className="text-right">
-                    <Gate permission="hr.edit">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setTrabajadorParaCorreccion(trabajador);
-                          setCorreccionModalOpen(true);
-                        }}
-                        icon={FileTextIcon}
-                        className="text-brand-700 hover:bg-brand-50"
-                      >
-                        Solicitar corrección
-                      </Button>
+                  <TD className="text-center">
+                    <Gate permission="hr.view">
+                      <IconButton
+                        icon={EyeIcon}
+                        label={`Ver ficha de ${nombre}`}
+                        onClick={() => setWorkerDetailId(trabajador.idTrabajador)}
+                        className="mx-auto"
+                      />
                     </Gate>
+                  </TD>
+
+                  <TD>
+                    {laboral.codigoEstadoTrabajador === 'CESADO' && pendingReincIds.has(trabajador.idTrabajador) ? (
+                      <Badge tone="accent">Reincorporación pendiente</Badge>
+                    ) : (
+                      <Badge
+                        tone={
+                          laboral.codigoEstadoTrabajador === 'ACTIVO'
+                            ? 'brand'
+                            : laboral.codigoEstadoTrabajador === 'EN_VERIFICACION'
+                            ? 'accent'
+                            : 'neutral'
+                        }
+                      >
+                        {laboral.estadoTrabajador}
+                      </Badge>
+                    )}
+                  </TD>
+
+                  <TD className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {laboral.codigoEstadoTrabajador === 'CESADO' &&
+                       !pendingReincIds.has(trabajador.idTrabajador) && (
+                        <Gate permission="hr.edit">
+                          <IconButton
+                            icon={UserCheckIcon}
+                            label={`Solicitar reincorporación para ${nombre}`}
+                            onClick={() => setReincorporarWorker(trabajador)}
+                          />
+                        </Gate>
+                      )}
+                      <Gate permission="hr.edit">
+                        <IconButton
+                          icon={PencilIcon}
+                          label={`Editar ${nombre}`}
+                          onClick={() => setWorkerEditId(trabajador.idTrabajador)}
+                        />
+                      </Gate>
+                    </div>
                   </TD>
                 </TR>
               );
@@ -381,15 +553,31 @@ export function Workers() {
         }}
       />
 
-      <SolicitarCorreccionModal
-        open={correccionModalOpen}
-        onClose={() => setCorreccionModalOpen(false)}
+      <WorkerDetailModal
+        open={workerDetailId !== null}
+        workerId={workerDetailId}
+        onClose={() => setWorkerDetailId(null)}
+      />
+
+      <EditWorkerModal
+        open={workerEditId !== null}
+        workerId={workerEditId}
+        onClose={() => setWorkerEditId(null)}
         onSuccess={() => {
-          setCorreccionModalOpen(false);
+          setWorkerEditId(null);
           setReloadKey((k) => k + 1);
         }}
-        trabajador={trabajadorParaCorreccion}
-        tiposDocumento={catalogos?.tiposDocumento ?? []}
+        onPartialUpdate={() => setReloadKey((k) => k + 1)}
+      />
+
+      <ReincorporarWorkerModal
+        open={reincorporarWorker !== null}
+        worker={reincorporarWorker}
+        onClose={() => setReincorporarWorker(null)}
+        onSuccess={() => {
+          setReincorporarWorker(null);
+          setReloadKey((k) => k + 1);
+        }}
       />
     </div>
   );

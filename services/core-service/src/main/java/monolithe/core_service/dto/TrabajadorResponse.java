@@ -7,6 +7,7 @@ public record TrabajadorResponse(
 
         Long idTrabajador,
         String codigo,
+        String fechaCreacion,
 
         InformacionPersonal informacionPersonal,
         InformacionLaboral informacionLaboral
@@ -30,13 +31,23 @@ public record TrabajadorResponse(
             LocalDate fechaNacimiento,
 
             String correoElectronico,
+            Boolean correoVerificado,
+            Boolean documentoVerificado,
             String telefono,
 
             // DOMICILIO
             String direccion,
             String referencia,
+            Long idPais,
+            String pais,
+            Long idDepartamento,
+            String codigoDepartamento,
             String departamento,
+            Long idProvincia,
+            String codigoProvincia,
             String provincia,
+            Long idDistrito,
+            String codigoDistrito,
             String distrito
 
     ) {

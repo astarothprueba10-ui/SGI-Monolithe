@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Table, TD, TH, TR } from '../ui/Table';
 import { Badge } from '../ui/Badge';
-import { EmptyState } from '../ui/Feedback';
+import { Alert, EmptyState } from '../ui/Feedback';
 import { Modal } from '../ui/Modal';
 import { FieldLabel } from '../ui/Field';
+import { FilterBar } from '../ui/filters/FilterBar';
+import { FilterSelect } from '../ui/filters/FilterSelect';
+import { FilterDateRange } from '../ui/filters/FilterDateRange';
 import { coreService } from '../../services/coreService';
 import { ApiError } from '../../lib/apiClient';
 import type { CorreccionDocumentalItem } from '../../types/workers';
@@ -33,8 +36,16 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [procesandoRechazo, setProcesandoRechazo] = useState(false);
 
-  // Estado para aprobacion
+  const [solicitudAAprobar, setSolicitudAAprobar] = useState<CorreccionDocumentalItem | null>(null);
+  const [procesandoAprobacion, setProcesandoAprobacion] = useState(false);
+  const bloqueoAprobacionRef = useRef(false);
   const [resolviendoId, setResolviendoId] = useState<number | null>(null);
+
+  // Estados de filtros
+  const [trabajadorFilter, setTrabajadorFilter] = useState('all');
+  const [tipoCorreccionFilter, setTipoCorreccionFilter] = useState('all');
+  const [fechaDesdeFilter, setFechaDesdeFilter] = useState('');
+  const [fechaHastaFilter, setFechaHastaFilter] = useState('');
 
   useEffect(() => {
     void cargarSolicitudes();
@@ -73,25 +84,49 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
     }
   }
 
-  async function handleAprobar(item: CorreccionDocumentalItem) {
-    if (!window.confirm(`¿Confirma la aprobacion de la correccion para la solicitud #${item.idSolicitud}?`)) {
-      return;
-    }
+  function abrirModalAprobacion(item: CorreccionDocumentalItem) {
+    setSolicitudAAprobar(item);
+  }
 
+  function cerrarModalAprobacion() {
+    if (bloqueoAprobacionRef.current) return;
+    setSolicitudAAprobar(null);
+  }
+
+  async function confirmarAprobacion() {
+    const item = solicitudAAprobar;
+    if (!item || bloqueoAprobacionRef.current) return;
+    if (!validarEvidenciaAprobacion(item)) return;
+
+    bloqueoAprobacionRef.current = true;
+    setProcesandoAprobacion(true);
+    await ejecutarAprobacion(item);
+  }
+
+  async function ejecutarAprobacion(item: CorreccionDocumentalItem) {
     setResolviendoId(item.idSolicitud);
     try {
       await coreService.resolverCorreccionDocumental(item.idSolicitud, {
         decision: 'APROBAR'
       });
       toast.success(`Solicitud #${item.idSolicitud} aprobada exitosamente.`);
+      setSolicitudAAprobar(null);
       await cargarSolicitudes();
       onSuccessAction?.();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Error al aprobar la correccion.';
       toast.error(msg);
     } finally {
+      bloqueoAprobacionRef.current = false;
+      setProcesandoAprobacion(false);
       setResolviendoId(null);
     }
+  }
+
+  function validarEvidenciaAprobacion(item: CorreccionDocumentalItem) {
+    if (item.tieneEvidencia) return true;
+    toast.error('No se puede aprobar la solicitud porque no tiene evidencia adjunta.');
+    return false;
   }
 
   function abrirModalRechazo(item: CorreccionDocumentalItem) {
@@ -129,6 +164,52 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
     }
   }
 
+  const trabajadoresDisponibles = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of solicitudes) {
+      const key = String(s.idTrabajador || s.idPersona);
+      const label = s.codigoTrabajador ? `${s.codigoTrabajador} - ${s.nombreCompleto}` : s.nombreCompleto;
+      map.set(key, label);
+    }
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [solicitudes]);
+
+  const tiposDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of solicitudes) {
+      if (s.tipoDocumentoPropuesto) set.add(s.tipoDocumentoPropuesto);
+    }
+    return Array.from(set).sort().map((t) => ({ value: t, label: t }));
+  }, [solicitudes]);
+
+  const solicitudesFiltradas = useMemo(() => {
+    return solicitudes.filter((s) => {
+      if (trabajadorFilter !== 'all') {
+        const key = String(s.idTrabajador || s.idPersona);
+        if (key !== trabajadorFilter) return false;
+      }
+      if (tipoCorreccionFilter !== 'all') {
+        if (s.tipoDocumentoPropuesto !== tipoCorreccionFilter) return false;
+      }
+      if (fechaDesdeFilter || fechaHastaFilter) {
+        const f = s.fechaSolicitud ? s.fechaSolicitud.slice(0, 10) : '';
+        if (!f) return false;
+        if (fechaDesdeFilter && f < fechaDesdeFilter) return false;
+        if (fechaHastaFilter && f > fechaHastaFilter) return false;
+      }
+      return true;
+    });
+  }, [solicitudes, trabajadorFilter, tipoCorreccionFilter, fechaDesdeFilter, fechaHastaFilter]);
+
+  const hayFiltrosActivos = trabajadorFilter !== 'all' || tipoCorreccionFilter !== 'all' || fechaDesdeFilter !== '' || fechaHastaFilter !== '';
+
+  function limpiarFiltros() {
+    setTrabajadorFilter('all');
+    setTipoCorreccionFilter('all');
+    setFechaDesdeFilter('');
+    setFechaHastaFilter('');
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -153,6 +234,47 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
       </div>
 
       <Card>
+        <FilterBar>
+          {trabajadoresDisponibles.length > 1 ? (
+            <FilterSelect
+              id="filtro-corr-trabajador"
+              label="Trabajador"
+              value={trabajadorFilter}
+              onChange={setTrabajadorFilter}
+              options={[{ value: 'all', label: 'Todos los trabajadores' }, ...trabajadoresDisponibles]}
+              className="w-64"
+            />
+          ) : null}
+
+          {tiposDisponibles.length > 0 ? (
+            <FilterSelect
+              id="filtro-corr-tipo"
+              label="Tipo propuesto"
+              value={tipoCorreccionFilter}
+              onChange={setTipoCorreccionFilter}
+              options={[{ value: 'all', label: 'Todos los tipos' }, ...tiposDisponibles]}
+              className="w-48"
+            />
+          ) : null}
+
+          <FilterDateRange
+            idDesde="filtro-corr-desde"
+            idHasta="filtro-corr-hasta"
+            labelDesde="Solicitado desde"
+            labelHasta="Hasta"
+            desde={fechaDesdeFilter}
+            hasta={fechaHastaFilter}
+            onChangeDesde={setFechaDesdeFilter}
+            onChangeHasta={setFechaHastaFilter}
+          />
+
+          {hayFiltrosActivos ? (
+            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+              Limpiar filtros
+            </Button>
+          ) : null}
+        </FilterBar>
+
         {cargando ? (
           <div className="p-8 text-center text-brand-500">
             Cargando solicitudes pendientes...
@@ -164,10 +286,14 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
               Reintentar
             </Button>
           </div>
-        ) : solicitudes.length === 0 ? (
+        ) : solicitudesFiltradas.length === 0 ? (
           <EmptyState
-            title="Sin correcciones pendientes"
-            description="No existen solicitudes de corrección de documento pendientes de aprobación."
+            title="Sin correcciones"
+            description={
+              solicitudes.length === 0
+                ? 'No existen solicitudes de corrección de documento pendientes de aprobación.'
+                : 'No hay solicitudes que coincidan con los filtros aplicados.'
+            }
           />
         ) : (
           <Table
@@ -184,8 +310,8 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
               </>
             }
           >
-            {solicitudes.map((item) => {
-              const nombreTrabajador = item.trabajador || [item.nombres, item.apellidoPaterno, item.apellidoMaterno].filter(Boolean).join(' ') || `Trabajador #${item.idTrabajador}`;
+            {solicitudesFiltradas.map((item) => {
+              const nombreTrabajador = item.nombreCompleto?.trim() || 'Nombre no disponible';
               const fecha = item.fechaSolicitud ? new Date(item.fechaSolicitud).toLocaleDateString() : '—';
               const estaResolviendo = resolviendoId === item.idSolicitud;
 
@@ -200,14 +326,14 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
 
                   <TD>
                     <span className="block font-medium text-brand-900">{nombreTrabajador}</span>
-                    {item.codigoTrabajador && (
-                      <span className="block text-[11px] text-brand-400">{item.codigoTrabajador}</span>
-                    )}
+                    <span className="block text-[11px] text-brand-400">
+                      {item.codigoTrabajador || 'Código laboral no disponible'}
+                    </span>
                   </TD>
 
                   <TD className="text-brand-600">
                     <span className="block text-[11px] text-brand-400">
-                      {item.tipoDocumentoActual ?? 'Actual'}
+                      {item.tipoDocumentoActual || '—'}
                     </span>
                     <span className="font-mono text-[13px]">
                       {item.numeroDocumentoActual || '—'}
@@ -216,33 +342,39 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
 
                   <TD className="text-brand-900">
                     <span className="block text-[11px] font-medium text-brand-500">
-                      {item.tipoDocumentoPropuesto ?? 'Propuesto'}
+                      {item.tipoDocumentoPropuesto || '—'}
                     </span>
                     <span className="font-mono text-[13px] font-semibold text-brand-900">
-                      {item.numeroDocumentoPropuesto ?? '—'}
+                      {item.numeroDocumentoPropuesto || '—'}
                     </span>
                   </TD>
 
                   <TD className="max-w-xs">
                     <p className="line-clamp-2 text-[12px] text-brand-600" title={item.motivo}>
-                      {item.motivo || 'Sin motivo'}
+                      {item.motivo || 'Sin motivo registrado'}
                     </p>
                   </TD>
 
                   <TD>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void verEvidencia(item)}
-                      icon={EyeIcon}
-                    >
-                      Ver foto
-                    </Button>
+                    {item.tieneEvidencia ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void verEvidencia(item)}
+                        icon={EyeIcon}
+                      >
+                        Ver evidencia
+                      </Button>
+                    ) : (
+                      <span className="text-[12px] font-medium text-rose-700">
+                        Sin evidencia adjunta
+                      </span>
+                    )}
                   </TD>
 
                   <TD>
                     <Badge tone="accent">
-                      {item.estado ?? 'PENDIENTE'}
+                      {item.estado || 'PENDIENTE'}
                     </Badge>
                   </TD>
 
@@ -252,7 +384,7 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
                         size="sm"
                         variant="primary"
                         disabled={estaResolviendo}
-                        onClick={() => void handleAprobar(item)}
+                        onClick={() => abrirModalAprobacion(item)}
                         icon={CheckIcon}
                       >
                         Aprobar
@@ -276,6 +408,73 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
           </Table>
         )}
       </Card>
+
+      <Modal
+        open={solicitudAAprobar !== null}
+        onClose={cerrarModalAprobacion}
+        title="Confirmar aprobación de corrección"
+        description="Revise los datos de identidad antes de aplicar la corrección."
+        width="max-w-xl"
+        footer={
+          <div className="flex items-center justify-end gap-2.5">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={cerrarModalAprobacion}
+              disabled={procesandoAprobacion}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void confirmarAprobacion()}
+              disabled={procesandoAprobacion || !solicitudAAprobar?.tieneEvidencia}
+              icon={CheckIcon}
+            >
+              {procesandoAprobacion ? 'Aprobando...' : 'Confirmar aprobación'}
+            </Button>
+          </div>
+        }
+      >
+        {solicitudAAprobar ? (
+          <div className="space-y-4">
+            <div>
+              <p className="font-medium text-brand-900">
+                {solicitudAAprobar.nombreCompleto || 'Nombre no disponible'}
+              </p>
+              <p className="text-[12px] text-brand-400">
+                {solicitudAAprobar.codigoTrabajador || 'Código laboral no disponible'}
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-brand-100 p-3">
+                <p className="text-[11px] font-medium uppercase text-brand-400">Documento actual</p>
+                <p className="mt-1 font-mono text-sm text-brand-800">
+                  {solicitudAAprobar.tipoDocumentoActual || '—'}: {solicitudAAprobar.numeroDocumentoActual || '—'}
+                </p>
+              </div>
+              <div className="rounded-md border border-brand-100 p-3">
+                <p className="text-[11px] font-medium uppercase text-brand-400">Documento propuesto</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-brand-900">
+                  {solicitudAAprobar.tipoDocumentoPropuesto || '—'}: {solicitudAAprobar.numeroDocumentoPropuesto || '—'}
+                </p>
+              </div>
+            </div>
+
+            <Alert tone="warning" title="Advertencia sobre los datos de identidad">
+              Al aprobar, se modificarán los datos de identidad del trabajador y se aplicará el documento propuesto.
+            </Alert>
+
+            {!solicitudAAprobar.tieneEvidencia ? (
+              <Alert tone="danger" title="No se puede aprobar sin evidencia">
+                Esta solicitud todavía no tiene evidencia adjunta. La aprobación permanecerá bloqueada hasta que se registre.
+              </Alert>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
       {/* Modal visor de evidencia fotografica con URL firmada */}
       <Modal

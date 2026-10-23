@@ -100,4 +100,24 @@ class TrabajadorProcedureRepositoryCorreccionTest {
                 any(RowMapper.class),
                 eq(1L), eq(3L), eq("RECHAZAR"), eq(motivo));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void debeInvocarProcedimientoListarReincorporaciones() {
+        ResultadoProcedimiento esperado = new ResultadoProcedimiento(null, "OK", null);
+        when(jdbcTemplate.queryForObject(
+                contains("sp_rrhh_listar_reincorporaciones"),
+                any(RowMapper.class),
+                eq(1L), eq("PENDIENTE"), eq(15L)))
+                .thenReturn(esperado);
+
+        ResultadoProcedimiento resultado =
+                repository.listarReincorporaciones(1L, "PENDIENTE", 15L);
+
+        assertEquals("OK", resultado.estado());
+        verify(jdbcTemplate).queryForObject(
+                contains("sp_rrhh_listar_reincorporaciones"),
+                any(RowMapper.class),
+                eq(1L), eq("PENDIENTE"), eq(15L));
+    }
 }

@@ -11,6 +11,14 @@ import type {
   SolicitudCorreccionDocumentoRequest
 } from '../../types/workers';
 import { UploadIcon, AlertCircleIcon, FileImageIcon } from 'lucide-react';
+import {
+  clearIncompleteCorrection,
+  correctionStorageKey,
+  CORRECTION_EVIDENCE_MAX_SIZE as MAX_FILE_SIZE,
+  CORRECTION_EVIDENCE_MIME_TYPES as ALLOWED_MIME_TYPES,
+  saveIncompleteCorrection,
+  type IncompleteCorrectionRequest as IncompleteRequest
+} from './correctionDocumentUtils';
 
 interface SolicitarCorreccionModalProps {
   open: boolean;
@@ -19,18 +27,6 @@ interface SolicitarCorreccionModalProps {
   trabajador: TrabajadorResponse | null;
   tiposDocumento: CatalogosTrabajadorResponse['tiposDocumento'];
 }
-
-interface IncompleteRequest {
-  idSolicitud: number;
-  idTrabajador: number;
-  idTipoDocumento: number;
-  numeroDocumento: string;
-  timestamp: number;
-}
-
-const STORAGE_PREFIX = 'sgi_correccion_incompleta_';
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function SolicitarCorreccionModal({
   open,
@@ -53,12 +49,24 @@ export function SolicitarCorreccionModal({
 
   // Inicializacion y deteccion de solicitudes incompletas guardadas localmente
   useEffect(() => {
+    function resetFromEffect() {
+      setIdTipoDocumento('');
+      setNumeroDocumento('');
+      setMotivo('');
+      setArchivo(null);
+      setPreviewUrl(null);
+      setEnviando(false);
+      setFase('formulario');
+      setSolicitudPendiente(null);
+      setErrorLocal(null);
+    }
+
     if (!open || !trabajador) {
-      limpiarEstado();
+      resetFromEffect();
       return;
     }
 
-    const key = `${STORAGE_PREFIX}${trabajador.idTrabajador}`;
+    const key = correctionStorageKey(trabajador.idTrabajador);
     const guardado = localStorage.getItem(key);
     if (guardado) {
       try {
@@ -75,18 +83,19 @@ export function SolicitarCorreccionModal({
       }
     }
 
-    limpiarEstado();
+    resetFromEffect();
   }, [open, trabajador]);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   function limpiarEstado() {
     setIdTipoDocumento('');
     setNumeroDocumento('');
     setMotivo('');
     setArchivo(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
+    setPreviewUrl(null);
     setEnviando(false);
     setFase('formulario');
     setSolicitudPendiente(null);
@@ -108,15 +117,12 @@ export function SolicitarCorreccionModal({
     }
 
     setArchivo(file);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setPreviewUrl(URL.createObjectURL(file));
   }
 
   function descartarSolicitudIncompleta() {
     if (trabajador) {
-      localStorage.removeItem(`${STORAGE_PREFIX}${trabajador.idTrabajador}`);
+      clearIncompleteCorrection(trabajador.idTrabajador);
     }
     limpiarEstado();
   }
@@ -129,7 +135,7 @@ export function SolicitarCorreccionModal({
     try {
       await coreService.adjuntarEvidenciaCorreccion(idSolicitud, fileToUpload);
       if (trabajador) {
-        localStorage.removeItem(`${STORAGE_PREFIX}${trabajador.idTrabajador}`);
+        clearIncompleteCorrection(trabajador.idTrabajador);
       }
       toast.success('Solicitud de correccion documental enviada y evidencia registrada con exito.');
       limpiarEstado();
@@ -206,7 +212,7 @@ export function SolicitarCorreccionModal({
         numeroDocumento: docLimpio,
         timestamp: Date.now()
       };
-      localStorage.setItem(`${STORAGE_PREFIX}${trabajador.idTrabajador}`, JSON.stringify(incompleto));
+      saveIncompleteCorrection(incompleto);
       setSolicitudPendiente(incompleto);
 
       // Paso 2: Subir evidencia
