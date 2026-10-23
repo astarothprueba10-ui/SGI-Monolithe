@@ -29,7 +29,7 @@ export interface SecurityRole {
   idRol: number;
   codigo: string;
   nombre: string;
-  descripcion: string;
+  descripcion: string | null;
   esSistema: boolean;
   activo: boolean;
   asignableRrhh: boolean;
@@ -158,6 +158,21 @@ export const securityApi = {
       method: 'POST',
       body: JSON.stringify({ nombre })
     }),
+  actualizarRol: (codigoRol: string, nombre: string, descripcion: string | null) =>
+    request<SecurityOperationResponse>(`/roles/${encodeURIComponent(codigoRol)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ nombre, descripcion })
+    }),
+  desactivarRol: (codigoRol: string) =>
+    request<SecurityOperationResponse>(
+      `/roles/${encodeURIComponent(codigoRol)}/deactivate`,
+      { method: 'PATCH' }
+    ),
+  reactivarRol: (codigoRol: string) =>
+    request<SecurityOperationResponse>(
+      `/roles/${encodeURIComponent(codigoRol)}/activate`,
+      { method: 'PATCH' }
+    ),
   listarPermisosRol: (codigoRol: string) =>
     request<SecurityPermission[]>(
       `/roles/${encodeURIComponent(codigoRol)}/permissions`

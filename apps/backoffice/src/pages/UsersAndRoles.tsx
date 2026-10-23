@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { FilterIcon, PencilIcon, PlusIcon, ShieldCheckIcon } from 'lucide-react';
+import { FilterIcon, PencilIcon, PlusIcon, PowerIcon, RotateCcwIcon, ShieldCheckIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Button, IconButton } from '../components/ui/Button';
 import { SearchInput } from '../components/ui/Field';
 import { Dropdown, DropdownItem } from '../components/ui/Dropdown';
 import { Table, TD, TH, TR } from '../components/ui/Table';
@@ -14,8 +14,10 @@ import { PermissionMatrix } from '../components/users/PermissionMatrix';
 import { CreateUserModal } from '../components/users/CreateUserModal';
 import { ManageUserRolesModal } from '../components/users/ManageUserRolesModal';
 import { CreateRoleModal } from '../components/users/CreateRoleModal';
+import { EditRoleModal } from '../components/users/EditRoleModal';
+import { motivoBloqueoDesactivacion } from '../components/users/roleManagementPolicy';
+import { Modal } from '../components/ui/Modal';
 import { cn } from '../utils/cn';
-import type { RoleName } from '../types';
 import { getStoredAuthUser } from '../lib/authSession';
 import {
   securityApi,
@@ -49,7 +51,7 @@ export function UsersAndRoles() {
   const [tab, setTab] = useState('usuarios');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('ACTIVO');
-  const [selectedRole, setSelectedRole] = useState<RoleName>('Asesor');
+  const [selectedRoleCode, setSelectedRoleCode] = useState('');
   const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SecurityUser | null>(null);
 
@@ -62,6 +64,9 @@ export function UsersAndRoles() {
   const [rolesUser, setRolesUser] = useState<SecurityUser | null>(null);
   const [rolesModalOpen, setRolesModalOpen] = useState(false);
   const [createRoleModalOpen, setCreateRoleModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<SecurityRole | null>(null);
+  const [updatingRoleCode, setUpdatingRoleCode] = useState<string | null>(null);
+  const [rolePendingDeactivation, setRolePendingDeactivation] = useState<SecurityRole | null>(null);
 
   useEffect(() => {
     securityApi.listarUsuarios()
@@ -77,6 +82,12 @@ export function UsersAndRoles() {
       .finally(() => setLoadingRoles(false));
   }, []);
 
+  useEffect(() => {
+    if (!selectedRoleCode && securityRoles.length > 0) {
+      setSelectedRoleCode(securityRoles[0].codigo);
+    }
+  }, [securityRoles, selectedRoleCode]);
+
   const recargarUsuarios = async () => {
     const data = await securityApi.listarUsuarios();
     setSecurityUsers(data);
@@ -87,6 +98,17 @@ export function UsersAndRoles() {
     setSecurityRoles(data);
   };
 
+  const recargarCatalogos = async () => {
+    const resultados = await Promise.allSettled([recargarUsuarios(), recargarRoles()]);
+
+    if (resultados[0].status === 'rejected') {
+      toast.error('No se pudo actualizar el listado de usuarios');
+    }
+    if (resultados[1].status === 'rejected') {
+      toast.error('No se pudo actualizar el catálogo de roles');
+    }
+  };
+
   const cambiarEstadoUsuario = async (user: SecurityUser) => {
     try {
       setUpdatingUserId(user.idUsuario);
@@ -95,7 +117,7 @@ export function UsersAndRoles() {
         ? await securityApi.desactivarUsuario(user.idUsuario)
         : await securityApi.activarUsuario(user.idUsuario);
 
-      await recargarUsuarios();
+      await recargarCatalogos();
 
       toast.success(
         user.estado === 'ACTIVO'
@@ -115,14 +137,53 @@ export function UsersAndRoles() {
     }
   };
 
+  const cambiarEstadoRol = async (
+    role: SecurityRole,
+    confirmadaDesactivacion = false
+  ): Promise<boolean> => {
+    const reactivar = !role.activo;
+    if (!reactivar && !confirmadaDesactivacion) {
+      setRolePendingDeactivation(role);
+      return false;
+    }
+
+    try {
+      setUpdatingRoleCode(role.codigo);
+      const resultado = reactivar
+        ? await securityApi.reactivarRol(role.codigo)
+        : await securityApi.desactivarRol(role.codigo);
+      const estadosExitosos = reactivar ? ['OK', 'REACTIVADO'] : ['OK', 'DESACTIVADO'];
+      if (!estadosExitosos.includes(resultado.estado)) {
+        throw new Error(resultado.mensaje || 'La operación fue rechazada.');
+      }
+      await recargarRoles();
+      toast.success(reactivar ? 'Rol reactivado' : 'Rol desactivado', {
+        description: resultado.mensaje
+      });
+      return true;
+    } catch (error) {
+      toast.error(reactivar ? 'No se pudo reactivar el rol' : 'No se pudo desactivar el rol', {
+        description: error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+      });
+      return false;
+    } finally {
+      setUpdatingRoleCode(null);
+    }
+  };
+
+  const confirmarDesactivacionRol = async () => {
+    if (!rolePendingDeactivation) return;
+
+    const desactivado = await cambiarEstadoRol(rolePendingDeactivation, true);
+    if (desactivado) setRolePendingDeactivation(null);
+  };
+
   const normalizedQuery = query.trim().toLowerCase();
   const users = securityUsers.filter((user) =>
     filterUser(user, statusFilter, normalizedQuery)
   );
 
-  const selectedSecurityRole = securityRoles.find(
-    (role) => role.nombre === selectedRole
-  );
+  const selectedSecurityRole = securityRoles.find((role) => role.codigo === selectedRoleCode);
 
   return (
     <div>
@@ -164,7 +225,7 @@ export function UsersAndRoles() {
           setEditingUser(null);
         }}
         roles={securityRoles}
-        onSuccess={recargarUsuarios}
+        onSuccess={recargarCatalogos}
         user={editingUser}
       />
 
@@ -176,12 +237,20 @@ export function UsersAndRoles() {
           setRolesModalOpen(false);
           setRolesUser(null);
         }}
-        onSuccess={recargarUsuarios}
+        onSuccess={recargarCatalogos}
       />
 
       <CreateRoleModal
         open={createRoleModalOpen}
         onClose={() => setCreateRoleModalOpen(false)}
+        onSuccess={recargarRoles}
+      />
+
+      <EditRoleModal
+        open={editingRole !== null}
+        role={editingRole}
+        roles={securityRoles}
+        onClose={() => setEditingRole(null)}
         onSuccess={recargarRoles}
       />
 
@@ -425,19 +494,19 @@ export function UsersAndRoles() {
               </div>
             )}
 
-            <ul className="p-2">
+            <ul className="space-y-1 p-2">
               {securityRoles.map((role) => {
-                const roleName = role.nombre as RoleName;
-                const isActive = roleName === selectedRole;
+                const isActive = role.codigo === selectedRoleCode;
+                const bloqueo = motivoBloqueoDesactivacion(role);
 
                 return (
-                  <li key={role.idRol}>
+                  <li key={role.codigo} className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setSelectedRole(roleName)}
+                      onClick={() => setSelectedRoleCode(role.codigo)}
                       aria-pressed={isActive}
                       className={cn(
-                        'w-full rounded-md px-3 py-2.5 text-left transition-colors duration-150 ease-smooth',
+                        'min-w-0 flex-1 rounded-md px-3 py-2.5 text-left transition-colors duration-150 ease-smooth',
                         isActive
                           ? 'bg-brand-900 text-white'
                           : 'hover:bg-brand-50'
@@ -462,10 +531,29 @@ export function UsersAndRoles() {
                             : 'text-brand-400'
                         )}
                       >
-                        {role.cantidadPermisos} permisos ·{' '}
-                        {role.cantidadUsuarios} usuarios
+                        {role.cantidadPermisos} permisos · {role.cantidadUsuarios} usuarios ·{' '}
+                        {role.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </button>
+                    <AccountAdminGate permissions="roles.edit">
+                      <IconButton
+                        icon={PencilIcon}
+                        label={`Editar ${role.nombre}`}
+                        title={`Editar ${role.nombre}`}
+                        disabled={updatingRoleCode !== null}
+                        onClick={() => setEditingRole(role)}
+                      />
+                    </AccountAdminGate>
+                    <AccountAdminGate permissions={role.activo ? 'roles.deactivate' : 'roles.activate'}>
+                      <IconButton
+                        icon={role.activo ? PowerIcon : RotateCcwIcon}
+                        label={`${role.activo ? 'Desactivar' : 'Reactivar'} ${role.nombre}`}
+                        title={role.activo && bloqueo ? bloqueo : `${role.activo ? 'Desactivar' : 'Reactivar'} ${role.nombre}`}
+                        className={role.activo ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-700 hover:bg-emerald-50'}
+                        disabled={updatingRoleCode !== null || (role.activo && bloqueo !== null)}
+                        onClick={() => void cambiarEstadoRol(role)}
+                      />
+                    </AccountAdminGate>
                   </li>
                 );
               })}
@@ -474,7 +562,7 @@ export function UsersAndRoles() {
 
           <Card>
             <CardHeader
-              title={`Permisos del rol ${selectedRole}`}
+              title={selectedSecurityRole ? `Permisos del rol ${selectedSecurityRole.nombre}` : 'Permisos del rol'}
               description={
                 selectedSecurityRole?.descripcion ??
                 'Selecciona un rol para consultar sus permisos.'
@@ -488,6 +576,44 @@ export function UsersAndRoles() {
         </div>
       )
       }
+
+      <Modal
+        open={rolePendingDeactivation !== null}
+        onClose={() => {
+          if (updatingRoleCode === null) setRolePendingDeactivation(null);
+        }}
+        title="Confirmar desactivación"
+        description="Confirma la desactivación del rol seleccionado."
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              disabled={updatingRoleCode !== null}
+              onClick={() => setRolePendingDeactivation(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              disabled={updatingRoleCode !== null}
+              onClick={() => void confirmarDesactivacionRol()}
+            >
+              {updatingRoleCode !== null ? 'Desactivando...' : 'Desactivar'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-brand-700">
+          ¿Deseas desactivar el rol{' '}
+          <strong className="font-semibold text-brand-900">
+            {rolePendingDeactivation?.nombre}
+          </strong>
+          ?
+        </p>
+        <p className="mt-2 text-xs text-brand-400">
+          Se conservará el historial de asignaciones de usuarios.
+        </p>
+      </Modal>
     </div >
   );
 }

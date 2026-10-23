@@ -23,6 +23,7 @@ public class RolePermissionService {
         return repository.crearRol(actor, nombreTrimmed);
     }
 
+    /** Actualiza datos descriptivos del rol sin modificar sus permisos. */
     @Transactional
     public SecurityOperationResult actualizarPermisos(
             Long actor,
@@ -34,5 +35,30 @@ public class RolePermissionService {
                 codigoRol,
                 permisos == null ? List.of() : permisos
         );
+    }
+
+    /** Solicita la desactivación del rol mediante el procedimiento autorizado. */
+    @Transactional
+    public SecurityOperationResult actualizarRol(
+            Long actor,
+            String codigoRol,
+            String nombre,
+            String descripcion) {
+        return repository.actualizarRol(
+                actor,
+                codigoRol,
+                nombre == null ? null : nombre.trim(),
+                descripcion == null || descripcion.isBlank() ? null : descripcion.trim());
+    }
+
+    /** Solicita la reactivación del rol mediante el procedimiento autorizado. */
+    @Transactional
+    public SecurityOperationResult desactivarRol(Long actor, String codigoRol) {
+        return repository.desactivarRol(actor, codigoRol);
+    }
+
+    @Transactional
+    public SecurityOperationResult reactivarRol(Long actor, String codigoRol) {
+        return repository.reactivarRol(actor, codigoRol);
     }
 }

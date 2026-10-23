@@ -19,6 +19,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.versionSesiones FROM User u WHERE u.idUsuario = :idUsuario")
     Optional<Long> findVersionSesionesByIdUsuario(@Param("idUsuario") Long idUsuario);
 
+    /** Devuelve la persona vinculada sin exponer otros datos de la cuenta. */
+    @Query("SELECT u.idPersona FROM User u WHERE u.idUsuario = :idUsuario")
+    Optional<Long> findIdPersonaByIdUsuario(@Param("idUsuario") Long idUsuario);
+
     @Procedure(procedureName = "sp_registrar_acceso_exitoso")
     void registrarAccesoExitoso(
             @Param("p_id_usuario") Long idUsuario);

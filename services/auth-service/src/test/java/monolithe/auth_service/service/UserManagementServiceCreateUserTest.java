@@ -3,6 +3,7 @@ package monolithe.auth_service.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import monolithe.auth_service.repository.UserManagementProcedureRepository;
+import monolithe.auth_service.dto.CredentialMailContext;
+import monolithe.auth_service.repository.projection.ActivatedUserResult;
 import monolithe.auth_service.repository.projection.CreatedUserResult;
 import monolithe.auth_service.repository.projection.SecurityOperationResult;
 import tools.jackson.databind.ObjectMapper;
@@ -44,6 +47,8 @@ class UserManagementServiceCreateUserTest {
     private EmailService emailService;
     @Mock
     private SecurityQueryService securityQueryService;
+    @Mock
+    private CredentialMailContextService credentialMailContextService;
 
     @InjectMocks
     private UserManagementService service;
@@ -248,6 +253,32 @@ class UserManagementServiceCreateUserTest {
         verify(repository).crearUsuario(ACTOR_ID, PERSONA_ID, "123456", "password-hash");
         verify(repository).asignarRol(ACTOR_ID, USER_ID, "RRHH");
         verify(repository).asignarRol(ACTOR_ID, USER_ID, "AUDITOR");
+    }
+
+    @Test
+    void enviaCredencialesConContextoOficialCuandoLaActivacionSeCompleta() {
+        CredentialMailContext contexto = new CredentialMailContext("DNI", "16748595", true, false);
+        when(repository.activarUsuario(eq(ACTOR_ID), eq(USER_ID), any(), any()))
+                .thenReturn(new ActivatedUserResult("usuario", "persona@example.test", "ACTIVADO", "Activado"));
+        when(credentialMailContextService.obtener(USER_ID)).thenReturn(contexto);
+
+        SecurityOperationResult resultado = service.activarUsuario(ACTOR_ID, USER_ID);
+
+        assertEquals("ACTIVADO", resultado.estado());
+        verify(emailService).enviarCredencialesTemporales(
+                eq("persona@example.test"), eq("usuario"), any(), eq(contexto), eq(24L));
+    }
+
+    @Test
+    void noConsultaDocumentoNiEnviaCorreoCuandoLaActivacionEsRechazada() {
+        when(repository.activarUsuario(eq(ACTOR_ID), eq(USER_ID), any(), any()))
+                .thenReturn(new ActivatedUserResult(null, null, "SIN_ROL", "Debe asignar un rol activo"));
+
+        SecurityOperationResult resultado = service.activarUsuario(ACTOR_ID, USER_ID);
+
+        assertEquals("SIN_ROL", resultado.estado());
+        verify(credentialMailContextService, never()).obtener(USER_ID);
+        verify(emailService, never()).enviarCredencialesTemporales(any(), any(), any(), any(), anyLong());
     }
 
     private void contextoPersona(String relaciones, boolean elegible, boolean verificado) throws Exception {

@@ -5,6 +5,7 @@ import monolithe.auth_service.repository.UserManagementProcedureRepository;
 import monolithe.auth_service.repository.projection.CreatedUserResult;
 import monolithe.auth_service.repository.projection.SecurityOperationResult;
 import monolithe.auth_service.repository.projection.ActivatedUserResult;
+import monolithe.auth_service.dto.CredentialMailContext;
 import tools.jackson.databind.JsonNode;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,6 +37,7 @@ public class UserManagementService {
         private final PasswordEncoder passwordEncoder;
         private final EmailService emailService;
         private final SecurityQueryService securityQueryService;
+        private final CredentialMailContextService credentialMailContextService;
 
         private final SecureRandom secureRandom = new SecureRandom();
 
@@ -224,8 +226,9 @@ public class UserManagementService {
                 ActivatedUserResult resultado = repository.activarUsuario(idActor, idUsuario, passwordHash, expiraEn);
 
                 if ("ACTIVADO".equals(resultado.estado())) {
+                        CredentialMailContext contexto = credentialMailContextService.obtener(idUsuario);
                         emailService.enviarCredencialesTemporales(resultado.correo(), resultado.usuarioLogin(),
-                                        passwordTemporal, 24);
+                                        passwordTemporal, contexto, 24);
                 }
 
                 return new SecurityOperationResult(resultado.estado(), resultado.mensaje());
