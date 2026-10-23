@@ -1,6 +1,5 @@
 package monolithe.core_service.service;
 
-import monolithe.core_service.dto.UbigeoResponse;
 import monolithe.core_service.exception.ReglaNegocioException;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +12,7 @@ class UbigeoServiceTest {
     void catalogoContieneTodasLasJerarquiasSinDuplicados() {
         var filas = service.listar();
         assertEquals(1893, filas.size());
-        assertEquals(1893, filas.stream().map(UbigeoResponse::codigo).distinct().count());
+        assertEquals(1893, filas.stream().map(fila -> fila.codigo()).distinct().count());
         assertEquals(25, filas.stream().map(fila -> fila.codigo().substring(0, 2)).distinct().count());
         assertEquals(196, filas.stream().map(fila -> fila.codigo().substring(0, 4)).distinct().count());
         for (var fila : filas) {

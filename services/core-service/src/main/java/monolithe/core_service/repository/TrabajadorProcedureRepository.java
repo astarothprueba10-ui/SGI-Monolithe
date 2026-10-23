@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Repository
@@ -309,6 +312,167 @@ public class TrabajadorProcedureRepository {
                                 storagePath,
                                 nombreArchivo,
                                 tipoMime);
+        }
+
+        public ResultadoProcedimiento programarSuspension(
+                        Long idActor,
+                        Long idTrabajador,
+                        OffsetDateTime fechaInicio,
+                        OffsetDateTime fechaFin,
+                        String motivo) {
+                String sql = """
+                                CALL public.sp_rrhh_programar_suspension(
+                                    ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                fechaInicio,
+                                fechaFin,
+                                motivo);
+        }
+
+        public ResultadoProcedimiento cesarTrabajador(
+                        Long idActor,
+                        Long idTrabajador,
+                        LocalDate fechaCese,
+                        String motivo) {
+                String sql = """
+                                CALL public.sp_rrhh_cesar_trabajador(
+                                    ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                fechaCese,
+                                motivo);
+        }
+
+        public ResultadoProcedimiento solicitarReincorporacion(
+                        Long idActor,
+                        Long idTrabajador,
+                        LocalDate nuevaFechaIngreso,
+                        String motivo) {
+                String sql = """
+                                CALL public.sp_rrhh_solicitar_reincorporacion(
+                                    ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                nuevaFechaIngreso,
+                                motivo);
+        }
+
+        public ResultadoProcedimiento resolverReincorporacion(
+                        Long idActor,
+                        Long idSolicitud,
+                        String decision,
+                        String motivoResolucion) {
+                String sql = """
+                                CALL public.sp_rrhh_resolver_reincorporacion(
+                                    ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idSolicitud,
+                                decision,
+                                motivoResolucion);
+        }
+
+        public ResultadoProcedimiento listarReincorporaciones(
+                        Long idActor,
+                        String estado,
+                        Long idTrabajador) {
+                String sql = """
+                                CALL public.sp_rrhh_listar_reincorporaciones(
+                                    ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                extraerColumnaEstado(rs),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                estado,
+                                idTrabajador);
+        }
+
+        public ResultadoProcedimiento listarHistorialLaboral(
+                        Long idActor,
+                        Long idTrabajador,
+                        String tipoEvento,
+                        LocalDate fechaDesde,
+                        LocalDate fechaHasta) {
+                String sql = """
+                                CALL public.sp_rrhh_listar_historial_laboral(
+                                    ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                extraerColumnaEstado(rs),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                tipoEvento,
+                                fechaDesde,
+                                fechaHasta);
+        }
+
+        public ResultadoProcedimiento obtenerMetricasTrabajadores(Long idActor) {
+                String sql = """
+                                CALL public.sp_rrhh_obtener_metricas_trabajadores(
+                                    ?, NULL, NULL, NULL
+                                )
+                                """;
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                extraerColumnaEstado(rs),
+                                                rs.getString("p_mensaje")),
+                                idActor);
+        }
+
+        private String extraerColumnaEstado(ResultSet rs) {
+                try {
+                        return rs.getString("p_estado_respuesta");
+                } catch (SQLException e) {
+                        try {
+                                return rs.getString("p_estado");
+                        } catch (SQLException ex) {
+                                return null;
+                        }
+                }
         }
 
         private ResultadoProcedimiento mapearResultado(

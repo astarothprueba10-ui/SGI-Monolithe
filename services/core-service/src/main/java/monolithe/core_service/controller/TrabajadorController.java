@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import tools.jackson.databind.JsonNode;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -32,6 +34,33 @@ public class TrabajadorController {
         Long idActor = obtenerIdActor(jwt);
 
         return trabajadorService.listarTodos(idActor);
+    }
+
+    @GetMapping("/historial")
+    @PreAuthorize("hasAuthority('hr.view')")
+    public ResponseEntity<JsonNode> listarHistorialLaboral(
+            @RequestParam(required = false) Long idTrabajador,
+            @RequestParam(required = false) String tipoEvento,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return ResponseEntity.ok(trabajadorService.listarHistorialLaboral(
+                idActor,
+                idTrabajador,
+                tipoEvento,
+                fechaDesde,
+                fechaHasta));
+    }
+
+    @GetMapping("/metricas")
+    @PreAuthorize("hasAuthority('hr.view')")
+    public ResponseEntity<JsonNode> obtenerMetricasTrabajadores(
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return ResponseEntity.ok(trabajadorService.obtenerMetricasTrabajadores(idActor));
     }
 
     @GetMapping("/catalogos")
@@ -85,7 +114,7 @@ public class TrabajadorController {
     @PreAuthorize("hasAuthority('hr.edit')")
     public JsonNode actualizarTrabajador(
             @PathVariable Long idTrabajador,
-            @RequestBody @Valid ActualizarTrabajadorRequest solicitud,
+            @RequestBody JsonNode solicitud,
             @AuthenticationPrincipal Jwt jwt) {
         Long idActor = obtenerIdActor(jwt);
 
@@ -117,6 +146,49 @@ public class TrabajadorController {
 
         return ResponseEntity.ok(trabajadorService.confirmarCambioCorreo(
                 solicitud.token()));
+    }
+
+    @PostMapping("/{idTrabajador}/suspensiones")
+    @PreAuthorize("hasAuthority('hr.edit')")
+    public ResponseEntity<JsonNode> programarSuspension(
+            @PathVariable Long idTrabajador,
+            @RequestBody @Valid ProgramarSuspensionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return ResponseEntity.ok(trabajadorService.programarSuspension(
+                idActor,
+                idTrabajador,
+                request));
+    }
+
+    @PostMapping("/{idTrabajador}/cesar")
+    @PreAuthorize("hasAuthority('hr.edit')")
+    public ResponseEntity<JsonNode> cesarTrabajador(
+            @PathVariable Long idTrabajador,
+            @RequestBody @Valid CesarTrabajadorRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return ResponseEntity.ok(trabajadorService.cesarTrabajador(
+                idActor,
+                idTrabajador,
+                request));
+    }
+
+    @PostMapping("/{idTrabajador}/reincorporaciones")
+    @PreAuthorize("hasAuthority('hr.edit')")
+    public ResponseEntity<JsonNode> solicitarReincorporacion(
+            @PathVariable Long idTrabajador,
+            @RequestBody @Valid SolicitarReincorporacionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long idActor = obtenerIdActor(jwt);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                trabajadorService.solicitarReincorporacion(
+                        idActor,
+                        idTrabajador,
+                        request));
     }
 
     private Long obtenerIdActor(Jwt jwt) {

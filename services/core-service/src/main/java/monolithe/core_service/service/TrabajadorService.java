@@ -8,9 +8,7 @@ import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.repository.TrabajadorProcedureRepository;
 import monolithe.core_service.repository.TrabajadorProcedureRepository.ResultadoProcedimiento;
 import monolithe.core_service.client.EmailNotificationClient;
-import monolithe.core_service.dto.ConfirmacionCambioCorreoResponse;
-import monolithe.core_service.dto.ResolverCorreccionRequest;
-import monolithe.core_service.dto.SolicitudCambioCorreoResponse;
+import monolithe.core_service.dto.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
@@ -165,6 +165,53 @@ public class TrabajadorService {
                 }
 
                 String datosJson = serializarDatosActualizacion(solicitud);
+                return persistirActualizacion(idActor, idTrabajador, datosJson);
+        }
+
+        public JsonNode actualizarTrabajador(
+                        Long idActor,
+                        Long idTrabajador,
+                        JsonNode solicitud) {
+                if (solicitud == null || !solicitud.isObject()) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Los datos de actualización deben ser un objeto JSON.");
+                }
+
+                JsonNode personal = solicitud.get("informacionPersonal");
+                JsonNode laboral = solicitud.get("informacionLaboral");
+                if ((personal == null || !personal.isObject())
+                                && (laboral == null || !laboral.isObject())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Debe proporcionar informacionPersonal o informacionLaboral.");
+                }
+                if ((personal != null && !personal.isObject())
+                                || (laboral != null && !laboral.isObject())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Cada sección de actualización debe ser un objeto JSON.");
+                }
+                validarDocumentoNoModificable(personal);
+                validarCorreoNoModificable(personal);
+                validarEstadoNoEnVerificacion(laboral);
+
+                try {
+                        return persistirActualizacion(
+                                        idActor,
+                                        idTrabajador,
+                                        jsonMapper.writeValueAsString(solicitud));
+                } catch (JacksonException ex) {
+                        throw new IllegalStateException(
+                                        "No se pudieron procesar los datos de actualización.",
+                                        ex);
+                }
+        }
+
+        private JsonNode persistirActualizacion(
+                        Long idActor,
+                        Long idTrabajador,
+                        String datosJson) {
                 ResultadoProcedimiento respuesta = repository.actualizarTrabajador(
                                 idActor, idTrabajador, datosJson);
                 validarEstado(respuesta);
@@ -180,10 +227,42 @@ public class TrabajadorService {
                 }
         }
 
+        private void validarDocumentoNoModificable(JsonNode personal) {
+                if (personal == null || !personal.isObject()) {
+                        return;
+                }
+                if (personal.has("idTipoDocumento") || personal.has("numeroDocumento")) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "No se permite modificar el documento de identidad en la edicion ordinaria. Solicite una correccion documental.");
+                }
+        }
+
+        private void validarCorreoNoModificable(JsonNode personal) {
+                if (personal != null && personal.isObject() && personal.has("correoElectronico")) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "El cambio de correo debe realizarse mediante la solicitud con confirmación por enlace.");
+                }
+        }
+
         private void validarEstadoNoEnVerificacion(
                         ActualizarTrabajadorRequest.InformacionLaboral laboral) {
                 if (laboral.idEstadoTrabajador() != null
                                 && laboral.idEstadoTrabajador() == ID_ESTADO_EN_VERIFICACION) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "No se permite asignar manualmente el estado EN_VERIFICACION.");
+                }
+        }
+
+        private void validarEstadoNoEnVerificacion(JsonNode laboral) {
+                if (laboral == null || !laboral.isObject()) {
+                        return;
+                }
+                JsonNode idEstado = laboral.get("idEstadoTrabajador");
+                if (idEstado != null && !idEstado.isNull()
+                                && Integer.toString(ID_ESTADO_EN_VERIFICACION).equals(idEstado.asString())) {
                         throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
                                         "No se permite asignar manualmente el estado EN_VERIFICACION.");
@@ -491,6 +570,183 @@ public class TrabajadorService {
                 return resultado;
         }
 
+        public JsonNode programarSuspension(
+                        Long idActor,
+                        Long idTrabajador,
+                        ProgramarSuspensionRequest request) {
+
+                if (request.fechaFin().isBefore(request.fechaInicio())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "La fecha de fin no puede ser anterior a la fecha de inicio.");
+                }
+
+                ResultadoProcedimiento respuesta = repository.programarSuspension(
+                                idActor,
+                                idTrabajador,
+                                request.fechaInicio(),
+                                request.fechaFin(),
+                                request.motivo().trim());
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode cesarTrabajador(
+                        Long idActor,
+                        Long idTrabajador,
+                        CesarTrabajadorRequest request) {
+
+                ResultadoProcedimiento respuesta = repository.cesarTrabajador(
+                                idActor,
+                                idTrabajador,
+                                request.fechaCese(),
+                                request.motivo().trim());
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode solicitarReincorporacion(
+                        Long idActor,
+                        Long idTrabajador,
+                        SolicitarReincorporacionRequest request) {
+
+                ResultadoProcedimiento respuesta = repository.solicitarReincorporacion(
+                                idActor,
+                                idTrabajador,
+                                request.nuevaFechaIngreso(),
+                                request.motivo().trim());
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode resolverReincorporacion(
+                        Long idActor,
+                        Long idSolicitud,
+                        ResolverReincorporacionRequest request) {
+
+                validarResolucionReincorporacion(idSolicitud, request);
+
+                String motivo = request.obtenerMotivoEfectivo() != null
+                                ? request.obtenerMotivoEfectivo().trim()
+                                : null;
+
+                ResultadoProcedimiento respuesta = repository.resolverReincorporacion(
+                                idActor,
+                                idSolicitud,
+                                request.decision().trim().toUpperCase(),
+                                motivo);
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode listarReincorporaciones(
+                        Long idActor,
+                        String estado,
+                        Long idTrabajador) {
+                String estadoNormalizado = normalizarEstadoReincorporacion(estado);
+                validarIdTrabajadorFiltro(idTrabajador);
+
+                ResultadoProcedimiento respuesta = repository.listarReincorporaciones(
+                                idActor,
+                                estadoNormalizado,
+                                idTrabajador);
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode listarHistorialLaboral(
+                        Long idActor,
+                        Long idTrabajador,
+                        String tipoEvento,
+                        LocalDate fechaDesde,
+                        LocalDate fechaHasta) {
+                validarIdTrabajadorFiltro(idTrabajador);
+                validarRangoFechasHistorial(fechaDesde, fechaHasta);
+                String tipoEventoNormalizado = normalizarTextoFiltro(tipoEvento);
+
+                ResultadoProcedimiento respuesta = repository.listarHistorialLaboral(
+                                idActor,
+                                idTrabajador,
+                                tipoEventoNormalizado,
+                                fechaDesde,
+                                fechaHasta);
+
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        public JsonNode obtenerMetricasTrabajadores(Long idActor) {
+                ResultadoProcedimiento respuesta = repository.obtenerMetricasTrabajadores(idActor);
+                validarEstadoFase2A(respuesta);
+                return respuesta.resultado();
+        }
+
+        private void validarRangoFechasHistorial(LocalDate fechaDesde, LocalDate fechaHasta) {
+                if (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta)) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "La fecha desde no puede ser posterior a la fecha hasta.");
+                }
+        }
+
+        private String normalizarTextoFiltro(String valor) {
+                if (valor == null || valor.isBlank()) {
+                        return null;
+                }
+                return valor.trim().toUpperCase();
+        }
+
+        private String normalizarEstadoReincorporacion(String estado) {
+                if (estado == null || estado.isBlank()) {
+                        return null;
+                }
+                String normalizado = estado.trim().toUpperCase();
+                if (!ESTADOS_REINCORPORACION_VALIDOS.contains(normalizado)) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Estado invalido. Estados permitidos: PENDIENTE, APROBADA, RECHAZADA, CANCELADA.");
+                }
+                return normalizado;
+        }
+
+        private void validarIdTrabajadorFiltro(Long idTrabajador) {
+                if (idTrabajador != null && idTrabajador <= 0) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "El identificador del trabajador debe ser mayor a cero.");
+                }
+        }
+
+        public static final Set<String> ESTADOS_REINCORPORACION_VALIDOS = Set.of(
+                        "PENDIENTE", "APROBADA", "RECHAZADA", "CANCELADA");
+
+        private void validarResolucionReincorporacion(
+                        Long idSolicitud,
+                        ResolverReincorporacionRequest request) {
+
+                if (idSolicitud == null || idSolicitud <= 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID de solicitud invalido.");
+                }
+                String decision = request.decision() != null ? request.decision().trim().toUpperCase() : "";
+                String motivo = request.obtenerMotivoEfectivo();
+                if ("RECHAZAR".equals(decision)) {
+                        if (motivo == null || motivo.trim().length() < 10 || motivo.trim().length() > 1000) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
+                                                "El rechazo requiere un motivo de 10 a 1000 caracteres.");
+                        }
+                } else if (motivo != null && !motivo.trim().isBlank() && motivo.trim().length() > 1000) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "El motivo no puede superar los 1000 caracteres.");
+                }
+        }
+
         private void validarParametrosResolucion(
                         Long idSolicitud,
                         ResolverCorreccionRequest request) {
@@ -563,6 +819,34 @@ public class TrabajadorService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, mensaje);
         }
 
+        private void validarEstadoFase2A(ResultadoProcedimiento respuesta) {
+                if (respuesta == null) {
+                        throw new IllegalStateException("El procedimiento no devolvió una respuesta.");
+                }
+                String estado = respuesta.estado();
+                if ("OK".equals(estado)) {
+                        return;
+                }
+                String mensaje = respuesta.mensaje() != null ? respuesta.mensaje() : "Operación no completada.";
+
+                if ("SIN_ADMINISTRADOR".equals(estado) || "CONFIGURACION_INVALIDA".equals(estado)) {
+                        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, mensaje);
+                }
+                if (List.of("DENEGADO", "USUARIO_PROTEGIDO", "AUTOAPROBACION_DENEGADA").contains(estado)) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, mensaje);
+                }
+                if (List.of("NO_ENCONTRADO", "NO_ENCONTRADA").contains(estado)) {
+                        throw new RecursoNoEncontradoException(mensaje);
+                }
+                if (List.of("SUSPENSION_PENDIENTE", "SOLICITUD_PENDIENTE", "SOLICITUD_RESUELTA", "ESTADO_INVALIDO").contains(estado)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, mensaje);
+                }
+                if (List.of("DATOS_INVALIDOS", "FECHAS_INVALIDAS", "MOTIVO_INVALIDO").contains(estado)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, mensaje);
+                }
+                validarEstado(respuesta);
+        }
+
         private void validarEstado(ResultadoProcedimiento respuesta) {
                 if (respuesta == null) {
                         throw new IllegalStateException(
@@ -578,6 +862,7 @@ public class TrabajadorService {
                                 ? respuesta.mensaje()
                                 : "No se pudo completar la operación.";
 
+                validarConfiguracionYPlataforma(estado, mensaje);
                 validarSeguridadYExistencia(estado, mensaje);
                 validarConflictos(estado, mensaje);
                 validarSolicitud(estado, mensaje);
@@ -586,47 +871,50 @@ public class TrabajadorService {
                                 "Error del procedimiento de RRHH: " + estado);
         }
 
+        private void validarConfiguracionYPlataforma(String estado, String mensaje) {
+                if ("CONFIGURACION_INVALIDA".equals(estado) || "SIN_ADMINISTRADOR".equals(estado)) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.INTERNAL_SERVER_ERROR,
+                                        mensaje != null ? mensaje : "Error de configuracion o administracion de RRHH.");
+                }
+        }
+
         private void validarSeguridadYExistencia(String estado, String mensaje) {
-                if ("DENEGADO".equals(estado) || "USUARIO_PROTEGIDO".equals(estado)) {
+                if (List.of("DENEGADO", "USUARIO_PROTEGIDO", "AUTOAPROBACION_DENEGADA",
+                                "AUTORESOLUCION_DENEGADA", "AUTOAPROBACION_NO_PERMITIDA", "ROL_NO_AUTORIZADO").contains(estado)) {
                         throw new ResponseStatusException(HttpStatus.FORBIDDEN, mensaje);
                 }
-                if ("NO_ENCONTRADO".equals(estado)) {
+                if (List.of("NO_ENCONTRADO", "NO_ENCONTRADA", "SOLICITUD_NO_ENCONTRADA",
+                                "TRABAJADOR_NO_ENCONTRADO", "REGISTRO_NO_ENCONTRADO").contains(estado)) {
                         throw new RecursoNoEncontradoException(mensaje);
                 }
         }
 
         private void validarConflictos(String estado, String mensaje) {
                 if (List.of(
-                                "CONFLICTO_UNICIDAD",
-                                "CORREO_DUPLICADO",
-                                "DOCUMENTO_EN_USO",
-                                "EMAIL_EN_USO",
-                                "TRABAJADOR_EXISTENTE",
-                                "PERSONA_NO_COINCIDE",
-                                "DOCUMENTO_NO_COINCIDE",
-                                "CONTACTO_NO_COINCIDE",
-                                "DOMICILIO_NO_COINCIDE").contains(estado)) {
+                                "SUSPENSION_PENDIENTE", "SOLICITUD_PENDIENTE", "SOLICITUD_RESUELTA",
+                                "SOLICITUD_YA_RESUELTA", "ESTADO_NO_PERMITE_SUSPENSION",
+                                "ESTADO_NO_PERMITE_CESE", "ESTADO_NO_PERMITE_REINCORPORACION",
+                                "SUSPENSION_VIGENTE", "TRABAJADOR_YA_CESADO", "TRABAJADOR_NO_CESADO",
+                                "CONFLICTO_UNICIDAD", "CORREO_DUPLICADO", "DOCUMENTO_EN_USO",
+                                "EMAIL_EN_USO", "TRABAJADOR_EXISTENTE", "PERSONA_NO_COINCIDE",
+                                "DOCUMENTO_NO_COINCIDE", "CONTACTO_NO_COINCIDE", "DOMICILIO_NO_COINCIDE").contains(estado)) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, mensaje);
                 }
         }
 
         private void validarSolicitud(String estado, String mensaje) {
-                if ("CONFIGURACION_INVALIDA".equals(estado)) {
-                        throw new ResponseStatusException(
-                                        HttpStatus.INTERNAL_SERVER_ERROR,
-                                        "La configuracion de RRHH requiere revision.");
-                }
-
                 if (List.of(
+                                "ESTADO_INVALIDO", "DATOS_INVALIDOS", "FECHAS_INVALIDAS", "MOTIVO_INVALIDO",
                                 "CAMPOS_OBLIGATORIOS", "CARGO_INVALIDO", "CORRECCION_DOCUMENTAL_REQUERIDA",
-                                "DATOS_INVALIDOS", "DOCUMENTO_INACTIVO", "DOCUMENTO_INVALIDO",
-                                "DOMICILIO_INVALIDO", "EMAIL_INVALIDO", "EMAIL_VERIFICACION_REQUERIDA",
-                                "ESTADO_INVALIDO", "FECHAS_INVALIDAS", "HORARIO_INVALIDO",
+                                "DOCUMENTO_INACTIVO", "DOCUMENTO_INVALIDO", "DOMICILIO_INVALIDO",
+                                "EMAIL_INVALIDO", "EMAIL_VERIFICACION_REQUERIDA", "HORARIO_INVALIDO",
                                 "ID_INVALIDO", "PERSONA_INVALIDA", "REQUIERE_IDENTIFICACION",
-                                "TELEFONO_INVALIDO", "TIPO_DOCUMENTO_INVALIDO",
-                                "TOKEN_EXPIRADO", "TOKEN_INVALIDO", "TOKEN_NO_ENCONTRADO",
-                                "TOKEN_UTILIZADO", "TOKEN_YA_USADO",
-                                "VERIFICACION_DOCUMENTAL_PENDIENTE", "VINCULO_INVALIDO").contains(estado)) {
+                                "TELEFONO_INVALIDO", "TIPO_DOCUMENTO_INVALIDO", "TOKEN_EXPIRADO",
+                                "TOKEN_INVALIDO", "TOKEN_NO_ENCONTRADO", "TOKEN_UTILIZADO",
+                                "TOKEN_YA_USADO", "VERIFICACION_DOCUMENTAL_PENDIENTE", "VINCULO_INVALIDO",
+                                "DECISION_INVALIDA", "MOTIVO_REQUERIDO", "MOTIVO_OBLIGATORIO",
+                                "FECHA_CESE_INVALIDA", "FECHA_INGRESO_INVALIDA").contains(estado)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, mensaje);
                 }
         }

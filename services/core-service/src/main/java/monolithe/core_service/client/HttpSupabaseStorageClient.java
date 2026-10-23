@@ -77,7 +77,15 @@ public class HttpSupabaseStorageClient implements SupabaseStorageClient {
             if (signedUrl == null || !signedUrl.isString()) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "La URL firmada no fue generada.");
             }
-            return signedUrl.asString();
+            String rutaFirmada = signedUrl.asString();
+
+            if (!rutaFirmada.startsWith("/object/sign/")) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Formato de URL firmada inesperado.");
+            }
+
+            return storageBaseUrl.replaceAll("/+$", "") + rutaFirmada;
         } catch (HttpClientErrorException | JacksonException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "No se pudo generar el acceso temporal.");
         }

@@ -2,10 +2,20 @@ import { coreApi } from '../lib/apiClient';
 import type {
   TrabajadorResponse,
   CatalogosTrabajadorResponse,
+  ActualizarTrabajadorRequest,
+  SolicitudCambioCorreoResponse,
   SolicitudCorreccionDocumentoRequest,
   SolicitudCorreccionDocumentoResponse,
   CorreccionDocumentalItem,
-  ResolverCorreccionRequest
+  ResolverCorreccionRequest,
+  ProgramarSuspensionRequest,
+  CesarTrabajadorRequest,
+  SolicitarReincorporacionRequest,
+  ListarReincorporacionesResponse,
+  ResolverReincorporacionRequest,
+  ResolverReincorporacionResponse,
+  MetricasTrabajadoresResponse,
+  ListarHistorialLaboralResponse
 } from '../types/workers';
 import type {
   ProyectoResponse,
@@ -88,9 +98,104 @@ export const coreService = {
     return coreApi.get<TrabajadorResponse[]>('/trabajadores');
   },
 
+  getWorker(idTrabajador: number): Promise<TrabajadorResponse> {
+    return coreApi.get<TrabajadorResponse>(`/trabajadores/${idTrabajador}`);
+  },
+
+  updateWorker(
+    idTrabajador: number,
+    data: ActualizarTrabajadorRequest
+  ): Promise<unknown> {
+    return coreApi.put<unknown>(`/trabajadores/${idTrabajador}`, { ...data });
+  },
+
+  solicitarCambioCorreoTrabajador(
+    idTrabajador: number,
+    correoNuevo: string
+  ): Promise<SolicitudCambioCorreoResponse> {
+    return coreApi.post<SolicitudCambioCorreoResponse>(
+      `/trabajadores/${idTrabajador}/solicitar-cambio-correo`,
+      { correoNuevo }
+    );
+  },
+
+  programarSuspension(
+    idTrabajador: number,
+    data: ProgramarSuspensionRequest
+  ): Promise<unknown> {
+    return coreApi.post<unknown>(
+      `/trabajadores/${idTrabajador}/suspensiones`,
+      { ...data }
+    );
+  },
+
+  cesarTrabajador(
+    idTrabajador: number,
+    data: CesarTrabajadorRequest
+  ): Promise<unknown> {
+    return coreApi.post<unknown>(
+      `/trabajadores/${idTrabajador}/cesar`,
+      { ...data }
+    );
+  },
+
+  solicitarReincorporacion(
+    idTrabajador: number,
+    data: SolicitarReincorporacionRequest
+  ): Promise<unknown> {
+    return coreApi.post<unknown>(
+      `/trabajadores/${idTrabajador}/reincorporaciones`,
+      { ...data }
+    );
+  },
+
+  listarReincorporaciones(params?: {
+    estado?: string;
+    idTrabajador?: number;
+  }): Promise<ListarReincorporacionesResponse> {
+    const query = new URLSearchParams();
+    if (params?.estado) query.set('estado', params.estado);
+    if (params?.idTrabajador) query.set('idTrabajador', String(params.idTrabajador));
+    const qs = query.toString();
+    return coreApi.get<ListarReincorporacionesResponse>(
+      qs ? `/reincorporaciones?${qs}` : '/reincorporaciones'
+    );
+  },
+
+  resolverReincorporacion(
+    idSolicitud: number,
+    data: ResolverReincorporacionRequest
+  ): Promise<ResolverReincorporacionResponse> {
+    return coreApi.post<ResolverReincorporacionResponse>(
+      `/reincorporaciones/${idSolicitud}/resolver`,
+      { ...data }
+    );
+  },
+
   getWorkerCatalogs(): Promise<CatalogosTrabajadorResponse> {
     return coreApi.get<CatalogosTrabajadorResponse>(
       '/trabajadores/catalogos'
+    );
+  },
+
+  getMetricasTrabajadores(): Promise<MetricasTrabajadoresResponse> {
+    return coreApi.get<MetricasTrabajadoresResponse>('/trabajadores/metricas');
+  },
+
+  getHistorialTrabajadores(params?: {
+    idTrabajador?: number;
+    tipoEvento?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Promise<ListarHistorialLaboralResponse> {
+    const query = new URLSearchParams();
+    if (params?.idTrabajador) query.set('idTrabajador', String(params.idTrabajador));
+    if (params?.tipoEvento && params.tipoEvento !== 'TODOS') query.set('tipoEvento', params.tipoEvento);
+    if (params?.fechaDesde) query.set('fechaDesde', params.fechaDesde);
+    if (params?.fechaHasta) query.set('fechaHasta', params.fechaHasta);
+    const qs = query.toString();
+    return coreApi.get<ListarHistorialLaboralResponse>(
+      qs ? `/trabajadores/historial?${qs}` : '/trabajadores/historial'
     );
   },
 
@@ -111,7 +216,7 @@ export const coreService = {
   createWorker(data: Record<string, unknown>): Promise<unknown> {
     return coreApi.post<unknown>(
       '/trabajadores',
-      data
+      { ...data }
     );
   },
 
@@ -122,7 +227,7 @@ export const coreService = {
   ): Promise<SolicitudCorreccionDocumentoResponse> {
     return coreApi.post<SolicitudCorreccionDocumentoResponse>(
       `/correcciones-documento/trabajadores/${idTrabajador}`,
-      data
+      { ...data }
     );
   },
 
@@ -164,7 +269,7 @@ export const coreService = {
   ): Promise<unknown> {
     return coreApi.post<unknown>(
       `/correcciones-documento/${idSolicitud}/resolver`,
-      data
+      { ...data }
     );
   },
 

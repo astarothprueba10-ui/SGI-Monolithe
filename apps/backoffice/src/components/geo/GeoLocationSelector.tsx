@@ -312,7 +312,13 @@ export function GeoLocationSelector({
       .then((data) => {
         if (cancelado || seq !== seqRef.current.paises) return;
         setPaises(data);
-        if (!value.idPais && defaultCountryName) {
+        if (value.idPais && !value.pais) {
+          // Resolver nombre cuando idPais ya existe pero el nombre no se recibio del backend
+          const encontrado = data.find((p) => p.idUbicacion === value.idPais);
+          if (encontrado) {
+            onChange({ ...value, pais: encontrado.nombre });
+          }
+        } else if (!value.idPais && defaultCountryName) {
           const paisDefecto = data.find((p) => normalize(p.nombre) === normalize(defaultCountryName));
           if (paisDefecto) {
             onChange({
