@@ -12,7 +12,7 @@ import {
   WalletIcon } from
 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ModuleKey, Permission } from '../types';
+import type { ModuleKey, Permission, RoleName } from '../types';
 
 export interface NavItem {
   label: string;
@@ -20,6 +20,7 @@ export interface NavItem {
   icon: LucideIcon;
   module: ModuleKey;
   permission: Permission;
+  allowedRoles?: readonly RoleName[];
 }
 
 export interface NavGroup {
@@ -126,7 +127,8 @@ export const NAV_GROUPS: NavGroup[] = [
     to: '/usuarios',
     icon: ShieldCheckIcon,
     module: 'users',
-    permission: 'users.view'
+    permission: 'users.view',
+    allowedRoles: ['Administrador', 'Gerencia']
   },
   {
     label: 'Auditoría',

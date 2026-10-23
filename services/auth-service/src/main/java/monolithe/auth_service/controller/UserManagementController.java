@@ -1,6 +1,7 @@
 package monolithe.auth_service.controller;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import monolithe.auth_service.dto.CreateUserRequest;
 import monolithe.auth_service.dto.CreatedUserResponse;
@@ -10,6 +11,8 @@ import monolithe.auth_service.dto.UserRoleRequest;
 import monolithe.auth_service.repository.projection.CreatedUserResult;
 import monolithe.auth_service.repository.projection.SecurityOperationResult;
 import monolithe.auth_service.service.UserManagementService;
+import monolithe.auth_service.service.AuditService;
+import monolithe.auth_service.service.UserCreationException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,19 +27,59 @@ import org.springframework.web.bind.annotation.*;
 public class UserManagementController {
 
         private final UserManagementService userManagementService;
+        private final AuditService auditService;
 
         @PostMapping
-        @PreAuthorize("hasAuthority('users.create')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.create') and hasAuthority('users.assign_role')")
         public ResponseEntity<CreatedUserResponse> crearUsuario(
                         @Valid @RequestBody CreateUserRequest request,
-                        @AuthenticationPrincipal Jwt jwt) {
+                        @AuthenticationPrincipal Jwt jwt,
+                        HttpServletRequest httpRequest) {
 
                 Long idActor = Long.valueOf(jwt.getSubject());
 
-                CreatedUserResult resultado = userManagementService.crearUsuario(
-                                idActor,
-                                request.getIdPersona(),
-                                request.getUsuarioLogin());
+                CreatedUserResult resultado;
+                boolean falloEnAsignacionAtomica = false;
+                try {
+                        resultado = userManagementService.crearUsuario(
+                                        idActor,
+                                        request.getIdPersona(),
+                                        request.getUsuarioLogin(),
+                                        request.getCodigosRol());
+                } catch (UserCreationException error) {
+                        resultado = new CreatedUserResult(null, error.getEstado(), error.getMessage());
+                        falloEnAsignacionAtomica = true;
+                }
+
+                boolean falloValidacionAuth = switch (resultado.estado()) {
+                        case "NO_ELEGIBLE",
+                                        "DENEGADO",
+                                        "RELACION_INVALIDA",
+                                        "ROL_CLIENTE_OBLIGATORIO",
+                                        "ROL_INTERNO_OBLIGATORIO",
+                                        "ROL_NO_PERMITIDO",
+                                        "CORREO_NO_DISPONIBLE",
+                                        "ROL_NO_AUTORIZADO" -> true;
+                        default -> false;
+                };
+                if (falloEnAsignacionAtomica || falloValidacionAuth) {
+                        String resultadoAuditoria = "DENEGADO".equals(resultado.estado())
+                                        || "ROL_PROTEGIDO".equals(resultado.estado())
+                                        || "ROL_NO_AUTORIZADO".equals(resultado.estado())
+                                        ? "DENEGADO"
+                                        : "FALLIDO";
+                        auditService.registrar(
+                                        idActor,
+                                        "CREAR_USUARIO",
+                                        resultadoAuditoria,
+                                        "Alta de cuenta para persona " + request.getIdPersona()
+                                                        + "; roles solicitados: " + request.getCodigosRol()
+                                                        + "; resultado: " + resultado.estado(),
+                                        httpRequest.getRemoteAddr(),
+                                        httpRequest.getHeader("User-Agent"),
+                                        "POST",
+                                        "/api/security/users");
+                }
 
                 CreatedUserResponse response = new CreatedUserResponse(
                                 resultado.idUsuario(),
@@ -52,12 +95,21 @@ public class UserManagementController {
 
                         case "PERSONA_CON_USUARIO",
                                         "LOGIN_EXISTENTE",
-                                        "CONFLICTO" ->
+                                        "CONFLICTO",
+                                        "NO_ELEGIBLE",
+                                        "RELACION_INVALIDA",
+                                        "ROL_CLIENTE_OBLIGATORIO",
+                                        "ROL_INTERNO_OBLIGATORIO",
+                                        "ROL_NO_PERMITIDO",
+                                        "CORREO_NO_DISPONIBLE" ->
                                 ResponseEntity
                                                 .status(HttpStatus.CONFLICT)
                                                 .body(response);
 
-                        case "DENEGADO" ->
+                        case "DENEGADO",
+                                        "ROL_PROTEGIDO",
+                                        "ROL_NO_AUTORIZADO",
+                                        "USUARIO_PROTEGIDO" ->
                                 ResponseEntity
                                                 .status(HttpStatus.FORBIDDEN)
                                                 .body(response);
@@ -76,7 +128,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}/activate")
-        @PreAuthorize("hasAuthority('users.activate')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.activate')")
         public ResponseEntity<UserOperationResponse> activarUsuario(
                         @PathVariable Long idUsuario,
                         @AuthenticationPrincipal Jwt jwt) {
@@ -92,7 +144,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}/deactivate")
-        @PreAuthorize("hasAuthority('users.deactivate')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.deactivate')")
         public ResponseEntity<UserOperationResponse> desactivarUsuario(
                         @PathVariable Long idUsuario,
                         @AuthenticationPrincipal Jwt jwt) {
@@ -108,7 +160,7 @@ public class UserManagementController {
         }
 
         @PostMapping("/{idUsuario}/roles")
-        @PreAuthorize("hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> asignarRol(
                         @PathVariable Long idUsuario,
                         @Valid @RequestBody UserRoleRequest request,
@@ -126,7 +178,7 @@ public class UserManagementController {
         }
 
         @PutMapping("/{idUsuario}/roles/{codigoRolActual}")
-        @PreAuthorize("hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> reemplazarRol(
                         @PathVariable Long idUsuario,
                         @PathVariable String codigoRolActual,
@@ -145,7 +197,7 @@ public class UserManagementController {
         }
 
         @DeleteMapping("/{idUsuario}/roles/{codigoRol}")
-        @PreAuthorize("hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> revocarRol(
                         @PathVariable Long idUsuario,
                         @PathVariable String codigoRol,
@@ -163,7 +215,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}")
-        @PreAuthorize("hasAuthority('users.edit')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.edit')")
         public ResponseEntity<UserOperationResponse> actualizarUsuario(
                         @PathVariable Long idUsuario,
                         @Valid @RequestBody UpdateUserRequest request,

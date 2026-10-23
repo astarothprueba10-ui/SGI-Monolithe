@@ -35,6 +35,10 @@ public class JwtService {
                 .map(authority -> authority.getAuthority())
                 .toList();
 
+        Long sessionVersion = principal.getVersionSesiones() != null
+                ? principal.getVersionSesiones()
+                : 0L;
+
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(principal.getIdUsuario().toString())
@@ -43,17 +47,12 @@ public class JwtService {
                 .id(UUID.randomUUID().toString())
                 .claim("username", principal.getUsername())
                 .claim("authorities", autoridades)
+                .claim("session_version", sessionVersion)
                 .claim("password_change_required", principal.isRequiereCambioPassword())
                 .build();
 
-        JwsHeader header = JwsHeader
-                .with(SignatureAlgorithm.RS256)
-                .build();
-
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
         JwtEncoderParameters parametros = JwtEncoderParameters.from(header, claims);
-
-        return jwtEncoder
-                .encode(parametros)
-                .getTokenValue();
+        return jwtEncoder.encode(parametros).getTokenValue();
     }
 }

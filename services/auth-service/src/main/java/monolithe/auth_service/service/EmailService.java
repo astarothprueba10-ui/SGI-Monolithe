@@ -2,13 +2,18 @@ package monolithe.auth_service.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.net.URI;
+import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import monolithe.auth_service.dto.CredentialMailContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @Service
@@ -19,6 +24,12 @@ public class EmailService {
 
   @Value("${security.mail.from}")
   private String remitente;
+
+  @Value("${security.portal.administrativo-url}")
+  private String portalAdministrativoUrl;
+
+  @Value("${security.portal.cliente-url}")
+  private String portalClienteUrl;
 
   public void enviarRecuperacionContrasena(
       String destinatario,
@@ -79,10 +90,15 @@ public class EmailService {
     }
   }
 
+  /**
+   * Envía credenciales temporales y accesos derivados de datos oficiales del
+   * usuario.
+   */
   public void enviarCredencialesTemporales(
       String destinatario,
       String usuarioLogin,
       String passwordTemporal,
+      CredentialMailContext contexto,
       long horasExpiracion) {
 
     try {
@@ -98,6 +114,7 @@ public class EmailService {
           construirCuerpoCredencialesTemporalesHtml(
               usuarioLogin,
               passwordTemporal,
+              contexto,
               horasExpiracion),
           true);
 
@@ -113,6 +130,78 @@ public class EmailService {
           e) {
       };
     }
+  }
+
+  public void enviarConfirmacionCambioCorreo(
+      String destinatario,
+      String urlConfirmacion,
+      long minutosExpiracion) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, true, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(destinatario);
+      helper.setSubject("Confirmación de cambio de correo - MONOLITHE");
+      helper.setText(
+          construirCuerpoConfirmacionCambioCorreoHtml(urlConfirmacion, minutosExpiracion),
+          true);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      log.error("Error al construir el correo de confirmación de cambio de correo");
+      throw new MailException("Error al preparar el correo de confirmación", e) {
+      };
+    }
+  }
+
+  private String construirCuerpoConfirmacionCambioCorreoHtml(
+      String urlConfirmacion,
+      long minutosExpiracion) {
+    return """
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        </head>
+        <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:'Segoe UI',Arial,sans-serif;">
+          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 0;">
+            <tr>
+              <td align="center">
+                <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
+                  <tr>
+                    <td style="background:#1a2e4a;padding:28px 40px;">
+                      <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">MONOLITHE</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:36px 40px 20px;">
+                      <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#1a2e4a;">Confirmación de nuevo correo</h1>
+                      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4a5568;">Se ha solicitado registrar esta dirección de correo electrónico para su expediente laboral en MONOLITHE.</p>
+                      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4a5568;">Para confirmar y activar este correo, haga clic en el siguiente enlace:</p>
+                      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                        <tr>
+                          <td style="background:#2b6cb0;border-radius:6px;">
+                            <a href="%s" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Confirmar Correo Electrónico</a>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#718096;">Este enlace expirará en <strong>%d minutos</strong> y solo puede ser utilizado una vez.</p>
+                      <p style="margin:0;font-size:13px;line-height:1.5;color:#718096;">Si usted no solicitó este cambio, puede ignorar este mensaje.</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+                      <p style="margin:0;font-size:12px;color:#a0aec0;text-align:center;">MONOLITHE &mdash; Sistema de Gestión Integrado</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """
+        .formatted(urlConfirmacion, minutosExpiracion);
   }
 
   private String construirCuerpoHtml(
@@ -366,9 +455,10 @@ public class EmailService {
         .formatted(codigoOtp, minutosExpiracion);
   }
 
-  private String construirCuerpoCredencialesTemporalesHtml(
+  String construirCuerpoCredencialesTemporalesHtml(
       String usuarioLogin,
       String passwordTemporal,
+      CredentialMailContext contexto,
       long horasExpiracion) {
 
     return """
@@ -396,11 +486,14 @@ public class EmailService {
                 <table width="560"
                        cellpadding="0"
                        cellspacing="0"
-                       style="background:#ffffff;
+                       style="max-width:560px;
+                              width:100%%;
+                              background:#ffffff;
                               border-radius:8px;
                               box-shadow:0 2px 8px rgba(0,0,0,0.08);
                               overflow:hidden;">
 
+                  <!-- ENCABEZADO -->
                   <tr>
                     <td style="background:#1a2e4a;padding:28px 40px;">
                       <p style="margin:0;
@@ -413,6 +506,7 @@ public class EmailService {
                     </td>
                   </tr>
 
+                  <!-- CONTENIDO -->
                   <tr>
                     <td style="padding:36px 40px 28px;">
 
@@ -427,84 +521,160 @@ public class EmailService {
                                 font-size:15px;
                                 color:#4a5568;
                                 line-height:1.6;">
-                        Se ha creado tu cuenta de acceso al Backoffice.
-                        Utiliza las siguientes credenciales para iniciar
-                        sesión por primera vez.
+                        Se ha habilitado tu cuenta de acceso al sistema
+                        MONOLITHE. Utiliza las siguientes credenciales
+                        para iniciar sesión por primera vez.
                       </p>
 
+                      <!-- CUADRICULA DE ACCESO -->
                       <div style="margin:24px 0;
                                   padding:20px;
                                   background:#f8fafc;
                                   border:1px solid #e2e8f0;
                                   border-radius:8px;">
 
-                        <p style="margin:0 0 12px;
+                        <!-- USUARIO -->
+                        <p style="margin:0 0 10px;
                                   font-size:14px;
                                   color:#718096;">
                           Usuario
                         </p>
 
-                        <p style="margin:0 0 20px;
-                                  font-size:16px;
-                                  font-weight:600;
+                        <p style="margin:0 0 22px;
+                                  font-size:17px;
+                                  font-weight:700;
                                   color:#1a2e4a;">
-                          %s
+                          %s: %s
                         </p>
 
-                        <p style="margin:0 0 12px;
+                        <!-- DIVISOR -->
+                        <div style="height:1px;
+                                    background:#e2e8f0;
+                                    margin:0 0 20px;">
+                        </div>
+
+                        <!-- CONTRASEÑA TEMPORAL -->
+                        <p style="margin:0 0 10px;
                                   font-size:14px;
                                   color:#718096;">
                           Contraseña temporal
                         </p>
 
-                        <p style="margin:0;
+                        <p style="margin:0 0 22px;
                                   font-family:monospace;
-                                  font-size:20px;
+                                  font-size:17px;
                                   font-weight:700;
                                   color:#1a2e4a;
-                                  letter-spacing:1px;">
+                                  line-height:1.6;
+                                  overflow-wrap:anywhere;
+                                  word-break:break-word;">
                           %s
                         </p>
 
+                        <!-- DIVISOR -->
+                        <div style="height:1px;
+                                    background:#e2e8f0;
+                                    margin:0 0 20px;">
+                        </div>
+
+                        <!-- PORTAL DE ACCESO -->
+                        <p style="margin:0 0 12px;
+                                  font-size:14px;
+                                  color:#718096;">
+                          Link del portal de inicio
+                        </p>
+
+                        %s
+
                       </div>
 
-                      <p style="margin:0 0 12px;font-size:14px;color:#718096;line-height:1.6;">
+                      <!-- VIGENCIA -->
+                      <p style="margin:0 0 12px;
+                                font-size:14px;
+                                color:#718096;
+                                line-height:1.6;">
                         Esta contraseña temporal tendrá una vigencia
-                        máxima de %d horas.
+                        máxima de <strong>%d horas</strong>.
                       </p>
 
-                      <p style="margin:0 0 12px;font-size:14px;color:#718096;line-height:1.6;">
+                      <!-- CAMBIO OBLIGATORIO -->
+                      <p style="margin:0 0 12px;
+                                font-size:14px;
+                                color:#718096;
+                                line-height:1.6;">
                         Al iniciar sesión por primera vez, el sistema
                         te solicitará crear una nueva contraseña personal
-                        antes de permitir el acceso al Backoffice.
+                        antes de permitir el acceso a MONOLITHE.
                       </p>
 
-                      <p style="margin:0;font-size:14px;color:#718096; line-height:1.6;">
+                      <!-- SEGURIDAD -->
+                      <p style="margin:0;
+                                font-size:14px;
+                                color:#718096;
+                                line-height:1.6;">
                         No compartas estas credenciales con otras personas.
                       </p>
 
                     </td>
                   </tr>
 
+                  <!-- PIE DE CORREO -->
                   <tr>
-                    <td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+                    <td style="background:#f8fafc;
+                               padding:20px 40px;
+                               border-top:1px solid #e2e8f0;">
 
-                      <p style="margin:0;font-size:12px; color:#a0aec0; text-align:center;">
+                      <p style="margin:0;
+                                font-size:12px;
+                                color:#a0aec0;
+                                text-align:center;">
                         MONOLITHE &mdash; Sistema de Gestión Integrado
                       </p>
 
                     </td>
                   </tr>
+
                 </table>
               </td>
             </tr>
           </table>
+
         </body>
         </html>
         """
         .formatted(
-            usuarioLogin,
-            passwordTemporal,
+            HtmlUtils.htmlEscape(contexto.tipoDocumento()),
+            HtmlUtils.htmlEscape(usuarioLogin),
+            HtmlUtils.htmlEscape(passwordTemporal),
+            construirBotonesAcceso(contexto),
             horasExpiracion);
+  }
+
+  private String construirBotonesAcceso(CredentialMailContext contexto) {
+    StringBuilder botones = new StringBuilder(
+        "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:28px auto 0\"><tr><td align=\"center\">");
+    if (contexto.portalAdministrativo())
+      botones.append(construirBotonAcceso("Portal Administrativo", portalAdministrativoUrl));
+    if (contexto.portalCliente())
+      botones.append(construirBotonAcceso("Portal Cliente", portalClienteUrl));
+    return botones.append("</td></tr></table>").toString();
+  }
+
+  private String construirBotonAcceso(String etiqueta, String url) {
+    String href = escaparUrlPortal(url);
+    return "<a href=\"%s\" style=\"display:inline-block;margin:6px;padding:13px 22px;background:#1a2e4a;border-radius:6px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600\">%s</a>"
+        .formatted(href, HtmlUtils.htmlEscape(etiqueta));
+  }
+
+  private String escaparUrlPortal(String url) {
+    URI uri = URI.create(url.trim());
+    boolean esquemaPermitido = Set.of("https", "http").contains(uri.getScheme() == null
+        ? ""
+        : uri.getScheme().toLowerCase(Locale.ROOT));
+    if (!uri.isAbsolute() || uri.getHost() == null || !esquemaPermitido
+        || uri.getRawQuery() != null || uri.getRawFragment() != null || uri.getUserInfo() != null) {
+      throw new IllegalStateException("La URL configurada para el portal no es válida.");
+    }
+    return HtmlUtils.htmlEscape(uri.toASCIIString());
   }
 }

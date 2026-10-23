@@ -3,6 +3,7 @@ import { SaveIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
+import { puedeAdministrarCuentas } from '../../lib/securityAccess';
 import { securityApi, type SecurityPermission } from '../../services/securityApi';
 import { cn } from '../../utils/cn';
 
@@ -52,7 +53,7 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 export function PermissionMatrix({ roleCode }: { roleCode: string }) {
-  const { can, role } = useAuth();
+  const { role, user, permissions: effectivePermissions } = useAuth();
 
   const [permissions, setPermissions] = useState<SecurityPermission[]>([]);
   const [granted, setGranted] = useState<Set<string>>(new Set());
@@ -61,7 +62,7 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
   const [saving, setSaving] = useState(false);
 
   const editable =
-    can('roles.assign_permissions') &&
+    puedeAdministrarCuentas(user.roles, effectivePermissions, 'roles.assign_permissions') &&
     roleCode !== 'GERENCIA' &&
     (roleCode !== 'ADMINISTRADOR' || role === 'Gerencia');
 

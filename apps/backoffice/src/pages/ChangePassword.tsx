@@ -1,5 +1,7 @@
 import { FormEvent, useRef, useState } from 'react';
 import {
+  EyeIcon,
+  EyeOffIcon,
   LoaderCircleIcon,
   LockKeyholeIcon,
   ShieldCheckIcon
@@ -18,6 +20,9 @@ export function ChangePassword() {
   const [contrasenaActual, setContrasenaActual] = useState('');
   const [nuevaContrasena, setNuevaContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
+  const [mostrarContrasenaActual, setMostrarContrasenaActual] = useState(false);
+  const [mostrarNuevaContrasena, setMostrarNuevaContrasena] = useState(false);
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,17 +160,30 @@ export function ChangePassword() {
                 Contraseña actual
               </FieldLabel>
 
-              <Input
-                ref={actualRef}
-                id="contrasenaActual"
-                type="password"
-                value={contrasenaActual}
-                onChange={(event) =>
-                  setContrasenaActual(event.target.value)
-                }
-                autoComplete="current-password"
-                disabled={loading || success}
-              />
+              <div className="relative">
+                <Input
+                  ref={actualRef}
+                  id="contrasenaActual"
+                  type={mostrarContrasenaActual ? 'text' : 'password'}
+                  value={contrasenaActual}
+                  onChange={(event) =>
+                    setContrasenaActual(event.target.value)
+                  }
+                  autoComplete="current-password"
+                  disabled={loading || success}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarContrasenaActual((visible) => !visible)}
+                  aria-label={mostrarContrasenaActual ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'}
+                  aria-pressed={mostrarContrasenaActual}
+                  disabled={loading || success}
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {mostrarContrasenaActual ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -173,16 +191,29 @@ export function ChangePassword() {
                 Nueva contraseña
               </FieldLabel>
 
-              <Input
-                id="nuevaContrasena"
-                type="password"
-                value={nuevaContrasena}
-                onChange={(event) =>
-                  setNuevaContrasena(event.target.value)
-                }
-                autoComplete="new-password"
-                disabled={loading || success}
-              />
+              <div className="relative">
+                <Input
+                  id="nuevaContrasena"
+                  type={mostrarNuevaContrasena ? 'text' : 'password'}
+                  value={nuevaContrasena}
+                  onChange={(event) =>
+                    setNuevaContrasena(event.target.value)
+                  }
+                  autoComplete="new-password"
+                  disabled={loading || success}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarNuevaContrasena((visible) => !visible)}
+                  aria-label={mostrarNuevaContrasena ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
+                  aria-pressed={mostrarNuevaContrasena}
+                  disabled={loading || success}
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {mostrarNuevaContrasena ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
 
               <p className="mt-1 text-[11px] text-brand-300">
                 Entre 8 y 72 caracteres.
@@ -194,16 +225,29 @@ export function ChangePassword() {
                 Confirmar nueva contraseña
               </FieldLabel>
 
-              <Input
-                id="confirmarContrasena"
-                type="password"
-                value={confirmarContrasena}
-                onChange={(event) =>
-                  setConfirmarContrasena(event.target.value)
-                }
-                autoComplete="new-password"
-                disabled={loading || success}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmarContrasena"
+                  type={mostrarConfirmacion ? 'text' : 'password'}
+                  value={confirmarContrasena}
+                  onChange={(event) =>
+                    setConfirmarContrasena(event.target.value)
+                  }
+                  autoComplete="new-password"
+                  disabled={loading || success}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarConfirmacion((visible) => !visible)}
+                  aria-label={mostrarConfirmacion ? 'Ocultar confirmación' : 'Mostrar confirmación'}
+                  aria-pressed={mostrarConfirmacion}
+                  disabled={loading || success}
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {mostrarConfirmacion ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <Button

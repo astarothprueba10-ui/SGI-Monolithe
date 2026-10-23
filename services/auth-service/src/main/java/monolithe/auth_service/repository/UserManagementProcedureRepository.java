@@ -23,7 +23,6 @@ public class UserManagementProcedureRepository {
         private final SimpleJdbcCall callDesactivarUsuario;
         private final SimpleJdbcCall callAsignarRol;
         private final SimpleJdbcCall callRevocarRol;
-        private final SimpleJdbcCall callAsociarCorreo;
         private final SimpleJdbcCall callActualizarLogin;
 
         public UserManagementProcedureRepository(
@@ -98,17 +97,6 @@ public class UserManagementProcedureRepository {
                                 jdbcTemplate,
                                 "sp_revocar_rol_usuario");
 
-                this.callAsociarCorreo = new SimpleJdbcCall(jdbcTemplate)
-                                .withSchemaName("public")
-                                .withProcedureName("sp_asociar_correo_persona_seguridad")
-                                .withoutProcedureColumnMetaDataAccess()
-                                .declareParameters(
-                                                new SqlParameter("p_id_actor", Types.BIGINT),
-                                                new SqlParameter("p_id_persona", Types.BIGINT),
-                                                new SqlParameter("p_correo", Types.VARCHAR),
-                                                new SqlOutParameter("p_estado", Types.VARCHAR),
-                                                new SqlOutParameter("p_mensaje", Types.VARCHAR));
-
                 this.callActualizarLogin = new SimpleJdbcCall(jdbcTemplate)
                                 .withSchemaName("public")
                                 .withProcedureName("sp_actualizar_login_usuario")
@@ -175,23 +163,6 @@ public class UserManagementProcedureRepository {
                                                 new SqlOutParameter(
                                                                 "p_mensaje",
                                                                 Types.VARCHAR));
-        }
-
-        public SecurityOperationResult asociarCorreoPersona(
-                        Long idActor,
-                        Long idPersona,
-                        String correo) {
-
-                MapSqlParameterSource params = new MapSqlParameterSource()
-                                .addValue("p_id_actor", idActor)
-                                .addValue("p_id_persona", idPersona)
-                                .addValue("p_correo", correo);
-
-                Map<String, Object> out = callAsociarCorreo.execute(params);
-
-                return new SecurityOperationResult(
-                                (String) out.get("p_estado"),
-                                (String) out.get("p_mensaje"));
         }
 
         public SecurityOperationResult actualizarLoginUsuario(

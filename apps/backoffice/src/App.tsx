@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { AppShell } from './components/layout/AppShell';
-import { PermissionRoute } from './components/auth/PermissionRoute';
+import { AccountAdminPermissionRoute, PermissionRoute } from './components/auth/PermissionRoute';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
@@ -211,9 +211,9 @@ export function App({
             <Route
               path="/usuarios"
               element={
-                <PermissionRoute permission="users.view">
+                <AccountAdminPermissionRoute permission="users.view">
                   <UsersAndRoles />
-                </PermissionRoute>
+                </AccountAdminPermissionRoute>
               }
             />
 

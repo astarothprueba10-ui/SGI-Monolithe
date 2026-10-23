@@ -28,7 +28,14 @@ export function Sidebar({
 
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => can(item.permission))
+    items: group.items.filter(
+      (item) =>
+        can(item.permission) &&
+        (!item.allowedRoles ||
+          item.allowedRoles.some((role) =>
+            user.roles.includes(role)
+          ))
+    )
   })).filter((group) => group.items.length > 0);
 
   return (
