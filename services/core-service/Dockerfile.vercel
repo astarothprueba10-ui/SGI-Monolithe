@@ -1,0 +1,30 @@
+
+# SGI MONOLITHE - Core Service para Vercel
+
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
+
+WORKDIR /build
+
+COPY pom.xml .
+COPY src ./src
+
+RUN mvn clean package -DskipTests -B
+
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+RUN addgroup -S appgroup && \
+    adduser -S appuser -G appgroup
+
+COPY --from=builder /build/target/*.jar /app/app.jar
+
+RUN chown appuser:appgroup /app/app.jar
+
+USER appuser
+
+ENV JWT_PUBLIC_KEY_PATH=/tmp/sgi-jwt/public.pem
+
+EXPOSE 80
+
+CMD ["sh", "-ec", "umask 077; mkdir -p /tmp/sgi-jwt; printf '%s' \"${JWT_PUBLIC_KEY_B64:?Falta JWT_PUBLIC_KEY_B64}\" | base64 -d > \"$JWT_PUBLIC_KEY_PATH\"; export SERVER_PORT=\"${PORT:-80}\"; exec java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -jar /app/app.jar"]
