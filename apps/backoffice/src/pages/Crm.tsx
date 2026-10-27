@@ -1921,7 +1921,11 @@ export function Crm() {
       <Modal
         open={Boolean(stageLead)}
         onClose={() => setStageLead(null)}
-        title="Cambiar etapa comercial"
+        title={
+          stageLead?.categoria === 'LEAD' && newStageCode === 'INTERESADO'
+            ? 'Convertir Lead a Potencial'
+            : 'Cambiar etapa comercial'
+        }
         description={
           stageLead
             ? `Prospecto ${stageLead.codigo} · ${stageLead.nombre_completo} (Etapa actual: ${stageLead.estado_nombre || stageLead.estado_codigo})`
@@ -1976,18 +1980,19 @@ export function Crm() {
               }
             >
               {catalogs?.estados ? (
-                catalogs.estados.map((est) => (
-                  <option key={est.codigo} value={est.codigo}>
-                    {est.nombre} {est.final ? '(Definitiva)' : ''}
-                  </option>
-                ))
+                catalogs.estados
+                  .filter((est) => est.codigo !== 'CONVERTIDO')
+                  .map((est) => (
+                    <option key={est.codigo} value={est.codigo}>
+                      {est.nombre} {est.final ? '(Definitiva)' : ''}
+                    </option>
+                  ))
               ) : (
                 <>
                   <option value="NUEVO">Nuevo</option>
                   <option value="CONTACTADO">Contactado</option>
                   <option value="INTERESADO">Interesado</option>
                   <option value="NEGOCIACION">En negociacion</option>
-                  <option value="CONVERTIDO">Convertido (Definitiva)</option>
                   <option value="NO_INTERESADO">No interesado (Definitiva)</option>
                   <option value="DESCARTADO">Descartado (Definitiva)</option>
                 </>
