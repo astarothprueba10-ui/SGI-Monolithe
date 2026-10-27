@@ -35,7 +35,8 @@ import {
   type CrmFollowUpItem,
   type CrmProspect,
   type CrmSummary,
-  type CrmVisit
+  type CrmVisit,
+  type CrmAssignment,
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
 import { currency, percent } from '../utils/format';
@@ -205,6 +206,7 @@ export function Crm() {
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
   const [detailVisitsList, setDetailVisitsList] = useState<CrmVisit[]>([]);
+  const [assignmentsList, setAssignmentsList] = useState<CrmAssignment[]>([]);
 
   // Modales de gestion
   const [assignLead, setAssignLead] = useState<CrmProspect | null>(null);
@@ -439,15 +441,18 @@ export function Crm() {
     setLeadDetail(null);
     setFollowUpsList([]);
     setDetailVisitsList([]);
+    setAssignmentsList([]);
     try {
-      const [det, follows, visits] = await Promise.all([
+      const [det, follows, visits, assignments] = await Promise.all([
         crmBackend.detalle(id),
         crmBackend.listarSeguimientos(id, 100).catch(() => []),
-        crmBackend.visitas(id).catch(() => [])
+        crmBackend.visitas(id).catch(() => []),
+        crmBackend.listarAsignaciones(id).catch(() => [])
       ]);
       setLeadDetail(det);
       setFollowUpsList(follows || []);
       setDetailVisitsList(visits || []);
+      setAssignmentsList(assignments || []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'No se pudo obtener el expediente.';
       toast.error('Error al consultar expediente', { description: msg });
@@ -1474,6 +1479,49 @@ export function Crm() {
                 </p>
               </div>
             )}
+
+            {/* Historial de asignaciones comerciales */}
+            <div className="pt-2 border-t border-brand-100">
+              <h4 className="text-[12px] font-semibold uppercase text-brand-700 mb-2">
+                Historial de asignaciones ({assignmentsList.length})
+              </h4>
+
+              {assignmentsList.length === 0 ? (
+                <p className="text-xs text-brand-400">
+                  Sin asignaciones registradas.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {assignmentsList.map((a) => (
+                    <div
+                      key={a.id_asignacion}
+                      className="rounded border border-brand-100 p-3 text-xs"
+                    >
+                      <div className="flex justify-between">
+                        <strong>{a.asesor_nombre}</strong>
+                        <span className={a.vigente ? 'text-emerald-700' : 'text-brand-400'}>
+                          {a.vigente ? 'Vigente' : 'Finalizada'}
+                        </span>
+                      </div>
+
+                      <p>Asignación: {formatDateTimeLima(a.fecha_asignacion)}</p>
+
+                      {a.fecha_fin && (
+                        <p>Finalización: {formatDateTimeLima(a.fecha_fin)}</p>
+                      )}
+
+                      {a.motivo_asignacion && (
+                        <p>Motivo: {a.motivo_asignacion}</p>
+                      )}
+
+                      {a.motivo_cierre && (
+                        <p>Motivo de cierre: {a.motivo_cierre}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Historial de Seguimientos Comerciales */}
             <div className="pt-2 border-t border-brand-100">

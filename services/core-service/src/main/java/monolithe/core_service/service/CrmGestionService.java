@@ -70,6 +70,23 @@ public class CrmGestionService {
         return ejecutar(() -> repository.listarSeguimientos(actor, prospecto, limite), true);
     }
 
+    @Transactional(readOnly = true)
+    public JsonNode listarAsignaciones(Long actor, Long prospecto) {
+        validarIdentidad(actor, prospecto);
+
+        return ejecutar(() -> {
+            String historial = repository.listarAsignaciones(actor, prospecto);
+
+            if (historial == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "No tiene permiso crm.view vigente.");
+            }
+
+            return historial;
+        }, true);
+    }
+
     private void validarIdentidad(Long actor, Long prospecto) {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion no valida.");
@@ -86,7 +103,8 @@ public class CrmGestionService {
         } catch (DataAccessException ex) {
             throw mapearError(ex);
         }
-        if (json == null) throw new IllegalStateException("Respuesta CRM vacia.");
+        if (json == null)
+            throw new IllegalStateException("Respuesta CRM vacia.");
         try {
             JsonNode resultado = jsonMapper.readTree(json);
             if (resultado == null || (esperaArray ? !resultado.isArray() : !resultado.isObject())) {
@@ -101,16 +119,19 @@ public class CrmGestionService {
     private ResponseStatusException mapearError(DataAccessException ex) {
         String error = extraerMensajeError(ex);
         if (error.contains("DENEGADO|")) {
-            return new ResponseStatusException(HttpStatus.FORBIDDEN, "No tiene permisos vigentes para esta operacion.", ex);
+            return new ResponseStatusException(HttpStatus.FORBIDDEN, "No tiene permisos vigentes para esta operacion.",
+                    ex);
         }
         if (error.contains("PROSPECTO_NO_EXISTE|")) {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Prospecto no encontrado o inactivo.", ex);
         }
         if (esConflictoNegocio(error)) {
-            return new ResponseStatusException(HttpStatus.CONFLICT, "La operacion no esta permitida por el estado comercial.", ex);
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La operacion no esta permitida por el estado comercial.", ex);
         }
         if (esDatoInvalido(error)) {
-            return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Los datos enviados no cumplen las reglas del CRM.", ex);
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Los datos enviados no cumplen las reglas del CRM.", ex);
         }
         return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No se pudo procesar la operacion CRM.", ex);
@@ -119,7 +140,8 @@ public class CrmGestionService {
     private String extraerMensajeError(DataAccessException ex) {
         StringBuilder mensajes = new StringBuilder();
         for (Throwable t = ex; t != null; t = t.getCause()) {
-            if (t.getMessage() != null) mensajes.append(t.getMessage()).append(' ');
+            if (t.getMessage() != null)
+                mensajes.append(t.getMessage()).append(' ');
         }
         return mensajes.toString();
     }

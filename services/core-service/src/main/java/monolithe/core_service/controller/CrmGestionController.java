@@ -35,6 +35,15 @@ public class CrmGestionController {
         return service.asignarAsesor(idActor(jwt), idProspecto, request);
     }
 
+    @GetMapping("/{idProspecto}/asignaciones")
+    @PreAuthorize("hasAuthority('crm.view')")
+    public JsonNode listarAsignaciones(
+            @PathVariable Long idProspecto,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return service.listarAsignaciones(idActor(jwt), idProspecto);
+    }
+
     @PostMapping("/{idProspecto}/seguimientos")
     @PreAuthorize("hasAuthority('crm.edit')")
     public ResponseEntity<JsonNode> registrarSeguimiento(@PathVariable Long idProspecto,
@@ -56,7 +65,8 @@ public class CrmGestionController {
         }
         try {
             long id = Long.parseLong(jwt.getSubject());
-            if (id <= 0) throw new NumberFormatException();
+            if (id <= 0)
+                throw new NumberFormatException();
             return id;
         } catch (NumberFormatException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identidad de JWT invalida.");

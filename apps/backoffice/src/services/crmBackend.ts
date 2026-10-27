@@ -79,6 +79,16 @@ export interface CrmDetail {
   totalVisitas: number;
   esComprador: boolean;
 }
+export interface CrmAssignment {
+  id_asignacion: number;
+  id_asesor: number;
+  asesor_nombre: string;
+  fecha_asignacion: string;
+  fecha_fin: string | null;
+  motivo_asignacion: string | null;
+  motivo_cierre: string | null;
+  vigente: boolean;
+}
 export interface CrmVisit {
   id_visita: number;
   fecha_visita: string;
@@ -199,4 +209,6 @@ export const crmBackend = {
     coreApi.get<CrmFollowUpItem[]>(`/crm/prospectos/${id}/seguimientos?limite=${limite}`),
   exportarCsv: (consulta?: string, etapa?: string, categoria = 'TODOS', limite = 5000) =>
     coreApi.get<string>(`/crm/exportaciones/prospectos.csv${qs({ consulta, etapa, categoria, limite })}`),
+  listarAsignaciones: (id: number) =>
+    coreApi.get<CrmAssignment[]>(`/crm/prospectos/${id}/asignaciones`),
 };
