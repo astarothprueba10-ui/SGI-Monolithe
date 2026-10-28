@@ -94,6 +94,13 @@ public class GlobalExceptionHandler {
                                 request);
         }
 
+        @ExceptionHandler(CredentialMailException.class)
+        public ResponseEntity<ApiErrorResponse> handleCredentialMailException(
+                        CredentialMailException exception,
+                        HttpServletRequest request) {
+                return construirRespuesta(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request);
+        }
+
         @ExceptionHandler(MailException.class)
         public ResponseEntity<ApiErrorResponse> handleMailException(
                         MailException exception,

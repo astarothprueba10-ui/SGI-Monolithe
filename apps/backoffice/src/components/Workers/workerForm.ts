@@ -3,6 +3,7 @@ import type {
   CatalogosTrabajadorResponse
 } from '../../types/workers';
 import { CORRECTION_EVIDENCE_MAX_SIZE, CORRECTION_EVIDENCE_MIME_TYPES } from './correctionDocumentUtils';
+import { normalizeEmailAddress } from '../../lib/emailAddress';
 
 export type WorkerDocumentType = CatalogosTrabajadorResponse['tiposDocumento'][number];
 
@@ -143,7 +144,6 @@ export function validateCorrectionRequest(
 const RE_SOLO_NOMBRE = /^[A-Za-z\u00C0-\u024F\s-]*$/;
 const RE_SOLO_NUMEROS = /^\d*$/;
 const RE_ALFANUMERICO = /^[A-Za-z0-9]*$/;
-const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function esTipoSoloNumerico(tipo: WorkerDocumentType | undefined): boolean {
   if (!tipo) return false;
@@ -196,7 +196,7 @@ export function validarNombreCampo(valor: string, etiqueta: string, requerido: b
 
 export function validarCorreo(valor: string): string | undefined {
   if (!valor.trim()) return undefined;
-  if (!RE_CORREO.test(valor.trim())) {
+  if (!normalizeEmailAddress(valor)) {
     return 'Ingresa un correo valido (ej: persona@correo.com).';
   }
   return undefined;

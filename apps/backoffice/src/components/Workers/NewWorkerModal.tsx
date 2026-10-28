@@ -8,16 +8,21 @@ import { coreService, type PersonaIdentificadaResponse } from '../../services/co
 import { ApiError } from '../../lib/apiClient';
 import { GeoLocationSelector, type GeoLocationValue } from '../geo/GeoLocationSelector';
 import type { CatalogosTrabajadorResponse } from '../../types/workers';
+import { usePeruToday } from '../../hooks/usePeruToday';
+import { normalizeEmailAddress } from '../../lib/emailAddress';
+import {
+  filterNewWorkerPhone, getNewWorkerDocumentTypes, isNewWorkerDocumentAllowed,
+  validateNewWorkerPhone, validateNewWorkerStartDate
+} from '../../lib/newWorkerPolicy';
+import { getPeruTodayDateString } from './workerDateUtils';
 import {
   createInitialWorkerForm as estadoInicial,
   esTipoSoloNumerico,
   filtrarCaracteresDocumento,
   filtrarCaracteresNombre,
-  filtrarTelefono,
   validarCorreo,
   validarDocumento,
   validarNombreCampo,
-  validarTelefono,
   type WorkerFormErrors as FormErrors,
   type WorkerFormKey as FormKey,
   type WorkerFormState as FormState,
@@ -48,15 +53,26 @@ function validarUbicacion(form: FormState, errores: FormErrors): void {
   }
 }
 
-function validarSeccionPersonal(
+function validarDocumentoAlta(
   form: FormState,
   catalogos: CatalogosTrabajadorResponse,
   errores: FormErrors
 ): void {
   const tipo = catalogos.tiposDocumento.find((t) => String(t.idTipoDocumento) === form.idTipoDocumento);
   if (!form.idTipoDocumento) errores.idTipoDocumento = 'Selecciona el tipo de documento.';
+  if (form.idTipoDocumento && (!tipo || !isNewWorkerDocumentAllowed(tipo))) {
+    errores.idTipoDocumento = 'Selecciona DNI o carné de extranjería.';
+  }
   const errDoc = validarDocumento(form.numeroDocumento, tipo);
   if (errDoc) errores.numeroDocumento = errDoc;
+}
+
+function validarSeccionPersonal(
+  form: FormState,
+  catalogos: CatalogosTrabajadorResponse,
+  errores: FormErrors
+): void {
+  validarDocumentoAlta(form, catalogos, errores);
   const errNom = validarNombreCampo(form.nombres, 'Los nombres', true);
   if (errNom) errores.nombres = errNom;
   const errPat = validarNombreCampo(form.apellidoPaterno, 'El apellido paterno', false);
@@ -65,7 +81,7 @@ function validarSeccionPersonal(
   if (errMat) errores.apellidoMaterno = errMat;
   const errCorreo = validarCorreo(form.correoElectronico);
   if (errCorreo) errores.correoElectronico = errCorreo;
-  const errTel = validarTelefono(form.telefono);
+  const errTel = validateNewWorkerPhone(form.telefono);
   if (errTel) errores.telefono = errTel;
   if (!form.direccion.trim()) errores.direccion = 'La direccion es obligatoria.';
   validarUbicacion(form, errores);
@@ -77,9 +93,10 @@ function validarSeccionLaboral(form: FormState, errores: FormErrors): void {
   if (!form.idTipoVinculoLaboral) {
     errores.idTipoVinculoLaboral = 'Selecciona el tipo de vinculo laboral.';
   }
-  if (!form.fechaIngreso) errores.fechaIngreso = 'La fecha de ingreso es obligatoria.';
+  const errorFecha = validateNewWorkerStartDate(form.fechaIngreso);
+  if (errorFecha) errores.fechaIngreso = errorFecha;
   if (form.fechaNacimiento) {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getPeruTodayDateString();
     if (form.fechaNacimiento > hoy) {
       errores.fechaNacimiento = 'La fecha de nacimiento no puede ser futura.';
     }
@@ -156,7 +173,7 @@ export function NewWorkerModal({
   const [errorIdentificacion, setErrorIdentificacion] = useState<string | null>(null);
   const [infoIdentificacion, setInfoIdentificacion] = useState<string | null>(null);
   const busquedaPersonaRef = useRef(0);
-  const hoyRef = useRef(new Date().toISOString().split('T')[0]);
+  const hoy = usePeruToday(open);
 
   const camposPersonaBloqueados =
     personaIdentificada !== null &&
@@ -430,7 +447,7 @@ export function NewWorkerModal({
         apellidoPaterno: form.apellidoPaterno.trim() || null,
         apellidoMaterno: form.apellidoMaterno.trim() || null,
         fechaNacimiento: form.fechaNacimiento || null,
-        correoElectronico: form.correoElectronico.trim() || null,
+        correoElectronico: normalizeEmailAddress(form.correoElectronico),
         telefono: form.telefono.trim() || null,
         direccion: form.direccion.trim(),
         referencia: form.referencia.trim() || null,
@@ -508,7 +525,6 @@ export function NewWorkerModal({
     }
   }
 
-  const hoy = hoyRef.current;
   const soloNumDoc = esTipoSoloNumerico(tipoDocSeleccionado);
   const docMaxLength = tipoDocSeleccionado?.longitudMaxima ?? undefined;
   const docInputMode: React.InputHTMLAttributes<HTMLInputElement>['inputMode'] =
@@ -589,7 +605,7 @@ export function NewWorkerModal({
                   disabled={submitting}
                 >
                   <option value="">Seleccionar tipo</option>
-                  {catalogos.tiposDocumento.map((tipo) => (
+                  {getNewWorkerDocumentTypes(catalogos.tiposDocumento).map((tipo) => (
                     <option key={tipo.idTipoDocumento} value={tipo.idTipoDocumento}>
                       {tipo.nombre}
                     </option>
@@ -820,7 +836,9 @@ export function NewWorkerModal({
                 <FieldLabel htmlFor="correoElectronico">Correo electronico</FieldLabel>
                 <Input
                   id="correoElectronico"
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  maxLength={254}
                   value={form.correoElectronico}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -848,20 +866,32 @@ export function NewWorkerModal({
                 <FieldError mensaje={errores.correoElectronico} />
               </div>
 
-              {/* Telefono — solo digitos */}
+              {/* Telefono celular */}
               <div>
                 <FieldLabel htmlFor="telefono">Telefono</FieldLabel>
                 <Input
                   id="telefono"
-                  type="text"
+                  type="tel"
                   inputMode="numeric"
+                  maxLength={9}
                   value={form.telefono}
-                  onChange={(e) => actualizarCampo('telefono', filtrarTelefono(e.target.value))}
-                  onBlur={() => marcarTocado('telefono')}
-                  placeholder="Solo digitos (ej: 999888777)"
+                  onChange={(e) => {
+                    const telefono = filterNewWorkerPhone(e.target.value);
+                    actualizarCampo(
+                      'telefono', telefono,
+                      touched.telefono ? validateNewWorkerPhone(telefono) : undefined
+                    );
+                  }}
+                  onBlur={() => marcarTocado('telefono', validateNewWorkerPhone(form.telefono))}
+                  placeholder="Ej: 987654321"
                   autoComplete="tel"
+                  aria-describedby="telefono-ayuda"
+                  aria-invalid={Boolean(errores.telefono)}
                   disabled={submitting}
                 />
+                <p id="telefono-ayuda" className="mt-1 text-[11px] text-brand-400">
+                  9 dígitos y debe comenzar con 9.
+                </p>
                 <FieldError mensaje={errores.telefono} />
               </div>
 
@@ -1052,20 +1082,27 @@ export function NewWorkerModal({
                 <Input
                   id="fechaIngreso"
                   type="date"
+                  min={hoy}
+                  max="9999-12-31"
+                  required
+                  aria-invalid={Boolean(errores.fechaIngreso)}
+                  aria-describedby="fechaIngreso-ayuda"
                   value={form.fechaIngreso}
                   onChange={(e) => actualizarCampo(
                     'fechaIngreso', e.target.value,
-                    touched.fechaIngreso && !e.target.value
-                      ? 'La fecha de ingreso es obligatoria.' : undefined
+                    validateNewWorkerStartDate(e.target.value)
                   )}
                   onBlur={() =>
                     marcarTocado(
                       'fechaIngreso',
-                      !form.fechaIngreso ? 'La fecha de ingreso es obligatoria.' : undefined
+                      validateNewWorkerStartDate(form.fechaIngreso)
                     )
                   }
                   disabled={submitting}
                 />
+                <p id="fechaIngreso-ayuda" className="mt-1 text-xs text-brand-400">
+                  Selecciona hoy o una fecha posterior (hora de Perú).
+                </p>
                 <FieldError mensaje={errores.fechaIngreso} />
               </div>
 

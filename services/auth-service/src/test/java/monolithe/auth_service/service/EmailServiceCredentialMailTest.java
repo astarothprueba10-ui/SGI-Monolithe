@@ -78,6 +78,6 @@ class EmailServiceCredentialMailTest {
     }
 
     private String normalizar(String texto) {
-        return texto.replaceAll("\\s+", " ");
+        return texto.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ");
     }
 }

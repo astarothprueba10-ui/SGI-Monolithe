@@ -134,6 +134,7 @@ async function request<T>(
   if (!response.ok) {
     throw new Error(
       data?.mensaje ??
+      data?.message ??
       `Error ${response.status} al consultar seguridad.`
     );
   }
@@ -239,12 +240,12 @@ export const securityApi = {
         body: JSON.stringify({ codigoRol: codigoRolNuevo })
       }
     ),
-  actualizarUsuario: (idUsuario: number, usuarioLogin: string) =>
+  actualizarUsuario: (idUsuario: number, usuarioLogin: string, correoElectronico?: string) =>
     request<SecurityOperationResponse>(
       `/users/${idUsuario}`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ usuarioLogin })
+        body: JSON.stringify({ usuarioLogin, ...(correoElectronico !== undefined ? { correoElectronico } : {}) })
       }
     ),
 

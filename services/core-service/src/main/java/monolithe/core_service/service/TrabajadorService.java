@@ -103,42 +103,23 @@ public class TrabajadorService {
                                 TrabajadorResponse.class);
         }
 
-        public JsonNode registrarTrabajador(
-                        Long idActor,
-                        JsonNode datos) {
-                if (datos == null || !datos.isObject()) {
-                        throw new ResponseStatusException(
-                                        HttpStatus.BAD_REQUEST,
-                                        "Los datos del trabajador deben ser un objeto JSON.");
-                }
-
-                if (!datos.has("informacionPersonal")
-                                || !datos.get("informacionPersonal").isObject()
-                                || !datos.has("informacionLaboral")
-                                || !datos.get("informacionLaboral").isObject()) {
-
-                        throw new ResponseStatusException(
-                                        HttpStatus.BAD_REQUEST,
-                                        "Debe proporcionar informacionPersonal e informacionLaboral.");
-                }
-
-                String datosJson;
-
-                try {
-                        datosJson = jsonMapper.writeValueAsString(datos);
-                } catch (JacksonException ex) {
-                        throw new IllegalStateException(
-                                        "No se pudieron procesar los datos del trabajador.",
-                                        ex);
-                }
-
+        /** Registra un trabajador después de validar documentos, fecha y correo. */
+        public JsonNode registrarTrabajador(Long idActor, JsonNode datos) {
+                ValidacionAltaTrabajador.validarEstructura(datos);
+                JsonNode normalizados = ValidacionAltaTrabajador.validar(
+                                datos, obtenerCatalogos(idActor), LocalDate.now(java.time.ZoneId.of("America/Lima")));
                 ResultadoProcedimiento respuesta = repository.registrarTrabajador(
-                                idActor,
-                                datosJson);
-
+                                idActor, serializarRegistro(normalizados));
                 validarEstado(respuesta);
-
                 return respuesta.resultado();
+        }
+
+        private String serializarRegistro(JsonNode datos) {
+                try {
+                        return jsonMapper.writeValueAsString(datos);
+                } catch (JacksonException exception) {
+                        throw new IllegalStateException("No se pudieron procesar los datos del trabajador.", exception);
+                }
         }
 
         private static final int ID_ESTADO_EN_VERIFICACION = 5;

@@ -13,6 +13,8 @@ import monolithe.auth_service.repository.projection.SecurityOperationResult;
 import monolithe.auth_service.service.UserManagementService;
 import monolithe.auth_service.service.AuditService;
 import monolithe.auth_service.service.UserCreationException;
+import monolithe.auth_service.service.UserAccountUpdateService;
+import monolithe.auth_service.exception.UserUpdateException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,7 @@ public class UserManagementController {
 
         private final UserManagementService userManagementService;
         private final AuditService auditService;
+        private final UserAccountUpdateService userAccountUpdateService;
 
         @PostMapping
         @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.create') and hasAuthority('users.assign_role')")
@@ -223,12 +226,11 @@ public class UserManagementController {
 
                 Long idActor = Long.valueOf(jwt.getSubject());
 
-                SecurityOperationResult resultado = userManagementService.actualizarUsuario(
-                                idActor,
-                                idUsuario,
-                                request.getUsuarioLogin());
-
-                return construirRespuestaOperacion(resultado);
+                try {
+                        return construirRespuestaOperacion(userAccountUpdateService.actualizar(idActor, idUsuario, request));
+                } catch (UserUpdateException exception) {
+                        return construirRespuestaOperacion(new SecurityOperationResult(exception.getEstado(), exception.getMessage()));
+                }
         }
 
         private ResponseEntity<UserOperationResponse> construirRespuestaOperacion(
@@ -267,7 +269,8 @@ public class UserManagementController {
                         case "SIN_ROL",
                                         "ULTIMO_ROL",
                                         "OPERACION_NO_PERMITIDA",
-                                        "LOGIN_EXISTENTE" ->
+                                        "LOGIN_EXISTENTE",
+                                        "CORREO_EXISTENTE" ->
                                 ResponseEntity
                                                 .status(HttpStatus.CONFLICT)
                                                 .body(response);

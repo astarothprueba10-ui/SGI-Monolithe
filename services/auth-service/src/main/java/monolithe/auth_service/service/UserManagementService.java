@@ -6,6 +6,7 @@ import monolithe.auth_service.repository.projection.CreatedUserResult;
 import monolithe.auth_service.repository.projection.SecurityOperationResult;
 import monolithe.auth_service.repository.projection.ActivatedUserResult;
 import monolithe.auth_service.dto.CredentialMailContext;
+import monolithe.auth_service.validation.EmailAddressPolicy;
 import tools.jackson.databind.JsonNode;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -117,7 +118,7 @@ public class UserManagementService {
                 }
 
                 String correo = persona.path("correo").asString("").trim();
-                if (correo.isBlank() || !correo.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                if (!correoDisponible(correo)) {
                         return new CreatedUserResult(null, "CORREO_NO_DISPONIBLE",
                                         "Se requiere un correo principal activo y válido antes de activar la cuenta.");
                 }
@@ -164,6 +165,14 @@ public class UserManagementService {
                 }
 
                 return creado;
+        }
+
+        private boolean correoDisponible(String correo) {
+                try {
+                        return EmailAddressPolicy.normalizeOptional(correo) != null;
+                } catch (IllegalArgumentException exception) {
+                        return false;
+                }
         }
 
         private boolean puedeAsignarRolesInternosProtegidos() {

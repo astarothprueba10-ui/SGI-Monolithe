@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "test:projects": "node --test tests/projectForm.test.mjs",
-    "test:workers": "node --require ./tests/register-types.cjs --test tests/workers.test.cjs",
+    "test:workers": "node --require ./tests/register-types.cjs --test tests/workers.test.cjs tests/newWorkerPolicy.test.cjs",
+    "test:users": "node --require ./tests/register-types.cjs --test tests/editUserEmail.test.cjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "vite preview"
   },
