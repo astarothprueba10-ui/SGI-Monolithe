@@ -482,6 +482,46 @@ export function Crm() {
     }
   };
 
+
+  const handleVerifySale = async (lead: CrmProspect) => {
+    try {
+      const resultado = await crmBackend.verificarCompra(
+        lead.id_prospecto
+      );
+
+      if (!resultado.esComprador) {
+        toast.info('Compra pendiente de formalización', {
+          description: resultado.mensaje
+        });
+        return;
+      }
+
+      await Promise.all([
+        loadLeads(),
+        loadCatalogsAndAdvisors(),
+        loadBuyers()
+      ]);
+
+      setCategory('COMPRADOR');
+      setPage(1);
+
+      toast.success('Comprador verificado', {
+        description:
+          `${lead.nombre_completo} tiene una compra formalizada. ` +
+          `Venta: ${resultado.compra?.codigoVenta ?? 'Registrada'}. ` +
+          `Contrato: ${resultado.compra?.codigoContrato ?? 'Válido'}.`
+      });
+
+    } catch (err: unknown) {
+      toast.error('No se pudo verificar la compra', {
+        description:
+          err instanceof Error
+            ? err.message
+            : 'Error al consultar al servidor.'
+      });
+    }
+  };
+
   const handleStageSubmit = async () => {
     if (!stageLead || !newStageCode) return;
     if (newStageCode === stageLead.estado_codigo) {
@@ -493,7 +533,7 @@ export function Crm() {
     const estadoActual = catalogs?.estados.find((e) => e.codigo === stageLead.estado_codigo);
     if (estadoActual?.final || stageLead.categoria === 'COMPRADOR' || stageLead.categoria === 'CERRADO') {
       toast.error('Etapa definitiva', {
-        description: `No se puede modificar la etapa de un prospecto en estado ${stageLead.estado_codigo} segun las reglas del CRM.`
+        description: `No se puede modificar la etapa de un prospecto en estado ${stageLead.estado_codigo} segun las reglas.`
       });
       return;
     }
@@ -939,6 +979,18 @@ export function Crm() {
                           >
                             Expediente
                           </Button>
+                          {lead.categoria === 'POTENCIAL' && (
+                            <Gate permission="crm.view">
+                              <Button
+                                size="sm"
+                                icon={CheckCircleIcon}
+                                title="Verificar venta y contrato"
+                                onClick={() => void handleVerifySale(lead)}
+                              >
+                                Verificar compra
+                              </Button>
+                            </Gate>
+                          )}
 
                           <Gate permission="crm.edit">
                             {(() => {
@@ -1249,7 +1301,7 @@ export function Crm() {
           <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
             <CardHeader
               title="Compradores en cartera"
-              description="Clientes con contrato o separacion formal registrada en el backend comercial."
+              description="Clientes con contrato o separacion formal registrada."
             />
             <SearchInput
               placeholder="Buscar comprador o contrato..."

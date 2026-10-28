@@ -1,5 +1,5 @@
-/** CRM Sprint 3 — cliente HTTP exclusivo del Core Service. No utiliza Supabase JS directo. */
 import { coreApi } from '../lib/apiClient';
+import { supabase } from '../lib/supabase';
 
 export type CrmCategory = 'TODOS' | 'LEAD' | 'POTENCIAL' | 'COMPRADOR' | 'CERRADO';
 
@@ -167,6 +167,87 @@ export interface CrmSearch {
   tamano?: number;
 }
 
+
+export interface CrmSaleValidationInput {
+  idProspecto: number;
+  idLote: number;
+  modalidad: 'CONTADO' | 'FINANCIADA';
+  montoTotal: number;
+  montoInicial?: number | null;
+  numeroCuotas?: number | null;
+  observaciones?: string | null;
+}
+
+export interface CrmSaleValidationResult {
+  elegible: boolean;
+  idProspecto: number;
+  codigoProspecto: string;
+  idPersona: number;
+  idAsesor: number;
+  idLote: number;
+  codigoLote: string;
+  idProyecto: number;
+  modalidad: 'CONTADO' | 'FINANCIADA';
+  precioVigente: number;
+  idMoneda: number;
+  mensaje: string;
+}
+
+export interface CrmBuyerVerification {
+  idProspecto: number;
+  codigoProspecto: string;
+  esComprador: boolean;
+  mensaje: string;
+  compra: {
+    idCliente: number;
+    codigoCliente: string;
+    idVenta: number;
+    codigoVenta: string;
+    estadoVenta: string;
+    idContrato: number;
+    codigoContrato: string;
+    estadoContrato: string;
+    idLote: number;
+    codigoLote: string;
+    precioVenta: number;
+    fechaVenta: string;
+  } | null;
+}
+
+export interface CrmPendingSaleResult {
+  success: boolean;
+  idVenta: number;
+  codigoVenta: string;
+  idContrato: number;
+  codigoContrato: string;
+  idProspecto: number;
+  idPersona: number;
+  idAsesor: number;
+  idLote: number;
+  idProyecto: number;
+  idPlanPago: number | null;
+  codigoPlanPago: string | null;
+  estadoVenta: 'PENDIENTE';
+  estadoContrato: 'PENDIENTE_FIRMA';
+  estadoLote: 'RESERVADO';
+  esComprador: boolean;
+  modalidad: 'CONTADO' | 'FINANCIADA';
+  montoTotal: number;
+  mensaje: string;
+}
+
+export interface CrmCancelPendingSaleResult {
+  success: boolean;
+  idVenta: number;
+  codigoVenta: string;
+  codigoContrato: string;
+  estadoVenta: 'ANULADA';
+  estadoContrato: 'ANULADO';
+  estadoLote: 'DISPONIBLE' | 'RESERVADO';
+  motivo: string;
+  mensaje: string;
+}
+
 function qs(filters: Record<string, string | number | boolean | null | undefined>) {
   const p = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
@@ -174,6 +255,92 @@ function qs(filters: Record<string, string | number | boolean | null | undefined
   }
   const query = p.toString();
   return query ? `?${query}` : '';
+}
+
+
+export interface CrmContractUpload {
+  bucket: string;
+  claveArchivo: string;
+  urlCarga: string;
+  tipoMime: string;
+  maxBytes: number;
+  expiresInSeconds: number;
+}
+
+export interface CrmContractEvidence {
+  success: boolean;
+  idContrato: number;
+  idContratoArchivo: number;
+  codigoArchivo: string;
+  numeroVersion: number;
+  claveArchivo: string;
+  tamanoBytes: number;
+  tipoMime: string;
+  firmaValidada: boolean;
+  contratoVigente: boolean;
+  mensaje: string;
+}
+
+
+export interface CrmPendingContract {
+  idContrato: number;
+  codigoContrato: string;
+  idVenta: number;
+  codigoVenta: string;
+  fechaVenta: string;
+  montoVenta: number;
+  idLote: number;
+  codigoLote: string;
+  idProyecto: number;
+  nombreProyecto: string;
+  comprador: string;
+  estadoContrato: 'PENDIENTE_FIRMA';
+  estadoVenta: 'PENDIENTE';
+  tieneEvidencia: boolean;
+  idArchivoVigente: number | null;
+  nombreArchivoVigente: string | null;
+}
+
+export interface CrmPendingContractsPage {
+  items: CrmPendingContract[];
+  total: number;
+  pagina: number;
+  tamano: number;
+}
+
+export interface CrmContractReadUrl {
+  idContrato: number;
+  idContratoArchivo: number;
+  nombreOriginal: string;
+  urlLectura: string;
+  expiresInSeconds: number;
+}
+
+
+export interface CrmAprobarFirmaRequest {
+  idContratoArchivo: number;
+  fechaFirma: string;
+  firmaRevisada: boolean;
+  observaciones: string;
+}
+
+export interface CrmAprobarFirmaResponse {
+  success: boolean;
+  idContrato: number;
+  codigoContrato: string;
+  idVenta: number;
+  codigoVenta: string;
+  idContratoArchivo: number;
+  idAprobacion: number;
+  idProspecto: number;
+  idLote: number;
+  estadoContrato: string;
+  estadoVenta: string;
+  estadoLote: string;
+  esComprador: boolean;
+  idPlanPago: number | null;
+  cuotasGeneradas: number;
+  mensaje: string;
 }
 
 export const crmBackend = {
@@ -198,6 +365,73 @@ export const crmBackend = {
     `/crm/prospectos/${id}${qs({ motivo })}`),
   compradores: (consulta: string, pagina: number, tamano: number) =>
     coreApi.get<CrmPage<CrmBuyer>>(`/crm/compradores${qs({ consulta, pagina, tamano })}`),
+
+  validarVenta: (body: CrmSaleValidationInput) =>
+    coreApi.post<CrmSaleValidationResult>(
+      '/crm/ventas/validar',
+      {
+        idProspecto: body.idProspecto,
+        idLote: body.idLote,
+        modalidad: body.modalidad,
+        montoTotal: body.montoTotal,
+        montoInicial: body.montoInicial ?? null,
+        numeroCuotas: body.numeroCuotas ?? null,
+        observaciones: body.observaciones ?? null
+      }
+    ),
+
+  registrarVentaPendiente: (body: CrmSaleValidationInput) =>
+    coreApi.post<CrmPendingSaleResult>(
+      '/crm/ventas/pendientes',
+      {
+        idProspecto: body.idProspecto,
+        idLote: body.idLote,
+        modalidad: body.modalidad,
+        montoTotal: body.montoTotal,
+        montoInicial: body.montoInicial ?? null,
+        numeroCuotas: body.numeroCuotas ?? null,
+        observaciones: body.observaciones ?? null
+      }
+    ),
+  cancelarVentaPendiente: (
+    idVenta: number,
+    motivo: string
+  ) =>
+    coreApi.post<CrmCancelPendingSaleResult>(
+      `/crm/ventas/${idVenta}/cancelar`,
+      { motivo: motivo.trim() }
+    ),
+  verificarCompra: (idProspecto: number) =>
+    coreApi.get<CrmBuyerVerification>(
+      `/crm/prospectos/${idProspecto}/verificar-compra`
+    ),
+  listarContratosPendientes: (
+    busqueda = '',
+    pagina = 1,
+    tamano = 20
+  ): Promise<CrmPendingContractsPage> =>
+    coreApi.get<CrmPendingContractsPage>(
+      `/crm/contratos/pendientes${qs({
+        busqueda: busqueda.trim(),
+        pagina,
+        tamano
+      })}`
+    ),
+
+  aprobarFirmaContrato: (
+    idContrato: number,
+    body: CrmAprobarFirmaRequest
+  ) =>
+    coreApi.post<CrmAprobarFirmaResponse>(
+      `/crm/contratos/${idContrato}/aprobar-firma`,
+      {
+        idContratoArchivo: body.idContratoArchivo,
+        fechaFirma: body.fechaFirma,
+        firmaRevisada: body.firmaRevisada,
+        observaciones: body.observaciones
+      }
+    ),
+
   visitas: (idProspecto: number) => coreApi.get<CrmVisit[]>(`/crm/prospectos/${idProspecto}/visitas`),
   agendarVisita: (idProspecto: number, body: CrmScheduleVisit) =>
     coreApi.post<Record<string, unknown>>(`/crm/prospectos/${idProspecto}/visitas`, body as unknown as Record<string, unknown>),
@@ -211,4 +445,87 @@ export const crmBackend = {
     coreApi.get<string>(`/crm/exportaciones/prospectos.csv${qs({ consulta, etapa, categoria, limite })}`),
   listarAsignaciones: (id: number) =>
     coreApi.get<CrmAssignment[]>(`/crm/prospectos/${id}/asignaciones`),
+
+  prepararLecturaContrato: (
+    idContrato: number,
+    idContratoArchivo: number
+  ) =>
+    coreApi.post<CrmContractReadUrl>(
+      `/crm/contratos/${idContrato}/evidencias/${idContratoArchivo}/preparar-lectura`
+    ),
+
+  subirEvidenciaContrato: async (
+    idContrato: number,
+    archivo: File
+  ): Promise<CrmContractEvidence> => {
+
+    const maxBytes = 10 * 1024 * 1024;
+
+    if (!Number.isSafeInteger(idContrato) || idContrato <= 0) {
+      throw new Error('El contrato seleccionado no es válido.');
+    }
+
+    if (
+      archivo.type !== 'application/pdf' ||
+      !/\.pdf$/i.test(archivo.name)
+    ) {
+      throw new Error('Solo se permiten documentos PDF.');
+    }
+
+    if (archivo.size <= 0 || archivo.size > maxBytes) {
+      throw new Error('El PDF debe tener un tamaño máximo de 10 MB.');
+    }
+
+    const cabecera = await archivo.slice(0, 5).text();
+
+    if (cabecera !== '%PDF-') {
+      throw new Error('El archivo no tiene una cabecera PDF válida.');
+    }
+
+    const carga = await coreApi.post<CrmContractUpload>(
+      `/crm/contratos/${idContrato}/evidencias/preparar-carga`
+    );
+
+    if (
+      carga.bucket !== 'contratos-firmados-private' ||
+      carga.tipoMime !== 'application/pdf' ||
+      carga.maxBytes !== maxBytes ||
+      !carga.claveArchivo.startsWith(`contratos/${idContrato}/`)
+    ) {
+      throw new Error('La configuración de carga no es válida.');
+    }
+
+    const token = new URL(carga.urlCarga).searchParams.get('token');
+
+    if (!token) {
+      throw new Error('No se recibió un token válido de carga.');
+    }
+
+    const { error } = await supabase.storage
+      .from(carga.bucket)
+      .uploadToSignedUrl(
+        carga.claveArchivo,
+        token,
+        archivo,
+        {
+          contentType: 'application/pdf',
+          upsert: false
+        }
+      );
+
+    if (error) {
+      throw new Error(
+        `No se pudo subir el documento: ${error.message}`
+      );
+    }
+
+    return coreApi.post<CrmContractEvidence>(
+      `/crm/contratos/${idContrato}/evidencias`,
+      {
+        claveArchivo: carga.claveArchivo,
+        nombreOriginal: archivo.name
+      }
+    );
+  },
+
 };
