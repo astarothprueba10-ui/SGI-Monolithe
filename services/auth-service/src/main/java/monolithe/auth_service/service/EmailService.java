@@ -95,41 +95,23 @@ public class EmailService {
    * usuario.
    */
   public void enviarCredencialesTemporales(
-      String destinatario,
-      String usuarioLogin,
-      String passwordTemporal,
-      CredentialMailContext contexto,
-      long horasExpiracion) {
+      String destinatario, String usuarioLogin, String passwordTemporal,
+      CredentialMailContext contexto, long horasExpiracion) {
+    String html = construirCuerpoCredencialesTemporalesHtml(
+        usuarioLogin, passwordTemporal, contexto, horasExpiracion);
+    String texto = construirCredencialesTexto(usuarioLogin, passwordTemporal, contexto, horasExpiracion);
+    new CredentialMailDelivery(mailSender).send(remitente, destinatario, texto, html);
+  }
 
-    try {
-      MimeMessage mensaje = mailSender.createMimeMessage();
-      MimeMessageHelper helper = new MimeMessageHelper(mensaje, true, "UTF-8");
-
-      helper.setFrom(remitente);
-      helper.setTo(destinatario);
-      helper.setSubject(
-          "Bienvenido a MONOLITHE - Credenciales de acceso");
-
-      helper.setText(
-          construirCuerpoCredencialesTemporalesHtml(
-              usuarioLogin,
-              passwordTemporal,
-              contexto,
-              horasExpiracion),
-          true);
-
-      mailSender.send(mensaje);
-
-    } catch (MessagingException e) {
-
-      log.error(
-          "Error al construir el correo de credenciales temporales");
-
-      throw new MailException(
-          "Error al preparar el correo de credenciales temporales",
-          e) {
-      };
-    }
+  private String construirCredencialesTexto(
+      String login, String password, CredentialMailContext contexto, long horas) {
+    String texto = "MONOLITHE - Credenciales de acceso\nUsuario: " + login
+        + "\n" + contexto.tipoDocumento() + ": " + contexto.numeroDocumento()
+        + "\nContraseña temporal: " + password + "\nVigencia máxima: " + horas
+        + " horas. Cambia tu contraseña en el primer acceso.\n";
+    if (contexto.portalAdministrativo()) texto += "Portal Administrativo: " + portalAdministrativoUrl.trim() + "\n";
+    if (contexto.portalCliente()) texto += "Portal Cliente: " + portalClienteUrl.trim() + "\n";
+    return texto;
   }
 
   public void enviarConfirmacionCambioCorreo(
@@ -544,6 +526,9 @@ public class EmailService {
                                   font-size:17px;
                                   font-weight:700;
                                   color:#1a2e4a;">
+                          %s
+                        </p>
+                        <p style="margin:0 0 22px;font-size:14px;color:#1a2e4a;">
                           %s: %s
                         </p>
 
@@ -643,8 +628,9 @@ public class EmailService {
         </html>
         """
         .formatted(
-            HtmlUtils.htmlEscape(contexto.tipoDocumento()),
             HtmlUtils.htmlEscape(usuarioLogin),
+            HtmlUtils.htmlEscape(contexto.tipoDocumento()),
+            HtmlUtils.htmlEscape(contexto.numeroDocumento()),
             HtmlUtils.htmlEscape(passwordTemporal),
             construirBotonesAcceso(contexto),
             horasExpiracion);

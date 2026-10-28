@@ -19,6 +19,9 @@ public class UpdateUserRequest {
         @Pattern(regexp = "^[a-zA-Z0-9._-]{3,120}$", message = "Usa entre 3 y 120 letras, números, puntos, guiones o guiones bajos")
         private String usuarioLogin;
 
+        @Size(max = 180, message = "El correo no puede superar los 180 caracteres")
+        private String correoElectronico;
+
         public void setUsuarioLogin(String usuarioLogin) {
                 this.usuarioLogin = usuarioLogin != null
                                 ? usuarioLogin.trim().toLowerCase(Locale.ROOT)

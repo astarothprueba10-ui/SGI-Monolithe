@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { FieldLabel, Input, Select } from '../ui/Field';
 import { useAuth } from '../../contexts/AuthContext';
+import { changedUserEmail, editedUserEmailError, userEmailChanged } from './editUserPolicy';
 import {
   securityApi,
   type AvailablePerson,
@@ -77,14 +78,17 @@ async function ejecutarFlujoCreacion(
 async function ejecutarFlujoEdicion(
   user: SecurityUser,
   nuevoLogin: string,
-  nuevoRol: string
+  nuevoRol: string,
+  nuevoCorreo: string
 ): Promise<void> {
   const loginActual = user.usuarioLogin.toLowerCase().trim();
   const loginNuevo = nuevoLogin.toLowerCase().trim();
   const rolActual = user.roles[0]?.codigo ?? '';
 
-  if (loginNuevo !== loginActual) {
-    const r = await securityApi.actualizarUsuario(user.idUsuario, loginNuevo);
+  if (loginNuevo !== loginActual || userEmailChanged(nuevoCorreo, user.correo)) {
+    const r = await securityApi.actualizarUsuario(
+      user.idUsuario, loginNuevo, changedUserEmail(nuevoCorreo, user.correo)
+    );
     if (r.estado !== 'ACTUALIZADO') {
       throw new Error(`LOGIN_FAIL:${r.mensaje}`);
     }
@@ -129,6 +133,7 @@ export function CreateUserModal({
   const [selectorPersonaAbierto, setSelectorPersonaAbierto] = useState(false);
   const [idPersona, setIdPersona] = useState<number | ''>('');
   const [usuarioLocal, setUsuarioLocal] = useState('');
+  const [correoLocal, setCorreoLocal] = useState('');
   const [codigoRol, setCodigoRol] = useState('');
   const [codigosRoles, setCodigosRoles] = useState<string[]>([]);
   const [rolesMenuOpen, setRolesMenuOpen] = useState(false);
@@ -144,6 +149,7 @@ export function CreateUserModal({
       setIdPersona(user.idPersona);
       setBusqueda(user.nombreCompleto);
       setUsuarioLocal(extraerPrefijo(user.usuarioLogin));
+      setCorreoLocal(user.correo ?? '');
       setCodigoRol(user.roles[0]?.codigo ?? '');
       setCodigosRoles(user.roles.map((r) => r.codigo));
       return;
@@ -161,6 +167,7 @@ export function CreateUserModal({
     setSelectorPersonaAbierto(false);
     setIdPersona('');
     setUsuarioLocal('');
+    setCorreoLocal('');
     setCodigoRol('');
     setCodigosRoles([]);
     setRolesMenuOpen(false);
@@ -204,8 +211,9 @@ export function CreateUserModal({
 
   const loginDerivado = personaSeleccionada?.numeroDocumento ?? '';
 
-  const correoEfectivo = modoEdicion ? user?.correo ?? '' : personaSeleccionada?.correo ?? '';
+  const correoEfectivo = modoEdicion ? correoLocal : personaSeleccionada?.correo ?? '';
   const correoValido = correoPrincipalValido(correoEfectivo);
+  const errorCorreoEdicion = modoEdicion ? editedUserEmailError(correoLocal, user?.correo ?? null) : undefined;
 
   const rolSeleccionadoValido =
     modoEdicion
@@ -253,6 +261,11 @@ export function CreateUserModal({
       return;
     }
 
+    if (errorCorreoEdicion) {
+      toast.error(errorCorreoEdicion);
+      return;
+    }
+
     if (!modoEdicion && (!rolSeleccionadoValido || !correoValido)) {
       toast.error('Verifica que la persona tenga un correo principal activo válido y selecciona los roles requeridos.');
       return;
@@ -265,7 +278,8 @@ export function CreateUserModal({
         await ejecutarFlujoEdicion(
           user,
           loginEfectivo,
-          esClienteEnEdicion ? CODIGO_ROL_CLIENTE : codigoRol
+          esClienteEnEdicion ? CODIGO_ROL_CLIENTE : codigoRol,
+          correoLocal
         );
         toast.success('Usuario actualizado', {
           description: 'Los cambios se guardaron correctamente.'
@@ -316,7 +330,7 @@ export function CreateUserModal({
     esElegible &&
     (modoEdicion ? /^[a-z0-9._-]{3,120}$/.test(usuarioLocal.trim()) : relacionesValidas) &&
     rolSeleccionadoValido &&
-    (modoEdicion || correoValido);
+    (modoEdicion ? !errorCorreoEdicion : correoValido);
 
   return (
     <Modal
@@ -630,21 +644,27 @@ export function CreateUserModal({
           <FieldLabel htmlFor="correoInput">Correo electronico *</FieldLabel>
           <Input
             id="correoInput"
-            type="email"
+            type={modoEdicion ? 'text' : 'email'}
+            inputMode="email"
             value={correoEfectivo}
+            onChange={modoEdicion ? (event) => setCorreoLocal(event.target.value) : undefined}
+            maxLength={modoEdicion ? 180 : undefined}
+            autoComplete="email"
+            aria-invalid={Boolean(errorCorreoEdicion)}
+            aria-describedby={errorCorreoEdicion ? 'correoInput-error' : undefined}
             placeholder={
               modoEdicion
-                ? 'usuario@gmail.com'
+                ? 'persona@empresa.com.pe'
                 : personaSeleccionada
                   ? 'Sin correo principal activo'
                   : 'Selecciona una persona para cargar su correo'
             }
-            readOnly
+            readOnly={!modoEdicion}
             disabled={submitting || (!modoEdicion && !personaSeleccionada)}
           />
-          {modoEdicion && !correoEfectivo && (
-            <p className="mt-1 text-xs text-amber-700">
-              El correo se modifica desde el flujo de actualización de datos personales con confirmación mediante enlace.
+          {errorCorreoEdicion && (
+            <p id="correoInput-error" role="alert" className="mt-1 text-xs text-rose-600">
+              {errorCorreoEdicion}
             </p>
           )}
           {!modoEdicion && personaSeleccionada && correoEfectivo.length > 0 && !correoValido && (
@@ -662,7 +682,7 @@ export function CreateUserModal({
           )}
           <p className="mt-1 text-[11px] text-brand-400">
             {modoEdicion
-              ? 'Este correo recibira notificaciones del sistema. Para cambiarlo se requiere confirmación por enlace.'
+              ? 'El correo de contacto se actualizará al guardar y recibirá las próximas notificaciones del sistema.'
               : 'Este correo recibira las credenciales temporales de acceso.'}
           </p>
         </div>
