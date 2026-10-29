@@ -15,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -268,23 +269,17 @@ public class TrabajadorService {
                         Long idActor,
                         Long idTrabajador,
                         String correoNuevo,
-                        String jwtToken) {
-
-                String tokenReal = generarTokenSeguro();
-                String tokenHash = calcularSha256(tokenReal);
-                OffsetDateTime fechaExpiracion = OffsetDateTime.now(ZoneOffset.UTC)
-                                .plusMinutes(minutosExpiracionCorreo);
+                        String motivo) {
+                if (motivo == null || motivo.trim().length() < 10 || motivo.trim().length() > 1000) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "El motivo debe tener entre 10 y 1000 caracteres.");
+                }
 
                 ResultadoProcedimiento respuesta = repository.solicitarCambioCorreo(
-                                idActor, idTrabajador, correoNuevo, tokenHash, fechaExpiracion);
-
+                                idActor, idTrabajador, correoNuevo, motivo.trim());
                 validarEstado(respuesta);
-
-                enviarCorreoConfirmacion(correoNuevo, tokenReal, jwtToken);
-
                 return new SolicitudCambioCorreoResponse(
-                                "Solicitud de cambio de correo iniciada. Se ha enviado un enlace de confirmación al nuevo correo.",
-                                minutosExpiracionCorreo);
+                                "Solicitud pendiente de aprobacion por Gerencia o Administracion.", 0);
         }
 
         private void enviarCorreoConfirmacion(
@@ -292,7 +287,8 @@ public class TrabajadorService {
                         String tokenReal,
                         String jwtToken) {
                 if (emailNotificationClient == null) {
-                        return;
+                        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                                        "No esta configurado el servicio de correo de confirmacion.");
                 }
                 String urlConfirmacion = UriComponentsBuilder
                                 .fromUriString(urlConfirmacionBase)
@@ -537,6 +533,7 @@ public class TrabajadorService {
                 return resolverCorreccion(idActor, idSolicitud, request, obtenerJwtContexto());
         }
 
+        @Transactional
         public JsonNode resolverCorreccion(
                         Long idActor,
                         Long idSolicitud,
@@ -544,16 +541,25 @@ public class TrabajadorService {
                         String jwtToken) {
                 validarParametrosResolucion(idSolicitud, request);
 
-                ResultadoProcedimiento respuesta = repository.resolverCorreccionIdentidad(
-                                idActor, idSolicitud, request.decision(), request.motivo());
+                // El token real se mantiene en el servidor; SQL recibe solo el hash.
+                String tokenReal = "APROBAR".equalsIgnoreCase(request.decision())
+                                ? generarTokenSeguro() : null;
+                String tokenHash = tokenReal == null ? null : calcularSha256(tokenReal);
+                OffsetDateTime expira = tokenReal == null ? null : OffsetDateTime.now(ZoneOffset.UTC)
+                                .plusMinutes(minutosExpiracionCorreo);
 
+                ResultadoProcedimiento respuesta = repository.resolverCorreccionIdentidad(
+                                idActor, idSolicitud, request.decision(), request.motivo(), tokenHash, expira);
                 validarEstadoCorreccion(respuesta);
                 JsonNode resultado = respuesta.resultado();
                 if (resultado == null || !resultado.isObject()) {
-                        throw new IllegalStateException(
-                                        "El procedimiento no devolvio la resolucion de la correccion.");
+                        throw new IllegalStateException("No se recibio la resolucion de la correccion.");
                 }
-                notificarConfirmacionCorreoSiAprobado(request, resultado, jwtToken);
+                if (resultado.path("tokenReal").isString()
+                                && !resultado.path("tokenReal").asString("").isEmpty()) {
+                        throw new IllegalStateException("La base de datos intento exponer un token sensible.");
+                }
+                notificarConfirmacionCorreoSiAprobado(request, resultado, tokenReal, jwtToken);
                 return resultado;
         }
 
@@ -568,6 +574,7 @@ public class TrabajadorService {
         private void notificarConfirmacionCorreoSiAprobado(
                         ResolverCorreccionRequest request,
                         JsonNode resultado,
+                        String tokenReal,
                         String jwtToken) {
                 if (!"APROBAR".equals(request.decision())) {
                         return;
@@ -579,10 +586,11 @@ public class TrabajadorService {
                 String correoNuevo = resultado.has("correoPropuesto")
                                 ? resultado.path("correoPropuesto").asString("")
                                 : resultado.path("valorPropuesto").asString("");
-                String tokenReal = resultado.path("tokenReal").asString("");
-                if (!correoNuevo.isBlank() && !tokenReal.isBlank() && jwtToken != null) {
-                        enviarCorreoConfirmacion(correoNuevo, tokenReal, jwtToken);
+                if (correoNuevo.isBlank() || tokenReal == null || jwtToken == null) {
+                        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                                        "No fue posible notificar el cambio de correo aprobado.");
                 }
+                enviarCorreoConfirmacion(correoNuevo, tokenReal, jwtToken);
         }
 
         public JsonNode programarSuspension(

@@ -238,3 +238,7 @@ export const cmsApi =
 
 export const coreApi =
   createApiClient(coreApiUrl, true);
+
+  // Cliente público para confirmar correos sin iniciar sesión.
+export const corePublicApi =
+  createApiClient(coreApiUrl);

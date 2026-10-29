@@ -23,6 +23,7 @@ import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { ConfirmarCorreo } from './pages/ConfirmarCorreo';
 import {
   getSessionRoles,
   getStoredAuthUser
@@ -81,6 +82,11 @@ export function App({
         <Routes>
           {/* RUTAS PÚBLICAS */}
           <Route path="/login" element={<Login />} />
+
+          <Route
+            path="/confirmar-correo"
+            element={<ConfirmarCorreo />}
+          />
 
           <Route
             path="/recuperar-contrasena"

@@ -9,6 +9,7 @@ public record SolicitudCambioCorreoRequest(
         @Email(message = "El nuevo correo debe tener un formato válido.")
         String correoNuevo,
 
+        @NotBlank(message = "El motivo es obligatorio.")
         @Size(min = 10, max = 1000, message = "El motivo debe tener entre 10 y 1000 caracteres.")
         String motivo
 ) {

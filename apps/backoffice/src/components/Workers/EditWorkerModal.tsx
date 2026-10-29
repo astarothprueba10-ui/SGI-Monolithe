@@ -142,9 +142,13 @@ function validateChanges(
     errors.fechaNacimiento = 'La fecha de nacimiento no puede ser futura.';
   }
   if (changed.has('correoElectronico')) {
-    errors.correoElectronico = form.correoElectronico.trim()
+    const message = form.correoElectronico.trim()
       ? validarCorreo(form.correoElectronico)
       : 'El correo principal no se puede quitar desde este formulario.';
+
+    if (message) {
+      errors.correoElectronico = message;
+    }
   }
   if (changed.has('telefono')) {
     const message = validarTelefono(form.telefono);
@@ -217,6 +221,7 @@ export function EditWorkerModal({
   const [draft, setDraft] = useState<CorrectionDraft>(EMPTY_CORRECTION);
   const [pendingCorrection, setPendingCorrection] = useState<IncompleteCorrectionRequest | null>(null);
   const [correoSolicitudEnviada, setCorreoSolicitudEnviada] = useState<string | null>(null);
+  const [motivoCorreo, setMotivoCorreo] = useState('');
   const [expandedCorrection, setExpandedCorrection] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -227,6 +232,7 @@ export function EditWorkerModal({
     fechaCese?: string;
     motivoCambioEstado?: string;
     correction?: string;
+    correoMotivo?: string;
   }>({});
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
@@ -246,6 +252,7 @@ export function EditWorkerModal({
     setErrors({});
     setPendingCorrection(null);
     setCorreoSolicitudEnviada(null);
+    setMotivoCorreo('');
 
     Promise.all([
       coreService.getWorker(workerId),
@@ -445,9 +452,24 @@ export function EditWorkerModal({
     }
     if (!correctionOnlyRetry) {
       const validationErrors = validateChanges(form, baseline, currentChanges, catalogs);
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors((current) => ({ ...current, ...validationErrors }));
-        toast.error('Revisa los campos modificados antes de guardar.');
+      if (currentChanges.has('correoElectronico') &&
+        (motivoCorreo.trim().length < 10 || motivoCorreo.trim().length > 1000)) {
+        validationErrors.correoElectronico = 'Indica el motivo del cambio de correo (10 a 1000 caracteres).';
+      }
+      const firstError = Object.values(validationErrors).find(
+        (message) =>
+          typeof message === 'string' &&
+          message.trim().length > 0
+      );
+
+      if (firstError) {
+        setErrors((current) => ({
+          ...current,
+          ...validationErrors
+        }));
+
+        toast.error(firstError);
+
         submitLock.current = false;
         return;
       }
@@ -502,15 +524,16 @@ export function EditWorkerModal({
         if (emailChanged) {
           const response = await coreService.solicitarCambioCorreoTrabajador(
             worker.idTrabajador,
-            form.correoElectronico.trim()
+            form.correoElectronico.trim(),
+            motivoCorreo.trim()
           );
-          completed.push('la solicitud de confirmación del nuevo correo');
+          completed.push('la solicitud de aprobación del nuevo correo');
           setCorreoSolicitudEnviada(form.correoElectronico.trim());
           setBaseline((current) => current ? {
             ...current,
             correoElectronico: form.correoElectronico.trim()
           } : current);
-          toast.info(response.mensaje || 'El cambio de correo queda pendiente de confirmación.');
+          toast.info(response.mensaje || 'La solicitud queda pendiente de aprobación por Gerencia o Administración.');
         }
       }
 
@@ -748,7 +771,16 @@ export function EditWorkerModal({
                 <div>
                   <FieldLabel htmlFor="editCorreo">Correo electrónico</FieldLabel>
                   <Input id="editCorreo" type="email" value={form.correoElectronico} onChange={(event) => setFormValue('correoElectronico', event.target.value)} disabled={disabledFields} autoComplete="email" />
-                  <p className="mt-1 text-[11px] text-brand-400">Los cambios se aplican únicamente al confirmar el enlace enviado al nuevo correo.</p>
+                  <p className="mt-1 text-[11px] text-brand-400">El cambio requiere aprobación de Gerencia o Administración y confirmación desde el nuevo correo. El correo actual se conserva mientras tanto.</p>
+                  {changed.has('correoElectronico') ? (
+                    <div className="mt-3">
+                      <FieldLabel htmlFor="editMotivoCorreo">Motivo del cambio de correo *</FieldLabel>
+                      <textarea id="editMotivoCorreo" rows={3} maxLength={1000} value={motivoCorreo}
+                        onChange={(event) => { setMotivoCorreo(event.target.value); setErrors((v) => ({ ...v, correoElectronico: undefined })); }}
+                        disabled={disabledFields} placeholder="Describe el motivo para Gerencia o Administración (mínimo 10 caracteres)."
+                        className="w-full rounded-md border border-brand-200 px-3 py-2 text-[13px] text-brand-800 focus:border-brand-500 focus:outline-none disabled:bg-brand-50" />
+                    </div>
+                  ) : null}
                   {fieldError(errors.correoElectronico)}
                 </div>
                 <div>
