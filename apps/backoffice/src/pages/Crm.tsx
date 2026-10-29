@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   CalendarIcon,
@@ -10,7 +10,9 @@ import {
   PlusIcon,
   RefreshCw,
   UserPlusIcon,
-  XCircleIcon
+  XCircleIcon,
+  Users,
+  TrendingUp,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -24,6 +26,7 @@ import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
+import { calcularRangoCrm } from '../utils/crmPeriodo';
 import {
   crmBackend,
   type CrmAdvisor,
@@ -37,11 +40,23 @@ import {
   type CrmSummary,
   type CrmVisit,
   type CrmAssignment,
+  type CrmFuentesPeriodo,
+  type CrmAsesoresPeriodo,
+  type CrmVisitaPeriodo,
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
-import { currency, percent } from '../utils/format';
-
-const STAGE_TONES: Record<string, string> = {
+import { currency } from '../utils/format';
+import {
+  CrmPeriodoGlobal,
+  type PeriodoCrmModo
+} from '../components/crm/CrmPeriodoGlobal';
+import { CrmEvolucionChart } from '../components/crm/CrmEvolucionChart';
+import type { CrmEvolucionMes } from '../services/crmBackend';
+import {
+  sanitizarLead, validarNuevoLead,
+  type LeadField,
+  type LeadFormValues
+} from '../utils/crmLeadValidation'; const STAGE_TONES: Record<string, string> = {
   NUEVO: 'bg-slate-100 text-slate-700 border-slate-200',
   CONTACTADO: 'bg-sky-50 text-sky-700 border-sky-200',
   EN_SEGUIMIENTO: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -51,14 +66,6 @@ const STAGE_TONES: Record<string, string> = {
   NO_INTERESADO: 'bg-rose-50 text-rose-700 border-rose-200',
   DESCARTADO: 'bg-rose-50 text-rose-700 border-rose-200'
 };
-
-const FUNNEL_STEPS: Array<{ category: CrmCategory; label: string; countKey: keyof CrmSummary }> = [
-  { category: 'TODOS', label: 'Total cartera', countKey: 'total' },
-  { category: 'LEAD', label: 'Leads activos', countKey: 'leads' },
-  { category: 'POTENCIAL', label: 'Potenciales', countKey: 'potenciales' },
-  { category: 'COMPRADOR', label: 'Compradores en cartera', countKey: 'compradores' },
-  { category: 'CERRADO', label: 'Cerrados', countKey: 'cerrados' }
-];
 
 function formatDateTimeLima(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
@@ -138,20 +145,7 @@ function validateVisitForm(form: {
   return { valid: true, fechaIso: `${year}-${pad2(month)}-${pad2(day)}T${pad2(hours)}:${pad2(minutes)}:00-05:00` };
 }
 
-interface LeadFormData {
-  names: string;
-  paternalSurname: string;
-  maternalSurname: string;
-  phone: string;
-  email: string;
-  idProyecto: number | '';
-  origenCodigo: string;
-  motivoContacto: string;
-  mensaje: string;
-  idAsesor: number | '';
-  tipoDocumento: string;
-  numeroDocumento: string;
-}
+type LeadFormData = LeadFormValues;
 
 const INITIAL_FORM: LeadFormData = {
   names: '',
@@ -165,15 +159,75 @@ const INITIAL_FORM: LeadFormData = {
   mensaje: '',
   idAsesor: '',
   tipoDocumento: 'DNI',
-  numeroDocumento: ''
+  numeroDocumento: '',
+  direccion: ''
 };
+
+
+function obtenerFechaHoyLima(): string {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const valor = (tipo: string) =>
+    partes.find((parte) => parte.type === tipo)?.value ?? '';
+
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
+
+const KPI_CRM = [
+  {
+    key: 'total',
+    label: 'Total cartera',
+    description: 'Prospectos registrados',
+    icon: Users,
+    color: 'bg-blue-50 text-blue-700'
+  },
+  {
+    key: 'leads',
+    label: 'Leads',
+    description: 'Registrados en el período',
+    icon: UserPlusIcon,
+    color: 'bg-emerald-50 text-emerald-700'
+  },
+  {
+    key: 'potenciales',
+    label: 'Clientes potenciales',
+    description: 'Registrados en el período',
+    icon: TrendingUp,
+    color: 'bg-amber-50 text-amber-700'
+  },
+  {
+    key: 'compradores',
+    label: 'Clientes compradores',
+    description: 'Formalizados en el período',
+    icon: CheckCircleIcon,
+    color: 'bg-violet-50 text-violet-700'
+  },
+  {
+    key: 'cerrados',
+    label: 'Cerrados',
+    description: 'Registrados en el período',
+    icon: XCircleIcon,
+    color: 'bg-rose-50 text-rose-700'
+  }
+] as const;
 
 export function Crm() {
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
-  const [category, setCategory] = useState<CrmCategory>('TODOS');
+  const [origin, setOrigin] = useState('all');
+  const [category, setCategory] = useState<CrmCategory>('LEAD');
   const [advisorFilter, setAdvisorFilter] = useState<number | ''>('');
+  const [projectFilter, setProjectFilter] = useState<number | ''>('');
+  const [fechaTablaDesde, setFechaTablaDesde] = useState('');
+  const [fechaTablaHasta, setFechaTablaHasta] = useState('');
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
@@ -182,7 +236,17 @@ export function Crm() {
   const [summary, setSummary] = useState<CrmSummary | null>(null);
   const [catalogs, setCatalogs] = useState<CrmCatalogs | null>(null);
   const [advisorsList, setAdvisorsList] = useState<CrmAdvisor[]>([]);
+  const [asesoresPeriodoData, setAsesoresPeriodoData] = useState<CrmAsesoresPeriodo | null>(null);
+  const [asesoresPeriodoLoading, setAsesoresPeriodoLoading] = useState(false);
+
   const [visitsList, setVisitsList] = useState<CrmVisit[]>([]);
+  const [agendaVisits, setAgendaVisits] = useState<CrmVisitaPeriodo[]>([]);
+  const [agendaTotal, setAgendaTotal] = useState(0);
+  const [agendaPage, setAgendaPage] = useState(1);
+  const [agendaLoading, setAgendaLoading] = useState(false);
+  const [agendaError, setAgendaError] = useState<string | null>(null);
+  const [agendaRefreshKey, setAgendaRefreshKey] = useState(0);
+
 
   const [buyersList, setBuyersList] = useState<CrmBuyer[]>([]);
   const [buyersTotal, setBuyersTotal] = useState(0);
@@ -194,10 +258,147 @@ export function Crm() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
+  const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
+  const [fechaDesde, setFechaDesde] = useState(obtenerFechaHoyLima);
+  const [fechaHasta, setFechaHasta] = useState(obtenerFechaHoyLima);
+
+  const rangoPeriodo = useMemo(
+    () =>
+      calcularRangoCrm(
+        periodoModo,
+        fechaReferencia,
+        fechaDesde,
+        fechaHasta
+      ),
+    [
+      periodoModo,
+      fechaReferencia,
+      fechaDesde,
+      fechaHasta
+    ]
+  );
+
+
+  const rangoTabla = useMemo(() => {
+    if (!fechaTablaDesde && !fechaTablaHasta) {
+      return rangoPeriodo;
+    }
+
+    if (!fechaTablaDesde || !fechaTablaHasta) {
+      return null;
+    }
+
+    return calcularRangoCrm(
+      'RANGO',
+      fechaReferencia,
+      fechaTablaDesde,
+      fechaTablaHasta
+    );
+  }, [
+    fechaTablaDesde,
+    fechaTablaHasta,
+    fechaReferencia,
+    rangoPeriodo
+  ]);
+
+
+  const rangoEvolucion = useMemo(() => {
+    if (!rangoPeriodo) return null;
+
+    const fechaBase =
+      periodoModo === 'RANGO' ? fechaHasta : fechaReferencia;
+
+    const anio = Number(fechaBase.slice(0, 4));
+    const mes = Number(fechaBase.slice(5, 7));
+
+    if (!anio || mes < 1 || mes > 12) return null;
+
+    const inicio = new Date(Date.UTC(anio, mes - 6, 1));
+    const fin = new Date(Date.UTC(anio, mes, 1));
+
+    return {
+      desde: `${inicio.toISOString().slice(0, 10)}T00:00:00-05:00`,
+      hastaExclusivo:
+        `${fin.toISOString().slice(0, 10)}T00:00:00-05:00`
+    };
+  }, [rangoPeriodo, periodoModo, fechaReferencia, fechaHasta]);
+
+  const [evolucionItems, setEvolucionItems] = useState<CrmEvolucionMes[]>([]);
+  const [evolucionLoading, setEvolucionLoading] = useState(false);
+  const [evolucionError, setEvolucionError] = useState<string | null>(null);
+
+
+
   // Solicitud UUID estable para registrar leads
   const [solicitudId, setSolicitudId] = useState<string>(() => crypto.randomUUID());
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
   const [form, setForm] = useState<LeadFormData>(INITIAL_FORM);
+  const [leadIntentoGuardar, setLeadIntentoGuardar] = useState(false);
+
+  const [leadCamposVisitados, setLeadCamposVisitados] =
+    useState<Partial<Record<LeadField, boolean>>>({});
+
+  const leadErrores = validarNuevoLead(form);
+
+  const mostrarError = (campo: LeadField) => {
+    if (!leadIntentoGuardar && !leadCamposVisitados[campo]) {
+      return undefined;
+    }
+    return leadErrores[campo];
+  };
+
+  const actualizarCampoTexto = (
+    campo: 'names' | 'paternalSurname' | 'maternalSurname'
+      | 'phone' | 'numeroDocumento',
+    valor: string
+  ) => {
+    const limpio = sanitizarLead(
+      campo,
+      valor,
+      form.tipoDocumento
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      [campo]: limpio
+    }));
+  };
+
+  const propiedadesError = (campo: LeadField) => {
+    const error = mostrarError(campo);
+
+    return {
+      'aria-invalid': Boolean(error),
+      'aria-describedby': error
+        ? `lead-error-${campo}`
+        : undefined,
+      className: error
+        ? 'border-red-500 focus:border-red-500'
+        : undefined,
+      onBlur: () => {
+        setLeadCamposVisitados((prev) => ({
+          ...prev,
+          [campo]: true
+        }));
+      }
+    };
+  };
+
+  const mensajeError = (campo: LeadField) => {
+    const error = mostrarError(campo);
+    if (!error) return null;
+
+    return (
+      <p
+        id={`lead-error-${campo}`}
+        role="alert"
+        className="mt-1 text-[11px] font-medium text-red-600"
+      >
+        {error}
+      </p>
+    );
+  };
 
   // Expediente / Detalle
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -237,8 +438,9 @@ export function Crm() {
 
   const [isNewVisitOpen, setIsNewVisitOpen] = useState(false);
   const [selectedVisitProspectId, setSelectedVisitProspectId] = useState<number | null>(null);
-  const [isLoadingVisits, setIsLoadingVisits] = useState(false);
-  const [visitsError, setVisitsError] = useState<string | null>(null);
+  const [, setIsLoadingVisits] = useState(false);
+  const [, setVisitsError] = useState<string | null>(null);
+
   const [visitForm, setVisitForm] = useState({
     prospectId: 0,
     projectId: 0,
@@ -249,16 +451,23 @@ export function Crm() {
     notes: ''
   });
 
-  const [portfolioLeads, setPortfolioLeads] = useState<CrmProspect[]>([]);
+  const [fuentesData, setFuentesData] = useState<CrmFuentesPeriodo | null>(null);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
 
   const loadCatalogsAndAdvisors = useCallback(async () => {
     try {
+
       const [cats, advs, sum] = await Promise.all([
         crmBackend.catalogos(),
         crmBackend.asesores(),
-        crmBackend.resumen()
+        rangoPeriodo
+          ? crmBackend.resumenPeriodo(
+            rangoPeriodo.desde,
+            rangoPeriodo.hastaExclusivo
+          )
+          : Promise.resolve(null)
       ]);
+
       setCatalogs(cats);
       setAdvisorsList(advs);
       setSummary(sum);
@@ -269,45 +478,115 @@ export function Crm() {
       const msg = err instanceof Error ? err.message : 'Error al cargar catalogos CRM.';
       setErrorMsg(msg);
     }
-  }, [selectedAdvisorId]);
+  }, [selectedAdvisorId, rangoPeriodo]);
+
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
+
     try {
-      const res = await crmBackend.buscar({
+      // Las tablas utilizan su rango independiente.
+      // La agenda conserva la búsqueda general de prospectos.
+      const rangoConsulta = tab === 'visitas'
+        ? rangoPeriodo
+        : rangoTabla;
+
+      if (!rangoConsulta) {
+        setLeadsList([]);
+        setTotalLeads(0);
+        setErrorMsg(
+          'Complete Fecha desde y Fecha hasta con un rango válido.'
+        );
+        return;
+      }
+
+      const filtros = {
         consulta: query.trim() || undefined,
         etapa: stage === 'all' ? undefined : stage,
-        idAsesor: typeof advisorFilter === 'number' ? advisorFilter : undefined,
-        categoria: category,
+        origen: origin === 'all' ? undefined : origin,
+        idAsesor: typeof advisorFilter === 'number'
+          ? advisorFilter
+          : undefined,
+        sinAsignar: onlyUnassigned || undefined,
         pagina: page,
         tamano: pageSize
-      });
-      setLeadsList(res.items || []);
-      setTotalLeads(res.total || 0);
+      };
+
+      const res = tab === 'visitas'
+        ? await crmBackend.buscar({
+          ...filtros,
+          categoria: 'TODOS'
+        })
+        : await crmBackend.buscarPeriodo({
+          ...filtros,
+          categoria: tab === 'potenciales'
+            ? 'POTENCIAL'
+            : 'LEAD',
+          idProyecto: projectFilter === ''
+            ? undefined
+            : projectFilter,
+          desde: rangoConsulta.desde,
+          hastaExclusivo: rangoConsulta.hastaExclusivo
+        });
+
+      setLeadsList(res.items ?? []);
+      setTotalLeads(res.total ?? 0);
+
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al consultar lista de prospectos.';
+      const msg = err instanceof Error
+        ? err.message
+        : 'Error al consultar lista de prospectos.';
+
       setErrorMsg(msg);
       setLeadsList([]);
+      setTotalLeads(0);
+
     } finally {
       setIsLoading(false);
     }
-  }, [query, stage, advisorFilter, category, page, pageSize]);
+  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla]);
+
 
   const loadBuyers = useCallback(async () => {
     setBuyersLoading(true);
+
     try {
-      const res = await crmBackend.compradores(buyersQuery.trim(), buyersPage, 15);
-      setBuyersList(res.items || []);
-      setBuyersTotal(res.total || 0);
+      if (!rangoPeriodo) {
+        setBuyersList([]);
+        setBuyersTotal(0);
+        return;
+      }
+
+      const res = await crmBackend.compradoresPeriodo(
+        buyersQuery.trim() || undefined,
+        buyersPage,
+        15,
+        rangoPeriodo.desde,
+        rangoPeriodo.hastaExclusivo
+      );
+
+      setBuyersList(res.items ?? []);
+      setBuyersTotal(res.total ?? 0);
+
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar compradores.';
-      toast.error('Error en compradores', { description: msg });
+      const msg = err instanceof Error
+        ? err.message
+        : 'Error al cargar compradores.';
+
+      toast.error('Error en compradores', {
+        description: msg
+      });
+
       setBuyersList([]);
+      setBuyersTotal(0);
+
     } finally {
       setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage]);
+  }, [buyersQuery, buyersPage, rangoPeriodo]
+  );
+
 
   const loadVisits = useCallback(async (prospectId: number) => {
     setIsLoadingVisits(true);
@@ -325,28 +604,46 @@ export function Crm() {
     }
   }, []);
 
+
   const loadPortfolioLeads = useCallback(async () => {
     setIsLoadingPortfolio(true);
+
     try {
-      const res = await crmBackend.buscar({
-        categoria: 'TODOS',
-        pagina: 1,
-        tamano: 100
+      if (!rangoPeriodo) {
+        setFuentesData(null);
+        return;
+      }
+
+      const res = await crmBackend.fuentesPeriodo(
+        rangoPeriodo.desde,
+        rangoPeriodo.hastaExclusivo
+      );
+
+      setFuentesData(res);
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error
+        ? err.message
+        : 'No se pudieron cargar las fuentes de captación.';
+
+      toast.error('Error en fuentes de captación', {
+        description: msg
       });
-      setPortfolioLeads(res.items ?? []);
-    } catch {
-      setPortfolioLeads([]);
+
+      setFuentesData(null);
+
     } finally {
       setIsLoadingPortfolio(false);
     }
-  }, []);
+  }, [rangoPeriodo]);
+
 
   useEffect(() => {
     void loadCatalogsAndAdvisors();
   }, [loadCatalogsAndAdvisors]);
 
   useEffect(() => {
-    if (tab === 'leads') {
+    if (tab === 'leads' || tab === 'potenciales') {
       void loadLeads();
     } else if (tab === 'visitas') {
       if (leadsList.length === 0) {
@@ -359,80 +656,227 @@ export function Crm() {
     }
   }, [tab, leadsList.length, loadLeads, loadBuyers, loadPortfolioLeads]);
 
+
   useEffect(() => {
     if (tab !== 'visitas') return;
 
-    const targetId =
-      selectedVisitProspectId ?? leadsList[0]?.id_prospecto;
-
-    if (!targetId) return;
-
-    if (selectedVisitProspectId === null) {
-      setSelectedVisitProspectId(targetId);
+    if (!rangoPeriodo) {
+      setAgendaVisits([]);
+      setAgendaTotal(0);
+      setAgendaError('Seleccione un rango de fechas válido.');
+      setAgendaLoading(false);
       return;
     }
-    void loadVisits(targetId);
-  }, [tab, selectedVisitProspectId, leadsList, loadVisits]);
+
+    let activo = true;
+
+    setAgendaLoading(true);
+    setAgendaError(null);
+
+    void crmBackend.visitasPeriodo(
+      rangoPeriodo.desde,
+      rangoPeriodo.hastaExclusivo,
+      selectedVisitProspectId ?? undefined,
+      agendaPage,
+      15
+    )
+      .then((res) => {
+        if (!activo) return;
+
+        setAgendaVisits(res.items ?? []);
+        setAgendaTotal(res.total ?? 0);
+      })
+      .catch((err: unknown) => {
+        if (!activo) return;
+
+        const msg = err instanceof Error
+          ? err.message
+          : 'No se pudo cargar la agenda de visitas.';
+
+        setAgendaError(msg);
+        setAgendaVisits([]);
+        setAgendaTotal(0);
+      })
+      .finally(() => {
+        if (activo) {
+          setAgendaLoading(false);
+        }
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [tab, rangoPeriodo, selectedVisitProspectId, agendaPage, agendaRefreshKey]);
+
+
+
+  useEffect(() => {
+    if (!rangoEvolucion) {
+      setEvolucionItems([]);
+      setEvolucionLoading(false);
+      return;
+    }
+
+    let activo = true;
+
+    setEvolucionLoading(true);
+    setEvolucionError(null);
+
+    crmBackend.evolucionMensual(
+      rangoEvolucion.desde,
+      rangoEvolucion.hastaExclusivo
+    )
+      .then((resultado) => {
+        if (activo) {
+          setEvolucionItems(resultado.items ?? []);
+        }
+      })
+      .catch((error: unknown) => {
+        if (activo) {
+          setEvolucionItems([]);
+          setEvolucionError(
+            error instanceof Error
+              ? error.message
+              : 'No se pudo cargar la evolución comercial.'
+          );
+        }
+      })
+      .finally(() => {
+        if (activo) setEvolucionLoading(false);
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [rangoEvolucion]);
+
+
+  useEffect(() => {
+    if (tab !== 'asesores') return;
+
+    if (!rangoPeriodo) {
+      setAsesoresPeriodoData(null);
+      setAsesoresPeriodoLoading(false);
+      return;
+    }
+
+    let activo = true;
+
+    setAsesoresPeriodoLoading(true);
+
+    void crmBackend.asesoresPeriodo(
+      rangoPeriodo.desde,
+      rangoPeriodo.hastaExclusivo
+    )
+      .then((res) => {
+        if (activo) {
+          setAsesoresPeriodoData(res);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!activo) return;
+
+        const msg = err instanceof Error
+          ? err.message
+          : 'No se pudieron consultar los asesores.';
+
+        toast.error('Error en estadísticas de asesores', {
+          description: msg
+        });
+
+        setAsesoresPeriodoData(null);
+      })
+      .finally(() => {
+        if (activo) {
+          setAsesoresPeriodoLoading(false);
+        }
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [tab, rangoPeriodo]);
 
   const handleOpenNewLead = () => {
     setSolicitudId(crypto.randomUUID());
-    setForm(INITIAL_FORM);
-    if (catalogs?.proyectos && catalogs.proyectos.length > 0) {
-      setForm((prev) => ({ ...prev, idProyecto: catalogs.proyectos[0].id }));
-    }
+    setLeadIntentoGuardar(false);
+    setLeadCamposVisitados({});
+    setForm({
+      ...INITIAL_FORM,
+      idProyecto: catalogs?.proyectos?.[0]?.id ?? ''
+    });
     setIsNewLeadOpen(true);
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.names.trim() || !form.paternalSurname.trim()) {
-      toast.error('Campos requeridos', { description: 'Ingrese nombres y apellido paterno.' });
-      return;
-    }
-    if (!form.phone.trim() || !form.email.trim()) {
-      toast.error('Campos requeridos', { description: 'Ingrese telefono y correo electronico.' });
-      return;
-    }
-    if (!form.idProyecto) {
-      toast.error('Proyecto requerido', { description: 'Seleccione el proyecto de interes del prospecto.' });
-      return;
-    }
-    if (!form.motivoContacto.trim()) {
-      toast.error('Motivo requerido', { description: 'Ingrese el motivo del contacto comercial.' });
+
+    if (isSubmitting) return;
+
+    setLeadIntentoGuardar(true);
+    const errores = validarNuevoLead(form);
+
+    if (Object.keys(errores).length > 0) {
+      toast.error('Formulario incompleto o incorrecto', {
+        description: 'Revisa los campos resaltados en rojo.'
+      });
       return;
     }
 
     setIsSubmitting(true);
+
     try {
       await crmBackend.crear({
         idSolicitud: solicitudId,
         nombres: form.names.trim(),
         apellidoPaterno: form.paternalSurname.trim(),
         apellidoMaterno: form.maternalSurname.trim() || undefined,
-        correo: form.email.trim(),
+        correo: form.email.trim().toLowerCase(),
         telefono: form.phone.trim(),
         idProyecto: Number(form.idProyecto),
         origenCodigo: form.origenCodigo,
         motivoContacto: form.motivoContacto.trim(),
         mensaje: form.mensaje.trim() || undefined,
-        idAsesor: form.idAsesor ? Number(form.idAsesor) : undefined,
-        tipoDocumento: form.tipoDocumento || undefined,
-        numeroDocumento: form.numeroDocumento.trim() || undefined
+        idAsesor: form.idAsesor
+          ? Number(form.idAsesor)
+          : undefined,
+        tipoDocumento: form.tipoDocumento,
+        numeroDocumento: form.numeroDocumento.trim(),
+        direccion: form.direccion.trim() || undefined
       });
-      toast.success('Lead registrado', {
-        description: `${form.names} ${form.paternalSurname} ingresado exitosamente al CRM.`
+
+      toast.success('Lead registrado correctamente', {
+        description: `${form.names.trim()} ${form.paternalSurname.trim()} ingresó exitosamente al CRM.`
       });
+
       setIsNewLeadOpen(false);
+
       setForm(INITIAL_FORM);
+      setLeadIntentoGuardar(false);
+      setLeadCamposVisitados({});
       setSolicitudId(crypto.randomUUID());
-      await Promise.all([loadLeads(), loadCatalogsAndAdvisors()]);
+
+      await Promise.all([
+        loadLeads(),
+        loadCatalogsAndAdvisors()
+      ]);
+
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido al registrar prospecto.';
-      toast.error('Error al registrar lead', { description: msg });
+      const msg = err instanceof Error
+        ? err.message
+        : 'Error desconocido al registrar prospecto.';
+
+      toast.error('Error al registrar lead', {
+        description: msg
+      });
+
+      setLeadIntentoGuardar(true);
+
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   const handleOpenDetail = async (id: number) => {
     setDetailModalOpen(true);
@@ -690,6 +1134,8 @@ export function Crm() {
         description: 'Visita guiada oficial al terreno agendada con exito en el backend.'
       });
       setIsNewVisitOpen(false);
+      setAgendaPage(1);
+      setAgendaRefreshKey((prev) => prev + 1);
       const targetId = visitForm.prospectId;
       setSelectedVisitProspectId(targetId);
       await refreshVisitDetails(targetId);
@@ -710,6 +1156,9 @@ export function Crm() {
     try {
       await crmBackend.actualizarEstadoVisita(visitaId, { estadoCodigo, observaciones });
       toast.success(successMsg, { description: `Estado actualizado a ${estadoCodigo}.` });
+
+      setAgendaRefreshKey((prev) => prev + 1);
+
       if (selectedVisitProspectId) {
         await refreshVisitDetails(selectedVisitProspectId);
       } else {
@@ -775,110 +1224,346 @@ export function Crm() {
         }
       />
 
-      {/* Tarjetas del Embudo Comercial */}
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
-        {FUNNEL_STEPS.map((step) => {
-          const count = summary ? summary[step.countKey] : 0;
-          const isActive = category === step.category;
-          return (
-            <button
-              key={step.category}
-              type="button"
-              onClick={() => {
-                setTab('leads');
-                setCategory(step.category);
-                setPage(1);
-              }}
-              aria-pressed={isActive}
-              className={cn(
-                'rounded-lg border bg-white px-4 py-3 text-left shadow-card transition-colors duration-150 ease-smooth',
-                isActive
-                  ? 'border-brand-700 ring-1 ring-brand-700'
-                  : 'border-brand-100 hover:border-brand-300'
-              )}
-            >
-              <p className="text-[12px] text-brand-400">{step.label}</p>
-              <p className="mt-1 text-[20px] font-semibold tabular text-brand-900">{count}</p>
-            </button>
-          );
-        })}
-      </div>
+      <CrmPeriodoGlobal
+        modo={periodoModo}
+        onModoChange={(modo) => {
+          setPeriodoModo(modo);
+          setPage(1);
+          setBuyersPage(1);
+        }}
+        fechaReferencia={fechaReferencia}
+        onFechaReferenciaChange={(fecha) => {
+          setFechaReferencia(fecha);
+          setPage(1);
+          setBuyersPage(1);
+        }}
+        fechaDesde={fechaDesde}
+        onFechaDesdeChange={(fecha) => {
+          setFechaDesde(fecha);
+          setPage(1);
+          setBuyersPage(1);
+        }}
+        fechaHasta={fechaHasta}
+        onFechaHastaChange={(fecha) => {
+          setFechaHasta(fecha);
+          setPage(1);
+          setBuyersPage(1);
+        }}
+      />
+
+      {/* Indicadores del período comercial */}
+      <section className="mb-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-brand-900">
+              Resumen comercial
+            </h2>
+            <p className="mt-1 text-xs text-brand-400">
+              Indicadores correspondientes al período seleccionado.
+            </p>
+          </div>
+
+          <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+            {periodoModo === 'HOY'
+              ? 'Día'
+              : periodoModo === 'SEMANA'
+                ? 'Semana'
+                : periodoModo === 'MES'
+                  ? 'Mes'
+                  : periodoModo === 'ANIO'
+                    ? 'Año'
+                    : 'Rango'}
+            {' · '}
+            {periodoModo === 'RANGO'
+              ? `${fechaDesde} — ${fechaHasta}`
+              : fechaReferencia}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {KPI_CRM.map((item) => {
+            const Icon = item.icon;
+            const valor = summary?.[item.key];
+
+            return (
+              <div
+                key={item.key}
+                className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="mb-4 flex items-start justify-between gap-2">
+                  <span className="text-xs font-semibold text-brand-700">
+                    {item.label}
+                  </span>
+
+                  <div className={`rounded-lg p-2 ${item.color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <p className="text-3xl font-bold tabular-nums text-brand-950">
+                  {typeof valor === 'number' ? valor : '—'}
+                </p>
+
+                <p className="mt-2 text-xs text-brand-400">
+                  {item.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+
+      {/* Gráfico de evolución comercial */}
+      {evolucionError && (
+        <p
+          role="alert"
+          className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+        >
+          {evolucionError}
+        </p>
+      )}
+
+      <CrmEvolucionChart
+        items={evolucionItems}
+        loading={evolucionLoading}
+      />
+
 
       <Tabs
         className="mb-5"
         active={tab}
-        onChange={setTab}
+        onChange={(newTab) => {
+          setTab(newTab);
+
+          if (newTab === 'leads') {
+            setCategory('LEAD');
+          } else if (newTab === 'potenciales') {
+            setCategory('POTENCIAL');
+          }
+
+          setPage(1);
+        }}
         items={[
-          { id: 'leads', label: 'Leads y potenciales', count: totalLeads },
-          { id: 'visitas', label: 'Agenda de visitas', count: visitsList.length },
-          { id: 'asesores', label: 'Equipo de asesores', count: advisorsList.length },
-          { id: 'compradores', label: 'Compradores en cartera', count: buyersTotal || summary?.compradores },
-          { id: 'fuentes', label: 'Fuentes de captacion' }
+          {
+            id: 'leads',
+            label: 'Leads',
+            count: summary?.leads
+          },
+          {
+            id: 'potenciales',
+            label: 'Clientes potenciales',
+            count: summary?.potenciales
+          },
+          {
+            id: 'compradores',
+            label: 'Clientes compradores',
+            count: summary?.compradores
+          },
+          {
+            id: 'fuentes',
+            label: 'Fuentes de captación'
+          },
+          {
+            id: 'asesores',
+            label: 'Equipo de asesores',
+            count: advisorsList.length
+          },
+          {
+            id: 'visitas',
+            label: 'Agenda de visitas',
+            count: visitsList.length
+          }
         ]}
       />
 
       {/* PESTANA 1: Leads y potenciales */}
-      {tab === 'leads' && (
+      {(tab === 'leads' || tab === 'potenciales') && (
         <Card>
-          <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
-            <SearchInput
-              placeholder="Buscar por nombre, correo, telefono o codigo..."
-              value={query}
-              onValueChange={(val) => {
-                setQuery(val);
-                setPage(1);
-              }}
-              className="w-full md:w-80"
-            />
-            <div className="flex flex-wrap items-center gap-2 text-[12px] text-brand-400">
-              <span>Etapa:</span>
-              <Select
-                aria-label="Filtrar por etapa"
-                value={stage}
-                onChange={(e) => {
-                  setStage(e.target.value);
-                  setPage(1);
-                }}
-                className="w-36"
-              >
-                <option value="all">Todas ({totalLeads})</option>
-                {catalogs?.estados ? (
-                  catalogs.estados.map((est) => (
-                    <option key={est.codigo} value={est.codigo}>
-                      {est.nombre}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="NUEVO">Nuevos</option>
-                    <option value="CONTACTADO">Contactados</option>
-                    <option value="INTERESADO">Interesados</option>
-                    <option value="NEGOCIACION">En negociacion</option>
-                    <option value="CONVERTIDO">Convertidos</option>
-                  </>
-                )}
-              </Select>
 
-              <span>Asesor:</span>
-              <Select
-                aria-label="Filtrar por asesor"
-                value={advisorFilter}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setAdvisorFilter(val ? Number(val) : '');
-                  setPage(1);
-                }}
-                className="w-40"
-              >
-                <option value="">Todos los asesores</option>
-                {advisorsList.map((adv) => (
-                  <option key={adv.id_asesor} value={adv.id_asesor}>
-                    {adv.nombre_completo}
-                  </option>
-                ))}
-              </Select>
+          {/* FILTROS COMERCIALES */}
+          <div className="border-b border-brand-100 p-4">
+            <div className="flex flex-col gap-4">
+
+              {/* FILA 1: Buscador y filtros desplegables */}
+              <div className="flex flex-wrap items-end gap-3">
+
+                {/* BUSCADOR ORIGINAL - SIN MODIFICACIONES */}
+                <SearchInput
+                  placeholder="Buscar por nombre, correo, telefono o codigo..."
+                  value={query}
+                  onValueChange={(val) => {
+                    setQuery(val);
+                    setPage(1);
+                  }}
+                  className="w-full md:w-80"
+                />
+
+                {/* Etapa */}
+                <div className="w-full sm:w-36">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Etapa
+                  </label>
+                  <Select
+                    aria-label="Filtrar por etapa"
+                    value={stage}
+                    onChange={(e) => {
+                      setStage(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  >
+                    <option value="all">Todas</option>
+                    {(catalogs?.estados ?? []).map((est) => (
+                      <option key={est.codigo} value={est.codigo}>
+                        {est.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Origen */}
+                <div className="w-full sm:w-48">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Origen
+                  </label>
+                  <Select
+                    aria-label="Filtrar por origen"
+                    value={origin}
+                    onChange={(e) => {
+                      setOrigin(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  >
+                    <option value="all">Todos los orígenes</option>
+                    {(catalogs?.origenes ?? []).map((origen) => (
+                      <option key={origen.codigo} value={origen.codigo}>
+                        {origen.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Asesor */}
+                <div className="w-full sm:w-52">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Asesor
+                  </label>
+                  <Select
+                    aria-label="Filtrar por asesor"
+                    value={onlyUnassigned ? 'sin_asignar' : String(advisorFilter)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+
+                      if (value === 'sin_asignar') {
+                        setOnlyUnassigned(true);
+                        setAdvisorFilter('');
+                      } else {
+                        setOnlyUnassigned(false);
+                        setAdvisorFilter(value ? Number(value) : '');
+                      }
+
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  >
+                    <option value="">Todos los asesores</option>
+                    <option value="sin_asignar">Sin asesor asignado</option>
+                    {advisorsList.map((adv) => (
+                      <option key={adv.id_asesor} value={adv.id_asesor}>
+                        {adv.nombre_completo}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Proyecto */}
+                <div className="w-full sm:w-52">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Proyecto
+                  </label>
+                  <Select
+                    aria-label="Filtrar por proyecto"
+                    value={projectFilter}
+                    onChange={(e) => {
+                      setProjectFilter(
+                        e.target.value ? Number(e.target.value) : ''
+                      );
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  >
+                    <option value="">Todos los proyectos</option>
+                    {(catalogs?.proyectos ?? []).map((proyecto) => (
+                      <option key={proyecto.id} value={proyecto.id}>
+                        {proyecto.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              {/* FILA 2: Fechas y limpieza de filtros */}
+              <div className="flex flex-wrap items-end gap-3">
+
+                {/* Fecha desde */}
+                <div className="w-full sm:w-48">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Fecha desde
+                  </label>
+                  <Input
+                    type="date"
+                    value={fechaTablaDesde}
+                    max={fechaTablaHasta || undefined}
+                    onChange={(e) => {
+                      setFechaTablaDesde(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Fecha hasta */}
+                <div className="w-full sm:w-48">
+                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                    Fecha hasta
+                  </label>
+                  <Input
+                    type="date"
+                    value={fechaTablaHasta}
+                    min={fechaTablaDesde || undefined}
+                    onChange={(e) => {
+                      setFechaTablaHasta(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Limpiar filtros */}
+                <Button
+                  size="sm"
+                  icon={RefreshCw}
+                  onClick={() => {
+                    setQuery('');
+                    setStage('all');
+                    setOrigin('all');
+                    setAdvisorFilter('');
+                    setOnlyUnassigned(false);
+                    setProjectFilter('');
+                    setFechaTablaDesde('');
+                    setFechaTablaHasta('');
+                    setPage(1);
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+
+              </div>
             </div>
           </div>
+
 
           {errorMsg && (
             <div className="p-4">
@@ -1097,35 +1782,57 @@ export function Crm() {
         </Card>
       )}
 
-      {/* PESTANA 2: Agenda de visitas */}
+
+      {/* PESTAÑA: Agenda de visitas */}
       {tab === 'visitas' && (
         <Card>
           <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
             <CardHeader
-              title="Agenda de visitas guiadas al terreno"
-              description="Coordinacion de traslados y visitas oficiales al proyecto (Miercoles a Domingo 11:00 AM y 3:00 PM)."
+              title="Agenda de visitas guiadas"
+              description="Visitas comerciales programadas durante el período seleccionado."
             />
+
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-brand-600">
-                <span className="shrink-0 font-medium">Prospecto:</span>
-                <ProspectSearchAutocomplete
-                  value={selectedVisitProspectId}
-                  initialLeads={leadsList}
-                  onSelect={(p) => {
-                    setSelectedVisitProspectId(p.id_prospecto);
-                    void loadVisits(p.id_prospecto);
+              <span className="text-xs font-medium text-brand-600">
+                Prospecto:
+              </span>
+
+              <ProspectSearchAutocomplete
+                value={selectedVisitProspectId}
+                initialLeads={leadsList}
+                onSelect={(p) => {
+                  setSelectedVisitProspectId(p.id_prospecto);
+                  setAgendaPage(1);
+                }}
+                className="w-72"
+              />
+
+              {selectedVisitProspectId !== null && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedVisitProspectId(null);
+                    setAgendaPage(1);
                   }}
-                  className="w-72"
-                />
-              </div>
+                >
+                  Ver todos
+                </Button>
+              )}
 
               <Button
                 icon={CalendarIcon}
                 variant="primary"
                 onClick={() => {
-                  const targetId = selectedVisitProspectId || (leadsList.length > 0 ? leadsList[0].id_prospecto : 0);
+                  if (!selectedVisitProspectId) {
+                    toast.error('Seleccione un prospecto', {
+                      description:
+                        'Seleccione primero el prospecto para agendar una visita.'
+                    });
+                    return;
+                  }
+
                   setVisitForm({
-                    prospectId: targetId,
+                    prospectId: selectedVisitProspectId,
                     projectId: catalogs?.proyectos?.[0]?.id || 1,
                     advisorId: advisorsList[0]?.id_asesor || 0,
                     visitDate: '',
@@ -1133,6 +1840,7 @@ export function Crm() {
                     meetingPoint: 'Oficina de Ventas - Lurin',
                     notes: ''
                   });
+
                   setIsNewVisitOpen(true);
                 }}
               >
@@ -1141,74 +1849,96 @@ export function Crm() {
             </div>
           </div>
 
-          {visitsError && (
-            <div className="flex items-center justify-between border-b border-rose-200 bg-rose-50 p-4 text-xs text-rose-700">
-              <div className="flex items-center gap-2">
-                <XCircleIcon className="h-4 w-4 shrink-0 text-rose-500" />
-                <span>{visitsError}</span>
+          {agendaError ? (
+            <div className="flex items-center justify-between gap-3 border-b border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-center gap-2 text-xs text-rose-700">
+                <XCircleIcon className="h-4 w-4 shrink-0" />
+                <span>{agendaError}</span>
               </div>
+
               <Button
                 size="sm"
                 onClick={() => {
-                  if (selectedVisitProspectId) void loadVisits(selectedVisitProspectId);
+                  setAgendaRefreshKey((prev) => prev + 1);
                 }}
               >
                 Reintentar
               </Button>
             </div>
-          )}
-
-          {isLoadingVisits ? (
+          ) : agendaLoading ? (
             <div className="flex items-center justify-center p-12 text-brand-500">
-              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-              <span>Cargando agenda de visitas del prospecto...</span>
+              <RefreshCw className="mr-2 h-6 w-6 animate-spin" />
+              <span>Consultando agenda de visitas...</span>
             </div>
-          ) : visitsList.length === 0 ? (
+          ) : agendaVisits.length === 0 ? (
             <EmptyState
-              title="No hay visitas cargadas para el prospecto seleccionado"
-              description="Seleccione otro prospecto o haga clic en 'Agendar visita' para coordinar un traslado con un prospecto."
+              title="No se encontraron visitas"
+              description={
+                selectedVisitProspectId
+                  ? 'El prospecto seleccionado no tiene visitas dentro del período indicado.'
+                  : 'No existen visitas programadas dentro del período seleccionado.'
+              }
             />
           ) : (
-            <Table
-              head={
-                <>
-                  <TH>Prospecto / Identificador</TH>
-                  <TH>Fecha y Turno</TH>
-                  <TH>Asesor comercial</TH>
-                  <TH>Punto de encuentro</TH>
-                  <TH align="center">Estado</TH>
-                  <TH align="right">Acciones</TH>
-                </>
-              }
-            >
-              {visitsList.map((vis) => {
-                const matchedLead = leadsList.find((l) => l.id_prospecto === vis.id_prospecto);
-                const matchedProject = catalogs?.proyectos.find((p) => p.id === vis.id_proyecto);
-                const matchedAdvisor = advisorsList.find((a) => a.id_asesor === vis.id_asesor);
-                return (
+            <>
+              <Table
+                head={
+                  <>
+                    <TH>Prospecto / Proyecto</TH>
+                    <TH>Fecha y turno</TH>
+                    <TH>Asesor comercial</TH>
+                    <TH>Punto de encuentro</TH>
+                    <TH align="center">Estado</TH>
+                    <TH align="right">Acciones</TH>
+                  </>
+                }
+              >
+                {agendaVisits.map((vis) => (
                   <TR key={vis.id_visita}>
                     <TD>
-                      <p className="font-medium text-brand-900">
-                        {matchedLead ? matchedLead.nombre_completo : `Prospecto #${vis.id_prospecto}`}
-                      </p>
-                      <p className="text-[12px] text-brand-400">
-                        {matchedProject ? matchedProject.nombre : `Proyecto #${vis.id_proyecto}`}
-                      </p>
+                      <div>
+                        <p className="font-medium text-brand-900">
+                          {vis.prospecto_nombre}
+                        </p>
+
+                        <p className="font-mono text-[11px] text-brand-500">
+                          {vis.prospecto_codigo}
+                        </p>
+
+                        <p className="text-[12px] text-brand-400">
+                          {vis.proyecto_nombre}
+                        </p>
+                      </div>
                     </TD>
+
                     <TD>
-                      <p className="font-semibold text-brand-800">{formatDateLima(vis.fecha_visita)}</p>
-                      <p className="text-[12px] text-brand-500">Turno {vis.turno}</p>
+                      <p className="font-semibold text-brand-800">
+                        {formatDateLima(vis.fecha_visita)}
+                      </p>
+
+                      <p className="text-[12px] text-brand-500">
+                        Turno {vis.turno}
+                      </p>
                     </TD>
+
                     <TD className="text-brand-700">
-                      {matchedAdvisor ? matchedAdvisor.nombre_completo : `Asesor #${vis.id_asesor}`}
+                      {vis.asesor_nombre}
                     </TD>
-                    <TD className="text-brand-500 text-[12px]">{vis.punto_encuentro}</TD>
+
+                    <TD className="text-[12px] text-brand-500">
+                      {vis.punto_encuentro}
+                    </TD>
+
                     <TD align="center">
                       <StatusBadge
                         status={
-                          vis.estado === 'REALIZADA' ? 'Realizada' :
-                            vis.estado === 'CONFIRMADA' ? 'Aprobado' :
-                              vis.estado === 'CANCELADA' ? 'Rechazado' : 'Pendiente'
+                          vis.estado === 'REALIZADA'
+                            ? 'Realizada'
+                            : vis.estado === 'CONFIRMADA'
+                              ? 'Aprobado'
+                              : vis.estado === 'CANCELADA'
+                                ? 'Rechazado'
+                                : 'Pendiente'
                         }
                         className={
                           vis.estado === 'REALIZADA'
@@ -1217,6 +1947,7 @@ export function Crm() {
                         }
                       />
                     </TD>
+
                     <TD align="right">
                       <div className="flex justify-end gap-1.5">
                         {vis.estado === 'PROGRAMADA' && (
@@ -1228,6 +1959,7 @@ export function Crm() {
                             Confirmar
                           </Button>
                         )}
+
                         {vis.estado === 'CONFIRMADA' && (
                           <Button
                             size="sm"
@@ -1237,63 +1969,101 @@ export function Crm() {
                             Realizada
                           </Button>
                         )}
-                        {vis.estado !== 'CANCELADA' && vis.estado !== 'REALIZADA' && (
-                          <Button
-                            size="sm"
-                            icon={XCircleIcon}
-                            onClick={() => handleCancelVisit(vis.id_visita)}
-                          >
-                            Cancelar
-                          </Button>
-                        )}
+
+                        {vis.estado !== 'CANCELADA' &&
+                          vis.estado !== 'REALIZADA' && (
+                            <Button
+                              size="sm"
+                              icon={XCircleIcon}
+                              onClick={() =>
+                                handleCancelVisit(vis.id_visita)
+                              }
+                            >
+                              Cancelar
+                            </Button>
+                          )}
                       </div>
                     </TD>
                   </TR>
-                );
-              })}
+                ))}
+              </Table>
+
+              <Pagination
+                page={agendaPage}
+                pageSize={15}
+                total={agendaTotal}
+                onPageChange={(p) => setAgendaPage(p)}
+              />
+            </>
+          )}
+        </Card>
+      )}
+
+      {/* PESTAÑA 3: Equipo de asesores */}
+      {tab === 'asesores' && (
+        <Card>
+          <CardHeader
+            title="Equipo comercial de asesores"
+            description="Distribución del equipo comercial, cartera actual y asignaciones realizadas durante el período seleccionado."
+          />
+
+          {asesoresPeriodoLoading ? (
+            <div className="flex items-center justify-center p-12 text-brand-500">
+              <RefreshCw className="mr-2 h-6 w-6 animate-spin" />
+              <span>Consultando estadísticas de asesores...</span>
+            </div>
+          ) : (
+            <Table
+              head={
+                <>
+                  <TH>Código</TH>
+                  <TH>Asesor comercial</TH>
+                  <TH>Correo corporativo</TH>
+                  <TH>Teléfono directo</TH>
+                  <TH align="center">Estado</TH>
+                  <TH align="right">Cartera actual</TH>
+                  <TH align="right">Asignaciones del período</TH>
+                </>
+              }
+            >
+              {(asesoresPeriodoData?.items ?? []).map((adv) => (
+                <TR key={adv.id_asesor}>
+                  <TD className="font-mono text-[12px] font-semibold text-brand-600">
+                    {adv.codigo}
+                  </TD>
+
+                  <TD className="font-medium text-brand-900">
+                    {adv.nombre_completo}
+                  </TD>
+
+                  <TD className="text-brand-600">
+                    {adv.email}
+                  </TD>
+
+                  <TD className="tabular text-brand-500">
+                    {adv.telefono}
+                  </TD>
+
+                  <TD align="center">
+                    <Badge tone={adv.activo ? 'brand' : 'neutral'}>
+                      {adv.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </TD>
+
+                  <TD align="right" className="font-semibold text-brand-900">
+                    {adv.leads_activos} prospectos
+                  </TD>
+
+                  <TD align="right" className="font-semibold text-brand-900">
+                    {adv.asignaciones_periodo}
+                  </TD>
+                </TR>
+              ))}
             </Table>
           )}
         </Card>
       )}
 
-      {/* PESTANA 3: Equipo de asesores */}
-      {tab === 'asesores' && (
-        <Card>
-          <CardHeader
-            title="Equipo comercial de asesores"
-            description="Distribucion del equipo de ventas y balance de cartera de prospectos activos en el backend."
-          />
-          <Table
-            head={
-              <>
-                <TH>Codigo</TH>
-                <TH>Asesor comercial</TH>
-                <TH>Correo corporativo</TH>
-                <TH>Telefono directo</TH>
-                <TH align="center">Estado</TH>
-                <TH align="right">Leads asignados</TH>
-              </>
-            }
-          >
-            {advisorsList.map((adv) => (
-              <TR key={adv.id_asesor}>
-                <TD className="font-mono text-[12px] font-semibold text-brand-600">{adv.codigo}</TD>
-                <TD className="font-medium text-brand-900">{adv.nombre_completo}</TD>
-                <TD className="text-brand-600">{adv.email}</TD>
-                <TD className="tabular text-brand-500">{adv.telefono}</TD>
-                <TD align="center">
-                  <Badge tone={adv.activo ? 'brand' : 'neutral'}>
-                    {adv.activo ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                </TD>
-                <TD align="right" className="font-semibold text-brand-900">
-                  {adv.leads_activos} prospectos
-                </TD>
-              </TR>
-            ))}
-          </Table>
-        </Card>
-      )}
 
       {/* PESTANA 4: Compradores */}
       {tab === 'compradores' && (
@@ -1392,34 +2162,48 @@ export function Crm() {
                 </>
               }
             >
-              {(catalogs?.origenes || []).map((source) => {
-                const base = portfolioLeads.length > 0 ? portfolioLeads : leadsList;
-                const total = Math.max(1, base.length);
-                const all = base.filter((l) => l.origen_codigo === source.codigo);
-                const activos = all.length;
-                const convertidos = all.filter((l) => l.categoria === 'COMPRADOR').length;
-                const pct = (all.length / total) * 100;
-                return (
-                  <TR key={source.codigo}>
-                    <TD className="font-mono text-[12px] font-semibold text-brand-600">{source.codigo}</TD>
-                    <TD className="font-medium text-brand-900">{source.nombre}</TD>
-                    <TD align="right" className="font-semibold text-brand-900">{all.length}</TD>
-                    <TD align="right" className="text-sky-700 font-medium">{activos}</TD>
-                    <TD align="right" className="text-emerald-700 font-medium">{convertidos}</TD>
-                    <TD className="w-56">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-brand-50">
-                          <span
-                            className="block h-full rounded-full bg-brand-600 transition-all duration-300"
-                            style={{ width: `${Math.max(all.length > 0 ? 3 : 0, pct)}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] text-brand-400 tabular">{percent(pct, 1)}</span>
+
+              {(fuentesData?.items ?? []).map((source) => (
+                <TR key={source.codigo}>
+                  <TD className="font-mono text-[12px] font-semibold text-brand-600">
+                    {source.codigo}
+                  </TD>
+
+                  <TD className="font-medium text-brand-900">
+                    {source.nombre}
+                  </TD>
+
+                  <TD align="right" className="font-semibold text-brand-900">
+                    {source.total}
+                  </TD>
+
+                  <TD align="right" className="text-sky-700 font-medium">
+                    {source.activos}
+                  </TD>
+
+                  <TD align="right" className="text-emerald-700 font-medium">
+                    {source.convertidos}
+                  </TD>
+
+                  <TD className="w-56">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-brand-50">
+                        <span
+                          className="block h-full rounded-full bg-brand-600 transition-all duration-300"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, source.participacion))}%`
+                          }}
+                        />
                       </div>
-                    </TD>
-                  </TR>
-                );
-              })}
+
+                      <span className="text-[11px] text-brand-400 tabular">
+                        {source.participacion.toFixed(1)}%
+                      </span>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+
             </Table>
           )}
         </Card>
@@ -1735,7 +2519,7 @@ export function Crm() {
         open={isNewLeadOpen}
         onClose={() => setIsNewLeadOpen(false)}
         title="Registrar nuevo lead"
-        description="Captacion comercial validada por el Core Service con idempotencia UUID."
+        description="Captacion comercial."
         footer={
           <>
             <Button onClick={() => setIsNewLeadOpen(false)} disabled={isSubmitting}>
@@ -1747,169 +2531,140 @@ export function Crm() {
           </>
         }
       >
-        <form onSubmit={handleCreateSubmit} className="space-y-3">
-          <div className="rounded bg-slate-50 border border-slate-200 p-2 text-[11px] font-mono text-slate-500">
-            ID Solicitud estable: {solicitudId}
+
+        <form noValidate onSubmit={handleCreateSubmit} className="space-y-3">
+          <div className="rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] text-slate-500">
+            ID Solicitud: {solicitudId}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Nombres *</label>
-              <Input
-                required
-                value={form.names}
-                onChange={(e) => setForm({ ...form, names: e.target.value })}
-                placeholder="Ej. Juan Carlos"
-              />
+              <label className="text-xs font-medium text-brand-700">Nombres *</label>
+              <Input required maxLength={120} value={form.names}
+                onChange={e => actualizarCampoTexto('names', e.target.value)}
+                placeholder="Ej. Juan Carlos" {...propiedadesError('names')} />
+              {mensajeError('names')}
             </div>
-            <div>
-              <label className="text-[12px] font-medium text-brand-700">Apellido paterno *</label>
-              <Input
-                required
-                value={form.paternalSurname}
-                onChange={(e) => setForm({ ...form, paternalSurname: e.target.value })}
-                placeholder="Ej. Perez"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Apellido materno</label>
-              <Input
-                value={form.maternalSurname}
-                onChange={(e) => setForm({ ...form, maternalSurname: e.target.value })}
-                placeholder="Ej. Gomez"
-              />
+              <label className="text-xs font-medium text-brand-700">Apellido paterno *</label>
+              <Input required maxLength={80} value={form.paternalSurname}
+                onChange={e => actualizarCampoTexto('paternalSurname', e.target.value)}
+                placeholder="Ej. Pérez" {...propiedadesError('paternalSurname')} />
+              {mensajeError('paternalSurname')}
             </div>
-            <div>
-              <label className="text-[12px] font-medium text-brand-700">Telefono / WhatsApp *</label>
-              <Input
-                required
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+51 987 654 321"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Correo electronico *</label>
-              <Input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="prospecto@ejemplo.com"
-              />
+              <label className="text-xs font-medium text-brand-700">Apellido materno</label>
+              <Input maxLength={80} value={form.maternalSurname}
+                onChange={e => actualizarCampoTexto('maternalSurname', e.target.value)}
+                placeholder="Ej. Gómez" {...propiedadesError('maternalSurname')} />
+              {mensajeError('maternalSurname')}
             </div>
+
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Proyecto de interes *</label>
-              <Select
-                aria-label="Proyecto de interes"
-                value={form.idProyecto}
-                onChange={(e) => setForm({ ...form, idProyecto: Number(e.target.value) })}
-              >
+              <label className="text-xs font-medium text-brand-700">Teléfono / WhatsApp *</label>
+              <Input required type="tel" inputMode="tel" maxLength={16} value={form.phone}
+                onChange={e => actualizarCampoTexto('phone', e.target.value)}
+                placeholder="+51987654321" {...propiedadesError('phone')} />
+              {mensajeError('phone')}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-brand-700">Correo electrónico *</label>
+              <Input required type="email" maxLength={180} value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                placeholder="persona@example.com" {...propiedadesError('email')} />
+              {mensajeError('email')}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-brand-700">Proyecto de interés *</label>
+              <Select aria-label="Proyecto de interés" value={form.idProyecto}
+                onChange={e => setForm(p => ({ ...p, idProyecto: e.target.value ? Number(e.target.value) : '' }))}
+                {...propiedadesError('idProyecto')}>
                 <option value="">Seleccione un proyecto...</option>
-                {catalogs?.proyectos?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} {p.distrito ? `(${p.distrito})` : ''}
-                  </option>
+                {catalogs?.proyectos?.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre} {p.distrito ? `(${p.distrito})` : ''}</option>
                 ))}
               </Select>
+              {mensajeError('idProyecto')}
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Canal de origen *</label>
-              <Select
-                aria-label="Canal de origen"
-                value={form.origenCodigo}
-                onChange={(e) => setForm({ ...form, origenCodigo: e.target.value })}
-              >
-                {catalogs?.origenes ? (
-                  catalogs.origenes.map((o) => (
-                    <option key={o.codigo} value={o.codigo}>
-                      {o.nombre}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="WEB">Pagina Web</option>
-                    <option value="FACEBOOK">Facebook</option>
-                    <option value="INSTAGRAM">Instagram</option>
-                    <option value="WHATSAPP">WhatsApp</option>
-                    <option value="FERIA">Feria comercial</option>
-                    <option value="REFERIDO">Referido</option>
-                  </>
-                )}
+              <label className="text-xs font-medium text-brand-700">Canal de origen *</label>
+              <Select aria-label="Canal de origen" value={form.origenCodigo}
+                onChange={e => setForm(p => ({ ...p, origenCodigo: e.target.value }))}
+                {...propiedadesError('origenCodigo')}>
+                {(catalogs?.origenes ?? [
+                  { codigo: 'WEB', nombre: 'Página Web' }, { codigo: 'FACEBOOK', nombre: 'Facebook' },
+                  { codigo: 'INSTAGRAM', nombre: 'Instagram' }, { codigo: 'WHATSAPP', nombre: 'WhatsApp' },
+                  { codigo: 'FERIA', nombre: 'Feria comercial' }, { codigo: 'REFERIDO', nombre: 'Referido' }
+                ]).map(o => <option key={o.codigo} value={o.codigo}>{o.nombre}</option>)}
               </Select>
+              {mensajeError('origenCodigo')}
             </div>
+
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Asesor inicial</label>
-              <Select
-                aria-label="Asesor inicial"
-                value={form.idAsesor}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    idAsesor: e.target.value ? Number(e.target.value) : ''
-                  })
-                }
-              >
+              <label className="text-xs font-medium text-brand-700">Asesor inicial</label>
+              <Select aria-label="Asesor inicial" value={form.idAsesor}
+                onChange={e => setForm(p => ({ ...p, idAsesor: e.target.value ? Number(e.target.value) : '' }))}>
                 <option value="">Sin asignar (Rotativo)</option>
-                {advisorsList.map((a) => (
+                {advisorsList.map(a => (
                   <option key={a.id_asesor} value={a.id_asesor}>
                     {a.nombre_completo} ({a.leads_activos} activos)
                   </option>
                 ))}
               </Select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Tipo de documento</label>
-              <Select
-                aria-label="Tipo de documento"
-                value={form.tipoDocumento}
-                onChange={(e) => setForm({ ...form, tipoDocumento: e.target.value })}
-              >
+              <label className="text-xs font-medium text-brand-700">Tipo de documento *</label>
+              <Select aria-label="Tipo de documento" value={form.tipoDocumento}
+                onChange={e => setForm(p => ({ ...p, tipoDocumento: e.target.value, numeroDocumento: '' }))}
+                {...propiedadesError('tipoDocumento')}>
                 <option value="DNI">DNI</option>
-                <option value="CE">Carnet de Extranjeria</option>
+                <option value="CE">Carné de extranjería</option>
                 <option value="PASAPORTE">Pasaporte</option>
                 <option value="RUC">RUC</option>
               </Select>
+              {mensajeError('tipoDocumento')}
             </div>
+
             <div>
-              <label className="text-[12px] font-medium text-brand-700">Numero de documento</label>
-              <Input
-                value={form.numeroDocumento}
-                onChange={(e) => setForm({ ...form, numeroDocumento: e.target.value })}
-                placeholder="Ej. 72635489"
-              />
+              <label className="text-xs font-medium text-brand-700">Número de documento *</label>
+              <Input required value={form.numeroDocumento}
+                maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
+                inputMode={form.tipoDocumento === 'PASAPORTE' ? 'text' : 'numeric'}
+                onChange={e => actualizarCampoTexto('numeroDocumento', e.target.value)}
+                placeholder={form.tipoDocumento === 'DNI' ? '8 dígitos' : form.tipoDocumento === 'RUC' ? '11 dígitos' : form.tipoDocumento === 'CE' ? '12 dígitos' : 'Letras y números'}
+                {...propiedadesError('numeroDocumento')} />
+              {mensajeError('numeroDocumento')}
             </div>
-          </div>
 
-          <div>
-            <label className="text-[12px] font-medium text-brand-700">Motivo de contacto *</label>
-            <Input
-              required
-              value={form.motivoContacto}
-              onChange={(e) => setForm({ ...form, motivoContacto: e.target.value })}
-              placeholder="Ej. Solicitud de cotizacion de lote de 120m2"
-            />
-          </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-brand-700">Dirección (opcional)</label>
+              <Input maxLength={255} value={form.direccion}
+                onChange={e => setForm(p => ({ ...p, direccion: e.target.value }))}
+                placeholder="Ej. Av. Los Incas 123, Chiclayo" {...propiedadesError('direccion')} />
+              {mensajeError('direccion')}
+            </div>
 
-          <div>
-            <label className="text-[12px] font-medium text-brand-700">Mensaje adicional</label>
-            <Input
-              value={form.mensaje}
-              onChange={(e) => setForm({ ...form, mensaje: e.target.value })}
-              placeholder="Notas comerciales del primer contacto..."
-            />
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-brand-700">Motivo de contacto *</label>
+              <Input required maxLength={150} value={form.motivoContacto}
+                onChange={e => setForm(p => ({ ...p, motivoContacto: e.target.value }))}
+                placeholder="Ej. Consulta sobre financiamiento" {...propiedadesError('motivoContacto')} />
+              {mensajeError('motivoContacto')}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-brand-700">Nota adicional</label>
+              <Input maxLength={4000} value={form.mensaje}
+                onChange={e => setForm(p => ({ ...p, mensaje: e.target.value }))}
+                placeholder="Notas comerciales del primer contacto..." {...propiedadesError('mensaje')} />
+              {mensajeError('mensaje')}
+            </div>
           </div>
         </form>
       </Modal>

@@ -51,6 +51,16 @@ export interface CrmAdvisor {
   activo: boolean;
   leads_activos: number | string;
 }
+
+export type CrmAsesorPeriodo = CrmAdvisor & {
+  asignaciones_periodo: number;
+};
+
+export interface CrmAsesoresPeriodo {
+  total: number;
+  items: CrmAsesorPeriodo[];
+}
+
 export interface CrmBuyer {
   id_cliente: number;
   codigo_cliente: string;
@@ -70,6 +80,18 @@ export interface CrmSummary {
   cerrados: number;
   sinAsesor: number;
 }
+
+export interface CrmEvolucionMes {
+  mes: string;
+  leads: number;
+  potenciales: number;
+  compradores: number;
+}
+
+export interface CrmEvolucionMensual {
+  items: CrmEvolucionMes[];
+}
+
 export interface CrmDetail {
   prospecto: CrmProspect;
   documentoPrincipal: { tipoCodigo: string; numero: string; verificado: boolean } | null;
@@ -100,6 +122,14 @@ export interface CrmVisit {
   id_asesor: number;
   id_proyecto: number;
 }
+
+export interface CrmVisitaPeriodo extends CrmVisit {
+  prospecto_codigo: string;
+  prospecto_nombre: string;
+  proyecto_nombre: string;
+  asesor_nombre: string;
+}
+
 
 export interface CrmScheduleVisit {
   idProyecto: number;
@@ -153,6 +183,7 @@ export interface CrmLeadCreate {
   idPersona?: number;
   tipoDocumento?: string;
   numeroDocumento?: string;
+  direccion?: string;
   [key: string]: unknown;
 }
 
@@ -167,6 +198,11 @@ export interface CrmSearch {
   tamano?: number;
 }
 
+export interface CrmSearchPeriodo extends CrmSearch {
+  idProyecto?: number;
+  desde: string;
+  hastaExclusivo: string;
+}
 
 export interface CrmSaleValidationInput {
   idProspecto: number;
@@ -343,9 +379,41 @@ export interface CrmAprobarFirmaResponse {
   mensaje: string;
 }
 
+export interface CrmFuentePeriodo {
+  codigo: string;
+  nombre: string;
+  total: number;
+  activos: number;
+  convertidos: number;
+  participacion: number;
+}
+
+export interface CrmFuentesPeriodo {
+  total: number;
+  items: CrmFuentePeriodo[];
+}
+
+
 export const crmBackend = {
   catalogos: () => coreApi.get<CrmCatalogs>('/crm/catalogos'),
   resumen: () => coreApi.get<CrmSummary>('/crm/resumen'),
+
+  resumenPeriodo: (desde: string, hastaExclusivo: string) =>
+    coreApi.get<CrmSummary>(
+      `/crm/resumen/periodo${qs({
+        desde,
+        hastaExclusivo
+      })}`
+    ),
+
+  evolucionMensual: (desde: string, hastaExclusivo: string) =>
+    coreApi.get<CrmEvolucionMensual>(
+      `/crm/evolucion-mensual${qs({
+        desde,
+        hastaExclusivo
+      })}`
+    ),
+
   asesores: () => coreApi.get<CrmAdvisor[]>('/crm/asesores'),
   prospectos: () => coreApi.get<CrmProspect[]>('/crm/prospectos'),
   buscar: (f: CrmSearch) => coreApi.get<CrmPage<CrmProspect>>(`/crm/prospectos/buscar${qs({
@@ -353,6 +421,24 @@ export const crmBackend = {
     idAsesor: f.idAsesor, sinAsignar: f.sinAsignar,
     categoria: f.categoria ?? 'TODOS', pagina: f.pagina ?? 1, tamano: f.tamano ?? 20
   })}`),
+
+  buscarPeriodo: (f: CrmSearchPeriodo) =>
+    coreApi.get<CrmPage<CrmProspect>>(
+      `/crm/prospectos/buscar-periodo${qs({
+        consulta: f.consulta?.trim(),
+        etapa: f.etapa,
+        origen: f.origen,
+        idAsesor: f.idAsesor,
+        sinAsignar: f.sinAsignar,
+        categoria: f.categoria ?? 'TODOS',
+        pagina: f.pagina ?? 1,
+        tamano: f.tamano ?? 20,
+        idProyecto: f.idProyecto,
+        desde: f.desde,
+        hastaExclusivo: f.hastaExclusivo
+      })}`
+    ),
+
   detalle: (id: number) => coreApi.get<CrmDetail>(`/crm/prospectos/${id}`),
   crear: (data: CrmLeadCreate) => coreApi.post<Record<string, unknown>>('/crm/prospectos', data as Record<string, unknown>),
   actualizar: (id: number, body: { origenCodigo?: string; observaciones?: string; idProyectoInteres?: number }) =>
@@ -365,6 +451,45 @@ export const crmBackend = {
     `/crm/prospectos/${id}${qs({ motivo })}`),
   compradores: (consulta: string, pagina: number, tamano: number) =>
     coreApi.get<CrmPage<CrmBuyer>>(`/crm/compradores${qs({ consulta, pagina, tamano })}`),
+
+  compradoresPeriodo: (
+    consulta: string | undefined,
+    pagina: number,
+    tamano: number,
+    desde: string,
+    hastaExclusivo: string
+  ) =>
+    coreApi.get<CrmPage<CrmBuyer>>(
+      `/crm/compradores/periodo${qs({
+        consulta: consulta?.trim(),
+        pagina,
+        tamano,
+        desde,
+        hastaExclusivo
+      })}`
+    ),
+
+  fuentesPeriodo: (
+    desde: string,
+    hastaExclusivo: string
+  ) =>
+    coreApi.get<CrmFuentesPeriodo>(
+      `/crm/fuentes/periodo${qs({
+        desde,
+        hastaExclusivo
+      })}`
+    ),
+
+  asesoresPeriodo: (
+    desde: string,
+    hastaExclusivo: string
+  ) =>
+    coreApi.get<CrmAsesoresPeriodo>(
+      `/crm/asesores/periodo${qs({
+        desde,
+        hastaExclusivo
+      })}`
+    ),
 
   validarVenta: (body: CrmSaleValidationInput) =>
     coreApi.post<CrmSaleValidationResult>(
@@ -433,6 +558,9 @@ export const crmBackend = {
     ),
 
   visitas: (idProspecto: number) => coreApi.get<CrmVisit[]>(`/crm/prospectos/${idProspecto}/visitas`),
+
+  visitasPeriodo: (desde: string, hastaExclusivo: string, idProspecto?: number, pagina = 1, tamano = 15) =>
+    coreApi.get<CrmPage<CrmVisitaPeriodo>>(`/crm/visitas/periodo${qs({ desde, hastaExclusivo, idProspecto, pagina, tamano })}`),
   agendarVisita: (idProspecto: number, body: CrmScheduleVisit) =>
     coreApi.post<Record<string, unknown>>(`/crm/prospectos/${idProspecto}/visitas`, body as unknown as Record<string, unknown>),
   actualizarEstadoVisita: (idVisita: number, body: CrmUpdateVisitStatus) =>
@@ -445,7 +573,6 @@ export const crmBackend = {
     coreApi.get<string>(`/crm/exportaciones/prospectos.csv${qs({ consulta, etapa, categoria, limite })}`),
   listarAsignaciones: (id: number) =>
     coreApi.get<CrmAssignment[]>(`/crm/prospectos/${id}/asignaciones`),
-
   prepararLecturaContrato: (
     idContrato: number,
     idContratoArchivo: number
