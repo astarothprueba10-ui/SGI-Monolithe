@@ -35,9 +35,111 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode buscarPeriodo(
+            Long actor,
+            String consulta,
+            String etapa,
+            String origen,
+            Long asesor,
+            boolean sinAsignar,
+            String categoria,
+            Integer pagina,
+            Integer tamano,
+            Long proyecto,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+        validarBusqueda(consulta, etapa, categoria, pagina, tamano);
+
+        if ((origen != null && origen.length() > 40)
+                || (asesor != null && asesor <= 0)
+                || (proyecto != null && proyecto <= 0)) {
+
+            throw badRequest(
+                    "Los filtros comerciales proporcionados no son válidos.");
+        }
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas del CRM no es válido.");
+        }
+
+        return ejecutar(
+                () -> repository.buscarPeriodo(
+                        actor,
+                        consulta,
+                        normalizar(etapa),
+                        normalizar(origen),
+                        asesor,
+                        sinAsignar,
+                        categoria(categoria),
+                        pagina,
+                        tamano,
+                        proyecto,
+                        desde,
+                        hastaExclusivo),
+                false);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode indicadores(Long actor) {
         validarActor(actor);
         return ejecutar(() -> repository.indicadores(actor), false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode indicadoresPeriodo(
+            Long actor,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas del CRM no es valido.");
+        }
+
+        return ejecutar(
+                () -> repository.indicadoresPeriodo(
+                        actor,
+                        desde,
+                        hastaExclusivo),
+                false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode evolucionMensual(
+            Long actor,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(3))) {
+
+            throw badRequest(
+                    "El rango de fechas para la evolución comercial no es válido.");
+        }
+
+        return ejecutar(
+                () -> repository.evolucionMensual(
+                        actor,
+                        desde,
+                        hastaExclusivo),
+                false);
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +148,125 @@ public class CrmCierreService {
         validarPagina(pagina, tamano);
         validarTexto(consulta, 120, "busqueda");
         return ejecutar(() -> repository.compradores(actor, consulta, pagina, tamano), false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode compradoresPeriodo(
+            Long actor,
+            String consulta,
+            Integer pagina,
+            Integer tamano,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+        validarPagina(pagina, tamano);
+        validarTexto(consulta, 120, "busqueda");
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas de compradores no es valido.");
+        }
+
+        return ejecutar(
+                () -> repository.compradoresPeriodo(
+                        actor,
+                        consulta,
+                        pagina,
+                        tamano,
+                        desde,
+                        hastaExclusivo),
+                false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode fuentesPeriodo(
+            Long actor,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas para fuentes de captacion no es valido.");
+        }
+
+        return ejecutar(
+                () -> repository.fuentesPeriodo(
+                        actor,
+                        desde,
+                        hastaExclusivo),
+                false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode asesoresPeriodo(
+            Long actor,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo) {
+
+        validarActor(actor);
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas para asesores no es valido.");
+        }
+
+        return ejecutar(
+                () -> repository.asesoresPeriodo(
+                        actor,
+                        desde,
+                        hastaExclusivo),
+                false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode visitasPeriodo(
+            Long actor,
+            java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,
+            Long idProspecto,
+            Integer pagina,
+            Integer tamano) {
+
+        validarActor(actor);
+        validarPagina(pagina, tamano);
+
+        if (idProspecto != null && idProspecto <= 0) {
+            throw badRequest("El ID del prospecto no es valido.");
+        }
+
+        if (desde == null
+                || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde)
+                || hastaExclusivo.isAfter(desde.plusYears(10))) {
+
+            throw badRequest(
+                    "El rango de fechas para visitas no es valido.");
+        }
+
+        return ejecutar(
+                () -> repository.visitasPeriodo(
+                        actor,
+                        desde,
+                        hastaExclusivo,
+                        idProspecto,
+                        pagina,
+                        tamano),
+                false);
     }
 
     @Transactional
@@ -86,15 +307,17 @@ public class CrmCierreService {
         }
         JsonNode items = ejecutar(() -> repository.exportar(actor, consulta, normalizar(etapa),
                 categoria(categoria), limite), true);
-        StringBuilder csv = new StringBuilder("\uFEFFCodigo;Nombre;Telefono;Correo;Etapa;Categoria;Origen;Asesor;FechaRegistro\r\n");
+        StringBuilder csv = new StringBuilder(
+                "\uFEFFCodigo;Nombre;Telefono;Correo;Etapa;Categoria;Origen;Asesor;FechaRegistro\r\n");
         for (JsonNode p : items) {
             String[] campos = {
-                valor(p, "codigo"), valor(p, "nombre_completo"), valor(p, "telefono"),
-                valor(p, "email"), valor(p, "estado_nombre"), valor(p, "categoria"),
-                valor(p, "origen_nombre"), valor(p, "asesor_nombre"), valor(p, "fecha_registro")
+                    valor(p, "codigo"), valor(p, "nombre_completo"), valor(p, "telefono"),
+                    valor(p, "email"), valor(p, "estado_nombre"), valor(p, "categoria"),
+                    valor(p, "origen_nombre"), valor(p, "asesor_nombre"), valor(p, "fecha_registro")
             };
             for (int i = 0; i < campos.length; i++) {
-                if (i > 0) csv.append(';');
+                if (i > 0)
+                    csv.append(';');
                 csv.append(celda(campos[i]));
             }
             csv.append("\r\n");
@@ -107,7 +330,6 @@ public class CrmCierreService {
         return value.isNull() || value.isMissingNode() ? "" : value.asString();
     }
 
-    // Previene formula-injection al abrir un CSV en Excel/LibreOffice.
     private static String celda(String contenido) {
         String seguro = contenido == null ? "" : contenido.replace('\r', ' ').replace('\n', ' ');
         String sinEspacios = seguro.stripLeading();
@@ -124,10 +346,12 @@ public class CrmCierreService {
     }
 
     private static void validarProspecto(Long prospecto) {
-        if (prospecto == null || prospecto <= 0) throw badRequest("ID de prospecto invalido.");
+        if (prospecto == null || prospecto <= 0)
+            throw badRequest("ID de prospecto invalido.");
     }
 
-    private static void validarBusqueda(String consulta, String etapa, String categoria, Integer pagina, Integer tamano) {
+    private static void validarBusqueda(String consulta, String etapa, String categoria, Integer pagina,
+            Integer tamano) {
         validarPagina(pagina, tamano);
         validarTexto(consulta, 120, "busqueda");
         validarTexto(etapa, 40, "etapa");
@@ -141,7 +365,8 @@ public class CrmCierreService {
     }
 
     private static void validarTexto(String texto, int maximo, String campo) {
-        if (texto != null && texto.length() > maximo) throw badRequest("Campo " + campo + " demasiado largo.");
+        if (texto != null && texto.length() > maximo)
+            throw badRequest("Campo " + campo + " demasiado largo.");
     }
 
     private static String normalizar(String texto) {
@@ -167,7 +392,8 @@ public class CrmCierreService {
         } catch (DataAccessException e) {
             throw traducir(e);
         }
-        if (json == null) throw new IllegalStateException("Respuesta nula desde el CRM.");
+        if (json == null)
+            throw new IllegalStateException("Respuesta nula desde el CRM.");
         try {
             JsonNode data = jsonMapper.readTree(json);
             if (data == null || (array ? !data.isArray() : !data.isObject())) {
@@ -182,7 +408,8 @@ public class CrmCierreService {
     private static ResponseStatusException traducir(DataAccessException e) {
         StringBuilder errores = new StringBuilder();
         for (Throwable causa = e; causa != null; causa = causa.getCause()) {
-            if (causa.getMessage() != null) errores.append(causa.getMessage()).append(' ');
+            if (causa.getMessage() != null)
+                errores.append(causa.getMessage()).append(' ');
         }
         String texto = errores.toString();
         if (texto.contains("DENEGADO|")) {
@@ -192,7 +419,8 @@ public class CrmCierreService {
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Prospecto no encontrado.", e);
         }
         if (texto.contains("VENTA_EXISTENTE|") || texto.contains("VISITAS_PENDIENTES|")) {
-            return new ResponseStatusException(HttpStatus.CONFLICT, "El prospecto tiene operaciones comerciales pendientes.", e);
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El prospecto tiene operaciones comerciales pendientes.", e);
         }
         if (texto.contains("DATOS_INVALIDOS|") || texto.contains("CATALOGO_INVALIDO|")) {
             return badRequest("Datos invalidos para el CRM.");

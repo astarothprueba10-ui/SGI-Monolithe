@@ -31,7 +31,6 @@ public class CrmCaptacionService {
 
         final String payload;
         try {
-            // No incluye el actor: el valor confiable se envia en un parametro SQL separado.
             Map<String, Object> datos = new LinkedHashMap<>();
             datos.put("nombres", solicitud.nombres());
             datos.put("apellidoPaterno", solicitud.apellidoPaterno());
@@ -42,12 +41,11 @@ public class CrmCaptacionService {
             datos.put("origenCodigo", solicitud.origenCodigo());
             datos.put("motivoContacto", solicitud.motivoContacto());
             datos.put("mensaje", solicitud.mensaje());
-            // Los opcionales numericos deben ser JSON null (no "").
-            // La funcion SQL interpreta d->>'idPersona' y d->>'idAsesor' como BIGINT.
             datos.put("idPersona", solicitud.idPersona());
             datos.put("idAsesor", solicitud.idAsesor());
             datos.put("tipoDocumento", solicitud.tipoDocumento());
             datos.put("numeroDocumento", solicitud.numeroDocumento());
+            datos.put("direccion", solicitud.direccion());
             payload = jsonMapper.writeValueAsString(datos);
         } catch (JacksonException ex) {
             throw new IllegalStateException("No fue posible serializar la solicitud CRM.", ex);
