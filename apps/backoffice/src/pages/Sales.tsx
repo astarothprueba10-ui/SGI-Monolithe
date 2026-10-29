@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckIcon, DownloadIcon, FileTextIcon, PlusIcon, XIcon, Clock } from 'lucide-react';
+import { DownloadIcon, FileTextIcon, PlusIcon, Clock } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -11,11 +11,11 @@ import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
-import { SALES } from '../data/sales';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
 import { lotsService } from '../services/lotsService';
 import { crmService } from '../services/crmService';
+import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
 import type { Sale, Lot, Lead } from '../types';
 
 export function Sales() {
@@ -23,8 +23,8 @@ export function Sales() {
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
-  const [salesList, setSalesList] = useState<Sale[]>(SALES);
-  const [loading, setLoading] = useState(false);
+  const [salesList, setSalesList] = useState<Sale[]>([]);
+  const [, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [opType, setOpType] = useState<'Separacion' | 'Venta'>('Separacion');
@@ -39,19 +39,18 @@ export function Sales() {
   const [formObservations, setFormObservations] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+
   const fetchSalesData = async () => {
     setLoading(true);
+
     try {
       const liveSales = await salesService.getSales();
-      if (liveSales && liveSales.length > 0) {
-        const merged = [
-          ...liveSales,
-          ...SALES.filter((s) => !liveSales.some((ls) => ls.code === s.code))
-        ];
-        setSalesList(merged);
-      }
+      setSalesList(liveSales ?? []);
+
     } catch (err: any) {
       console.error('Error al cargar ventas:', err.message);
+      setSalesList([]);
+      toast.error('No se pudieron cargar las operaciones.');
     } finally {
       setLoading(false);
     }
@@ -106,7 +105,7 @@ export function Sales() {
     const res = await salesService.registerSeparation({
       lotId: lotIdNum,
       personaId,
-      observations: formObservations || 'Separacion registrada desde Backoffice'
+      notes: formObservations || 'Separacion registrada desde Backoffice'
     });
     toast.success(`Separacion registrada exitosamente (#${res.id_reserva}). Vigencia: 7 dias.`);
   };
@@ -115,9 +114,9 @@ export function Sales() {
     const res = await salesService.formalizeCashSale({
       lotId: lotIdNum,
       personaId,
-      advisorId,
+      advisorId: advisorId ?? undefined,
       totalAmount: parseFloat(formTotal),
-      observations: formObservations || 'Venta al contado formalizada'
+      notes: formObservations || 'Venta al contado formalizada'
     });
     toast.success(`Venta al contado formalizada: ${res.codigo_venta}`);
   };
@@ -126,11 +125,11 @@ export function Sales() {
     const res = await salesService.formalizeFinancedSale({
       lotId: lotIdNum,
       personaId,
-      advisorId,
+      advisorId: advisorId ?? undefined,
       totalAmount: parseFloat(formTotal),
       downPayment: parseFloat(formInitial),
       installmentsCount: parseInt(formInstallments, 10),
-      observations: formObservations || 'Venta financiada formalizada'
+      notes: formObservations || 'Venta financiada formalizada'
     });
     toast.success(`Venta financiada: ${res.codigo_venta} (${res.numero_cuotas} cuotas)`);
   };
@@ -142,8 +141,19 @@ export function Sales() {
       return;
     }
     const lead = leadsList.find((l) => l.id === selectedLeadId);
-    const personaId = lead?.personaId || 13;
-    const advisorId = lead?.advisorId || null;
+
+    if (!lead?.personaId || lead.personaId <= 0) {
+      toast.error('Debe seleccionar un prospecto válido.');
+      return;
+    }
+
+    if (opType === 'Venta' && (!lead.advisorId || lead.advisorId <= 0)) {
+      toast.error('El prospecto necesita un asesor comercial asignado.');
+      return;
+    }
+
+    const personaId = lead.personaId;
+    const advisorId = lead.advisorId ?? null;
     const lotIdNum = parseInt(formLotId, 10);
 
     setSubmitting(true);
@@ -188,14 +198,14 @@ export function Sales() {
         description="Operaciones comerciales con su comprador, lote, modalidad de venta y contrato asociado."
         actions={
           <div className="flex items-center gap-2">
-            <Button icon={Clock} variant="secondary" onClick={handleExpireOverdue}>
+            <Button icon={Clock} variant="secondary" disabled onClick={handleExpireOverdue}>
               Control de caducidad (7 d)
             </Button>
             <Gate permission="sales.export">
               <Button icon={DownloadIcon}>Exportar</Button>
             </Gate>
             <Gate permission="sales.create">
-              <Button icon={PlusIcon} variant="primary" onClick={handleOpenModal}>
+              <Button icon={PlusIcon} variant="primary" disabled onClick={handleOpenModal}>
                 Nueva operación
               </Button>
             </Gate>
@@ -213,6 +223,10 @@ export function Sales() {
           { id: 'Venta', label: 'Ventas', count: salesCount }
         ]}
       />
+
+      <Gate permission="sales.view">
+        <ContratosPendientesPanel />
+      </Gate>
 
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
@@ -241,9 +255,9 @@ export function Sales() {
             description="No hay separaciones ni ventas con los filtros aplicados."
           />
         ) : (
-          <Table>
-            <thead>
-              <TR isHeader>
+          <Table
+            head={
+              <>
                 <TH>Código</TH>
                 <TH>Tipo</TH>
                 <TH>Comprador</TH>
@@ -254,55 +268,54 @@ export function Sales() {
                 <TH>Contrato</TH>
                 <TH>Estado</TH>
                 <TH align="right">Acciones</TH>
+              </>
+            }
+          >
+            {rows.map((sale) => (
+              <TR key={sale.id} onClick={() => setDetail(sale)}>
+                <TD className="font-mono text-brand-900 font-semibold">{sale.code}</TD>
+                <TD>
+                  <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>
+                    {sale.type}
+                  </Badge>
+                </TD>
+                <TD>
+                  <div className="font-medium text-brand-900">{sale.buyer}</div>
+                  <div className="text-[11px] text-brand-400">{sale.document}</div>
+                </TD>
+                <TD>
+                  <div className="font-medium text-brand-800">{sale.lot}</div>
+                  <div className="text-[11px] text-brand-400">{sale.project}</div>
+                </TD>
+                <TD className="text-brand-600">{sale.modality}</TD>
+                <TD align="right" className="font-mono font-medium text-brand-900">
+                  {currency(sale.amount)}
+                </TD>
+                <TD className="text-brand-600">{sale.advisor}</TD>
+                <TD>
+                  <Badge tone={sale.contract === 'Firmado' ? 'brand' : 'info'}>
+                    {sale.contract}
+                  </Badge>
+                </TD>
+                <TD>
+                  <StatusBadge status={sale.status} />
+                </TD>
+                <TD align="right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetail(sale);
+                      }}
+                    >
+                      Ver detalle
+                    </Button>
+                  </div>
+                </TD>
               </TR>
-            </thead>
-            <tbody>
-              {rows.map((sale) => (
-                <TR key={sale.id} onClick={() => setDetail(sale)}>
-                  <TD className="font-mono text-brand-900 font-semibold">{sale.code}</TD>
-                  <TD>
-                    <Badge variant={sale.type === 'Venta' ? 'brand' : 'gray'}>
-                      {sale.type}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <div className="font-medium text-brand-900">{sale.buyer}</div>
-                    <div className="text-[11px] text-brand-400">{sale.document}</div>
-                  </TD>
-                  <TD>
-                    <div className="font-medium text-brand-800">{sale.lot}</div>
-                    <div className="text-[11px] text-brand-400">{sale.project}</div>
-                  </TD>
-                  <TD className="text-brand-600">{sale.modality}</TD>
-                  <TD align="right" className="font-mono font-medium text-brand-900">
-                    {currency(sale.amount)}
-                  </TD>
-                  <TD className="text-brand-600">{sale.advisor}</TD>
-                  <TD>
-                    <Badge variant={sale.contract === 'Firmado' ? 'success' : 'warning'}>
-                      {sale.contract}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <StatusBadge status={sale.status} />
-                  </TD>
-                  <TD align="right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDetail(sale);
-                        }}
-                      >
-                        Ver detalle
-                      </Button>
-                    </div>
-                  </TD>
-                </TR>
-              ))}
-            </tbody>
+            ))}
           </Table>
         )}
       </Card>
@@ -363,22 +376,20 @@ export function Sales() {
               <button
                 type="button"
                 onClick={() => setOpType('Separacion')}
-                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
-                  opType === 'Separacion'
-                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                }`}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Separacion'
+                  ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                  : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                  }`}
               >
                 Separación (S/ 500)
               </button>
               <button
                 type="button"
                 onClick={() => setOpType('Venta')}
-                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${
-                  opType === 'Venta'
-                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                }`}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Venta'
+                  ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                  : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                  }`}
               >
                 Venta (Contado / Financiada)
               </button>
@@ -392,7 +403,7 @@ export function Sales() {
             <Select value={selectedLeadId} onChange={(e) => setSelectedLeadId(e.target.value)}>
               {leadsList.map((lead) => (
                 <option key={lead.id} value={lead.id}>
-                  {lead.name} {lead.document ? `(DNI/RUC: ${lead.document})` : ''} - {lead.status}
+                  {lead.name} - {lead.stage}
                 </option>
               ))}
             </Select>
