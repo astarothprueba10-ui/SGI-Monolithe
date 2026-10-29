@@ -27,6 +27,8 @@ import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { calcularRangoCrm } from '../utils/crmPeriodo';
+import { CrmActionsMenu, type CrmMenuAction } from '../components/crm/CrmActionsMenu';
+import { CrmCategoriaLegend } from '../components/crm/CrmCategoriaLegend';
 import {
   crmBackend,
   type CrmAdvisor,
@@ -486,8 +488,6 @@ export function Crm() {
     setErrorMsg(null);
 
     try {
-      // Las tablas utilizan su rango independiente.
-      // La agenda conserva la búsqueda general de prospectos.
       const rangoConsulta = tab === 'visitas'
         ? rangoPeriodo
         : rangoTabla;
@@ -1559,6 +1559,10 @@ export function Crm() {
                 >
                   Limpiar filtros
                 </Button>
+                
+                <div className="mt-3 flex justify-end">
+                  <CrmCategoriaLegend />
+                </div>
 
               </div>
             </div>
@@ -1594,15 +1598,17 @@ export function Crm() {
           ) : (
             <>
               <Table
+
                 head={
                   <>
-                    <TH>Lead / Contacto</TH>
-                    <TH>Interes / Proyecto</TH>
+                    <TH>Fecha de registro</TH>
+                    <TH>{tab === 'leads' ? 'Lead' : 'Cliente potencial'}</TH>
+                    <TH>Contacto</TH>
+                    <TH>Interés / Proyecto</TH>
                     <TH>Origen</TH>
-                    <TH>Etapa</TH>
                     <TH>Asesor</TH>
-                    <TH>Puntuacion</TH>
-                    <TH>Ultimo contacto</TH>
+                    <TH>Estado</TH>
+                    <TH>Último contacto</TH>
                     <TH align="right">Acciones</TH>
                   </>
                 }
@@ -1612,50 +1618,99 @@ export function Crm() {
                     STAGE_TONES[lead.estado_codigo] ||
                     STAGE_TONES[lead.estado_nombre] ||
                     'bg-slate-100 text-slate-700 border-slate-200';
+
+                  const isLeadFinal = Boolean(
+                    catalogs?.estados.find(e => e.codigo === lead.estado_codigo)?.final ||
+                    lead.categoria === 'COMPRADOR' || lead.categoria === 'CERRADO'
+                  );
+
+                  const acciones: CrmMenuAction[] = [
+                    ...(lead.categoria === 'POTENCIAL' ? [{
+                      label: 'Verificar compra', icon: CheckCircleIcon, permission: 'crm.view' as const,
+                      onClick: () => void handleVerifySale(lead)
+                    }] : []),
+                    {
+                      label: 'Cambiar etapa', icon: RefreshCw, permission: 'crm.edit',
+                      disabled: isLeadFinal,
+                      onClick: () => { setStageLead(lead); setNewStageCode(lead.estado_codigo); }
+                    },
+                    {
+                      label: 'Editar ficha comercial', icon: PencilIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setEditLead(lead);
+                        setEditOrigen(lead.origen_codigo);
+                        setEditObservaciones(lead.observaciones || '');
+                      }
+                    },
+                    {
+                      label: 'Registrar seguimiento', icon: PhoneIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setFollowUpLead(lead);
+                        setFollowUpForm({
+                          tipoCodigo: 'LLAMADA',
+                          asunto: `Contacto de seguimiento con ${lead.nombre_completo}`,
+                          detalle: '', resultado: '', requiereSeguimiento: false,
+                          fechaProximoSeguimiento: null
+                        });
+                      }
+                    },
+                    {
+                      label: 'Asignar asesor', icon: UserPlusIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setAssignLead(lead);
+                        if (advisorsList.length > 0) setSelectedAdvisorId(advisorsList[0].id_asesor);
+                      }
+                    },
+                    {
+                      label: 'Agendar visita', icon: CalendarIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setVisitForm({
+                          prospectId: lead.id_prospecto,
+                          projectId: catalogs?.proyectos?.[0]?.id || 1,
+                          advisorId: lead.id_asesor || advisorsList[0]?.id_asesor || 0,
+                          visitDate: '', shift: '11:00',
+                          meetingPoint: 'Oficina de Ventas - Lurin', notes: ''
+                        });
+                        setIsNewVisitOpen(true);
+                      }
+                    },
+                    {
+                      label: 'Desactivar prospecto', icon: XCircleIcon, permission: 'crm.delete',
+                      danger: true,
+                      onClick: () => { setDeactivateLead(lead); setDeactivateReason(''); }
+                    }
+                  ];
                   return (
                     <TR key={lead.id_prospecto}>
-                      <TD>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[11px] font-semibold text-brand-500">
-                              {lead.codigo}
-                            </span>
-                            <p className="font-medium text-brand-900">{lead.nombre_completo}</p>
-                          </div>
-                          <p className="text-[12px] text-brand-400">
-                            {lead.telefono} · {lead.email}
-                          </p>
-                        </div>
-                      </TD>
-                      <TD className="text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
-                      <TD>
-                        <Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge>
+
+                      <TD className="whitespace-nowrap text-xs text-brand-500">
+                        {formatDateLima(lead.fecha_registro)}
                       </TD>
                       <TD>
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                            stageTone
-                          )}
-                        >
+                        <p className="font-semibold text-brand-900">{lead.nombre_completo}</p>
+                        <p className="font-mono text-[11px] text-brand-400">{lead.codigo}</p>
+                      </TD>
+                      <TD>
+                        <p className="whitespace-nowrap text-brand-700">{lead.telefono}</p>
+                        <p className="text-xs text-brand-400">{lead.email}</p>
+                      </TD>
+                      <TD className="min-w-44 text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
+                      <TD><Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge></TD>
+                      <TD className="text-brand-600">
+                        {lead.asesor_nombre || <span className="italic text-brand-400">Sin asignar</span>}
+                      </TD>
+                      <TD>
+                        <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', stageTone)}>
                           {lead.estado_nombre || lead.estado_codigo}
                         </span>
                       </TD>
-                      <TD className="text-brand-600">
-                        {lead.asesor_nombre ? (
-                          lead.asesor_nombre
-                        ) : (
-                          <span className="italic text-brand-300">Sin asignar</span>
-                        )}
+                      <TD className="whitespace-nowrap text-xs text-brand-500">
+                        {formatDateTimeLima(lead.ultimo_contacto)}
                       </TD>
-                      <TD>
-                        <Badge tone={lead.puntuacion === 'Alto' ? 'accent' : 'neutral'}>
-                          {lead.puntuacion || 'Medio'}
-                        </Badge>
-                      </TD>
-                      <TD className="tabular text-brand-400 text-[12px]">{formatDateTimeLima(lead.ultimo_contacto)}</TD>
+
+
                       <TD align="right">
-                        <div className="flex justify-end items-center gap-1">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
                             icon={EyeIcon}
@@ -1664,107 +1719,10 @@ export function Crm() {
                           >
                             Expediente
                           </Button>
-                          {lead.categoria === 'POTENCIAL' && (
-                            <Gate permission="crm.view">
-                              <Button
-                                size="sm"
-                                icon={CheckCircleIcon}
-                                title="Verificar venta y contrato"
-                                onClick={() => void handleVerifySale(lead)}
-                              >
-                                Verificar compra
-                              </Button>
-                            </Gate>
-                          )}
-
-                          <Gate permission="crm.edit">
-                            {(() => {
-                              const isLeadFinal = Boolean(
-                                catalogs?.estados.find((e) => e.codigo === lead.estado_codigo)?.final ||
-                                lead.categoria === 'COMPRADOR' ||
-                                lead.categoria === 'CERRADO'
-                              );
-                              return (
-                                <Button
-                                  size="sm"
-                                  icon={RefreshCw}
-                                  disabled={isLeadFinal}
-                                  title={isLeadFinal ? 'Prospecto en etapa definitiva o cerrada' : 'Cambiar etapa'}
-                                  onClick={() => {
-                                    setStageLead(lead);
-                                    setNewStageCode(lead.estado_codigo);
-                                  }}
-                                />
-                              );
-                            })()}
-                            <Button
-                              size="sm"
-                              icon={PencilIcon}
-                              title="Editar ficha comercial"
-                              onClick={() => {
-                                setEditLead(lead);
-                                setEditOrigen(lead.origen_codigo);
-                                setEditObservaciones(lead.observaciones || '');
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={PhoneIcon}
-                              title="Registrar seguimiento"
-                              onClick={() => {
-                                setFollowUpLead(lead);
-                                setFollowUpForm({
-                                  tipoCodigo: 'LLAMADA',
-                                  asunto: `Contacto de seguimiento con ${lead.nombre_completo}`,
-                                  detalle: '',
-                                  resultado: '',
-                                  requiereSeguimiento: false,
-                                  fechaProximoSeguimiento: null
-                                });
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={UserPlusIcon}
-                              title="Asignar asesor"
-                              onClick={() => {
-                                setAssignLead(lead);
-                                if (advisorsList.length > 0) {
-                                  setSelectedAdvisorId(advisorsList[0].id_asesor);
-                                }
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={CalendarIcon}
-                              title="Agendar visita comercial"
-                              onClick={() => {
-                                setVisitForm({
-                                  prospectId: lead.id_prospecto,
-                                  projectId: catalogs?.proyectos?.[0]?.id || 1,
-                                  advisorId: lead.id_asesor || advisorsList[0]?.id_asesor || 0,
-                                  visitDate: '',
-                                  shift: '11:00',
-                                  meetingPoint: 'Oficina de Ventas - Lurin',
-                                  notes: ''
-                                });
-                                setIsNewVisitOpen(true);
-                              }}
-                            />
-                          </Gate>
-
-                          <Gate permission="crm.delete">
-                            <Button
-                              size="sm"
-                              icon={XCircleIcon}
-                              className="text-rose-600 hover:text-rose-700"
-                              title="Desactivar prospecto"
-                              onClick={() => {
-                                setDeactivateLead(lead);
-                                setDeactivateReason('');
-                              }}
-                            />
-                          </Gate>
+                          <CrmActionsMenu
+                            label={`Acciones de ${lead.nombre_completo}`}
+                            actions={acciones}
+                          />
                         </div>
                       </TD>
                     </TR>
