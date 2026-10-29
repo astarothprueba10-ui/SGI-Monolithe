@@ -1,3 +1,4 @@
+import { coreApi } from '../lib/apiClient';
 import { supabase } from '../lib/supabase';
 
 export interface CommissionSettlement {
@@ -29,15 +30,29 @@ export interface ManagerialKpis {
   comisionesAprobadas: number;
 }
 
-export const commissionsService = {
-  async getSettlements(): Promise<CommissionSettlement[]> {
-    const { data, error } = await supabase.rpc('sp_listar_liquidaciones_asesores');
-    if (error) {
-      console.error('Error al listar liquidaciones:', error.message);
-      return [];
-    }
+type CommissionRow = {
+  id_comision: number;
+  codigo_comision: string;
+  codigo_venta: string;
+  lote_codigo: string;
+  asesor_nombre: string;
+  modalidad: string;
+  precio_venta: number | string;
+  porcentaje_comision: number | string;
+  monto_comision: number | string;
+  estado_comision: string;
+  contrato_codigo: string | null;
+  contrato_estado: string | null;
+  fecha_generacion: string | null;
+  fecha_aprobacion: string | null;
+};
 
-    return (data || []).map((row: any) => ({
+export const commissionsService = {
+  // Autorizacion desde JWT en Core Service + comprobacion de permisos vigentes en BD.
+  // No usa RPC de Supabase en el navegador para listar comisiones.
+  async getSettlements(): Promise<CommissionSettlement[]> {
+    const data = await coreApi.get<CommissionRow[]>('/crm/comisiones');
+    return data.map((row) => ({
       id: String(row.id_comision),
       code: row.codigo_comision,
       saleCode: row.codigo_venta,
@@ -55,22 +70,20 @@ export const commissionsService = {
     }));
   },
 
+  // El actor se toma exclusivamente del JWT, nunca de un ID predeterminado del frontend.
+  async approveCommission(commissionId: number): Promise<{ success: boolean; mensaje: string }> {
+    return coreApi.post<{ success: boolean; mensaje: string }>(
+      `/crm/comisiones/${commissionId}/aprobar`, {}
+    );
+  },
+
+  // Se conserva la funcionalidad ajena a esta pantalla para no afectar otros modulos.
+  // Pendiente de pasar tambien este calculo al backend autenticado.
   async calculateCommission(saleId: number, advisorId: number = 1) {
     const { data, error } = await supabase.rpc('sp_calcular_comision_venta', {
       p_id_venta: saleId,
       p_id_asesor: advisorId
     });
-
-    if (error) throw new Error(error.message);
-    return data;
-  },
-
-  async approveCommission(commissionId: number, userId: number = 3) {
-    const { data, error } = await supabase.rpc('sp_aprobar_devengo_comision', {
-      p_id_comision: commissionId,
-      p_id_usuario: userId
-    });
-
     if (error) throw new Error(error.message);
     return data;
   },
@@ -81,7 +94,6 @@ export const commissionsService = {
       console.error('Error al consultar KPIs gerenciales:', error.message);
       return null;
     }
-
     return {
       totalLotes: Number(data.total_lotes) || 0,
       lotesDisponibles: Number(data.lotes_disponibles) || 0,

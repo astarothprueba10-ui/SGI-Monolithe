@@ -11,6 +11,9 @@ import monolithe.core_service.client.EmailNotificationClient;
 import monolithe.core_service.dto.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -531,24 +534,55 @@ public class TrabajadorService {
                         Long idActor,
                         Long idSolicitud,
                         ResolverCorreccionRequest request) {
+                return resolverCorreccion(idActor, idSolicitud, request, obtenerJwtContexto());
+        }
 
+        public JsonNode resolverCorreccion(
+                        Long idActor,
+                        Long idSolicitud,
+                        ResolverCorreccionRequest request,
+                        String jwtToken) {
                 validarParametrosResolucion(idSolicitud, request);
 
-                ResultadoProcedimiento respuesta =
-                        repository.resolverCorreccionIdentidad(
-                                idActor,
-                                idSolicitud,
-                                request.decision(),
-                                request.motivo());
+                ResultadoProcedimiento respuesta = repository.resolverCorreccionIdentidad(
+                                idActor, idSolicitud, request.decision(), request.motivo());
 
                 validarEstadoCorreccion(respuesta);
-
                 JsonNode resultado = respuesta.resultado();
                 if (resultado == null || !resultado.isObject()) {
                         throw new IllegalStateException(
                                         "El procedimiento no devolvio la resolucion de la correccion.");
                 }
+                notificarConfirmacionCorreoSiAprobado(request, resultado, jwtToken);
                 return resultado;
+        }
+
+        private String obtenerJwtContexto() {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+                        return jwt.getTokenValue();
+                }
+                return null;
+        }
+
+        private void notificarConfirmacionCorreoSiAprobado(
+                        ResolverCorreccionRequest request,
+                        JsonNode resultado,
+                        String jwtToken) {
+                if (!"APROBAR".equals(request.decision())) {
+                        return;
+                }
+                String tipoDato = resultado.path("tipoDato").asString("");
+                if (!"CONTACTO".equalsIgnoreCase(tipoDato)) {
+                        return;
+                }
+                String correoNuevo = resultado.has("correoPropuesto")
+                                ? resultado.path("correoPropuesto").asString("")
+                                : resultado.path("valorPropuesto").asString("");
+                String tokenReal = resultado.path("tokenReal").asString("");
+                if (!correoNuevo.isBlank() && !tokenReal.isBlank() && jwtToken != null) {
+                        enviarCorreoConfirmacion(correoNuevo, tokenReal, jwtToken);
+                }
         }
 
         public JsonNode programarSuspension(

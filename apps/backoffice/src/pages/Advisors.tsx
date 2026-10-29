@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckIcon, DownloadIcon, PlusIcon, FileTextIcon } from 'lucide-react';
+import { CheckIcon, FileTextIcon, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -10,88 +10,88 @@ import { StatusBadge, Badge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
 import { Gate } from '../components/auth/PermissionRoute';
-import { ADVISORS } from '../data/people';
+import { crmBackend, type CrmAdvisor } from '../services/crmBackend';
+import { commissionsService, type CommissionSettlement } from '../services/commissionsService';
 import { currency, number } from '../utils/format';
-import { commissionsService, CommissionSettlement } from '../services/commissionsService';
+
+type AdvisorsTab = 'asesores' | 'liquidaciones';
 
 export function Advisors() {
-  const [tab, setTab] = useState<'cartera' | 'liquidaciones' | 'asistencia'>('liquidaciones');
+  const [tab, setTab] = useState<AdvisorsTab>('asesores');
   const [query, setQuery] = useState('');
+  const [advisors, setAdvisors] = useState<CrmAdvisor[]>([]);
   const [settlements, setSettlements] = useState<CommissionSettlement[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [advisorsLoading, setAdvisorsLoading] = useState(true);
+  const [settlementsLoading, setSettlementsLoading] = useState(true);
+  const [advisorsError, setAdvisorsError] = useState<string | null>(null);
 
-  const fetchSettlements = async () => {
-    setLoading(true);
+  const fetchAdvisors = useCallback(async () => {
+    setAdvisorsLoading(true);
+    setAdvisorsError(null);
     try {
-      const data = await commissionsService.getSettlements();
-      setSettlements(data);
-    } catch (err: any) {
-      console.error('Error al cargar liquidaciones:', err.message);
+      const items = await crmBackend.asesores();
+      setAdvisors(items);
+    } catch (error: unknown) {
+      setAdvisors([]);
+      setAdvisorsError(error instanceof Error ? error.message : 'No fue posible consultar los asesores.');
     } finally {
-      setLoading(false);
+      setAdvisorsLoading(false);
     }
-  };
+  }, []);
+
+  const fetchSettlements = useCallback(async () => {
+    setSettlementsLoading(true);
+    try {
+      setSettlements(await commissionsService.getSettlements());
+    } catch (error: unknown) {
+      setSettlements([]);
+      toast.error(error instanceof Error ? error.message : 'No fue posible consultar las liquidaciones.');
+    } finally {
+      setSettlementsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchSettlements();
-  }, []);
+    void fetchAdvisors();
+    void fetchSettlements();
+  }, [fetchAdvisors, fetchSettlements]);
 
   const handleApproveDevengo = async (commissionId: string) => {
     try {
-      const idNum = parseInt(commissionId, 10);
-      const res = await commissionsService.approveCommission(idNum);
-      toast.success(res?.mensaje || 'Devengo de comisión aprobado conforme a contrato vigente');
+      const result = await commissionsService.approveCommission(Number.parseInt(commissionId, 10));
+      toast.success(result?.mensaje || 'Devengo aprobado conforme al contrato vigente');
       await fetchSettlements();
-    } catch (err: any) {
-      toast.error('Error al aprobar devengo: ' + err.message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'No fue posible aprobar el devengo.');
     }
   };
 
-  const rows = ADVISORS.filter((a) => {
-    const q = query.trim().toLowerCase();
-    return q.length === 0 || a.name.toLowerCase().includes(q) || a.team.toLowerCase().includes(q);
-  });
+  const search = query.trim().toLowerCase();
+  const filteredAdvisors = useMemo(() => advisors.filter((advisor) =>
+    !search || [advisor.nombre_completo, advisor.codigo, advisor.email, advisor.telefono]
+      .some((value) => value.toLowerCase().includes(search))
+  ), [advisors, search]);
+  const filteredSettlements = useMemo(() => settlements.filter((item) =>
+    !search || [item.advisorName, item.code, item.saleCode, item.lotCode]
+      .some((value) => value.toLowerCase().includes(search))
+  ), [settlements, search]);
 
-  const filteredSettlements = settlements.filter((s) => {
-    const q = query.trim().toLowerCase();
-    return (
-      q.length === 0 ||
-      s.advisorName.toLowerCase().includes(q) ||
-      s.code.toLowerCase().includes(q) ||
-      s.saleCode.toLowerCase().includes(q) ||
-      s.lotCode.toLowerCase().includes(q)
-    );
-  });
-
-  const totalCommissionsCalculated = settlements.reduce((s, c) => s + c.amount, 0);
-  const totalCommissionsApproved = settlements
-    .filter((c) => c.status === 'Aprobada')
-    .reduce((s, c) => s + c.amount, 0);
+  const totalCommissions = settlements.reduce((sum, item) => sum + item.amount, 0);
+  const approvedCommissions = settlements
+    .filter((item) => item.status === 'Aprobada')
+    .reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <div>
       <PageHeader
         title="Asesores y comisiones"
-        description="Liquidación de comisiones comerciales (3% Contado, 2% Financiado), devengo formal contra contrato y control de equipo."
-        actions={
-          <>
-            <Gate permission="advisors.export">
-              <Button icon={DownloadIcon}>Exportar liquidación</Button>
-            </Gate>
-            <Gate permission="advisors.create">
-              <Button icon={PlusIcon} variant="primary">
-                Nuevo asesor
-              </Button>
-            </Gate>
-          </>
-        }
+        description="Equipo comercial real, cartera vigente y liquidaciones de comisiones. Los asesores se registran desde Trabajadores y Usuarios y roles."
       />
-
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { label: 'Asesores activos', value: number(ADVISORS.filter((a) => a.status === 'Activo').length) },
-          { label: 'Comisiones generadas', value: currency(totalCommissionsCalculated || 0) },
-          { label: 'Comisiones aprobadas (devengadas)', value: currency(totalCommissionsApproved || 0) }
+          { label: 'Asesores operativos', value: advisorsLoading ? '—' : number(advisors.length) },
+          { label: 'Comisiones generadas', value: settlementsLoading ? '—' : currency(totalCommissions) },
+          { label: 'Comisiones aprobadas (devengadas)', value: settlementsLoading ? '—' : currency(approvedCommissions) }
         ].map((item) => (
           <Card key={item.label} className="p-5">
             <p className="text-[12px] text-brand-400">{item.label}</p>
@@ -103,168 +103,119 @@ export function Advisors() {
       <Tabs
         className="mb-5"
         active={tab}
-        onChange={(t) => setTab(t as any)}
+        onChange={(value) => { if (value === 'asesores' || value === 'liquidaciones') setTab(value); }}
         items={[
-          { id: 'liquidaciones', label: 'Liquidación de comisiones', count: settlements.length },
-          { id: 'cartera', label: 'Ventas del equipo', count: ADVISORS.length },
-          { id: 'asistencia', label: 'Horarios y asistencia' }
+          { id: 'asesores', label: 'Asesores comerciales', count: advisors.length },
+          { id: 'liquidaciones', label: 'Liquidación de comisiones', count: settlements.length }
         ]}
       />
 
       <Card>
-        <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 px-5 py-3.5">
           <SearchInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Buscar asesor, lote o código…"
-            className="w-full sm:w-72"
+            placeholder={tab === 'asesores' ? 'Buscar asesor, código o contacto…' : 'Buscar comisión, asesor, venta o lote…'}
+            className="w-full sm:w-80"
           />
+          <Button size="sm" icon={RefreshCw} onClick={() => void (tab === 'asesores' ? fetchAdvisors() : fetchSettlements())}>
+            Actualizar
+          </Button>
         </div>
 
-        {tab === 'liquidaciones' && (
-          filteredSettlements.length === 0 ? (
+        {tab === 'asesores' && (
+          advisorsLoading ? (
+            <p className="p-6 text-sm text-brand-500">Cargando asesores desde el Core Service...</p>
+          ) : advisorsError ? (
+            <div role="alert" className="p-6 text-sm text-rose-700">
+              No fue posible cargar la nómina de asesores: {advisorsError}
+            </div>
+          ) : filteredAdvisors.length === 0 ? (
             <EmptyState
-              icon={FileTextIcon}
-              title="Sin liquidaciones"
-              description="No hay comisiones calculadas con los filtros aplicados."
+              title="Sin asesores operativos"
+              description="No hay trabajadores con cuenta activa y rol ASESOR vigente que coincidan con la búsqueda."
             />
           ) : (
-            <Table>
-              <thead>
-                <TR isHeader>
-                  <TH>Código</TH>
-                  <TH>Asesor</TH>
-                  <TH>Venta / Lote</TH>
-                  <TH>Modalidad</TH>
-                  <TH align="right">Precio Venta</TH>
-                  <TH align="right">Tasa</TH>
-                  <TH align="right">Comisión</TH>
-                  <TH>Contrato</TH>
-                  <TH>Estado</TH>
-                  <TH align="right">Acciones</TH>
+            <Table head={<>
+              <TH>Código</TH>
+              <TH>Asesor comercial</TH>
+              <TH>Correo corporativo</TH>
+              <TH>Teléfono directo</TH>
+              <TH>Estado</TH>
+              <TH align="right">Cartera actual</TH>
+            </>}>
+              {filteredAdvisors.map((advisor) => (
+                <TR key={advisor.id_asesor}>
+                  <TD className="font-mono text-[12px] font-semibold text-brand-800">{advisor.codigo}</TD>
+                  <TD className="font-medium text-brand-900">{advisor.nombre_completo}</TD>
+                  <TD className="text-brand-600">{advisor.email}</TD>
+                  <TD className="text-brand-600">{advisor.telefono}</TD>
+                  <TD><StatusBadge status={advisor.activo ? 'Activo' : 'Inactivo'} /></TD>
+                  <TD align="right" className="font-semibold">{number(Number(advisor.leads_activos) || 0)}</TD>
                 </TR>
-              </thead>
-              <tbody>
-                {filteredSettlements.map((s) => (
-                  <TR key={s.id}>
-                    <TD className="font-mono text-[12px] font-semibold text-brand-900">{s.code}</TD>
-                    <TD className="font-medium">{s.advisorName}</TD>
-                    <TD>
-                      <div className="font-mono text-[12px] text-brand-800">{s.saleCode}</div>
-                      <div className="text-[11px] text-brand-400">{s.lotCode}</div>
-                    </TD>
-                    <TD className="text-brand-600">{s.modality}</TD>
-                    <TD align="right" className="font-mono">{currency(s.salePrice)}</TD>
-                    <TD align="right" className="font-mono font-medium text-brand-700">{s.rate}%</TD>
-                    <TD align="right" className="font-mono font-semibold text-brand-900">
-                      {currency(s.amount)}
-                    </TD>
-                    <TD>
-                      <Badge variant={s.contractStatus === 'Vigente' ? 'success' : 'warning'}>
-                        {s.contractStatus}
-                      </Badge>
-                    </TD>
-                    <TD>
-                      <Badge variant={s.status === 'Aprobada' ? 'brand' : 'gray'}>
-                        {s.status}
-                      </Badge>
-                    </TD>
-                    <TD align="right">
-                      {s.status === 'Pendiente' ? (
-                        <Gate permission="advisors.approve">
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={CheckIcon}
-                            onClick={() => handleApproveDevengo(s.id)}
-                          >
-                            Aprobar devengo
-                          </Button>
-                        </Gate>
-                      ) : (
-                        <span className="text-[12px] text-emerald-600 font-medium">Devengada</span>
-                      )}
-                    </TD>
-                  </TR>
-                ))}
-              </tbody>
+              ))}
             </Table>
           )
         )}
 
-        {tab === 'cartera' && (
-          <Table>
-            <thead>
-              <TR isHeader>
-                <TH>Asesor</TH>
-                <TH>Tipo</TH>
-                <TH>Equipo</TH>
-                <TH align="right">Ventas</TH>
-                <TH align="right">Monto vendido</TH>
-                <TH align="right">Comisión</TH>
-                <TH align="right">Bono</TH>
-                <TH>Estado</TH>
-              </TR>
-            </thead>
-            <tbody>
-              {rows.map((advisor) => (
-                <TR key={advisor.id}>
+        {tab === 'liquidaciones' && (
+          settlementsLoading ? (
+            <p className="p-6 text-sm text-brand-500">Cargando liquidaciones...</p>
+          ) : filteredSettlements.length === 0 ? (
+            <EmptyState
+              icon={FileTextIcon}
+              title="Sin liquidaciones"
+              description="No existen liquidaciones para la búsqueda seleccionada."
+            />
+          ) : (
+            <Table head={<>
+              <TH>Código</TH>
+              <TH>Asesor</TH>
+              <TH>Venta / Lote</TH>
+              <TH>Modalidad</TH>
+              <TH align="right">Precio venta</TH>
+              <TH align="right">Tasa</TH>
+              <TH align="right">Comisión</TH>
+              <TH>Contrato</TH>
+              <TH>Estado</TH>
+              <TH align="right">Acciones</TH>
+            </>}>
+              {filteredSettlements.map((item) => (
+                <TR key={item.id}>
+                  <TD className="font-mono text-[12px] font-semibold text-brand-900">{item.code}</TD>
+                  <TD className="font-medium">{item.advisorName}</TD>
                   <TD>
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-600">
-                        {advisor.initials}
-                      </span>
-                      <span className="font-medium text-brand-900">{advisor.name}</span>
-                    </div>
+                    <div className="font-mono text-[12px] text-brand-800">{item.saleCode}</div>
+                    <div className="text-[11px] text-brand-400">{item.lotCode}</div>
                   </TD>
+                  <TD className="text-brand-600">{item.modality}</TD>
+                  <TD align="right" className="font-mono">{currency(item.salePrice)}</TD>
+                  <TD align="right" className="font-mono font-medium text-brand-700">{item.rate}%</TD>
+                  <TD align="right" className="font-mono font-semibold text-brand-900">{currency(item.amount)}</TD>
                   <TD>
-                    <Badge variant={advisor.type === 'Interno' ? 'brand' : 'gray'}>
-                      {advisor.type}
+                    <Badge tone={item.contractStatus.toUpperCase() === 'VIGENTE' ? 'accent' : 'neutral'}>
+                      {item.contractStatus}
                     </Badge>
                   </TD>
-                  <TD className="text-brand-500">{advisor.team}</TD>
-                  <TD align="right">{advisor.salesCount}</TD>
-                  <TD align="right">{currency(advisor.salesAmount)}</TD>
-                  <TD align="right" className="font-medium text-brand-900">
-                    {currency(advisor.commission)}
-                  </TD>
-                  <TD align="right">{advisor.bonus > 0 ? currency(advisor.bonus) : '—'}</TD>
                   <TD>
-                    <StatusBadge status={advisor.status} />
+                    <Badge tone={item.status === 'Aprobada' ? 'brand' : 'neutral'}>{item.status}</Badge>
+                  </TD>
+                  <TD align="right">
+                    {item.status === 'Pendiente' ? (
+                      <Gate permission="advisors.approve">
+                        <Button size="sm" variant="primary" icon={CheckIcon}
+                          onClick={() => void handleApproveDevengo(item.id)}>
+                          Aprobar devengo
+                        </Button>
+                      </Gate>
+                    ) : (
+                      <span className="text-[12px] font-medium text-emerald-600">Devengada</span>
+                    )}
                   </TD>
                 </TR>
               ))}
-            </tbody>
-          </Table>
-        )}
-
-        {tab === 'asistencia' && (
-          <Table>
-            <thead>
-              <TR isHeader>
-                <TH>Asesor</TH>
-                <TH>Horario</TH>
-                <TH align="right">Faltas justificadas</TH>
-                <TH align="right">Descuentos</TH>
-                <TH>Estado</TH>
-              </TR>
-            </thead>
-            <tbody>
-              {rows.map((advisor) => (
-                <TR key={advisor.id}>
-                  <TD className="font-medium text-brand-900">{advisor.name}</TD>
-                  <TD className="text-brand-500">{advisor.schedule}</TD>
-                  <TD align="right">{advisor.absences}</TD>
-                  <TD align="right" className={advisor.discount > 0 ? 'text-rose-700' : ''}>
-                    {advisor.discount > 0 ? currency(advisor.discount) : '—'}
-                  </TD>
-                  <TD>
-                    <StatusBadge status={advisor.status} />
-                  </TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
+            </Table>
+          )
         )}
       </Card>
     </div>
