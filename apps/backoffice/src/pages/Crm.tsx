@@ -48,6 +48,7 @@ import {
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
 import { currency } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
 import {
   CrmPeriodoGlobal,
   type PeriodoCrmModo
@@ -119,15 +120,11 @@ function validateFollowUpForm(form: CrmFollowUpCreate): { valid: boolean; error?
 function validateVisitForm(form: {
   prospectId: number;
   projectId: number;
-  advisorId: number;
   visitDate: string;
   shift: string;
 }): { valid: boolean; error?: string; fechaIso?: string } {
   if (!form.prospectId || !form.projectId || !form.visitDate) {
     return { valid: false, error: 'Seleccione prospecto, proyecto y fecha de visita.' };
-  }
-  if (!form.advisorId) {
-    return { valid: false, error: 'Seleccione un asesor responsable para la visita.' };
   }
   const [year, month, day] = form.visitDate.split('-').map(Number);
   const [hours, minutes] = form.shift.split(':').map(Number);
@@ -220,6 +217,19 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
+  const { user } = useAuth();
+
+  const puedeVerGestionGlobal = user.roles.some(
+    (rol) => rol === 'Administrador' || rol === 'Gerencia'
+  );
+
+  const puedeElegirAsesor = user.roles.some(
+    (rol) =>
+      rol === 'Administrador' ||
+      rol === 'Gerencia' ||
+      rol === 'Supervisor comercial'
+  );
+
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
@@ -248,7 +258,6 @@ export function Crm() {
   const [agendaLoading, setAgendaLoading] = useState(false);
   const [agendaError, setAgendaError] = useState<string | null>(null);
   const [agendaRefreshKey, setAgendaRefreshKey] = useState(0);
-
 
   const [buyersList, setBuyersList] = useState<CrmBuyer[]>([]);
   const [buyersTotal, setBuyersTotal] = useState(0);
@@ -330,9 +339,6 @@ export function Crm() {
   const [evolucionLoading, setEvolucionLoading] = useState(false);
   const [evolucionError, setEvolucionError] = useState<string | null>(null);
 
-
-
-  // Solicitud UUID estable para registrar leads
   const [solicitudId, setSolicitudId] = useState<string>(() => crypto.randomUUID());
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
   const [form, setForm] = useState<LeadFormData>(INITIAL_FORM);
@@ -456,13 +462,17 @@ export function Crm() {
   const [fuentesData, setFuentesData] = useState<CrmFuentesPeriodo | null>(null);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
 
+
   const loadCatalogsAndAdvisors = useCallback(async () => {
     try {
-
       const [cats, advs, sum] = await Promise.all([
         crmBackend.catalogos(),
-        crmBackend.asesores(),
-        rangoPeriodo
+
+        puedeElegirAsesor
+          ? crmBackend.asesores()
+          : Promise.resolve([] as CrmAdvisor[]),
+
+        puedeVerGestionGlobal && rangoPeriodo
           ? crmBackend.resumenPeriodo(
             rangoPeriodo.desde,
             rangoPeriodo.hastaExclusivo
@@ -473,15 +483,22 @@ export function Crm() {
       setCatalogs(cats);
       setAdvisorsList(advs);
       setSummary(sum);
-      if (advs.length > 0 && selectedAdvisorId === null) {
+
+      if (
+        puedeElegirAsesor &&
+        advs.length > 0 &&
+        selectedAdvisorId === null
+      ) {
         setSelectedAdvisorId(advs[0].id_asesor);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar catalogos CRM.';
+      const msg = err instanceof Error
+        ? err.message
+        : 'Error al cargar catálogos CRM.';
+
       setErrorMsg(msg);
     }
-  }, [selectedAdvisorId, rangoPeriodo]);
-
+  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
@@ -505,10 +522,14 @@ export function Crm() {
         consulta: query.trim() || undefined,
         etapa: stage === 'all' ? undefined : stage,
         origen: origin === 'all' ? undefined : origin,
-        idAsesor: typeof advisorFilter === 'number'
+
+        idAsesor: puedeVerGestionGlobal &&
+          typeof advisorFilter === 'number'
           ? advisorFilter
           : undefined,
-        sinAsignar: onlyUnassigned || undefined,
+        sinAsignar: puedeVerGestionGlobal
+          ? onlyUnassigned || undefined
+          : undefined,
         pagina: page,
         tamano: pageSize
       };
@@ -545,7 +566,8 @@ export function Crm() {
     } finally {
       setIsLoading(false);
     }
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla]);
+
+  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla, puedeVerGestionGlobal]);
 
 
   const loadBuyers = useCallback(async () => {
@@ -711,7 +733,7 @@ export function Crm() {
 
 
   useEffect(() => {
-    if (!rangoEvolucion) {
+    if (!puedeVerGestionGlobal || !rangoEvolucion) {
       setEvolucionItems([]);
       setEvolucionLoading(false);
       return;
@@ -748,7 +770,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [rangoEvolucion]);
+  }, [rangoEvolucion, puedeVerGestionGlobal]);
 
 
   useEffect(() => {
@@ -837,9 +859,11 @@ export function Crm() {
         origenCodigo: form.origenCodigo,
         motivoContacto: form.motivoContacto.trim(),
         mensaje: form.mensaje.trim() || undefined,
-        idAsesor: form.idAsesor
-          ? Number(form.idAsesor)
-          : undefined,
+        idAsesor:
+          puedeElegirAsesor && form.idAsesor
+            ? Number(form.idAsesor)
+            : undefined,
+
         tipoDocumento: form.tipoDocumento,
         numeroDocumento: form.numeroDocumento.trim(),
         direccion: form.direccion.trim() || undefined
@@ -1252,83 +1276,88 @@ export function Crm() {
       />
 
       {/* Indicadores del período comercial */}
-      <section className="mb-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-brand-900">
-              Resumen comercial
-            </h2>
-            <p className="mt-1 text-xs text-brand-400">
-              Indicadores correspondientes al período seleccionado.
-            </p>
+      {puedeVerGestionGlobal && (
+        <section className="mb-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-brand-900">
+                Resumen comercial
+              </h2>
+              <p className="mt-1 text-xs text-brand-400">
+                Indicadores correspondientes al período seleccionado.
+              </p>
+            </div>
+
+            <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+              {periodoModo === 'HOY'
+                ? 'Día'
+                : periodoModo === 'SEMANA'
+                  ? 'Semana'
+                  : periodoModo === 'MES'
+                    ? 'Mes'
+                    : periodoModo === 'ANIO'
+                      ? 'Año'
+                      : 'Rango'}
+              {' · '}
+              {periodoModo === 'RANGO'
+                ? `${fechaDesde} — ${fechaHasta}`
+                : fechaReferencia}
+            </span>
           </div>
 
-          <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-            {periodoModo === 'HOY'
-              ? 'Día'
-              : periodoModo === 'SEMANA'
-                ? 'Semana'
-                : periodoModo === 'MES'
-                  ? 'Mes'
-                  : periodoModo === 'ANIO'
-                    ? 'Año'
-                    : 'Rango'}
-            {' · '}
-            {periodoModo === 'RANGO'
-              ? `${fechaDesde} — ${fechaHasta}`
-              : fechaReferencia}
-          </span>
-        </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {KPI_CRM.map((item) => {
+              const Icon = item.icon;
+              const valor = summary?.[item.key];
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {KPI_CRM.map((item) => {
-            const Icon = item.icon;
-            const valor = summary?.[item.key];
+              return (
+                <div
+                  key={item.key}
+                  className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-2">
+                    <span className="text-xs font-semibold text-brand-700">
+                      {item.label}
+                    </span>
 
-            return (
-              <div
-                key={item.key}
-                className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="mb-4 flex items-start justify-between gap-2">
-                  <span className="text-xs font-semibold text-brand-700">
-                    {item.label}
-                  </span>
-
-                  <div className={`rounded-lg p-2 ${item.color}`}>
-                    <Icon className="h-5 w-5" />
+                    <div className={`rounded-lg p-2 ${item.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
                   </div>
+
+                  <p className="text-3xl font-bold tabular-nums text-brand-950">
+                    {typeof valor === 'number' ? valor : '—'}
+                  </p>
+
+                  <p className="mt-2 text-xs text-brand-400">
+                    {item.description}
+                  </p>
                 </div>
-
-                <p className="text-3xl font-bold tabular-nums text-brand-950">
-                  {typeof valor === 'number' ? valor : '—'}
-                </p>
-
-                <p className="mt-2 text-xs text-brand-400">
-                  {item.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
 
       {/* Gráfico de evolución comercial */}
-      {evolucionError && (
-        <p
-          role="alert"
-          className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
-        >
-          {evolucionError}
-        </p>
+      {puedeVerGestionGlobal && (
+        <>
+          {evolucionError && (
+            <p
+              role="alert"
+              className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+            >
+              {evolucionError}
+            </p>
+          )}
+
+          <CrmEvolucionChart
+            items={evolucionItems}
+            loading={evolucionLoading}
+          />
+        </>
       )}
-
-      <CrmEvolucionChart
-        items={evolucionItems}
-        loading={evolucionLoading}
-      />
-
 
       <Tabs
         className="mb-5"
@@ -1374,7 +1403,11 @@ export function Crm() {
             label: 'Agenda de visitas',
             count: visitsList.length
           }
-        ]}
+        ].filter(
+          (item) =>
+            puedeVerGestionGlobal ||
+            !['fuentes', 'asesores'].includes(item.id)
+        )}
       />
 
       {/* PESTANA 1: Leads y potenciales */}
@@ -1446,37 +1479,44 @@ export function Crm() {
                 </div>
 
                 {/* Asesor */}
-                <div className="w-full sm:w-52">
-                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
-                    Asesor
-                  </label>
-                  <Select
-                    aria-label="Filtrar por asesor"
-                    value={onlyUnassigned ? 'sin_asignar' : String(advisorFilter)}
-                    onChange={(e) => {
-                      const value = e.target.value;
 
-                      if (value === 'sin_asignar') {
-                        setOnlyUnassigned(true);
-                        setAdvisorFilter('');
-                      } else {
-                        setOnlyUnassigned(false);
-                        setAdvisorFilter(value ? Number(value) : '');
-                      }
+                {/* Filtro global de asesores: solo Administración y Gerencia */}
+                {puedeVerGestionGlobal && (
+                  <div className="w-full sm:w-52">
+                    <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                      Asesor
+                    </label>
 
-                      setPage(1);
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Todos los asesores</option>
-                    <option value="sin_asignar">Sin asesor asignado</option>
-                    {advisorsList.map((adv) => (
-                      <option key={adv.id_asesor} value={adv.id_asesor}>
-                        {adv.nombre_completo}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                    <Select
+                      aria-label="Filtrar por asesor"
+                      value={onlyUnassigned ? 'sin_asignar' : String(advisorFilter)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        if (value === 'sin_asignar') {
+                          setOnlyUnassigned(true);
+                          setAdvisorFilter('');
+                        } else {
+                          setOnlyUnassigned(false);
+                          setAdvisorFilter(value ? Number(value) : '');
+                        }
+
+                        setPage(1);
+                      }}
+                      className="w-full"
+                    >
+                      <option value="">Todos los asesores</option>
+                      <option value="sin_asignar">Sin asesor asignado</option>
+
+                      {advisorsList.map((adv) => (
+                        <option key={adv.id_asesor} value={adv.id_asesor}>
+                          {adv.nombre_completo}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+
 
                 {/* Proyecto */}
                 <div className="w-full sm:w-52">
@@ -1559,7 +1599,7 @@ export function Crm() {
                 >
                   Limpiar filtros
                 </Button>
-                
+
                 <div className="mt-3 flex justify-end">
                   <CrmCategoriaLegend />
                 </div>
@@ -1654,13 +1694,19 @@ export function Crm() {
                         });
                       }
                     },
-                    {
-                      label: 'Asignar asesor', icon: UserPlusIcon, permission: 'crm.edit',
+
+                    ...(puedeVerGestionGlobal ? [{
+                      label: 'Asignar asesor',
+                      icon: UserPlusIcon,
+                      permission: 'crm.edit' as const,
                       onClick: () => {
                         setAssignLead(lead);
-                        if (advisorsList.length > 0) setSelectedAdvisorId(advisorsList[0].id_asesor);
+                        if (advisorsList.length > 0) {
+                          setSelectedAdvisorId(advisorsList[0].id_asesor);
+                        }
                       }
-                    },
+                    }] : []),
+
                     {
                       label: 'Agendar visita', icon: CalendarIcon, permission: 'crm.edit',
                       onClick: () => {
@@ -1674,11 +1720,18 @@ export function Crm() {
                         setIsNewVisitOpen(true);
                       }
                     },
-                    {
-                      label: 'Desactivar prospecto', icon: XCircleIcon, permission: 'crm.delete',
+
+                    ...(puedeVerGestionGlobal ? [{
+                      label: 'Desactivar prospecto',
+                      icon: XCircleIcon,
+                      permission: 'crm.delete' as const,
                       danger: true,
-                      onClick: () => { setDeactivateLead(lead); setDeactivateReason(''); }
-                    }
+                      onClick: () => {
+                        setDeactivateLead(lead);
+                        setDeactivateReason('');
+                      }
+                    }] : [])
+
                   ];
                   return (
                     <TR key={lead.id_prospecto}>
@@ -1708,7 +1761,6 @@ export function Crm() {
                         {formatDateTimeLima(lead.ultimo_contacto)}
                       </TD>
 
-
                       <TD align="right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
@@ -1719,6 +1771,7 @@ export function Crm() {
                           >
                             Expediente
                           </Button>
+
                           <CrmActionsMenu
                             label={`Acciones de ${lead.nombre_completo}`}
                             actions={acciones}
@@ -1777,33 +1830,35 @@ export function Crm() {
                 </Button>
               )}
 
-              <Button
-                icon={CalendarIcon}
-                variant="primary"
-                onClick={() => {
-                  if (!selectedVisitProspectId) {
-                    toast.error('Seleccione un prospecto', {
-                      description:
-                        'Seleccione primero el prospecto para agendar una visita.'
+              <Gate permission="crm.edit">
+                <Button
+                  icon={CalendarIcon}
+                  variant="primary"
+                  onClick={() => {
+                    if (!selectedVisitProspectId) {
+                      toast.error('Seleccione un prospecto', {
+                        description:
+                          'Seleccione primero el prospecto para agendar una visita.'
+                      });
+                      return;
+                    }
+
+                    setVisitForm({
+                      prospectId: selectedVisitProspectId,
+                      projectId: catalogs?.proyectos?.[0]?.id || 1,
+                      advisorId: advisorsList[0]?.id_asesor || 0,
+                      visitDate: '',
+                      shift: '11:00',
+                      meetingPoint: 'Oficina de Ventas - Lurin',
+                      notes: ''
                     });
-                    return;
-                  }
 
-                  setVisitForm({
-                    prospectId: selectedVisitProspectId,
-                    projectId: catalogs?.proyectos?.[0]?.id || 1,
-                    advisorId: advisorsList[0]?.id_asesor || 0,
-                    visitDate: '',
-                    shift: '11:00',
-                    meetingPoint: 'Oficina de Ventas - Lurin',
-                    notes: ''
-                  });
-
-                  setIsNewVisitOpen(true);
-                }}
-              >
-                Agendar visita
-              </Button>
+                    setIsNewVisitOpen(true);
+                  }}
+                >
+                  Agendar visita
+                </Button>
+              </Gate>
             </div>
           </div>
 
@@ -1909,36 +1964,42 @@ export function Crm() {
                     <TD align="right">
                       <div className="flex justify-end gap-1.5">
                         {vis.estado === 'PROGRAMADA' && (
-                          <Button
-                            size="sm"
-                            icon={CheckCircleIcon}
-                            onClick={() => handleConfirmVisit(vis.id_visita)}
-                          >
-                            Confirmar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button
+                              size="sm"
+                              icon={CheckCircleIcon}
+                              onClick={() => handleConfirmVisit(vis.id_visita)}
+                            >
+                              Confirmar
+                            </Button>
+                          </Gate>
                         )}
 
                         {vis.estado === 'CONFIRMADA' && (
-                          <Button
-                            size="sm"
-                            icon={CheckCircleIcon}
-                            onClick={() => handleCompleteVisit(vis.id_visita)}
-                          >
-                            Realizada
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button
+                              size="sm"
+                              icon={CheckCircleIcon}
+                              onClick={() => handleCompleteVisit(vis.id_visita)}
+                            >
+                              Realizada
+                            </Button>
+                          </Gate>
                         )}
 
                         {vis.estado !== 'CANCELADA' &&
                           vis.estado !== 'REALIZADA' && (
-                            <Button
-                              size="sm"
-                              icon={XCircleIcon}
-                              onClick={() =>
-                                handleCancelVisit(vis.id_visita)
-                              }
-                            >
-                              Cancelar
-                            </Button>
+                            <Gate permission="crm.edit">
+                              <Button
+                                size="sm"
+                                icon={XCircleIcon}
+                                onClick={() =>
+                                  handleCancelVisit(vis.id_visita)
+                                }
+                              >
+                                Cancelar
+                              </Button>
+                            </Gate>
                           )}
                       </div>
                     </TD>
@@ -2448,19 +2509,25 @@ export function Crm() {
                           }
                         />
                         {v.estado === 'PROGRAMADA' && (
-                          <Button size="sm" onClick={() => handleConfirmVisit(v.id_visita)}>
-                            Confirmar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleConfirmVisit(v.id_visita)}>
+                              Confirmar
+                            </Button>
+                          </Gate>
                         )}
                         {v.estado === 'CONFIRMADA' && (
-                          <Button size="sm" onClick={() => handleCompleteVisit(v.id_visita)}>
-                            Realizada
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleCompleteVisit(v.id_visita)}>
+                              Realizada
+                            </Button>
+                          </Gate>
                         )}
                         {v.estado !== 'CANCELADA' && v.estado !== 'REALIZADA' && (
-                          <Button size="sm" onClick={() => handleCancelVisit(v.id_visita)}>
-                            Cancelar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleCancelVisit(v.id_visita)}>
+                              Cancelar
+                            </Button>
+                          </Gate>
                         )}
                       </div>
                     </div>
@@ -2563,18 +2630,43 @@ export function Crm() {
               {mensajeError('origenCodigo')}
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-brand-700">Asesor inicial</label>
-              <Select aria-label="Asesor inicial" value={form.idAsesor}
-                onChange={e => setForm(p => ({ ...p, idAsesor: e.target.value ? Number(e.target.value) : '' }))}>
-                <option value="">Sin asignar (Rotativo)</option>
-                {advisorsList.map(a => (
-                  <option key={a.id_asesor} value={a.id_asesor}>
-                    {a.nombre_completo} ({a.leads_activos} activos)
-                  </option>
-                ))}
-              </Select>
-            </div>
+
+            {/* Asignación inicial: Administrador, Gerencia y Supervisor comercial */}
+            {puedeElegirAsesor && (
+              <div>
+                <label className="text-xs font-medium text-brand-700">
+                  Asesor responsable
+                </label>
+
+                <Select
+                  aria-label="Asesor responsable"
+                  value={form.idAsesor}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      idAsesor: e.target.value
+                        ? Number(e.target.value)
+                        : ''
+                    }))
+                  }
+                >
+                  <option value="">Sin asignar</option>
+
+                  {advisorsList
+                    .filter((asesor) => asesor.activo !== false)
+                    .map((asesor) => (
+                      <option
+                        key={asesor.id_asesor}
+                        value={asesor.id_asesor}
+                      >
+                        {asesor.nombre_completo}
+                        {' '}({asesor.leads_activos} activos)
+                      </option>
+                    ))}
+                </Select>
+              </div>
+            )}
+
 
             <div>
               <label className="text-xs font-medium text-brand-700">Tipo de documento *</label>
@@ -3065,19 +3157,15 @@ export function Crm() {
             </Select>
           </div>
 
-          <div>
-            <label className="text-[12px] font-medium text-brand-700">Asesor responsable *</label>
-            <Select
-              aria-label="Asesor responsable"
-              value={visitForm.advisorId || ''}
-              onChange={(e) => setVisitForm({ ...visitForm, advisorId: Number(e.target.value) })}
-            >
-              {advisorsList.map((a) => (
-                <option key={a.id_asesor} value={a.id_asesor}>
-                  {a.nombre_completo} ({a.codigo})
-                </option>
-              ))}
-            </Select>
+          <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+            <p className="text-xs font-medium text-brand-800">
+              Asesor comercial responsable
+            </p>
+            <p className="mt-1 text-xs text-brand-600">
+              La visita se registrará según las reglas de asignación
+              comercial del prospecto. No es necesario seleccionar
+              manualmente un asesor.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

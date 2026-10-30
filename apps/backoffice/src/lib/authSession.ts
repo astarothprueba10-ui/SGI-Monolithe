@@ -15,7 +15,8 @@ const ROLE_MAP: Record<string, RoleName> = {
     ROLE_MARKETING: 'Marketing',
     ROLE_ASESOR: 'Asesor',
     ROLE_FINANZAS: 'Finanzas',
-    ROLE_RRHH: 'RRHH'
+    ROLE_RRHH: 'RRHH',
+    ROLE_SUPERVISOR_COMERCIAL: 'Supervisor comercial'
 };
 
 export function getStoredAuthUser(): StoredAuthUser | null {

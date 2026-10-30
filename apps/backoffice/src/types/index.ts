@@ -36,7 +36,8 @@ export type RoleName =
   | 'Asesor'
   | 'Finanzas'
   | 'Marketing'
-  | 'RRHH';
+  | 'RRHH'
+  | 'Supervisor comercial';
 
 export interface Role {
   name: RoleName;
