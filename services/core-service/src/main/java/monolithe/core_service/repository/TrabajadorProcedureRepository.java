@@ -171,6 +171,29 @@ public class TrabajadorProcedureRepository {
                         Long idActor,
                         Long idTrabajador,
                         String correoNuevo,
+                        String motivo) {
+                String sql = """
+                                CALL public.sp_rrhh_solicitar_cambio_correo(
+                                    ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idTrabajador,
+                                correoNuevo,
+                                motivo);
+        }
+
+        public ResultadoProcedimiento solicitarCambioCorreo(
+                        Long idActor,
+                        Long idTrabajador,
+                        String correoNuevo,
                         String tokenHash,
                         OffsetDateTime fechaExpiracion) {
                 String sql = """
@@ -286,6 +309,34 @@ public class TrabajadorProcedureRepository {
                                 idSolicitud,
                                 decision,
                                 motivo);
+        }
+
+        public ResultadoProcedimiento resolverCorreccionIdentidad(
+                        Long idActor,
+                        Long idSolicitud,
+                        String decision,
+                        String motivo,
+                        String tokenHash,
+                        OffsetDateTime fechaExpiracion) {
+
+                String sql = """
+                                CALL public.sp_core_resolver_correccion_identidad(
+                                    ?, ?, ?, ?, ?, ?, NULL, NULL, NULL
+                                )
+                                """;
+
+                return jdbcTemplate.queryForObject(
+                                sql,
+                                (rs, rowNum) -> mapearResultado(
+                                                rs.getString("p_resultado"),
+                                                rs.getString("p_estado"),
+                                                rs.getString("p_mensaje")),
+                                idActor,
+                                idSolicitud,
+                                decision,
+                                motivo,
+                                tokenHash,
+                                fechaExpiracion);
         }
 
         public ResultadoProcedimiento adjuntarEvidenciaCorreccion(

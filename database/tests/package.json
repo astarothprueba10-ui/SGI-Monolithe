@@ -1,0 +1,6 @@
+{
+  "name": "monolithe-database-tests",
+  "private": true,
+  "scripts": { "test:rrhh": "node --test rrhhPermisos.test.cjs" },
+  "devDependencies": { "@electric-sql/pglite": "0.5.13" }
+}

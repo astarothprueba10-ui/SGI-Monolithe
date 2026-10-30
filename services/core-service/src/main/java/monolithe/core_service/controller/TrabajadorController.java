@@ -131,13 +131,8 @@ public class TrabajadorController {
             @RequestBody @Valid SolicitudCambioCorreoRequest solicitud,
             @AuthenticationPrincipal Jwt jwt) {
         Long idActor = obtenerIdActor(jwt);
-        String tokenJwt = jwt.getTokenValue();
-
         return ResponseEntity.ok(trabajadorService.solicitarCambioCorreo(
-                idActor,
-                idTrabajador,
-                solicitud.correoNuevo(),
-                tokenJwt));
+                idActor, idTrabajador, solicitud.correoNuevo(), solicitud.motivo()));
     }
 
     @PostMapping("/confirmar-cambio-correo")

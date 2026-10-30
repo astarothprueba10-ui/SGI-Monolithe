@@ -27,6 +27,8 @@ import { Pagination } from '../components/ui/Pagination';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { calcularRangoCrm } from '../utils/crmPeriodo';
+import { CrmActionsMenu, type CrmMenuAction } from '../components/crm/CrmActionsMenu';
+import { CrmCategoriaLegend } from '../components/crm/CrmCategoriaLegend';
 import {
   crmBackend,
   type CrmAdvisor,
@@ -46,6 +48,7 @@ import {
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
 import { currency } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
 import {
   CrmPeriodoGlobal,
   type PeriodoCrmModo
@@ -117,15 +120,11 @@ function validateFollowUpForm(form: CrmFollowUpCreate): { valid: boolean; error?
 function validateVisitForm(form: {
   prospectId: number;
   projectId: number;
-  advisorId: number;
   visitDate: string;
   shift: string;
 }): { valid: boolean; error?: string; fechaIso?: string } {
   if (!form.prospectId || !form.projectId || !form.visitDate) {
     return { valid: false, error: 'Seleccione prospecto, proyecto y fecha de visita.' };
-  }
-  if (!form.advisorId) {
-    return { valid: false, error: 'Seleccione un asesor responsable para la visita.' };
   }
   const [year, month, day] = form.visitDate.split('-').map(Number);
   const [hours, minutes] = form.shift.split(':').map(Number);
@@ -218,6 +217,19 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
+  const { user } = useAuth();
+
+  const puedeVerGestionGlobal = user.roles.some(
+    (rol) => rol === 'Administrador' || rol === 'Gerencia'
+  );
+
+  const puedeElegirAsesor = user.roles.some(
+    (rol) =>
+      rol === 'Administrador' ||
+      rol === 'Gerencia' ||
+      rol === 'Supervisor comercial'
+  );
+
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
@@ -246,7 +258,6 @@ export function Crm() {
   const [agendaLoading, setAgendaLoading] = useState(false);
   const [agendaError, setAgendaError] = useState<string | null>(null);
   const [agendaRefreshKey, setAgendaRefreshKey] = useState(0);
-
 
   const [buyersList, setBuyersList] = useState<CrmBuyer[]>([]);
   const [buyersTotal, setBuyersTotal] = useState(0);
@@ -328,9 +339,6 @@ export function Crm() {
   const [evolucionLoading, setEvolucionLoading] = useState(false);
   const [evolucionError, setEvolucionError] = useState<string | null>(null);
 
-
-
-  // Solicitud UUID estable para registrar leads
   const [solicitudId, setSolicitudId] = useState<string>(() => crypto.randomUUID());
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
   const [form, setForm] = useState<LeadFormData>(INITIAL_FORM);
@@ -454,13 +462,17 @@ export function Crm() {
   const [fuentesData, setFuentesData] = useState<CrmFuentesPeriodo | null>(null);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
 
+
   const loadCatalogsAndAdvisors = useCallback(async () => {
     try {
-
       const [cats, advs, sum] = await Promise.all([
         crmBackend.catalogos(),
-        crmBackend.asesores(),
-        rangoPeriodo
+
+        puedeElegirAsesor
+          ? crmBackend.asesores()
+          : Promise.resolve([] as CrmAdvisor[]),
+
+        puedeVerGestionGlobal && rangoPeriodo
           ? crmBackend.resumenPeriodo(
             rangoPeriodo.desde,
             rangoPeriodo.hastaExclusivo
@@ -471,23 +483,28 @@ export function Crm() {
       setCatalogs(cats);
       setAdvisorsList(advs);
       setSummary(sum);
-      if (advs.length > 0 && selectedAdvisorId === null) {
+
+      if (
+        puedeElegirAsesor &&
+        advs.length > 0 &&
+        selectedAdvisorId === null
+      ) {
         setSelectedAdvisorId(advs[0].id_asesor);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar catalogos CRM.';
+      const msg = err instanceof Error
+        ? err.message
+        : 'Error al cargar catálogos CRM.';
+
       setErrorMsg(msg);
     }
-  }, [selectedAdvisorId, rangoPeriodo]);
-
+  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
 
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      // Las tablas utilizan su rango independiente.
-      // La agenda conserva la búsqueda general de prospectos.
       const rangoConsulta = tab === 'visitas'
         ? rangoPeriodo
         : rangoTabla;
@@ -505,10 +522,14 @@ export function Crm() {
         consulta: query.trim() || undefined,
         etapa: stage === 'all' ? undefined : stage,
         origen: origin === 'all' ? undefined : origin,
-        idAsesor: typeof advisorFilter === 'number'
+
+        idAsesor: puedeVerGestionGlobal &&
+          typeof advisorFilter === 'number'
           ? advisorFilter
           : undefined,
-        sinAsignar: onlyUnassigned || undefined,
+        sinAsignar: puedeVerGestionGlobal
+          ? onlyUnassigned || undefined
+          : undefined,
         pagina: page,
         tamano: pageSize
       };
@@ -545,7 +566,8 @@ export function Crm() {
     } finally {
       setIsLoading(false);
     }
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla]);
+
+  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla, puedeVerGestionGlobal]);
 
 
   const loadBuyers = useCallback(async () => {
@@ -711,7 +733,7 @@ export function Crm() {
 
 
   useEffect(() => {
-    if (!rangoEvolucion) {
+    if (!puedeVerGestionGlobal || !rangoEvolucion) {
       setEvolucionItems([]);
       setEvolucionLoading(false);
       return;
@@ -748,7 +770,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [rangoEvolucion]);
+  }, [rangoEvolucion, puedeVerGestionGlobal]);
 
 
   useEffect(() => {
@@ -837,9 +859,11 @@ export function Crm() {
         origenCodigo: form.origenCodigo,
         motivoContacto: form.motivoContacto.trim(),
         mensaje: form.mensaje.trim() || undefined,
-        idAsesor: form.idAsesor
-          ? Number(form.idAsesor)
-          : undefined,
+        idAsesor:
+          puedeElegirAsesor && form.idAsesor
+            ? Number(form.idAsesor)
+            : undefined,
+
         tipoDocumento: form.tipoDocumento,
         numeroDocumento: form.numeroDocumento.trim(),
         direccion: form.direccion.trim() || undefined
@@ -1252,83 +1276,88 @@ export function Crm() {
       />
 
       {/* Indicadores del período comercial */}
-      <section className="mb-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-brand-900">
-              Resumen comercial
-            </h2>
-            <p className="mt-1 text-xs text-brand-400">
-              Indicadores correspondientes al período seleccionado.
-            </p>
+      {puedeVerGestionGlobal && (
+        <section className="mb-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-brand-900">
+                Resumen comercial
+              </h2>
+              <p className="mt-1 text-xs text-brand-400">
+                Indicadores correspondientes al período seleccionado.
+              </p>
+            </div>
+
+            <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+              {periodoModo === 'HOY'
+                ? 'Día'
+                : periodoModo === 'SEMANA'
+                  ? 'Semana'
+                  : periodoModo === 'MES'
+                    ? 'Mes'
+                    : periodoModo === 'ANIO'
+                      ? 'Año'
+                      : 'Rango'}
+              {' · '}
+              {periodoModo === 'RANGO'
+                ? `${fechaDesde} — ${fechaHasta}`
+                : fechaReferencia}
+            </span>
           </div>
 
-          <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-            {periodoModo === 'HOY'
-              ? 'Día'
-              : periodoModo === 'SEMANA'
-                ? 'Semana'
-                : periodoModo === 'MES'
-                  ? 'Mes'
-                  : periodoModo === 'ANIO'
-                    ? 'Año'
-                    : 'Rango'}
-            {' · '}
-            {periodoModo === 'RANGO'
-              ? `${fechaDesde} — ${fechaHasta}`
-              : fechaReferencia}
-          </span>
-        </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {KPI_CRM.map((item) => {
+              const Icon = item.icon;
+              const valor = summary?.[item.key];
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {KPI_CRM.map((item) => {
-            const Icon = item.icon;
-            const valor = summary?.[item.key];
+              return (
+                <div
+                  key={item.key}
+                  className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-2">
+                    <span className="text-xs font-semibold text-brand-700">
+                      {item.label}
+                    </span>
 
-            return (
-              <div
-                key={item.key}
-                className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="mb-4 flex items-start justify-between gap-2">
-                  <span className="text-xs font-semibold text-brand-700">
-                    {item.label}
-                  </span>
-
-                  <div className={`rounded-lg p-2 ${item.color}`}>
-                    <Icon className="h-5 w-5" />
+                    <div className={`rounded-lg p-2 ${item.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
                   </div>
+
+                  <p className="text-3xl font-bold tabular-nums text-brand-950">
+                    {typeof valor === 'number' ? valor : '—'}
+                  </p>
+
+                  <p className="mt-2 text-xs text-brand-400">
+                    {item.description}
+                  </p>
                 </div>
-
-                <p className="text-3xl font-bold tabular-nums text-brand-950">
-                  {typeof valor === 'number' ? valor : '—'}
-                </p>
-
-                <p className="mt-2 text-xs text-brand-400">
-                  {item.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
 
       {/* Gráfico de evolución comercial */}
-      {evolucionError && (
-        <p
-          role="alert"
-          className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
-        >
-          {evolucionError}
-        </p>
+      {puedeVerGestionGlobal && (
+        <>
+          {evolucionError && (
+            <p
+              role="alert"
+              className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+            >
+              {evolucionError}
+            </p>
+          )}
+
+          <CrmEvolucionChart
+            items={evolucionItems}
+            loading={evolucionLoading}
+          />
+        </>
       )}
-
-      <CrmEvolucionChart
-        items={evolucionItems}
-        loading={evolucionLoading}
-      />
-
 
       <Tabs
         className="mb-5"
@@ -1374,7 +1403,11 @@ export function Crm() {
             label: 'Agenda de visitas',
             count: visitsList.length
           }
-        ]}
+        ].filter(
+          (item) =>
+            puedeVerGestionGlobal ||
+            !['fuentes', 'asesores'].includes(item.id)
+        )}
       />
 
       {/* PESTANA 1: Leads y potenciales */}
@@ -1446,37 +1479,44 @@ export function Crm() {
                 </div>
 
                 {/* Asesor */}
-                <div className="w-full sm:w-52">
-                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
-                    Asesor
-                  </label>
-                  <Select
-                    aria-label="Filtrar por asesor"
-                    value={onlyUnassigned ? 'sin_asignar' : String(advisorFilter)}
-                    onChange={(e) => {
-                      const value = e.target.value;
 
-                      if (value === 'sin_asignar') {
-                        setOnlyUnassigned(true);
-                        setAdvisorFilter('');
-                      } else {
-                        setOnlyUnassigned(false);
-                        setAdvisorFilter(value ? Number(value) : '');
-                      }
+                {/* Filtro global de asesores: solo Administración y Gerencia */}
+                {puedeVerGestionGlobal && (
+                  <div className="w-full sm:w-52">
+                    <label className="mb-1.5 block text-xs font-medium text-brand-600">
+                      Asesor
+                    </label>
 
-                      setPage(1);
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Todos los asesores</option>
-                    <option value="sin_asignar">Sin asesor asignado</option>
-                    {advisorsList.map((adv) => (
-                      <option key={adv.id_asesor} value={adv.id_asesor}>
-                        {adv.nombre_completo}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                    <Select
+                      aria-label="Filtrar por asesor"
+                      value={onlyUnassigned ? 'sin_asignar' : String(advisorFilter)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        if (value === 'sin_asignar') {
+                          setOnlyUnassigned(true);
+                          setAdvisorFilter('');
+                        } else {
+                          setOnlyUnassigned(false);
+                          setAdvisorFilter(value ? Number(value) : '');
+                        }
+
+                        setPage(1);
+                      }}
+                      className="w-full"
+                    >
+                      <option value="">Todos los asesores</option>
+                      <option value="sin_asignar">Sin asesor asignado</option>
+
+                      {advisorsList.map((adv) => (
+                        <option key={adv.id_asesor} value={adv.id_asesor}>
+                          {adv.nombre_completo}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+
 
                 {/* Proyecto */}
                 <div className="w-full sm:w-52">
@@ -1560,6 +1600,10 @@ export function Crm() {
                   Limpiar filtros
                 </Button>
 
+                <div className="mt-3 flex justify-end">
+                  <CrmCategoriaLegend />
+                </div>
+
               </div>
             </div>
           </div>
@@ -1594,15 +1638,17 @@ export function Crm() {
           ) : (
             <>
               <Table
+
                 head={
                   <>
-                    <TH>Lead / Contacto</TH>
-                    <TH>Interes / Proyecto</TH>
+                    <TH>Fecha de registro</TH>
+                    <TH>{tab === 'leads' ? 'Lead' : 'Cliente potencial'}</TH>
+                    <TH>Contacto</TH>
+                    <TH>Interés / Proyecto</TH>
                     <TH>Origen</TH>
-                    <TH>Etapa</TH>
                     <TH>Asesor</TH>
-                    <TH>Puntuacion</TH>
-                    <TH>Ultimo contacto</TH>
+                    <TH>Estado</TH>
+                    <TH>Último contacto</TH>
                     <TH align="right">Acciones</TH>
                   </>
                 }
@@ -1612,50 +1658,111 @@ export function Crm() {
                     STAGE_TONES[lead.estado_codigo] ||
                     STAGE_TONES[lead.estado_nombre] ||
                     'bg-slate-100 text-slate-700 border-slate-200';
+
+                  const isLeadFinal = Boolean(
+                    catalogs?.estados.find(e => e.codigo === lead.estado_codigo)?.final ||
+                    lead.categoria === 'COMPRADOR' || lead.categoria === 'CERRADO'
+                  );
+
+                  const acciones: CrmMenuAction[] = [
+                    ...(lead.categoria === 'POTENCIAL' ? [{
+                      label: 'Verificar compra', icon: CheckCircleIcon, permission: 'crm.view' as const,
+                      onClick: () => void handleVerifySale(lead)
+                    }] : []),
+                    {
+                      label: 'Cambiar etapa', icon: RefreshCw, permission: 'crm.edit',
+                      disabled: isLeadFinal,
+                      onClick: () => { setStageLead(lead); setNewStageCode(lead.estado_codigo); }
+                    },
+                    {
+                      label: 'Editar ficha comercial', icon: PencilIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setEditLead(lead);
+                        setEditOrigen(lead.origen_codigo);
+                        setEditObservaciones(lead.observaciones || '');
+                      }
+                    },
+                    {
+                      label: 'Registrar seguimiento', icon: PhoneIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setFollowUpLead(lead);
+                        setFollowUpForm({
+                          tipoCodigo: 'LLAMADA',
+                          asunto: `Contacto de seguimiento con ${lead.nombre_completo}`,
+                          detalle: '', resultado: '', requiereSeguimiento: false,
+                          fechaProximoSeguimiento: null
+                        });
+                      }
+                    },
+
+                    ...(puedeVerGestionGlobal ? [{
+                      label: 'Asignar asesor',
+                      icon: UserPlusIcon,
+                      permission: 'crm.edit' as const,
+                      onClick: () => {
+                        setAssignLead(lead);
+                        if (advisorsList.length > 0) {
+                          setSelectedAdvisorId(advisorsList[0].id_asesor);
+                        }
+                      }
+                    }] : []),
+
+                    {
+                      label: 'Agendar visita', icon: CalendarIcon, permission: 'crm.edit',
+                      onClick: () => {
+                        setVisitForm({
+                          prospectId: lead.id_prospecto,
+                          projectId: catalogs?.proyectos?.[0]?.id || 1,
+                          advisorId: lead.id_asesor || advisorsList[0]?.id_asesor || 0,
+                          visitDate: '', shift: '11:00',
+                          meetingPoint: 'Oficina de Ventas - Lurin', notes: ''
+                        });
+                        setIsNewVisitOpen(true);
+                      }
+                    },
+
+                    ...(puedeVerGestionGlobal ? [{
+                      label: 'Desactivar prospecto',
+                      icon: XCircleIcon,
+                      permission: 'crm.delete' as const,
+                      danger: true,
+                      onClick: () => {
+                        setDeactivateLead(lead);
+                        setDeactivateReason('');
+                      }
+                    }] : [])
+
+                  ];
                   return (
                     <TR key={lead.id_prospecto}>
-                      <TD>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[11px] font-semibold text-brand-500">
-                              {lead.codigo}
-                            </span>
-                            <p className="font-medium text-brand-900">{lead.nombre_completo}</p>
-                          </div>
-                          <p className="text-[12px] text-brand-400">
-                            {lead.telefono} · {lead.email}
-                          </p>
-                        </div>
-                      </TD>
-                      <TD className="text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
-                      <TD>
-                        <Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge>
+
+                      <TD className="whitespace-nowrap text-xs text-brand-500">
+                        {formatDateLima(lead.fecha_registro)}
                       </TD>
                       <TD>
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                            stageTone
-                          )}
-                        >
+                        <p className="font-semibold text-brand-900">{lead.nombre_completo}</p>
+                        <p className="font-mono text-[11px] text-brand-400">{lead.codigo}</p>
+                      </TD>
+                      <TD>
+                        <p className="whitespace-nowrap text-brand-700">{lead.telefono}</p>
+                        <p className="text-xs text-brand-400">{lead.email}</p>
+                      </TD>
+                      <TD className="min-w-44 text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
+                      <TD><Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge></TD>
+                      <TD className="text-brand-600">
+                        {lead.asesor_nombre || <span className="italic text-brand-400">Sin asignar</span>}
+                      </TD>
+                      <TD>
+                        <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', stageTone)}>
                           {lead.estado_nombre || lead.estado_codigo}
                         </span>
                       </TD>
-                      <TD className="text-brand-600">
-                        {lead.asesor_nombre ? (
-                          lead.asesor_nombre
-                        ) : (
-                          <span className="italic text-brand-300">Sin asignar</span>
-                        )}
+                      <TD className="whitespace-nowrap text-xs text-brand-500">
+                        {formatDateTimeLima(lead.ultimo_contacto)}
                       </TD>
-                      <TD>
-                        <Badge tone={lead.puntuacion === 'Alto' ? 'accent' : 'neutral'}>
-                          {lead.puntuacion || 'Medio'}
-                        </Badge>
-                      </TD>
-                      <TD className="tabular text-brand-400 text-[12px]">{formatDateTimeLima(lead.ultimo_contacto)}</TD>
+
                       <TD align="right">
-                        <div className="flex justify-end items-center gap-1">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
                             icon={EyeIcon}
@@ -1664,107 +1771,11 @@ export function Crm() {
                           >
                             Expediente
                           </Button>
-                          {lead.categoria === 'POTENCIAL' && (
-                            <Gate permission="crm.view">
-                              <Button
-                                size="sm"
-                                icon={CheckCircleIcon}
-                                title="Verificar venta y contrato"
-                                onClick={() => void handleVerifySale(lead)}
-                              >
-                                Verificar compra
-                              </Button>
-                            </Gate>
-                          )}
 
-                          <Gate permission="crm.edit">
-                            {(() => {
-                              const isLeadFinal = Boolean(
-                                catalogs?.estados.find((e) => e.codigo === lead.estado_codigo)?.final ||
-                                lead.categoria === 'COMPRADOR' ||
-                                lead.categoria === 'CERRADO'
-                              );
-                              return (
-                                <Button
-                                  size="sm"
-                                  icon={RefreshCw}
-                                  disabled={isLeadFinal}
-                                  title={isLeadFinal ? 'Prospecto en etapa definitiva o cerrada' : 'Cambiar etapa'}
-                                  onClick={() => {
-                                    setStageLead(lead);
-                                    setNewStageCode(lead.estado_codigo);
-                                  }}
-                                />
-                              );
-                            })()}
-                            <Button
-                              size="sm"
-                              icon={PencilIcon}
-                              title="Editar ficha comercial"
-                              onClick={() => {
-                                setEditLead(lead);
-                                setEditOrigen(lead.origen_codigo);
-                                setEditObservaciones(lead.observaciones || '');
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={PhoneIcon}
-                              title="Registrar seguimiento"
-                              onClick={() => {
-                                setFollowUpLead(lead);
-                                setFollowUpForm({
-                                  tipoCodigo: 'LLAMADA',
-                                  asunto: `Contacto de seguimiento con ${lead.nombre_completo}`,
-                                  detalle: '',
-                                  resultado: '',
-                                  requiereSeguimiento: false,
-                                  fechaProximoSeguimiento: null
-                                });
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={UserPlusIcon}
-                              title="Asignar asesor"
-                              onClick={() => {
-                                setAssignLead(lead);
-                                if (advisorsList.length > 0) {
-                                  setSelectedAdvisorId(advisorsList[0].id_asesor);
-                                }
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              icon={CalendarIcon}
-                              title="Agendar visita comercial"
-                              onClick={() => {
-                                setVisitForm({
-                                  prospectId: lead.id_prospecto,
-                                  projectId: catalogs?.proyectos?.[0]?.id || 1,
-                                  advisorId: lead.id_asesor || advisorsList[0]?.id_asesor || 0,
-                                  visitDate: '',
-                                  shift: '11:00',
-                                  meetingPoint: 'Oficina de Ventas - Lurin',
-                                  notes: ''
-                                });
-                                setIsNewVisitOpen(true);
-                              }}
-                            />
-                          </Gate>
-
-                          <Gate permission="crm.delete">
-                            <Button
-                              size="sm"
-                              icon={XCircleIcon}
-                              className="text-rose-600 hover:text-rose-700"
-                              title="Desactivar prospecto"
-                              onClick={() => {
-                                setDeactivateLead(lead);
-                                setDeactivateReason('');
-                              }}
-                            />
-                          </Gate>
+                          <CrmActionsMenu
+                            label={`Acciones de ${lead.nombre_completo}`}
+                            actions={acciones}
+                          />
                         </div>
                       </TD>
                     </TR>
@@ -1819,33 +1830,35 @@ export function Crm() {
                 </Button>
               )}
 
-              <Button
-                icon={CalendarIcon}
-                variant="primary"
-                onClick={() => {
-                  if (!selectedVisitProspectId) {
-                    toast.error('Seleccione un prospecto', {
-                      description:
-                        'Seleccione primero el prospecto para agendar una visita.'
+              <Gate permission="crm.edit">
+                <Button
+                  icon={CalendarIcon}
+                  variant="primary"
+                  onClick={() => {
+                    if (!selectedVisitProspectId) {
+                      toast.error('Seleccione un prospecto', {
+                        description:
+                          'Seleccione primero el prospecto para agendar una visita.'
+                      });
+                      return;
+                    }
+
+                    setVisitForm({
+                      prospectId: selectedVisitProspectId,
+                      projectId: catalogs?.proyectos?.[0]?.id || 1,
+                      advisorId: advisorsList[0]?.id_asesor || 0,
+                      visitDate: '',
+                      shift: '11:00',
+                      meetingPoint: 'Oficina de Ventas - Lurin',
+                      notes: ''
                     });
-                    return;
-                  }
 
-                  setVisitForm({
-                    prospectId: selectedVisitProspectId,
-                    projectId: catalogs?.proyectos?.[0]?.id || 1,
-                    advisorId: advisorsList[0]?.id_asesor || 0,
-                    visitDate: '',
-                    shift: '11:00',
-                    meetingPoint: 'Oficina de Ventas - Lurin',
-                    notes: ''
-                  });
-
-                  setIsNewVisitOpen(true);
-                }}
-              >
-                Agendar visita
-              </Button>
+                    setIsNewVisitOpen(true);
+                  }}
+                >
+                  Agendar visita
+                </Button>
+              </Gate>
             </div>
           </div>
 
@@ -1951,36 +1964,42 @@ export function Crm() {
                     <TD align="right">
                       <div className="flex justify-end gap-1.5">
                         {vis.estado === 'PROGRAMADA' && (
-                          <Button
-                            size="sm"
-                            icon={CheckCircleIcon}
-                            onClick={() => handleConfirmVisit(vis.id_visita)}
-                          >
-                            Confirmar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button
+                              size="sm"
+                              icon={CheckCircleIcon}
+                              onClick={() => handleConfirmVisit(vis.id_visita)}
+                            >
+                              Confirmar
+                            </Button>
+                          </Gate>
                         )}
 
                         {vis.estado === 'CONFIRMADA' && (
-                          <Button
-                            size="sm"
-                            icon={CheckCircleIcon}
-                            onClick={() => handleCompleteVisit(vis.id_visita)}
-                          >
-                            Realizada
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button
+                              size="sm"
+                              icon={CheckCircleIcon}
+                              onClick={() => handleCompleteVisit(vis.id_visita)}
+                            >
+                              Realizada
+                            </Button>
+                          </Gate>
                         )}
 
                         {vis.estado !== 'CANCELADA' &&
                           vis.estado !== 'REALIZADA' && (
-                            <Button
-                              size="sm"
-                              icon={XCircleIcon}
-                              onClick={() =>
-                                handleCancelVisit(vis.id_visita)
-                              }
-                            >
-                              Cancelar
-                            </Button>
+                            <Gate permission="crm.edit">
+                              <Button
+                                size="sm"
+                                icon={XCircleIcon}
+                                onClick={() =>
+                                  handleCancelVisit(vis.id_visita)
+                                }
+                              >
+                                Cancelar
+                              </Button>
+                            </Gate>
                           )}
                       </div>
                     </TD>
@@ -2490,19 +2509,25 @@ export function Crm() {
                           }
                         />
                         {v.estado === 'PROGRAMADA' && (
-                          <Button size="sm" onClick={() => handleConfirmVisit(v.id_visita)}>
-                            Confirmar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleConfirmVisit(v.id_visita)}>
+                              Confirmar
+                            </Button>
+                          </Gate>
                         )}
                         {v.estado === 'CONFIRMADA' && (
-                          <Button size="sm" onClick={() => handleCompleteVisit(v.id_visita)}>
-                            Realizada
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleCompleteVisit(v.id_visita)}>
+                              Realizada
+                            </Button>
+                          </Gate>
                         )}
                         {v.estado !== 'CANCELADA' && v.estado !== 'REALIZADA' && (
-                          <Button size="sm" onClick={() => handleCancelVisit(v.id_visita)}>
-                            Cancelar
-                          </Button>
+                          <Gate permission="crm.edit">
+                            <Button size="sm" onClick={() => handleCancelVisit(v.id_visita)}>
+                              Cancelar
+                            </Button>
+                          </Gate>
                         )}
                       </div>
                     </div>
@@ -2605,18 +2630,43 @@ export function Crm() {
               {mensajeError('origenCodigo')}
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-brand-700">Asesor inicial</label>
-              <Select aria-label="Asesor inicial" value={form.idAsesor}
-                onChange={e => setForm(p => ({ ...p, idAsesor: e.target.value ? Number(e.target.value) : '' }))}>
-                <option value="">Sin asignar (Rotativo)</option>
-                {advisorsList.map(a => (
-                  <option key={a.id_asesor} value={a.id_asesor}>
-                    {a.nombre_completo} ({a.leads_activos} activos)
-                  </option>
-                ))}
-              </Select>
-            </div>
+
+            {/* Asignación inicial: Administrador, Gerencia y Supervisor comercial */}
+            {puedeElegirAsesor && (
+              <div>
+                <label className="text-xs font-medium text-brand-700">
+                  Asesor responsable
+                </label>
+
+                <Select
+                  aria-label="Asesor responsable"
+                  value={form.idAsesor}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      idAsesor: e.target.value
+                        ? Number(e.target.value)
+                        : ''
+                    }))
+                  }
+                >
+                  <option value="">Sin asignar</option>
+
+                  {advisorsList
+                    .filter((asesor) => asesor.activo !== false)
+                    .map((asesor) => (
+                      <option
+                        key={asesor.id_asesor}
+                        value={asesor.id_asesor}
+                      >
+                        {asesor.nombre_completo}
+                        {' '}({asesor.leads_activos} activos)
+                      </option>
+                    ))}
+                </Select>
+              </div>
+            )}
+
 
             <div>
               <label className="text-xs font-medium text-brand-700">Tipo de documento *</label>
@@ -3107,19 +3157,15 @@ export function Crm() {
             </Select>
           </div>
 
-          <div>
-            <label className="text-[12px] font-medium text-brand-700">Asesor responsable *</label>
-            <Select
-              aria-label="Asesor responsable"
-              value={visitForm.advisorId || ''}
-              onChange={(e) => setVisitForm({ ...visitForm, advisorId: Number(e.target.value) })}
-            >
-              {advisorsList.map((a) => (
-                <option key={a.id_asesor} value={a.id_asesor}>
-                  {a.nombre_completo} ({a.codigo})
-                </option>
-              ))}
-            </Select>
+          <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+            <p className="text-xs font-medium text-brand-800">
+              Asesor comercial responsable
+            </p>
+            <p className="mt-1 text-xs text-brand-600">
+              La visita se registrará según las reglas de asignación
+              comercial del prospecto. No es necesario seleccionar
+              manualmente un asesor.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -129,6 +129,17 @@ export const ROLES: Record<RoleName, Role> = {
       ...perms('advisors', ['view', 'create', 'edit', 'approve', 'export']),
       ...perms('hr', ['view', 'create', 'edit', 'approve', 'export'])]
 
+  },
+  'Supervisor comercial': {
+    name: 'Supervisor comercial',
+    description: 'Supervisión comercial y gestión de equipo de ventas.',
+    permissions: [
+      ...perms('dashboard', ['view', 'export']),
+      ...perms('projects', ['view']),
+      ...perms('lots', ['view', 'edit']),
+      ...perms('crm', ['view', 'create', 'edit', 'export']),
+      ...perms('sales', ['view', 'create', 'edit'])
+    ]
   }
 };
 
@@ -186,5 +197,14 @@ export const DEMO_USERS: Record<RoleName, SessionUser> = {
     initials: 'AQ',
     primaryRole: 'RRHH',
     roles: ['RRHH']
+  },
+  'Supervisor comercial': {
+    id: 'U-007',
+    name: 'Supervisor Comercial',
+    email: 'supervisor@monolithe.pe',
+    jobTitle: 'Supervisor comercial',
+    initials: 'SC',
+    primaryRole: 'Supervisor comercial',
+    roles: ['Supervisor comercial']
   }
 };

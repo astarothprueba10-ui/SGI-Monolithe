@@ -4,6 +4,7 @@ import {
   getRefreshToken,
   updateStoredTokens
 } from './authSession';
+import { expireSessionIfInactive, getInactivitySessionId } from './inactivitySession';
 
 export class ApiError extends Error {
   constructor(
@@ -40,6 +41,10 @@ function createApiClient(
     allowRefresh = true,
     responseBlob = false
   ): Promise<T> {
+    if (authenticated && expireSessionIfInactive(revokeSession)) {
+      throw new ApiError(401, 'Tu sesión se cerró por inactividad.');
+    }
+    const sessionId = getInactivitySessionId();
     const headers = new Headers(options.headers);
 
     if (authenticated && !headers.has('Authorization')) {
@@ -87,8 +92,10 @@ function createApiClient(
         );
       }
 
-      clearStoredSession();
-      window.location.replace('/login');
+      if (getInactivitySessionId() === sessionId) {
+        clearStoredSession();
+        window.location.replace('/login');
+      }
 
       throw new ApiError(
         401,
@@ -228,10 +235,7 @@ async function refreshSession(): Promise<boolean> {
       const data =
         (await response.json()) as RefreshTokenResponse;
 
-      return updateStoredTokens(
-        data.accessToken,
-        data.refreshToken
-      );
+      return acceptRefreshedTokens(data, refreshToken);
     } catch {
       return false;
     } finally {
@@ -250,3 +254,47 @@ export const cmsApi =
 
 export const coreApi =
   createApiClient(coreApiUrl, true);
+
+
+/**
+ * Cliente público para confirmar cambios de correo
+ * sin necesidad de iniciar sesión.
+ */
+export const corePublicApi =
+  createApiClient(coreApiUrl);
+
+/**
+ * Revoca un refresh token sin retener
+ * la navegación hacia el login.
+ */
+export function revokeSession(
+  refreshToken: string
+): Promise<void> {
+  return authApi.post<void>(
+    '/logout',
+    { refreshToken },
+    { keepalive: true }
+  );
+}
+
+/**
+ * Acepta tokens renovados únicamente si
+ * pertenecen a la sesión original.
+ */
+async function acceptRefreshedTokens(
+  data: RefreshTokenResponse,
+  previousToken: string
+): Promise<boolean> {
+  if (
+    updateStoredTokens(
+      data.accessToken,
+      data.refreshToken,
+      previousToken
+    )
+  ) {
+    return true;
+  }
+
+  await revokeSession(data.refreshToken);
+  return false;
+}

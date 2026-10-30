@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.query.Procedure;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -26,4 +28,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Procedure(procedureName = "sp_registrar_acceso_exitoso")
     void registrarAccesoExitoso(
             @Param("p_id_usuario") Long idUsuario);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query("""
+            UPDATE User u
+            SET u.versionSesiones = u.versionSesiones + 1
+            WHERE u.idUsuario = :idUsuario
+            """)
+    int incrementarVersionSesiones(
+            @Param("idUsuario") Long idUsuario);
+
 }

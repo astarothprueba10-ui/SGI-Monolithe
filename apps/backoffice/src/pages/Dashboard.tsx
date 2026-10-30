@@ -92,6 +92,15 @@ const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
       { key: 'bono', label: 'Bono', type: 'line', color: '#1E3A5C' }],
 
     valuePrefix: 'S/ '
+  },
+  'Supervisor comercial': {
+    title: 'Ventas y separaciones comerciales',
+    description: 'Desempeño del equipo y avance de ventas',
+    data: SALES_TREND,
+    series: [
+      { key: 'separaciones', label: 'Separaciones', type: 'bar', color: '#C7D8E8' },
+      { key: 'ventas', label: 'Ventas', type: 'line', color: '#1E3A5C' }
+    ]
   }
 };
 

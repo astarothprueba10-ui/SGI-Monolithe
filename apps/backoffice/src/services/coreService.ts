@@ -111,11 +111,12 @@ export const coreService = {
 
   solicitarCambioCorreoTrabajador(
     idTrabajador: number,
-    correoNuevo: string
+    correoNuevo: string,
+    motivo: string
   ): Promise<SolicitudCambioCorreoResponse> {
     return coreApi.post<SolicitudCambioCorreoResponse>(
       `/trabajadores/${idTrabajador}/solicitar-cambio-correo`,
-      { correoNuevo }
+      { correoNuevo, motivo }
     );
   },
 

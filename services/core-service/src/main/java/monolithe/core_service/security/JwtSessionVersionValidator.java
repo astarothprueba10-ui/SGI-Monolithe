@@ -2,6 +2,7 @@ package monolithe.core_service.security;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.core.OAuth2Error;
+
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
@@ -55,7 +56,7 @@ public class JwtSessionVersionValidator implements OAuth2TokenValidator<Jwt> {
     private Long extraerSessionVersion(Jwt jwt) {
         Object claim = jwt.getClaim("session_version");
         if (claim == null) {
-            return 0L;
+            return null;
         }
         if (claim instanceof Number num) {
             return num.longValue();

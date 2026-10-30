@@ -107,6 +107,10 @@ export const BASE_DASHBOARD_INTRO: Record<Exclude<RoleName, 'Gerencia'>, { title
   RRHH: {
     title: 'Dashboard de gestión humana',
     description: 'Planilla comercial, comisiones por aprobar, horarios y asistencia.'
+  },
+  'Supervisor comercial': {
+    title: 'Dashboard comercial y supervisión',
+    description: 'Embudo de ventas, asignación de prospectos y métricas de asesores.'
   }
 };
 

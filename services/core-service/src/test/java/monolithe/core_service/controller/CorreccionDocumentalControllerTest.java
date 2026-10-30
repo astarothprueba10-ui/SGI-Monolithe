@@ -78,14 +78,14 @@ class CorreccionDocumentalControllerTest {
         ObjectNode resultado = jsonMapper.createObjectNode();
         resultado.put("estado", "APROBADA");
         ResolverCorreccionRequest request = new ResolverCorreccionRequest("APROBAR", null);
-        when(trabajadorService.resolverCorreccion(7L, 3L, request)).thenReturn(resultado);
+        when(trabajadorService.resolverCorreccion(7L, 3L, request, "token-mock")).thenReturn(resultado);
 
         ResponseEntity<JsonNode> response = controller.resolver(3L, request, buildJwt("7"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("APROBADA", response.getBody().get("estado").asString());
-        verify(trabajadorService).resolverCorreccion(7L, 3L, request);
+        verify(trabajadorService).resolverCorreccion(7L, 3L, request, "token-mock");
     }
 
     @Test
@@ -145,7 +145,7 @@ class CorreccionDocumentalControllerTest {
     @Test
     void debePropagarse409DelServicio() {
         ResolverCorreccionRequest request = new ResolverCorreccionRequest("APROBAR", null);
-        when(trabajadorService.resolverCorreccion(7L, 3L, request))
+        when(trabajadorService.resolverCorreccion(7L, 3L, request, "token-mock"))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Ya resuelta"));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
@@ -159,7 +159,7 @@ class CorreccionDocumentalControllerTest {
         ObjectNode resultado = jsonMapper.createObjectNode();
         resultado.put("idEvidencia", 10L);
         MockMultipartFile file = new MockMultipartFile(
-                "archivo", "foto.png", "image/png", new byte[]{1, 2, 3});
+                "archivo", "foto.png", "image/png", new byte[] { 1, 2, 3 });
         when(evidenciaService.adjuntarEvidencia(7L, 3L, file)).thenReturn(resultado);
 
         ResponseEntity<JsonNode> response = controller.adjuntarEvidencia(3L, file, buildJwt("7"));
@@ -175,8 +175,7 @@ class CorreccionDocumentalControllerTest {
         when(evidenciaService.generarUrlFirmada(7L, 3L))
                 .thenReturn("https://storage.supabase.co/signed-url");
 
-        ResponseEntity<Map<String, String>> response =
-                controller.obtenerUrlFirmada(3L, buildJwt("7"));
+        ResponseEntity<Map<String, String>> response = controller.obtenerUrlFirmada(3L, buildJwt("7"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
