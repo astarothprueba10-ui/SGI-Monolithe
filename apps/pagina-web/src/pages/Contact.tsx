@@ -17,10 +17,11 @@ import { Checkbox, Field, Input, Select, Textarea } from '../components/ui/Form'
 import { Alert } from '../components/ui/Feedback';
 import { SectionHeading } from '../components/ui/Primitives';
 import { contactInfo } from '../data/site';
-import { IMAGES, projects } from '../data/projects';
+import { IMAGES } from '../data/projects';
+import { usePublicProjects } from '../contexts/PublicProjectsContext';
 import { enviarConsulta } from '../services/api';
 
-type State = 'idle' | 'loading' | 'success';
+type State = 'idle' | 'loading' | 'success' | 'error';
 
 const initial = {
   nombres: '',
@@ -34,11 +35,12 @@ const initial = {
 };
 
 export function Contact() {
+  const { proyectos } = usePublicProjects();
   const [values, setValues] = useState(initial);
   const [accept, setAccept] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<State>('idle');
-  const [codigoSeguimiento, setCodigoSeguimiento] = useState<string>('CW-2026-001');
+  const [codigoSeguimiento, setCodigoSeguimiento] = useState<string>('');
 
   function update(key: keyof typeof initial, value: string) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -53,6 +55,11 @@ export function Contact() {
     if (!/^[0-9+\s]{9,15}$/.test(values.telefono.trim())) next.telefono = 'Teléfono inválido';
     if (!/^\S+@\S+\.\S+$/.test(values.correo.trim())) next.correo = 'Correo inválido';
     if (!values.motivo) next.motivo = 'Selecciona un motivo';
+    if (!values.proyecto) next.proyecto = 'Selecciona un proyecto o la opción Aún no lo decido';
+    const proyectoElegido = proyectos.find((p) => p.codigo.toLowerCase() === values.proyecto);
+    if (values.proyecto && values.proyecto !== 'otro' && !proyectoElegido) {
+      next.proyecto = 'El proyecto seleccionado ya no está disponible';
+    }
     if (!accept) next.accept = 'Debes aceptar la política de privacidad';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
@@ -63,6 +70,7 @@ export function Contact() {
         nombre: `${values.nombres.trim()} ${values.apellidos.trim()}`.trim(),
         telefono: values.telefono.trim(),
         correo: values.correo.trim(),
+        idProyecto: proyectoElegido?.idProyecto,
         asunto: values.motivo ? `[${values.motivo}] Consulta Web` : 'Contacto Web',
         mensaje: `DNI: ${values.dni || 'N/A'}\nProyecto: ${values.proyecto || 'General'}\nMotivo: ${values.motivo}\n\n${values.mensaje.trim()}`,
         aceptaPrivacidad: accept
@@ -70,8 +78,8 @@ export function Contact() {
       setCodigoSeguimiento(resp.codigo);
       setState('success');
     } catch {
-      setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
-      setState('success');
+      setCodigoSeguimiento('');
+      setState('error');
     }
   }
 
@@ -119,7 +127,13 @@ export function Contact() {
             <form onSubmit={submit} noValidate className="space-y-5">
                 <SectionHeading title="Cuéntanos qué necesitas" />
 
-                {Object.keys(errors).length > 0 &&
+                {state === 'error' && (
+                  <Alert tone="error" title="No se pudo registrar tu consulta">
+                    No pudimos confirmar el registro. Inténtalo nuevamente.
+                  </Alert>
+                )}
+
+                {Object.values(errors).some(Boolean) &&
               <Alert tone="error" title="No pudimos enviar tu solicitud">
                     Revisa los campos marcados en rojo y vuelve a intentarlo.
                   </Alert>
@@ -171,16 +185,17 @@ export function Contact() {
                     onChange={(e) => update('correo', e.target.value)} />
                   
                   </Field>
-                  <Field label="Proyecto de interés" htmlFor="proyecto" required>
+                  <Field label="Proyecto de interés" htmlFor="proyecto" required error={errors.proyecto}>
                     <Select
                     id="proyecto"
                     value={values.proyecto}
+                    error={errors.proyecto}
                     onChange={(e) => update('proyecto', e.target.value)}>
                     
                       <option value="">Selecciona un proyecto</option>
-                      {projects.map((p) =>
-                    <option key={p.slug} value={p.slug}>
-                          {p.name}
+                      {proyectos.map((p) =>
+                    <option key={p.codigo} value={p.codigo.toLowerCase()}>
+                          {p.nombre}
                         </option>
                     )}
                       <option value="otro">Aún no lo decido</option>

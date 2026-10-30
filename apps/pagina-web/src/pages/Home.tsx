@@ -5,23 +5,26 @@ import { LeadForm } from '../components/public/LeadForm';
 import { LinkButton, AnchorButton } from '../components/ui/Button';
 import { SectionHeading } from '../components/ui/Primitives';
 import { Icon } from '../components/ui/Icon';
-import { contactInfo, homeBenefits, pillars } from '../data/site';
+import { contactInfo, pillars } from '../data/site';
 import { IMAGES } from '../data/projects';
+import { usePublicProjects } from '../contexts/PublicProjectsContext';
 
 export function Home() {
+  const { proyectos } = usePublicProjects();
+  const losCocosVisible = proyectos.some((p) => p.codigo === 'PROY-001');
   return (
     <>
       <HeroCarousel />
       <FeaturedProject />
 
-      {/* Beneficios resumidos */}
-      <section className="bg-bone py-20 lg:py-24">
+      {/* Beneficios específicos de Los Cocos */}
+      {losCocosVisible && <section className="bg-bone py-20 lg:py-24">
         <div className="shell">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <SectionHeading
               eyebrow="Beneficios"
-              title="Todo lo que encuentras dentro del condominio"
-              description="Servicios, áreas recreativas y espacios comunes contemplados dentro del proyecto para complementar tu inversión." />
+              title="Consulta las características del proyecto"
+              description="Un asesor puede confirmar los servicios, las áreas comunes y su disponibilidad según la información aprobada del proyecto." />
             
             <LinkButton to="/beneficios" variant="secondary" className="shrink-0">
               Ver todos los beneficios
@@ -29,27 +32,14 @@ export function Home() {
             </LinkButton>
           </div>
 
-          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {homeBenefits.map((b) =>
-            <li
-              key={b.title}
-              className="flex h-full gap-4 rounded-xl border border-line bg-white p-6">
-              
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
-                  <Icon name={b.icon} className="h-5 w-5" />
-                </span>
-                <div>
-                  <h3 className="text-[15px] font-semibold text-night">{b.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted">{b.text}</p>
-                </div>
-              </li>
-            )}
-          </ul>
+          <p className="mt-10 max-w-2xl text-[15px] leading-relaxed text-muted">
+            Solicita la ficha vigente antes de tomar una decisión de compra.
+          </p>
         </div>
-      </section>
+      </section>}
 
-      {/* Inversión */}
-      <section className="relative isolate overflow-hidden bg-night py-20 lg:py-28">
+      {/* Inversión: promociones de Los Cocos solo mientras esté publicado */}
+      {losCocosVisible && <section className="relative isolate overflow-hidden bg-night py-20 lg:py-28">
         <img
           src={IMAGES.heroAerial}
           alt=""
@@ -62,36 +52,36 @@ export function Home() {
               light
               eyebrow="Inversión"
               title="Una inversión pensada para tu futuro"
-              description="Los Cocos ofrece lotes campestres desde 450 m² con precio de preventa y alternativas de financiamiento directo con MONOLITHE de hasta 36 meses." />
+              description="Conoce Los Cocos y consulta con un asesor los lotes disponibles, los precios y las condiciones comerciales vigentes." />
             
-            <LinkButton to="/proyectos/condominio-campestre-los-cocos" size="lg" className="mt-9">
-              Conoce nuestras facilidades de pago
+            <LinkButton to="/proyectos/proy-001" size="lg" className="mt-9">
+              Consultar condiciones comerciales
             </LinkButton>
           </div>
 
           <div className="w-full rounded-2xl border border-white/15 bg-white/[0.06] p-8 backdrop-blur lg:w-[360px]">
             <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-gold-400">
-              Precio de preventa
+              Información comercial
             </p>
-            <p className="mt-3 font-display text-[52px] leading-none text-white">S/ 25,900</p>
-            <p className="mt-2 text-sm text-white/60">al contado · lote de 450 m²</p>
+            <p className="mt-3 font-display text-[52px] leading-none text-white">Consultar precio</p>
+            <p className="mt-2 text-sm text-white/60">Solicita la cotización vigente a un asesor</p>
             <dl className="mt-8 space-y-4 border-t border-white/15 pt-6 text-sm">
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-white/60">Inicial desde</dt>
-                <dd className="font-semibold text-white">S/ 8,000</dd>
+                <dt className="text-white/60">Área de lote disponible</dt>
+                <dd className="font-semibold text-white">Consultar</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-white/60">Saldo financiado</dt>
-                <dd className="font-semibold text-white">Hasta 36 meses</dd>
+                <dt className="text-white/60">Opciones de pago</dt>
+                <dd className="font-semibold text-white">Consultar</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-white/60">Entidad financiera</dt>
-                <dd className="font-semibold text-gold-400">Directo con MONOLITHE</dd>
+                <dt className="text-white/60">Documentación y disponibilidad</dt>
+                <dd className="font-semibold text-gold-400">Consultar con un asesor</dd>
               </div>
             </dl>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Por qué MONOLITHE */}
       <section className="bg-white py-20 lg:py-28">
@@ -99,10 +89,10 @@ export function Home() {
           <SectionHeading
             align="center"
             eyebrow="Por qué MONOLITHE"
-            title="Cuatro razones para comprar con tranquilidad" />
+            title="Razones para comprar con tranquilidad" />
           
           <ul className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-            {pillars.map((p, i) =>
+            {pillars.filter((p) => !['Financiamiento flexible', 'Proyecto campestre'].includes(p.title)).map((p, i) =>
             <li key={p.title} className="flex h-full flex-col border-t-2 border-gold/40 pt-6">
                 <span className="font-display text-sm text-gold-600">0{i + 1}</span>
                 <Icon name={p.icon} className="mt-4 h-7 w-7 text-brand" />

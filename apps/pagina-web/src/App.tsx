@@ -12,12 +12,6 @@ import { Login } from './pages/auth/Login';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
 import { Welcome } from './pages/auth/Welcome';
-import { CmsLayout } from './pages/cms/CmsLayout';
-import { CmsDashboard } from './pages/cms/CmsDashboard';
-import { CmsContentEditor } from './pages/cms/CmsContentEditor';
-import { CmsProjects } from './pages/cms/CmsProjects';
-import { CmsMedia } from './pages/cms/CmsMedia';
-import { CmsPublications } from './pages/cms/CmsPublications';
 
 export function App() {
   return (
@@ -36,14 +30,6 @@ export function App() {
         <Route path="/mi-cuenta/recuperar" element={<ForgotPassword />} />
         <Route path="/mi-cuenta/nueva-contrasena" element={<ResetPassword />} />
         <Route path="/mi-cuenta/bienvenida" element={<Welcome />} />
-
-        <Route path="/cms" element={<CmsLayout />}>
-          <Route index element={<CmsDashboard />} />
-          <Route path="contenido/:section" element={<CmsContentEditor />} />
-          <Route path="proyectos" element={<CmsProjects />} />
-          <Route path="imagenes" element={<CmsMedia />} />
-          <Route path="publicaciones" element={<CmsPublications />} />
-        </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>

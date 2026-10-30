@@ -3,51 +3,76 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { LinkButton } from '../ui/Button';
 import { IMAGES } from '../../data/projects';
 import { cn } from '../../utils/cn';
+import { usePublicProjects } from '../../contexts/PublicProjectsContext';
+import { obtenerSlidesCmsPublicados, heroPublicadoHabilitado, promocionesCmsHabilitadas, resolverSlidesCmsVisibles, type SlidesCmsPublicados } from '../../services/publicHero';
 
 const slides = [
   {
     image: IMAGES.heroAerial,
-    eyebrow: 'Preventa · Picsi, Chiclayo',
+    eyebrow: 'Proyectos inmobiliarios · Chiclayo',
     title: 'Invierte hoy en el lugar donde construirás tu futuro',
-    text: 'Lotes campestres pensados para vivir, invertir y crecer.'
+    text: 'Conoce nuestras propuestas inmobiliarias y solicita información comercial vigente.'
   },
   {
     image: IMAGES.heroAvenue,
     eyebrow: 'Condominio Campestre Los Cocos',
-    title: 'Lotes campestres desde 450 m² a aproximadamente 30 minutos de Chiclayo',
-    text: 'Un proyecto con áreas recreativas, servicios y espacios comunes en un entorno campestre.'
+    title: 'Conoce nuestra propuesta inmobiliaria en Picsi',
+    text: 'Consulta con un asesor las características, servicios y disponibilidad del proyecto.'
   },
   {
     image: IMAGES.heroHouse,
-    eyebrow: 'Financiamiento directo',
-    title: 'Tu lote propio con una inicial desde S/ 8,000',
-    text: 'Financiamiento directo con MONOLITHE de hasta 36 meses.'
+    eyebrow: 'Información comercial',
+    title: 'Consulta las opciones de adquisición del proyecto',
+    text: 'Solicita los precios y las condiciones de pago vigentes a un asesor.'
   }
 ];
 
 
 export function HeroCarousel() {
-  const [index, setIndex] = useState(0);
+  const [slidesCms, setSlidesCms] = useState<SlidesCmsPublicados | null>(null);
 
   useEffect(() => {
-    const id = window.setInterval(() => setIndex((i) => (i + 1) % slides.length), 7000);
-    return () => window.clearInterval(id);
+    // Apagado por defecto: no cambia el sitio público hasta la activación controlada.
+    if (!heroPublicadoHabilitado(import.meta.env.VITE_CMS_HERO_PUBLICADO_ENABLED)) return;
+    const controller = new AbortController();
+    obtenerSlidesCmsPublicados(import.meta.env.VITE_API_URL || 'http://localhost:8082', controller.signal)
+      .then((cms) => { if (!controller.signal.aborted) setSlidesCms(cms); })
+      .catch(() => { /* Fallo de consulta: conserva el contenido visible anterior. */ });
+    return () => controller.abort();
   }, []);
 
-  const go = (dir: number) => setIndex((i) => (i + dir + slides.length) % slides.length);
-  const slide = slides[index];
+  const { proyectos } = usePublicProjects();
+  const publicado = proyectos.some((p) => p.codigo === 'PROY-001');
+  const promosHabilitadas = promocionesCmsHabilitadas(import.meta.env.VITE_CMS_HERO_PUBLICADO_ENABLED,
+    import.meta.env.VITE_CMS_HERO_PROMO_SLIDES_ENABLED);
+  const slidesVisibles = resolverSlidesCmsVisibles(slides, slidesCms, publicado, {
+    image: IMAGES.heroHouse,
+    eyebrow: 'MONOLITHE',
+    title: 'Conoce nuestros proyectos inmobiliarios',
+    text: 'Solicita información sobre nuestras propuestas y servicios.'
+  }, promosHabilitadas);
+  const [index, setIndex] = useState(0);
+  const actual = index % slidesVisibles.length;
+
+  useEffect(() => {
+    const id = window.setInterval(() => setIndex((i) => (i + 1) % slidesVisibles.length), 7000);
+    return () => window.clearInterval(id);
+  }, [slidesVisibles.length]);
+
+  const go = (dir: number) => setIndex((i) => (i + dir + slidesVisibles.length) % slidesVisibles.length);
+  const slide = slidesVisibles[actual];
 
   return (
     <section className="relative isolate min-h-[560px] overflow-hidden bg-night lg:min-h-[680px]">
-      {slides.map((s, i) =>
+      {slidesVisibles.map((s, i) =>
         <img
-          key={s.image}
+          key={i}
           src={s.image}
-          alt={i === index ? s.title : ''}
-          aria-hidden={i !== index}
+          alt={i === actual ? s.title : ''}
+          aria-hidden={i !== actual}
           className={cn(
             'absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-out',
-            i === index ? 'opacity-100' : 'opacity-0'
+            i === actual ? 'opacity-100' : 'opacity-0'
           )} />
 
       )}
@@ -57,7 +82,7 @@ export function HeroCarousel() {
 
 
       <div className="shell relative flex min-h-[560px] flex-col justify-center py-20 lg:min-h-[680px]">
-        <div key={index} className="max-w-2xl">
+        <div key={actual} className="max-w-2xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-night/40 px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-gold-400">
             {slide.eyebrow}
           </p>
@@ -83,16 +108,16 @@ export function HeroCarousel() {
 
         <div className="mt-14 flex items-center gap-5">
           <div className="flex gap-2" role="tablist" aria-label="Diapositivas del hero">
-            {slides.map((s, i) =>
+            {slidesVisibles.map((s, i) =>
               <button
-                key={s.image}
+                key={i}
                 role="tab"
-                aria-selected={i === index}
+                aria-selected={i === actual}
                 aria-label={`Ir a la diapositiva ${i + 1}`}
                 onClick={() => setIndex(i)}
                 className={cn(
                   'h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out',
-                  i === index ? 'w-10 bg-gold' : 'w-5 bg-white/35 hover:bg-white/60'
+                  i === actual ? 'w-10 bg-gold' : 'w-5 bg-white/35 hover:bg-white/60'
                 )} />
 
             )}

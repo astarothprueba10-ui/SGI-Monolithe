@@ -4,6 +4,7 @@ export type ModuleKey =
   | 'lots'
   | 'crm'
   | 'marketing'
+  | 'web_content'
   | 'sales'
   | 'financing'
   | 'finance'
@@ -26,7 +27,9 @@ export type Action =
   | 'activate'
   | 'deactivate'
   | 'assign_role'
-  | 'assign_permissions';
+  | 'assign_permissions'
+  | 'projects_visibility'
+  | 'publish';
 
 export type Permission = `${ModuleKey}.${Action}`;
 

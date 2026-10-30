@@ -4,8 +4,13 @@ import { MessageCircleIcon } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { contactInfo } from '../../data/site';
+import { PublicProjectsProvider } from '../../contexts/PublicProjectsContext';
 
 export function PublicLayout() {
+  return <PublicProjectsProvider><PublicLayoutContent /></PublicProjectsProvider>;
+}
+
+function PublicLayoutContent() {
   const { pathname } = useLocation();
 
   useEffect(() => {

@@ -10,6 +10,7 @@ import {
 'lucide-react';
 import { Logo } from './Logo';
 import { contactInfo } from '../../data/site';
+import { usePublicProjects } from '../../contexts/PublicProjectsContext';
 
 const columns = [
 {
@@ -50,6 +51,8 @@ const socials = [
 
 
 export function Footer() {
+  const { proyectos } = usePublicProjects();
+  const losCocosVisible = proyectos.some((p) => p.codigo === 'PROY-001');
   return (
     <footer className="bg-night text-white">
       <div className="shell grid gap-12 py-16 lg:grid-cols-[1.4fr_2.6fr]">
@@ -80,10 +83,10 @@ export function Footer() {
                 {col.title}
               </h3>
               <ul className="mt-4 space-y-2.5">
-                {col.links.map((link) =>
+                {col.links.filter((link) => losCocosVisible || link.label !== 'Financiamiento').map((link) =>
               <li key={link.label}>
                     <Link
-                  to={link.to}
+                  to={link.label === 'Financiamiento' ? (losCocosVisible ? '/proyectos/proy-001#financiamiento' : '/proyectos') : link.to}
                   className="text-sm text-white/70 transition-colors duration-150 ease-out hover:text-white">
                   
                       {link.label}

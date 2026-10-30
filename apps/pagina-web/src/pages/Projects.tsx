@@ -1,39 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SearchXIcon } from 'lucide-react';
 import { PageHero } from '../components/public/PageHero';
 import { ProjectCard } from '../components/public/ProjectCard';
 import { Tabs } from '../components/ui/Primitives';
 import { EmptyState } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
-import { IMAGES, projects as staticProjects } from '../data/projects';
-import { obtenerProyectosPublicos, ProyectoDto } from '../services/api';
+import { IMAGES } from '../data/projects';
+import type { ProyectoDto } from '../services/api';
+import { usePublicProjects } from '../contexts/PublicProjectsContext';
 import type { Project } from '../types/content';
 
-const filters = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'Preventa', label: 'Preventa' },
-  { id: 'En venta', label: 'En venta' },
-  { id: 'Próximamente', label: 'Próximamente' }
-];
+const filters = [{ id: 'todos', label: 'Todos' }]; // El estado comercial requiere datos oficiales.
 
 export function Projects() {
   const [active, setActive] = useState('todos');
-  const [listaProyectos, setListaProyectos] = useState<Project[]>(staticProjects);
-
-  useEffect(() => {
-    cargarProyectos();
-  }, []);
-
-  async function cargarProyectos() {
-    try {
-      const data = await obtenerProyectosPublicos();
-      if (data && data.length > 0) {
-        const mapeados = data.map(mapearProyectoApi);
-        setListaProyectos(mapeados);
-      }
-    } catch {
-    }
-  }
+  const { proyectos, cargando, error } = usePublicProjects();
+  const listaProyectos = useMemo(() => proyectos.map(mapearProyectoApi), [proyectos]);
 
   function mapearProyectoApi(dto: ProyectoDto): Project {
     const ubicacion = [dto.distrito, dto.provincia].filter(Boolean).join(', ') || 'Lambayeque, Perú';
@@ -41,21 +23,24 @@ export function Projects() {
       slug: dto.codigo.toLowerCase(),
       name: dto.nombre,
       location: ubicacion,
-      status: 'En venta',
-      type: 'Condominio Campestre',
+      status: 'Estado por confirmar',
+      type: 'Proyecto inmobiliario',
       priceFrom: 'Consultar precio',
-      areaFrom: dto.areaTotal ? `${dto.areaTotal} m²` : '1,000 m²',
-      shortDescription: dto.descripcion || 'Lotes campestres y urbanos con título de propiedad saneado.',
-      description: dto.descripcion || 'Desarrollo inmobiliario exclusivo en Lambayeque.',
-      cover: IMAGES.masterplan,
-      gallery: [{ src: IMAGES.masterplan, caption: dto.nombre }],
+      areaFrom: dto.areaTotal ? `${dto.areaTotal} m²` : 'Consultar área',
+      areaLabel: 'Área total',
+      shortDescription: dto.descripcion || 'Solicita más información sobre este proyecto.',
+      description: dto.descripcion || 'Consulta información del proyecto con un asesor.',
+      // Hasta que el CMS asigne una imagen específica, no atribuir el masterplan
+      // de Los Cocos a un proyecto distinto.
+      cover: dto.codigo === 'PROY-001' ? IMAGES.masterplan : '',
+      gallery: dto.codigo === 'PROY-001' ? [{ src: IMAGES.masterplan, caption: dto.nombre }] : [],
       financing: {
-        cash: 'Al contado con descuento',
-        downPayment: 'Desde 10%',
-        months: 'Hasta 36 meses',
-        note: 'Financiamiento directo con la inmobiliaria'
+        cash: 'Consultar precio',
+        downPayment: 'Consultar',
+        months: 'Consultar',
+        note: 'Consulta las condiciones vigentes con un asesor.'
       },
-      highlights: ['Servicios básicos', 'Pórtico de ingreso', 'Seguridad 24/7'],
+      highlights: [],
       published: true,
       updatedAt: '2026'
     };
@@ -78,8 +63,8 @@ export function Projects() {
         crumbs={[{ label: 'Inicio', to: '/' }, { label: 'Proyectos' }]}
         eyebrow="Proyectos"
         title="Nuestros proyectos"
-        description="Condominios campestres y lotes urbanos en Lambayeque, todos con documentación saneada y financiamiento directo."
-        image={IMAGES.masterplan}
+        description="Consulta los proyectos publicados y solicita al equipo comercial información actualizada sobre disponibilidad, documentación y condiciones de compra."
+        image={proyectos.some((p) => p.codigo === 'PROY-001') ? IMAGES.masterplan : IMAGES.team}
       />
 
       <section className="bg-white py-14 lg:py-20">
@@ -92,12 +77,22 @@ export function Projects() {
             </p>
           </div>
 
-          {visible.length === 0 ? (
+          {cargando ? (
+            <p className="mt-12 text-center text-muted">Cargando proyectos...</p>
+          ) : error ? (
+            <EmptyState
+              className="mt-12"
+              icon={<SearchXIcon className="h-10 w-10" />}
+              title="No se pudo cargar el catálogo"
+              description="Intenta nuevamente en unos momentos."
+              action={<Button onClick={() => window.location.reload()}>Reintentar</Button>}
+            />
+          ) : visible.length === 0 ? (
             <EmptyState
               className="mt-12"
               icon={<SearchXIcon className="h-10 w-10" />}
               title="No hay proyectos en este estado"
-              description="Pronto sumaremos nuevos desarrollos en Lambayeque. Déjanos tus datos y te avisaremos antes del lanzamiento."
+              description="No hay proyectos disponibles con los filtros actuales. Puedes solicitar información a nuestro equipo."
               action={<Button onClick={() => setActive('todos')}>Ver todos los proyectos</Button>}
             />
           ) : (

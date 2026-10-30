@@ -1,23 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowUpRightIcon,
   CheckIcon,
-  DownloadIcon,
   FileTextIcon,
   MapIcon,
   MapPinIcon,
   MessageCircleIcon,
-  NavigationIcon,
   ShieldCheckIcon
 } from 'lucide-react';
 import { Badge, Breadcrumbs, Modal, SectionHeading, Tabs, statusTone } from '../components/ui/Primitives';
 import { AnchorButton, Button, LinkButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/Feedback';
 import { LeadForm } from '../components/public/LeadForm';
-import { Icon } from '../components/ui/Icon';
 import { getProject } from '../data/projects';
-import { benefitCategories, contactInfo } from '../data/site';
+import { obtenerProyectoPublicoPorCodigo, type ProyectoDto } from '../services/api';
+import type { Project } from '../types/content';
+import { contactInfo } from '../data/site';
 
 const docs = [
   {
@@ -35,23 +34,91 @@ const docs = [
 ];
 
 export function ProjectDetail() {
-  const { slug } = useParams();
-  const project = getProject(slug ?? '');
-  const [activeImg, setActiveImg] = useState(0);
-  const [tab, setTab] = useState('todos');
-  const [modalOpen, setModalOpen] = useState(false);
+  const { slug = '' } = useParams();
+  const [dto, setDto] = useState<ProyectoDto | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(false);
 
-  if (!project) {
+  useEffect(() => {
+    let vigente = true;
+    // Los enlaces antiguos de Los Cocos siguen siendo válidos, pero solamente
+    // cuando el CMS confirma que el proyecto oficial continúa publicado.
+    const codigo = slug === 'condominio-campestre-los-cocos' ? 'PROY-001' : slug.toUpperCase();
+    setDto(null);
+    setCargando(true);
+    setError(false);
+    obtenerProyectoPublicoPorCodigo(codigo)
+      .then((resultado) => { if (vigente) setDto(resultado); })
+      .catch(() => { if (vigente) setError(true); })
+      .finally(() => { if (vigente) setCargando(false); });
+    return () => { vigente = false; };
+  }, [slug]);
+
+  if (cargando) return <div className="shell py-24">Cargando proyecto...</div>;
+  if (error) return <div className="shell py-24">No se pudo consultar el proyecto. Inténtalo nuevamente.</div>;
+  if (!dto) {
     return (
       <div className="shell py-24">
         <EmptyState
           title="No encontramos este proyecto"
           description="Es posible que el enlace haya cambiado o que el proyecto ya no esté publicado."
           action={<LinkButton to="/proyectos">Ver todos los proyectos</LinkButton>} />
-
-      </div>);
-
+      </div>
+    );
   }
+
+  // La página detallada heredada contiene descripciones específicas de Los Cocos.
+  // Nunca debe reutilizarse para otros proyectos.
+  const plantilla = dto.codigo === 'PROY-001' ? getProject('condominio-campestre-los-cocos') : undefined;
+  if (!plantilla) return <DetalleProyectoGeneral proyecto={dto} />;
+
+  const proyectoValidado: Project = {
+    ...plantilla,
+    name: dto.nombre,
+    description: dto.descripcion || plantilla.description,
+    shortDescription: dto.descripcion || 'Solicita información comercial actualizada al asesor.',
+    status: 'Estado por confirmar',
+    areaFrom: dto.areaTotal != null ? `${dto.areaTotal} m²` : 'Consultar área',
+    areaLabel: 'Área total',
+    priceFrom: 'Consultar precio',
+    financing: {
+      cash: 'Consultar precio',
+      downPayment: 'Consultar con un asesor',
+      months: 'Consultar con un asesor',
+      note: 'Consulta con un asesor las condiciones comerciales vigentes.'
+    },
+    highlights: [],
+    location: [dto.distrito, dto.provincia, dto.departamento].filter(Boolean).join(', ') || 'Ubicación por confirmar'
+  };
+  return <DetalleProyectoLosCocos project={proyectoValidado} />;
+}
+
+/** Ficha para proyectos sin presentación editorial propia: solo datos oficiales. */
+function DetalleProyectoGeneral({ proyecto }: { proyecto: ProyectoDto }) {
+  return (
+    <div className="shell py-16 lg:py-24">
+      <Breadcrumbs items={[{ label: 'Inicio', to: '/' }, { label: 'Proyectos', to: '/proyectos' }, { label: proyecto.nombre }]} />
+      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_1fr]">
+        <div>
+          <h1 className="font-display text-4xl text-night">{proyecto.nombre}</h1>
+          <p className="mt-4 text-muted">{[proyecto.distrito, proyecto.provincia, proyecto.departamento].filter(Boolean).join(', ')}</p>
+          {proyecto.descripcion && <p className="mt-6 leading-relaxed text-muted">{proyecto.descripcion}</p>}
+          {proyecto.areaTotal != null && <p className="mt-6 font-semibold text-night">Área total del proyecto: {proyecto.areaTotal} m²</p>}
+          <p className="mt-6 text-sm text-muted">Consulta los precios, lotes disponibles y condiciones comerciales con un asesor.</p>
+          <AnchorButton href={contactInfo.whatsappUrl} target="_blank" variant="secondary" className="mt-6">
+            <MessageCircleIcon className="h-4 w-4" /> Hablar con un asesor
+          </AnchorButton>
+        </div>
+        <LeadForm />
+      </div>
+    </div>
+  );
+}
+
+function DetalleProyectoLosCocos({ project }: { project: Project }) {
+  const [activeImg, setActiveImg] = useState(0);
+  const [tab, setTab] = useState('todos');
+  const [modalOpen, setModalOpen] = useState(false);
 
   const galleryFilters: Record<string, (caption: string) => boolean> = {
     todos: () => true,
@@ -72,10 +139,6 @@ export function ProjectDetail() {
   const shown = project.gallery[activeImg] && galleryFilters[tab](project.gallery[activeImg].caption) ?
     project.gallery[activeImg] :
     mainImage;
-
-  const allBenefits = benefitCategories.flatMap((c) =>
-    c.items.map((i) => ({ ...i, category: c.title }))
-  );
 
   return (
     <>
@@ -125,21 +188,21 @@ export function ProjectDetail() {
 
             <dl className="grid grid-cols-2 gap-x-10 gap-y-5 rounded-2xl border border-white/15 bg-night/60 p-6 backdrop-blur sm:grid-cols-4 lg:grid-cols-2">
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/50">Área desde</dt>
+                <dt className="text-[11px] uppercase tracking-wide text-white/50">{project.areaLabel ?? 'Área total'}</dt>
                 <dd className="mt-1 font-display text-2xl text-white">{project.areaFrom}</dd>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/50">Precio desde</dt>
+                <dt className="text-[11px] uppercase tracking-wide text-white/50">Precio vigente</dt>
                 <dd className="mt-1 font-display text-2xl text-gold-400">{project.priceFrom}</dd>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/50">Inicial</dt>
+                <dt className="text-[11px] uppercase tracking-wide text-white/50">Inicial (si aplica)</dt>
                 <dd className="mt-1 text-[15px] font-semibold text-white">
                   {project.financing.downPayment}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-white/50">Cuotas</dt>
+                <dt className="text-[11px] uppercase tracking-wide text-white/50">Plazo (si aplica)</dt>
                 <dd className="mt-1 text-[15px] font-semibold text-white">{project.financing.months}</dd>
               </div>
             </dl>
@@ -208,19 +271,19 @@ export function ProjectDetail() {
               Precio y financiamiento
             </p>
             <p className="mt-3 font-display text-4xl text-night">{project.financing.cash}</p>
-            <p className="mt-1 text-sm text-muted">Preventa al contado</p>
+            <p className="mt-1 text-sm text-muted">Consulta la cotización vigente</p>
 
             <dl className="mt-7 space-y-4 border-t border-line pt-6 text-sm">
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted">Inicial desde</dt>
+                <dt className="text-muted">Pago inicial (si aplica)</dt>
                 <dd className="font-semibold text-night">{project.financing.downPayment}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted">Saldo financiable</dt>
-                <dd className="font-semibold text-night">Directo con MONOLITHE</dd>
+                <dt className="text-muted">Alternativas de pago</dt>
+                <dd className="font-semibold text-night">Consultar con un asesor</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted">Plazo</dt>
+                <dt className="text-muted">Plazo (si aplica)</dt>
                 <dd className="font-semibold text-brand">{project.financing.months}</dd>
               </div>
             </dl>
@@ -262,35 +325,34 @@ export function ProjectDetail() {
               </p>
 
               <h2 className="mt-3 max-w-3xl font-display text-3xl leading-tight text-white sm:text-4xl">
-                Cada lote cuenta con inscripción registral individual
+                Consulta la situación registral del lote
               </h2>
 
               <p className="mt-5 max-w-3xl text-[15px] leading-relaxed text-white/70">
-                Todos los lotes de Condominio Campestre Los Cocos se encuentran
-                debidamente independizados e inscritos en el Registro de Predios
-                de la SUNARP, contando cada uno con su propia partida registral
-                electrónica.
+                Solicita al asesor la documentación registral correspondiente al
+                lote de tu interés y confirma la información directamente con
+                las entidades competentes antes de adquirirlo.
               </p>
 
               <ul className="mt-7 grid gap-3 sm:grid-cols-3">
                 <li className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4">
                   <CheckIcon className="h-4 w-4 shrink-0 text-gold" />
                   <span className="text-sm text-white">
-                    Lotes independizados
+                    Situación del lote
                   </span>
                 </li>
 
                 <li className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4">
                   <CheckIcon className="h-4 w-4 shrink-0 text-gold" />
                   <span className="text-sm text-white">
-                    Inscripción en SUNARP
+                    Documentos registrales
                   </span>
                 </li>
 
                 <li className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4">
                   <CheckIcon className="h-4 w-4 shrink-0 text-gold" />
                   <span className="text-sm text-white">
-                    Partida registral propia
+                    Verificación de antecedentes
                   </span>
                 </li>
               </ul>
@@ -304,22 +366,12 @@ export function ProjectDetail() {
         <div className="shell">
           <SectionHeading
             eyebrow="Beneficios y servicios"
-            title="Todo lo que incluye tu lote"
-            description="Conoce los servicios, espacios recreativos y elementos contemplados dentro del proyecto Los Cocos." />
+            title="Consulta los servicios disponibles"
+            description="Confirma con un asesor qué servicios, áreas comunes y condiciones están aprobados para el proyecto." />
 
-          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {allBenefits.map((b) =>
-              <li key={b.name} className="flex h-full gap-4 rounded-xl border border-line p-5">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold-100 text-gold-600">
-                  <Icon name={b.icon} className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted">{b.category}</p>
-                  <h3 className="mt-0.5 text-[15px] font-semibold text-night">{b.name}</h3>
-                </div>
-              </li>
-            )}
-          </ul>
+          <LinkButton to="/contacto" className="mt-8" size="lg">
+            Solicitar información del proyecto
+          </LinkButton>
         </div>
       </section>
 
@@ -341,13 +393,12 @@ export function ProjectDetail() {
                 <div>
                   <p className="text-sm font-semibold text-night">{project.location}</p>
                   <p className="mt-0.5 text-[13px] text-muted">
-                    Picsi, Lambayeque · A aproximadamente 35 minutos de Chiclayo
+                    Consulta la ruta y el tiempo de traslado con un asesor.
                   </p>
                 </div>
-                <AnchorButton href="#" variant="secondary" size="sm">
-                  <NavigationIcon className="h-4 w-4" />
-                  Cómo llegar
-                </AnchorButton>
+                <LinkButton to="/contacto" variant="secondary" size="sm">
+                  Solicitar ubicación
+                </LinkButton>
               </div>
             </div>
           </div>
@@ -367,7 +418,7 @@ export function ProjectDetail() {
                       <span className="block truncate text-sm font-semibold text-night">{d.name}</span>
                       <span className="block text-xs text-muted">{d.meta}</span>
                     </span>
-                    <DownloadIcon className="h-4 w-4 text-muted" />
+                    <MessageCircleIcon className="h-4 w-4 text-muted" />
                   </button>
                 </li>
               )}
@@ -376,7 +427,7 @@ export function ProjectDetail() {
               to="/beneficios"
               className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-night hover:text-brand">
 
-              Ver todos los beneficios del condominio
+              Consultar beneficios y servicios
               <ArrowUpRightIcon className="h-4 w-4" />
             </Link>
           </div>

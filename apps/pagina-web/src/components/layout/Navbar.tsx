@@ -5,8 +5,11 @@ import { Logo } from './Logo';
 import { AnchorButton, LinkButton } from '../ui/Button';
 import { contactInfo, navLinks } from '../../data/site';
 import { cn } from '../../utils/cn';
+import { usePublicProjects } from '../../contexts/PublicProjectsContext';
 
 export function Navbar() {
+  const { proyectos } = usePublicProjects();
+  const losCocosVisible = proyectos.some((p) => p.codigo === 'PROY-001');
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -28,7 +31,7 @@ export function Navbar() {
         <div className="shell flex h-9 items-center justify-between text-[12px]">
           <p className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden="true" />
-            Preventa activa · Condominio Campestre Los Cocos, Picsi
+            {losCocosVisible ? 'Preventa activa · Condominio Campestre Los Cocos, Picsi' : 'Conoce nuestros proyectos inmobiliarios'}
           </p>
           <a
             href={`tel:${contactInfo.phone.replace(/\s/g, '')}`}

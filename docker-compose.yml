@@ -103,9 +103,9 @@ services:
       - "${WEB_BACKEND_PORT:-8082}:8082"
     environment:
       SERVER_PORT: 8082
-      DB_URL: ${SUPABASE_DB_URL}
-      DB_USERNAME: ${SUPABASE_DB_USERNAME}
-      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      DB_URL: ${CMS_DB_URL:-${SUPABASE_DB_URL}}
+      DB_USERNAME: ${CMS_DB_USERNAME:-${SUPABASE_DB_USERNAME}}
+      DB_PASSWORD: ${CMS_DB_PASSWORD:-${SUPABASE_DB_PASSWORD}}
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
       SUPABASE_URL: ${SUPABASE_URL}

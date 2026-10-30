@@ -1,6 +1,8 @@
 package monolithe.cms_service.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authorization.AuthorizationManagers;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -51,10 +53,12 @@ public class SecurityConfig {
                                 "/api/public/**")
                         .permitAll()
 
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/public/**")
+                        // Solo la recepcion de consultas/leads es POST publico.
+                        // Nuevas rutas publicas de escritura deben revisarse expresamente.
+                        .requestMatchers(HttpMethod.POST, "/api/public/consultas")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/public/**")
+                        .denyAll()
 
                         .requestMatchers(
                                 "/actuator/health",
@@ -63,10 +67,47 @@ public class SecurityConfig {
                                 "/error")
                         .permitAll()
 
+                        // Solo permitir escritura de borradores en rutas explícitas.
+                        // Los endpoints heredados de publicación/escritura siguen bloqueados.
+                        .requestMatchers(HttpMethod.POST, "/api/cms/borradores/paginas")
+                        .hasAuthority("web_content.edit")
+                        .requestMatchers(HttpMethod.POST, "/api/cms/borradores/visibilidades")
+                        .hasAuthority("web_content.projects_visibility")
+                        .requestMatchers(HttpMethod.PUT, "/api/cms/borradores/{idBorrador}/paginas")
+                        .hasAuthority("web_content.edit")
+                        .requestMatchers(HttpMethod.PUT, "/api/cms/borradores/{idBorrador}/visibilidades")
+                        .hasAuthority("web_content.projects_visibility")
+                        .requestMatchers(HttpMethod.PATCH, "/api/cms/borradores/{idBorrador}/paginas/descartar")
+                        .hasAuthority("web_content.edit")
+                        .requestMatchers(HttpMethod.PATCH, "/api/cms/borradores/{idBorrador}/visibilidades/descartar")
+                        .hasAuthority("web_content.projects_visibility")
+
+                        // Imagenes privadas: escrituras solo sobre borradores propios.
+                        .requestMatchers(HttpMethod.PUT, "/api/cms/borradores/{idBorrador}/imagenes/{idSeccion}")
+                        .hasAuthority("web_content.edit")
+                        .requestMatchers(HttpMethod.DELETE, "/api/cms/borradores/{idBorrador}/imagenes/{idSeccion}")
+                        .hasAuthority("web_content.edit")
+                        // Publicación de visibilidad: requiere permisos tanto de
+                        // administración de proyectos web como de publicación.
+                        .requestMatchers(HttpMethod.GET, "/api/cms/borradores/visibilidades/proyectos")
+                        .hasAuthority("web_content.projects_visibility")
+                        .requestMatchers(HttpMethod.POST, "/api/cms/borradores/{idBorrador}/visibilidades/publicar")
+                        .access(AuthorizationManagers.allOf(
+                                AuthorityAuthorizationManager.hasAuthority("web_content.projects_visibility"),
+                                AuthorityAuthorizationManager.hasAuthority("web_content.publish")))
+
+                        .requestMatchers(HttpMethod.POST, "/api/cms/borradores/{idBorrador}/paginas/publicar-contenido")
+                        .hasAuthority("web_content.publish")
+
+                        // Único endpoint de publicación habilitado en 3E.3.
+                        .requestMatchers(HttpMethod.POST, "/api/cms/borradores/{idBorrador}/paginas/publicar")
+                        .hasAuthority("web_content.publish")
+
+                        .requestMatchers(HttpMethod.GET, "/api/cms/**")
+                        .hasAuthority("web_content.view")
+
                         .requestMatchers("/api/cms/**")
-                        .hasAnyAuthority(
-                                "ROLE_ADMINISTRADOR",
-                                "ROLE_MARKETING")
+                        .denyAll()
 
                         .anyRequest()
                         .authenticated()

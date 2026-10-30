@@ -92,6 +92,70 @@ public class SupabaseStorageService {
         }
     }
 
+    /**
+     * Publica bytes validados de un borrador; no acepta carpetas, rutas ni nombres del cliente.
+     * La compensación del archivo público la controla el servicio transaccional llamador.
+     */
+    public String nuevaClaveImagenCms(Long idSeccion, String mime) {
+        validarConfiguracion();
+        if (!"cms-public".equals(bucket) || idSeccion == null || idSeccion <= 0) {
+            throw new IllegalArgumentException("Bucket o sección de publicación inválidos");
+        }
+        String extension = switch (mime == null ? "" : mime) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            default -> throw new IllegalArgumentException("Formato de imagen no publicable");
+        };
+        return "contenido-web/inicio/" + idSeccion + "/" + UUID.randomUUID() + extension;
+    }
+
+    public void subirImagenCms(String clave, byte[] bytes, String mime) {
+        validarConfiguracion();
+        validarClaveCms(clave);
+        if (!"cms-public".equals(bucket) || bytes == null || bytes.length == 0 ||
+                bytes.length > ImagenBorradorValidador.MAX_BYTES) {
+            throw new IllegalArgumentException("La imagen pública excede el límite permitido");
+        }
+        subirImagenCmsConClave(clave, bytes, mime);
+    }
+
+    /** Solo acepta claves generadas para el publicador CMS; nunca rutas arbitrarias. */
+    public void eliminarImagenCms(String clave) {
+        validarClaveCms(clave);
+        validarConfiguracion();
+        try {
+            RestClient.RequestHeadersSpec<?> peticion = RestClient.create(supabaseUrl)
+                    .delete().uri("/storage/v1/object/" + bucket + "/" + clave)
+                    .header("apikey", secretKey);
+            if (!secretKey.startsWith("sb_secret_")) {
+                peticion = peticion.header("Authorization", "Bearer " + secretKey);
+            }
+            peticion.retrieve().toBodilessEntity();
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound ignorado) {
+            // Limpieza idempotente: un intento anterior pudo haberlo eliminado.
+        }
+    }
+
+    private void subirImagenCmsConClave(String clave, byte[] bytes, String mime) {
+        validarClaveCms(clave);
+        RestClient.RequestBodySpec peticion = RestClient.create(supabaseUrl)
+                .post().uri("/storage/v1/object/" + bucket + "/" + clave)
+                .header("apikey", secretKey).header("x-upsert", "false")
+                .contentType(MediaType.parseMediaType(mime));
+        if (!secretKey.startsWith("sb_secret_")) {
+            peticion = peticion.header("Authorization", "Bearer " + secretKey);
+        }
+        peticion.body(bytes).retrieve().toBodilessEntity();
+    }
+
+    private static void validarClaveCms(String clave) {
+        if (clave == null || !clave.matches(
+                "contenido-web/inicio/[1-9][0-9]*/[0-9a-f-]{36}\\.(jpg|png|webp)")) {
+            throw new IllegalArgumentException("Clave CMS no permitida");
+        }
+    }
+
     public String obtenerUrlPublica(
             String claveArchivo) {
 
