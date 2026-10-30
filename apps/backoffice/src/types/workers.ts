@@ -156,6 +156,8 @@ export interface CorreccionDocumentalItem {
   fechaSolicitud: string;
   estado: string;
   tieneEvidencia: boolean;
+  tipoDato?: 'DOCUMENTO' | 'CONTACTO';
+  moduloOrigen?: string;
 }
 
 export interface ResolverCorreccionRequest {

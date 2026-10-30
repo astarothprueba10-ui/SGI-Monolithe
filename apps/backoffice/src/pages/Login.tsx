@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChangeEvent, FormEvent, useRef, useState } from 'react';
 import {
     EyeIcon,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { ApiError, authApi } from '../lib/apiClient';
+import { beginSessionActivity } from '../lib/inactivitySession';
 import { Alert } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
 import { FieldLabel, Input, Select } from '../components/ui/Field';
@@ -109,6 +110,7 @@ function validarFormulario(
 }
 
 export function Login() {
+    const [searchParams] = useSearchParams();
 
     const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('DNI');
     const [usuario, setUsuario] = useState('');
@@ -212,6 +214,7 @@ export function Login() {
                 })
             );
 
+            beginSessionActivity(storage);
             setSuccess(true);
 
             window.setTimeout(() => {
@@ -260,6 +263,12 @@ export function Login() {
                             sistema de gestión.
                         </p>
                     </div>
+
+                    {searchParams.get('motivo') === 'inactividad' && (
+                        <Alert tone="info" title="Sesión cerrada por inactividad" className="mb-5">
+                            Pasaron 10 minutos sin actividad. Inicia sesión nuevamente.
+                        </Alert>
+                    )}
 
                     {error ? (
                         <Alert

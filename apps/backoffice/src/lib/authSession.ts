@@ -97,7 +97,8 @@ export function clearStoredSession(): void {
     const keys = [
         'monolithe_access_token',
         'monolithe_refresh_token',
-        'monolithe_user'
+        'monolithe_user',
+        'monolithe_session_id'
     ];
 
     for (const key of keys) {
@@ -106,35 +107,22 @@ export function clearStoredSession(): void {
     }
 }
 
+function storedTokenLocation(): Storage | null {
+    if (localStorage.getItem('monolithe_refresh_token') !== null) return localStorage;
+    if (sessionStorage.getItem('monolithe_refresh_token') !== null) return sessionStorage;
+    return null;
+}
+
+/** Actualiza solo una sesión existente y, si se indica, comprueba el token anterior. */
 export function updateStoredTokens(
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
+    expectedRefreshToken?: string
 ): boolean {
-    const usesLocalStorage =
-        localStorage.getItem('monolithe_refresh_token') !== null;
-
-    const usesSessionStorage =
-        sessionStorage.getItem('monolithe_refresh_token') !== null;
-
-    const storage = usesLocalStorage
-        ? localStorage
-        : usesSessionStorage
-            ? sessionStorage
-            : null;
-
-    if (!storage) {
-        return false;
-    }
-
-    storage.setItem(
-        'monolithe_access_token',
-        accessToken
-    );
-
-    storage.setItem(
-        'monolithe_refresh_token',
-        refreshToken
-    );
-
+    if (expectedRefreshToken !== undefined && getRefreshToken() !== expectedRefreshToken) return false;
+    const storage = storedTokenLocation();
+    if (!storage) return false;
+    storage.setItem('monolithe_access_token', accessToken);
+    storage.setItem('monolithe_refresh_token', refreshToken);
     return true;
 }

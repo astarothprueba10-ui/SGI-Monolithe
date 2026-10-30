@@ -93,7 +93,7 @@ public class CorreccionDocumentalController {
 
         Long idActor = obtenerIdActor(jwt);
         return ResponseEntity.ok(
-                trabajadorService.resolverCorreccion(idActor, idSolicitud, request));
+                trabajadorService.resolverCorreccion(idActor, idSolicitud, request, jwt != null ? jwt.getTokenValue() : null));
     }
 
     private Long obtenerIdActor(Jwt jwt) {

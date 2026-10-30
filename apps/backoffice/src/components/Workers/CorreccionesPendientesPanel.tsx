@@ -124,7 +124,7 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
   }
 
   function validarEvidenciaAprobacion(item: CorreccionDocumentalItem) {
-    if (item.tieneEvidencia) return true;
+    if (item.tipoDato === 'CONTACTO' || item.tieneEvidencia) return true;
     toast.error('No se puede aprobar la solicitud porque no tiene evidencia adjunta.');
     return false;
   }
@@ -177,9 +177,10 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
   const tiposDisponibles = useMemo(() => {
     const set = new Set<string>();
     for (const s of solicitudes) {
-      if (s.tipoDocumentoPropuesto) set.add(s.tipoDocumentoPropuesto);
+      if (s.tipoDato === 'CONTACTO') set.add('CORREO');
+      else if (s.tipoDocumentoPropuesto) set.add(s.tipoDocumentoPropuesto);
     }
-    return Array.from(set).sort().map((t) => ({ value: t, label: t }));
+    return Array.from(set).sort().map((t) => ({ value: t, label: t === 'CORREO' ? 'Correo electrónico' : t }));
   }, [solicitudes]);
 
   const solicitudesFiltradas = useMemo(() => {
@@ -189,7 +190,8 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
         if (key !== trabajadorFilter) return false;
       }
       if (tipoCorreccionFilter !== 'all') {
-        if (s.tipoDocumentoPropuesto !== tipoCorreccionFilter) return false;
+        const valorTipo = s.tipoDato === 'CONTACTO' ? 'CORREO' : s.tipoDocumentoPropuesto;
+        if (valorTipo !== tipoCorreccionFilter) return false;
       }
       if (fechaDesdeFilter || fechaHastaFilter) {
         const f = s.fechaSolicitud ? s.fechaSolicitud.slice(0, 10) : '';
@@ -215,10 +217,10 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[15px] font-semibold text-brand-900">
-            Correcciones documentales pendientes
+            Correcciones pendientes de identidad y correo
           </h2>
           <p className="text-[13px] text-brand-400">
-            Revisión y dictamen de rectificaciones de identidad respaldadas con evidencia fotográfica.
+            Revisión de correcciones documentales y solicitudes de cambio de correo de trabajadores.
           </p>
         </div>
 
@@ -291,7 +293,7 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
             title="Sin correcciones"
             description={
               solicitudes.length === 0
-                ? 'No existen solicitudes de corrección de documento pendientes de aprobación.'
+                ? 'No existen solicitudes de corrección de documento o correo pendientes de aprobación.'
                 : 'No hay solicitudes que coincidan con los filtros aplicados.'
             }
           />
@@ -301,8 +303,8 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
               <>
                 <TH>ID / Fecha</TH>
                 <TH>Trabajador</TH>
-                <TH>Documento actual</TH>
-                <TH>Documento propuesto</TH>
+                <TH>Dato actual</TH>
+                <TH>Dato propuesto</TH>
                 <TH>Motivo</TH>
                 <TH>Evidencia</TH>
                 <TH>Estado</TH>
@@ -333,19 +335,19 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
 
                   <TD className="text-brand-600">
                     <span className="block text-[11px] text-brand-400">
-                      {item.tipoDocumentoActual || '—'}
+                      {item.tipoDato === 'CONTACTO' ? 'CORREO' : item.tipoDocumentoActual || '—'}
                     </span>
                     <span className="font-mono text-[13px]">
-                      {item.numeroDocumentoActual || '—'}
+                      {item.tipoDato === 'CONTACTO' ? (item.valorAnterior || '—') : item.numeroDocumentoActual || '—'}
                     </span>
                   </TD>
 
                   <TD className="text-brand-900">
                     <span className="block text-[11px] font-medium text-brand-500">
-                      {item.tipoDocumentoPropuesto || '—'}
+                      {item.tipoDato === 'CONTACTO' ? 'CORREO' : item.tipoDocumentoPropuesto || '—'}
                     </span>
                     <span className="font-mono text-[13px] font-semibold text-brand-900">
-                      {item.numeroDocumentoPropuesto || '—'}
+                      {item.tipoDato === 'CONTACTO' ? (item.valorPropuesto || '—') : item.numeroDocumentoPropuesto || '—'}
                     </span>
                   </TD>
 
@@ -356,7 +358,9 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
                   </TD>
 
                   <TD>
-                    {item.tieneEvidencia ? (
+                    {item.tipoDato === 'CONTACTO' ? (
+                      <span className="text-[12px] text-brand-500">No requerida</span>
+                    ) : item.tieneEvidencia ? (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -413,7 +417,7 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
         open={solicitudAAprobar !== null}
         onClose={cerrarModalAprobacion}
         title="Confirmar aprobación de corrección"
-        description="Revise los datos de identidad antes de aplicar la corrección."
+        description="Revise los datos anteriores y propuestos antes de aprobar la solicitud."
         width="max-w-xl"
         footer={
           <div className="flex items-center justify-end gap-2.5">
@@ -429,7 +433,7 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
               type="button"
               variant="primary"
               onClick={() => void confirmarAprobacion()}
-              disabled={procesandoAprobacion || !solicitudAAprobar?.tieneEvidencia}
+              disabled={procesandoAprobacion || (solicitudAAprobar?.tipoDato !== 'CONTACTO' && !solicitudAAprobar?.tieneEvidencia)}
               icon={CheckIcon}
             >
               {procesandoAprobacion ? 'Aprobando...' : 'Confirmar aprobación'}
@@ -452,22 +456,24 @@ export function CorreccionesPendientesPanel({ onSuccessAction }: CorreccionesPen
               <div className="rounded-md border border-brand-100 p-3">
                 <p className="text-[11px] font-medium uppercase text-brand-400">Documento actual</p>
                 <p className="mt-1 font-mono text-sm text-brand-800">
-                  {solicitudAAprobar.tipoDocumentoActual || '—'}: {solicitudAAprobar.numeroDocumentoActual || '—'}
+                  {solicitudAAprobar.tipoDato === 'CONTACTO' ? 'Correo: ' + (solicitudAAprobar.valorAnterior || '—') : (solicitudAAprobar.tipoDocumentoActual || '—') + ': ' + (solicitudAAprobar.numeroDocumentoActual || '—')}
                 </p>
               </div>
               <div className="rounded-md border border-brand-100 p-3">
                 <p className="text-[11px] font-medium uppercase text-brand-400">Documento propuesto</p>
                 <p className="mt-1 font-mono text-sm font-semibold text-brand-900">
-                  {solicitudAAprobar.tipoDocumentoPropuesto || '—'}: {solicitudAAprobar.numeroDocumentoPropuesto || '—'}
+                  {solicitudAAprobar.tipoDato === 'CONTACTO' ? 'Correo: ' + (solicitudAAprobar.valorPropuesto || '—') : (solicitudAAprobar.tipoDocumentoPropuesto || '—') + ': ' + (solicitudAAprobar.numeroDocumentoPropuesto || '—')}
                 </p>
               </div>
             </div>
 
             <Alert tone="warning" title="Advertencia sobre los datos de identidad">
-              Al aprobar, se modificarán los datos de identidad del trabajador y se aplicará el documento propuesto.
+              {solicitudAAprobar.tipoDato === 'CONTACTO'
+                ? 'Se autorizara el envio de un enlace al nuevo correo. El correo actual solo cambiara cuando el trabajador confirme el enlace.'
+                : 'Al aprobar, se modificaran los datos documentales del trabajador.'}
             </Alert>
 
-            {!solicitudAAprobar.tieneEvidencia ? (
+            {solicitudAAprobar.tipoDato !== 'CONTACTO' && !solicitudAAprobar.tieneEvidencia ? (
               <Alert tone="danger" title="No se puede aprobar sin evidencia">
                 Esta solicitud todavía no tiene evidencia adjunta. La aprobación permanecerá bloqueada hasta que se registre.
               </Alert>
