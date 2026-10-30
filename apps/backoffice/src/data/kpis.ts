@@ -298,8 +298,43 @@ export const BASE_ROLE_KPIS: Record<Exclude<RoleName, 'Gerencia'>, Kpi[]> = {
     hint: 'operaciones cerradas',
     icon: TrendingUpIcon,
     tone: 'sky'
-  }]
-
+  }],
+  'Supervisor comercial': [
+    {
+      id: 'sc1',
+      label: 'Ventas del equipo',
+      value: 'S/ 1.42M',
+      delta: 12.4,
+      hint: 'Agosto 2026',
+      icon: TrendingUpIcon
+    },
+    {
+      id: 'sc2',
+      label: 'Lotes disponibles',
+      value: '233',
+      delta: -4.1,
+      hint: 'de 456 totales',
+      icon: LandPlotIcon,
+      tone: 'emerald'
+    },
+    {
+      id: 'sc3',
+      label: 'Separaciones activas',
+      value: '18',
+      delta: 8.0,
+      hint: 'por concretar',
+      icon: CalendarClockIcon,
+      tone: 'amber'
+    },
+    {
+      id: 'sc4',
+      label: 'Leads asignados',
+      value: '42',
+      delta: 15.2,
+      hint: 'en seguimiento',
+      icon: UsersIcon
+    }
+  ]
 };
 
 export const ROLE_KPIS: Record<RoleName, Kpi[]> = {

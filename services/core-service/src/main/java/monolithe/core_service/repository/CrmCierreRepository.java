@@ -9,6 +9,70 @@ import org.springframework.stereotype.Repository;
 public class CrmCierreRepository {
    private final JdbcTemplate jdbc;
 
+   private static final String SQL_ALCANCE_BUSQUEDA = """
+         SELECT CASE
+             WHEN NOT COALESCE(
+                 public.fn_usuario_tiene_permiso_seguridad(
+                     CAST(? AS bigint), 'crm.view'::varchar
+                 ), false
+             ) THEN NULL::bigint
+
+             WHEN EXISTS (
+                 SELECT 1
+                 FROM public.seg_usuarios_roles ur
+                 JOIN public.seg_roles r ON r.id_rol = ur.id_rol
+                 WHERE ur.id_usuario = CAST(? AS bigint)
+                   AND ur.activo = true
+                   AND ur.fecha_revocacion IS NULL
+                   AND r.activo = true
+                   AND r.codigo IN (
+                       'ADMINISTRADOR',
+                       'GERENCIA',
+                       'SUPERVISOR_COMERCIAL',
+                       'ADMINISTRACION'
+                   )
+             ) THEN -1::bigint
+
+             ELSE (
+                 SELECT CASE
+                     WHEN COUNT(DISTINCT a.id_asesor) = 1
+                     THEN MIN(a.id_asesor)
+                     ELSE NULL::bigint
+                 END
+                 FROM public.seg_usuarios u
+                 JOIN public.seg_usuarios_roles ur
+                     ON ur.id_usuario = u.id_usuario
+                 JOIN public.seg_roles r
+                     ON r.id_rol = ur.id_rol
+                 JOIN public.com_asesores a
+                     ON a.id_persona = u.id_persona
+                 JOIN public.cfg_estados_asesor ea
+                     ON ea.id_estado_asesor = a.id_estado_asesor
+                 WHERE u.id_usuario = CAST(? AS bigint)
+                   AND ur.activo = true
+                   AND ur.fecha_revocacion IS NULL
+                   AND r.activo = true
+                   AND r.codigo = 'ASESOR'
+                   AND ea.activo = true
+                   AND ea.permite_operar = true
+                   AND a.fecha_inicio <= CURRENT_DATE
+                   AND (
+                       a.fecha_fin IS NULL
+                       OR a.fecha_fin >= CURRENT_DATE
+                   )
+             )
+         END
+         """;
+
+   public Long resolverAlcanceBusqueda(Long idActor) {
+      return jdbc.queryForObject(
+            SQL_ALCANCE_BUSQUEDA,
+            Long.class,
+            idActor,
+            idActor,
+            idActor);
+   }
+
    public String buscar(Long actor, String consulta, String etapa, String origen, Long asesor,
          boolean sinAsignar, String categoria, int pagina, int tamano) {
       return jdbc.queryForObject("""

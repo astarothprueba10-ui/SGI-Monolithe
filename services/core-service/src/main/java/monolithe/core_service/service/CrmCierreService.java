@@ -23,15 +23,52 @@ public class CrmCierreService {
     private final JsonMapper jsonMapper;
 
     @Transactional(readOnly = true)
-    public JsonNode buscar(Long actor, String consulta, String etapa, String origen, Long asesor,
-            boolean sinAsignar, String categoria, Integer pagina, Integer tamano) {
+    public JsonNode buscar(Long actor, String consulta, String etapa,
+            String origen, Long asesor, boolean sinAsignar,
+            String categoria, Integer pagina, Integer tamano) {
+
         validarActor(actor);
         validarBusqueda(consulta, etapa, categoria, pagina, tamano);
-        if ((origen != null && origen.length() > 40) || (asesor != null && asesor <= 0)) {
+
+        if ((origen != null && origen.length() > 40)
+                || (asesor != null && asesor <= 0)) {
             throw badRequest("Filtro de origen o asesor invalido.");
         }
-        return ejecutar(() -> repository.buscar(actor, consulta, normalizar(etapa), normalizar(origen),
-                asesor, sinAsignar, categoria(categoria), pagina, tamano), false);
+
+        return ejecutar(() -> {
+            Long alcance = repository.resolverAlcanceBusqueda(actor);
+
+            if (alcance == null || alcance < -1L || alcance == 0L) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "No tiene autorización para consultar prospectos.");
+            }
+
+            Long asesorEfectivo = asesor;
+            boolean sinAsignarEfectivo = sinAsignar;
+
+            if (alcance > 0) {
+                if (sinAsignar || (asesor != null && !asesor.equals(alcance))) {
+                    throw new ResponseStatusException(
+                            HttpStatus.FORBIDDEN,
+                            "No puede consultar prospectos fuera de su cartera.");
+                }
+
+                asesorEfectivo = alcance;
+                sinAsignarEfectivo = false;
+            }
+
+            return repository.buscar(
+                    actor,
+                    consulta,
+                    normalizar(etapa),
+                    normalizar(origen),
+                    asesorEfectivo,
+                    sinAsignarEfectivo,
+                    categoria(categoria),
+                    pagina,
+                    tamano);
+        }, false);
     }
 
     @Transactional(readOnly = true)
@@ -69,21 +106,44 @@ public class CrmCierreService {
                     "El rango de fechas del CRM no es válido.");
         }
 
-        return ejecutar(
-                () -> repository.buscarPeriodo(
-                        actor,
-                        consulta,
-                        normalizar(etapa),
-                        normalizar(origen),
-                        asesor,
-                        sinAsignar,
-                        categoria(categoria),
-                        pagina,
-                        tamano,
-                        proyecto,
-                        desde,
-                        hastaExclusivo),
-                false);
+        return ejecutar(() -> {
+            Long alcance = repository.resolverAlcanceBusqueda(actor);
+
+            if (alcance == null || alcance < -1L || alcance == 0L) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "No tiene autorización para consultar prospectos.");
+            }
+
+            Long asesorEfectivo = asesor;
+            boolean sinAsignarEfectivo = sinAsignar;
+
+            if (alcance > 0) {
+                if (sinAsignar || (asesor != null && !asesor.equals(alcance))) {
+                    throw new ResponseStatusException(
+                            HttpStatus.FORBIDDEN,
+                            "No puede consultar prospectos fuera de su cartera.");
+                }
+
+                asesorEfectivo = alcance;
+                sinAsignarEfectivo = false;
+            }
+
+            return repository.buscarPeriodo(
+                    actor,
+                    consulta,
+                    normalizar(etapa),
+                    normalizar(origen),
+                    asesorEfectivo,
+                    sinAsignarEfectivo,
+                    categoria(categoria),
+                    pagina,
+                    tamano,
+                    proyecto,
+                    desde,
+                    hastaExclusivo);
+        }, false);
+
     }
 
     @Transactional(readOnly = true)

@@ -146,19 +146,6 @@ export const crmService = {
     }));
   },
 
-  async assignLead(prospectId: number, advisorId: number, reason = 'Asignacion manual'): Promise<boolean> {
-    const { data, error } = await supabase.rpc('sp_asignar_prospecto_asesor', {
-      p_id_prospecto: prospectId,
-      p_id_asesor: advisorId,
-      p_motivo: reason
-    });
-    if (error) {
-      console.error('Error al asignar prospecto:', error);
-      throw new Error(`Fallo asignacion de prospecto: ${error.message}`);
-    }
-    return Boolean(data?.success);
-  },
-
   async updateLeadStage(prospectId: number, stageId: number, note?: string): Promise<boolean> {
     const { data, error } = await supabase.rpc('sp_cambiar_etapa_prospecto', {
       p_id_prospecto: prospectId,
