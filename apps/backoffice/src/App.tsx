@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 import { AccountAdminPermissionRoute, PermissionRoute } from './components/auth/PermissionRoute';
+import { SessionInactivity } from './components/auth/SessionInactivity';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
@@ -77,6 +78,7 @@ export function App({
 }) {
   return (
     <AuthProvider>
+      <SessionInactivity />
       <BrowserRouter>
         <Routes>
           {/* RUTAS PÚBLICAS */}

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertCircleIcon, FileImageIcon, UploadIcon } from 'lucide-react';
 import { ApiError } from '../../lib/apiClient';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  getWorkerRegistrationDate, isWorkerEmploymentProtected, validateEditedWorkerStartDate
+} from '../../lib/editWorkerPolicy';
 import { coreService } from '../../services/coreService';
 import type {
   CatalogosTrabajadorResponse,
@@ -116,7 +120,8 @@ function validateChanges(
   form: EditFormState,
   initial: EditFormState,
   changed: Set<keyof EditFormState>,
-  catalogs: CatalogosTrabajadorResponse
+  catalogs: CatalogosTrabajadorResponse,
+  registrationDate: string | null
 ): WorkerFormErrors & { idEstadoTrabajador?: string; fechaCese?: string; motivoCambioEstado?: string } {
   const errors: WorkerFormErrors & {
     idEstadoTrabajador?: string;
@@ -171,8 +176,9 @@ function validateChanges(
   if (changed.has('idTipoVinculoLaboral') && !form.idTipoVinculoLaboral) {
     errors.idTipoVinculoLaboral = 'Selecciona el tipo de vínculo laboral.';
   }
-  if (changed.has('fechaIngreso') && !form.fechaIngreso) {
-    errors.fechaIngreso = 'La fecha de ingreso es obligatoria.';
+  if (changed.has('fechaIngreso')) {
+    const message = validateEditedWorkerStartDate(form.fechaIngreso, initial.fechaIngreso, registrationDate);
+    if (message) errors.fechaIngreso = message;
   }
   if (changed.has('idEstadoTrabajador') && form.idEstadoTrabajador === initial.idEstadoTrabajador) {
     errors.idEstadoTrabajador = 'Selecciona un estado laboral.';
@@ -210,6 +216,7 @@ export function EditWorkerModal({
   onSuccess,
   onPartialUpdate
 }: EditWorkerModalProps) {
+  const { user, can } = useAuth();
   const [worker, setWorker] = useState<TrabajadorResponse | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogosTrabajadorResponse | null>(null);
   const [form, setForm] = useState<EditFormState | null>(null);
@@ -328,6 +335,8 @@ export function EditWorkerModal({
     const cargo = worker.informacionLaboral.cargo?.toLowerCase() || '';
     return cargo.includes('gerente general') || cargo === 'gg';
   }, [worker]);
+  const protectedEmployment = isWorkerEmploymentProtected(isGerenteGeneral, user.roles, can('hr.edit'));
+  const registrationDate = getWorkerRegistrationDate(worker?.fechaCreacion);
 
   function handleSelectEstado(targetValue: string) {
     const selected = catalogs?.estadosTrabajador.find(
@@ -444,7 +453,7 @@ export function EditWorkerModal({
       return;
     }
     if (!correctionOnlyRetry) {
-      const validationErrors = validateChanges(form, baseline, currentChanges, catalogs);
+      const validationErrors = validateChanges(form, baseline, currentChanges, catalogs, registrationDate);
       if (Object.keys(validationErrors).length > 0) {
         setErrors((current) => ({ ...current, ...validationErrors }));
         toast.error('Revisa los campos modificados antes de guardar.');
@@ -753,7 +762,19 @@ export function EditWorkerModal({
                 </div>
                 <div>
                   <FieldLabel htmlFor="editTelefono">Teléfono</FieldLabel>
-                  <Input id="editTelefono" value={form.telefono} onChange={(event) => setFormValue('telefono', filtrarTelefono(event.target.value))} inputMode="numeric" disabled={disabledFields} />
+                  <Input
+                    id="editTelefono" type="tel" inputMode="numeric" maxLength={9}
+                    value={form.telefono}
+                    onChange={(event) => setFormValue('telefono', filtrarTelefono(event.target.value))}
+                    onBlur={() => setErrors((current) => ({ ...current, telefono:
+                      form.telefono === baseline?.telefono ? undefined : validarTelefono(form.telefono)
+                    }))}
+                    aria-describedby="editTelefono-ayuda" aria-invalid={Boolean(errors.telefono)}
+                    disabled={disabledFields}
+                  />
+                  <p id="editTelefono-ayuda" className="mt-1 text-[11px] text-brand-400">
+                    9 dígitos y debe comenzar con 9.
+                  </p>
                   {fieldError(errors.telefono)}
                 </div>
                 <div className="sm:col-span-2">
@@ -837,7 +858,21 @@ export function EditWorkerModal({
                 </div>
                 <div>
                   <FieldLabel htmlFor="editFechaIngreso">Fecha de ingreso *</FieldLabel>
-                  <Input id="editFechaIngreso" type="date" value={form.fechaIngreso} onChange={(event) => setFormValue('fechaIngreso', event.target.value)} disabled={disabledFields} />
+                  <Input
+                    id="editFechaIngreso" type="date" min={registrationDate ?? undefined}
+                    value={form.fechaIngreso}
+                    onChange={(event) => setFormValue('fechaIngreso', event.target.value)}
+                    onBlur={() => setErrors((current) => ({ ...current, fechaIngreso:
+                      validateEditedWorkerStartDate(form.fechaIngreso, baseline?.fechaIngreso ?? '', registrationDate)
+                    }))}
+                    aria-describedby="editFechaIngreso-ayuda" aria-invalid={Boolean(errors.fechaIngreso)}
+                    disabled={disabledFields || !registrationDate}
+                  />
+                  <p id="editFechaIngreso-ayuda" className="mt-1 text-[11px] text-brand-400">
+                    {registrationDate
+                      ? `Si cambias la fecha, debe ser desde el día de registro (${registrationDate.split('-').reverse().join('/')}).`
+                      : 'No se pudo determinar la fecha de registro. Vuelve a cargar el trabajador.'}
+                  </p>
                   {fieldError(errors.fechaIngreso)}
                 </div>
                 <div>
@@ -860,7 +895,7 @@ export function EditWorkerModal({
                           variant="secondary"
                           size="sm"
                           onClick={() => setShowReincorporarModal(true)}
-                          disabled={disabledFields || isGerenteGeneral}
+                          disabled={disabledFields || protectedEmployment}
                         >
                           Solicitar reincorporación
                         </Button>
@@ -872,7 +907,7 @@ export function EditWorkerModal({
                         id="editEstado"
                         value={form.idEstadoTrabajador}
                         onChange={(event) => handleSelectEstado(event.target.value)}
-                        disabled={disabledFields || isGerenteGeneral}
+                        disabled={disabledFields || protectedEmployment}
                       >
                         <option value="">Seleccionar estado</option>
                         {manualStatuses.map((item) => (
@@ -887,7 +922,7 @@ export function EditWorkerModal({
                           variant="secondary"
                           size="sm"
                           onClick={() => setShowSuspendModal(true)}
-                          disabled={disabledFields || isGerenteGeneral}
+                          disabled={disabledFields || protectedEmployment}
                         >
                           Suspender trabajador...
                         </Button>
@@ -896,7 +931,7 @@ export function EditWorkerModal({
                           variant="secondary"
                           size="sm"
                           onClick={() => setShowCesarModal(true)}
-                          disabled={disabledFields || isGerenteGeneral}
+                          disabled={disabledFields || protectedEmployment}
                         >
                           Cesar trabajador...
                         </Button>
@@ -904,7 +939,7 @@ export function EditWorkerModal({
                     </div>
                   )}
                   {statusIsSystemManaged ? <p className="mt-1 text-[11px] text-amber-700">Este estado lo administra la resolución de corrección documental.</p> : null}
-                  {isGerenteGeneral ? <p className="mt-1 text-[11px] text-brand-500">El Gerente General es un usuario protegido del sistema.</p> : null}
+                  {protectedEmployment ? <p className="mt-1 text-[11px] text-brand-500">El Gerente General es un usuario protegido del sistema.</p> : null}
                   {fieldError(errors.idEstadoTrabajador)}
                 </div>
                 {currentStatus?.codigo === 'CESADO' ? (

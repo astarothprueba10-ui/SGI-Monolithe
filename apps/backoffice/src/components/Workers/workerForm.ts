@@ -163,7 +163,7 @@ export function filtrarCaracteresNombre(valor: string): string {
 }
 
 export function filtrarTelefono(valor: string): string {
-  return valor.replace(/\D/g, '').slice(0, 15);
+  return valor.replace(/\D/g, '').slice(0, 9);
 }
 
 export function validarDocumento(valor: string, tipo: WorkerDocumentType | undefined): string | undefined {
@@ -204,8 +204,8 @@ export function validarCorreo(valor: string): string | undefined {
 
 export function validarTelefono(valor: string): string | undefined {
   if (!valor.trim()) return undefined;
-  if (!/^\d{7,15}$/.test(valor.trim())) {
-    return 'El telefono debe contener entre 7 y 15 digitos.';
+  if (!/^9[0-9]{8}$/.test(valor.trim())) {
+    return 'El teléfono debe tener 9 dígitos y comenzar con 9.';
   }
   return undefined;
 }
