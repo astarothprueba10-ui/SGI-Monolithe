@@ -32,7 +32,15 @@ public class CrmExpedienteService {
     public JsonNode detalle(Long actor, Long prospecto) {
         validarActor(actor);
         validarIdentificador(prospecto, "prospecto");
-        return ejecutar(() -> repository.detalle(actor, prospecto), false);
+
+        return ejecutar(() -> {
+            if (!repository.puedeConsultarProspecto(actor, prospecto)) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "No tiene autorizacion para consultar este prospecto.");
+            }
+            return repository.detalle(actor, prospecto);
+        }, false);
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +63,8 @@ public class CrmExpedienteService {
         }
         OffsetDateTime fecha = req.fechaVisita();
         if (!fecha.isAfter(OffsetDateTime.now()) || fecha.isAfter(OffsetDateTime.now().plusDays(180))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de visita debe estar dentro de los proximos 180 dias.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha de visita debe estar dentro de los proximos 180 dias.");
         }
         return ejecutar(() -> repository.agendar(actor, prospecto, req.idProyecto(), fecha,
                 req.turno(), req.puntoEncuentro(), req.observaciones()), false);
@@ -94,7 +103,8 @@ public class CrmExpedienteService {
         } catch (DataAccessException ex) {
             throw traducirError(ex);
         }
-        if (json == null) throw new IllegalStateException("Respuesta nula del backend CRM.");
+        if (json == null)
+            throw new IllegalStateException("Respuesta nula del backend CRM.");
         try {
             JsonNode resultado = jsonMapper.readTree(json);
             if (resultado == null || (array ? !resultado.isArray() : !resultado.isObject())) {
@@ -109,7 +119,8 @@ public class CrmExpedienteService {
     private ResponseStatusException traducirError(DataAccessException ex) {
         StringBuilder cadena = new StringBuilder();
         for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
-            if (causa.getMessage() != null) cadena.append(causa.getMessage()).append(' ');
+            if (causa.getMessage() != null)
+                cadena.append(causa.getMessage()).append(' ');
         }
         String detalle = cadena.toString();
         if (detalle.contains("DENEGADO|")) {
@@ -120,12 +131,14 @@ public class CrmExpedienteService {
         }
         if (detalle.contains("VISITA_OCUPADA|") || detalle.contains("TRANSICION_INVALIDA|")
                 || detalle.contains("PROSPECTO_CERRADO|") || detalle.contains("ASESOR_NO_ASIGNADO|")) {
-            return new ResponseStatusException(HttpStatus.CONFLICT, "La operacion no cumple el estado comercial actual.", ex);
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La operacion no cumple el estado comercial actual.", ex);
         }
         if (detalle.contains("DATOS_INVALIDOS|") || detalle.contains("HORARIO_INVALIDO|")
                 || detalle.contains("PROYECTO_INVALIDO|") || detalle.contains("ASESOR_INVALIDO|")
                 || detalle.contains("CATALOGO_INVALIDO|")) {
-            return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verifique los datos de la visita comercial.", ex);
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verifique los datos de la visita comercial.",
+                    ex);
         }
         return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No fue posible procesar la solicitud CRM.", ex);

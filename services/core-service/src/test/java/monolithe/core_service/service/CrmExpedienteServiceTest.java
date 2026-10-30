@@ -32,8 +32,17 @@ class CrmExpedienteServiceTest {
 
     @Test
     void muestraDetalleDeProspecto() {
-        when(repository.detalle(5L, 1L)).thenReturn("{\"prospecto\":{\"id_prospecto\":1},\"esComprador\":false}");
-        assertEquals(1, service.detalle(5L, 1L).path("prospecto").path("id_prospecto").asInt());
+        when(repository.puedeConsultarProspecto(5L, 1L))
+                .thenReturn(true);
+        when(repository.detalle(5L, 1L))
+                .thenReturn(
+                        "{\"prospecto\":{\"id_prospecto\":1},\"esComprador\":false}");
+        var resultado = service.detalle(5L, 1L);
+        assertEquals(
+                1,
+                resultado.path("prospecto").path("id_prospecto").asInt());
+        verify(repository).puedeConsultarProspecto(5L, 1L);
+        verify(repository).detalle(5L, 1L);
     }
 
     @Test
@@ -85,8 +94,35 @@ class CrmExpedienteServiceTest {
 
     @Test
     void verificaPermisosDenegadosEnBaseDeDatos() {
-        when(repository.detalle(5L, 1L)).thenThrow(new DataIntegrityViolationException("DENEGADO|Sin permiso"));
-        var e = assertThrows(ResponseStatusException.class, () -> service.detalle(5L, 1L));
-        assertEquals(HttpStatus.FORBIDDEN, e.getStatusCode());
+        when(repository.puedeConsultarProspecto(5L, 1L))
+                .thenReturn(true);
+
+        when(repository.detalle(5L, 1L))
+                .thenThrow(
+                        new DataIntegrityViolationException(
+                                "DENEGADO|Sin permiso"));
+
+        var error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.detalle(5L, 1L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
+        verify(repository).detalle(5L, 1L);
     }
+
+    @Test
+    void asesorNoPuedeConsultarDetalleDeProspectoAjeno() {
+        when(repository.puedeConsultarProspecto(5L, 22L))
+                .thenReturn(false);
+
+        var error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.detalle(5L, 22L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
+
+        verify(repository).puedeConsultarProspecto(5L, 22L);
+        verify(repository, never()).detalle(anyLong(), anyLong());
+    }
+
 }

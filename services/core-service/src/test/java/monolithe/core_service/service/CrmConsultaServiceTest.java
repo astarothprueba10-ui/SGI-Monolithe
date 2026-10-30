@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class CrmConsultaServiceTest {
@@ -25,7 +26,8 @@ class CrmConsultaServiceTest {
     @Test
     void listaProspectosConAutorizacionVigente() {
         when(repository.tienePermisoVista(5L)).thenReturn(true);
-        when(repository.listarProspectos()).thenReturn("[{\"id_prospecto\":15,\"estado_codigo\":\"NUEVO\"}]");
+        when(repository.tieneAlcanceProspectos(5L)).thenReturn(true);
+        when(repository.listarProspectos(5L)).thenReturn("[{\"id_prospecto\":15,\"estado_codigo\":\"NUEVO\"}]");
 
         var resultado = service.listarProspectos(5L);
 
@@ -33,7 +35,8 @@ class CrmConsultaServiceTest {
         assertEquals(1, resultado.size());
         assertEquals(15L, resultado.get(0).path("id_prospecto").asLong());
         verify(repository).tienePermisoVista(5L);
-        verify(repository).listarProspectos();
+        verify(repository).tieneAlcanceProspectos(5L);
+        verify(repository).listarProspectos(5L);
         verify(repository, never()).listarAsesores();
     }
 
@@ -57,7 +60,23 @@ class CrmConsultaServiceTest {
                 () -> service.listarProspectos(10L));
 
         assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
-        verify(repository, never()).listarProspectos();
+        verify(repository, never()).listarProspectos(anyLong());
+    }
+
+    @Test
+    void niegaAccesoCuandoNoTieneAlcanceComercial() {
+        when(repository.tienePermisoVista(5L)).thenReturn(true);
+        when(repository.tieneAlcanceProspectos(5L)).thenReturn(false);
+
+        var error = assertThrows(
+                ResponseStatusException.class,
+                () -> service.listarProspectos(5L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
+
+        verify(repository).tienePermisoVista(5L);
+        verify(repository).tieneAlcanceProspectos(5L);
+        verify(repository, never()).listarProspectos(anyLong());
     }
 
     @Test
@@ -72,12 +91,20 @@ class CrmConsultaServiceTest {
     @Test
     void fallaDeFormaControladaAnteErrorDeBaseDeDatos() {
         when(repository.tienePermisoVista(5L)).thenReturn(true);
-        when(repository.listarProspectos())
-                .thenThrow(new DataAccessResourceFailureException("Conexion interrumpida"));
+        when(repository.tieneAlcanceProspectos(5L))
+                .thenReturn(true);
+        when(repository.listarProspectos(5L))
+                .thenThrow(
+                        new DataAccessResourceFailureException(
+                                "Conexion interrumpida"));
 
-        var error = assertThrows(ResponseStatusException.class,
+        var error = assertThrows(
+                ResponseStatusException.class,
                 () -> service.listarProspectos(5L));
 
-        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, error.getStatusCode());
+        assertEquals(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                error.getStatusCode());
     }
+
 }

@@ -22,7 +22,15 @@ public class CrmConsultaService {
 
     @Transactional(readOnly = true)
     public JsonNode listarProspectos(Long idActor) {
-        return consultar(idActor, repository::listarProspectos);
+        return consultar(idActor, () -> {
+            if (!repository.tieneAlcanceProspectos(idActor)) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "No tiene autorizado un rol para consultar prospectos.");
+            }
+
+            return repository.listarProspectos(idActor);
+        });
     }
 
     @Transactional(readOnly = true)

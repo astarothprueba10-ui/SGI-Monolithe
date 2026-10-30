@@ -48,42 +48,14 @@ public class CrmGestionRepository {
 
     public String listarAsignaciones(Long actor, Long prospecto) {
         return jdbcTemplate.queryForObject("""
-                SELECT CASE
-                    WHEN COALESCE(
-                        public.fn_usuario_tiene_permiso_seguridad(
-                            CAST(? AS bigint), 'crm.view'
-                        ), false
-                    )
-                    THEN COALESCE((
-                        SELECT jsonb_agg(
-                            jsonb_build_object(
-                                'id_asignacion', a.id_asignacion_prospecto,
-                                'id_asesor', a.id_asesor,
-                                'asesor_nombre', COALESCE(
-                                    NULLIF(TRIM(CONCAT_WS(' ',
-                                        p.nombres,
-                                        p.apellido_paterno,
-                                        p.apellido_materno
-                                    )), ''),
-                                    'Asesor #' || a.id_asesor
-                                ),
-                                'fecha_asignacion', a.fecha_asignacion,
-                                'fecha_fin', a.fecha_fin,
-                                'motivo_asignacion', a.motivo_asignacion,
-                                'motivo_cierre', a.motivo_cierre,
-                                'vigente', a.fecha_fin IS NULL
-                            )
-                            ORDER BY a.fecha_asignacion DESC
-                        )
-                        FROM public.com_asignaciones_prospecto a
-                        LEFT JOIN public.com_asesores ca
-                            ON ca.id_asesor = a.id_asesor
-                        LEFT JOIN public.core_personas p
-                            ON p.id_persona = ca.id_persona
-                        WHERE a.id_prospecto = CAST(? AS bigint)
-                    ), '[]'::jsonb)::text
-                    ELSE NULL
-                END
-                """, String.class, actor, prospecto);
+                SELECT public.sp_crm_listar_asignaciones_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                String.class,
+                actor,
+                prospecto);
     }
+
 }
