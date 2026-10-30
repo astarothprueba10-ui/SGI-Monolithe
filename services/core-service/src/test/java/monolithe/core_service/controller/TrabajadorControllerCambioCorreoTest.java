@@ -38,20 +38,24 @@ class TrabajadorControllerCambioCorreoTest {
                 Map.of("sub", "10", "authorities", "hr.edit"));
 
         SolicitudCambioCorreoResponse respuestaEsperada = new SolicitudCambioCorreoResponse("Enlace enviado", 30L);
-        when(trabajadorService.solicitarCambioCorreo(10L, 5L, "nuevo@monolithe.pe", "token-mock"))
+        when(trabajadorService.solicitarCambioCorreo(
+                10L, 5L, "nuevo@monolithe.pe", "Correccion del correo laboral"))
                 .thenReturn(respuestaEsperada);
 
-        SolicitudCambioCorreoRequest request = new SolicitudCambioCorreoRequest("nuevo@monolithe.pe");
+        SolicitudCambioCorreoRequest request = new SolicitudCambioCorreoRequest(
+                "nuevo@monolithe.pe",
+                "Correccion del correo laboral");
         ResponseEntity<SolicitudCambioCorreoResponse> response = controller.solicitarCambioCorreo(5L, request, jwt);
-
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Enlace enviado", response.getBody().mensaje());
-        verify(trabajadorService).solicitarCambioCorreo(10L, 5L, "nuevo@monolithe.pe", "token-mock");
+        verify(trabajadorService).solicitarCambioCorreo(
+                10L, 5L, "nuevo@monolithe.pe", "Correccion del correo laboral");
     }
 
     @Test
     void debeConfirmarCambioCorreoDesdeController() {
-        ConfirmacionCambioCorreoResponse respuestaEsperada = new ConfirmacionCambioCorreoResponse("OK", "nuevo@monolithe.pe");
+        ConfirmacionCambioCorreoResponse respuestaEsperada = new ConfirmacionCambioCorreoResponse("OK",
+                "nuevo@monolithe.pe");
         when(trabajadorService.confirmarCambioCorreo("token123"))
                 .thenReturn(respuestaEsperada);
 
