@@ -55,7 +55,7 @@ public class JwtSessionVersionValidator implements OAuth2TokenValidator<Jwt> {
     private Long extraerSessionVersion(Jwt jwt) {
         Object claim = jwt.getClaim("session_version");
         if (claim == null) {
-            return 0L;
+            return null;
         }
         if (claim instanceof Number num) {
             return num.longValue();

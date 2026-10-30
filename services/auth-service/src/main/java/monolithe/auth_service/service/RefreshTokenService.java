@@ -260,5 +260,14 @@ public class RefreshTokenService {
                 });
 
                 sessionRepository.saveAll(sesionesActivas);
+
+                int actualizados = userRepository
+                                .incrementarVersionSesiones(idUsuario);
+
+                if (actualizados != 1) {
+                        throw new IllegalStateException(
+                                        "No se pudo invalidar la versión de sesión del usuario");
+                }
         }
+
 }
