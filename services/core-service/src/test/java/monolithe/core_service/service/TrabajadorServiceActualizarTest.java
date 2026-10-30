@@ -29,6 +29,9 @@ class TrabajadorServiceActualizarTest {
     void setUp() {
         repository = mock(TrabajadorProcedureRepository.class);
         jsonMapper = new JsonMapper();
+        JsonNode actual = jsonMapper.createObjectNode().put("fechaCreacion", "2024-01-01");
+        lenient().when(repository.obtenerTrabajador(anyLong(), anyLong()))
+                .thenReturn(new ResultadoProcedimiento(actual, "OK", null));
         service = new TrabajadorService(repository, jsonMapper);
     }
 

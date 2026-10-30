@@ -197,10 +197,22 @@ public class TrabajadorService {
                         Long idActor,
                         Long idTrabajador,
                         String datosJson) {
+                String datosValidados = validarDatosEdicion(idActor, idTrabajador, datosJson);
                 ResultadoProcedimiento respuesta = repository.actualizarTrabajador(
-                                idActor, idTrabajador, datosJson);
+                                idActor, idTrabajador, datosValidados);
                 validarEstado(respuesta);
                 return respuesta.resultado();
+        }
+
+        private String validarDatosEdicion(Long idActor, Long idTrabajador, String datosJson) {
+                JsonNode solicitud = jsonMapper.readTree(datosJson);
+                JsonNode actual = null;
+                if (ValidacionEdicionTrabajador.requiereFechaActual(solicitud)) {
+                        ResultadoProcedimiento respuesta = repository.obtenerTrabajador(idActor, idTrabajador);
+                        validarEstado(respuesta);
+                        actual = respuesta.resultado();
+                }
+                return jsonMapper.writeValueAsString(ValidacionEdicionTrabajador.validar(solicitud, actual));
         }
 
         private void validarDocumentoNoModificable(
