@@ -394,6 +394,50 @@ export interface CrmFuentesPeriodo {
 }
 
 
+
+export interface CrmRetrocesoMotivo {
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+}
+
+export interface CrmSolicitudRetroceso {
+  id_solicitud: number;
+  id_prospecto: number;
+  codigo_prospecto: string;
+  nombre_prospecto: string;
+  id_asesor?: number;
+  nombre_asesor: string;
+  etapa_origen: string;
+  nombre_etapa_origen: string;
+  etapa_destino: string;
+  nombre_etapa_destino: string;
+  motivo_codigo: string;
+  motivo_nombre: string;
+  motivo_detallado: string;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  tiene_evidencia?: boolean;
+  fecha_solicitud: string;
+  fecha_resolucion: string | null;
+  observacion_resolucion: string | null;
+  resuelto_por_nombre: string | null;
+  prospecto_codigo?: string;
+  prospecto_nombre?: string;
+  asesor_nombre?: string;
+  estado_origen_codigo?: string;
+  estado_origen_nombre?: string;
+  estado_destino_codigo?: string;
+  estado_destino_nombre?: string;
+}
+
+export interface CrmIndicadoresRetroceso {
+  total: number;
+  pendientes: number;
+  aprobadas: number;
+  rechazadas: number;
+  tasa_aprobacion: number;
+}
+
 export const crmBackend = {
   catalogos: () => coreApi.get<CrmCatalogs>('/crm/catalogos'),
   resumen: () => coreApi.get<CrmSummary>('/crm/resumen'),
@@ -655,4 +699,51 @@ export const crmBackend = {
     );
   },
 
+  retrocesos: {
+    solicitarRetroceso: (idProspecto: number, body: {
+      estadoDestinoCodigo: string;
+      motivoCodigo: string;
+      motivoDetallado: string;
+    }) => coreApi.post<{ id_solicitud: number; estado: string }>(
+      `/crm/prospectos/${idProspecto}/retrocesos`,
+      body as Record<string, unknown>
+    ),
+    adjuntarEvidencia: (idSolicitud: number, archivo: File) => {
+      const formData = new FormData();
+      formData.append('archivo', archivo);
+      return coreApi.post<{ ok: boolean; path?: string }>(
+        `/crm/retrocesos/${idSolicitud}/evidencia`,
+        formData
+      );
+    },
+    obtenerUrlEvidencia: (idSolicitud: number) =>
+      coreApi.get<{ url: string; segundos: number }>(
+        `/crm/retrocesos/${idSolicitud}/evidencia/url-firmada`
+      ),
+    miRetrocesoPendiente: (idProspecto: number) =>
+      coreApi.get<CrmSolicitudRetroceso | null>(
+        `/crm/prospectos/${idProspecto}/retrocesos/pendiente`
+      ),
+    listarSolicitudes: (params: {
+      desde: string;
+      hastaExclusivo: string;
+      estado?: string;
+      busqueda?: string;
+      pagina?: number;
+      tamano?: number;
+      asesor?: number;
+    }) => coreApi.get<CrmPage<CrmSolicitudRetroceso>>(
+      `/crm/retrocesos${qs(params)}`
+    ),
+    indicadores: (desde: string, hastaExclusivo: string, asesor?: number) =>
+      coreApi.get<CrmIndicadoresRetroceso>(
+        `/crm/retrocesos/indicadores${qs({ desde, hastaExclusivo, asesor })}`
+      ),
+    motivos: () => coreApi.get<CrmRetrocesoMotivo[]>('/crm/retrocesos/motivos'),
+    resolverDecision: (idSolicitud: number, body: { aprobar: boolean; observacion?: string }) =>
+      coreApi.put<Record<string, unknown>>(
+        `/crm/retrocesos/${idSolicitud}/decision`,
+        body as Record<string, unknown>
+      ),
+  },
 };
