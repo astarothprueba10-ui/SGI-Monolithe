@@ -29,6 +29,9 @@ import { Gate } from '../components/auth/PermissionRoute';
 import { calcularRangoCrm } from '../utils/crmPeriodo';
 import { CrmActionsMenu, type CrmMenuAction } from '../components/crm/CrmActionsMenu';
 import { CrmCategoriaLegend } from '../components/crm/CrmCategoriaLegend';
+import { CrmSolicitarRetrocesoModal } from '../components/crm/CrmSolicitarRetrocesoModal';
+import { CrmSolicitudesRetroceso } from '../components/crm/CrmSolicitudesRetroceso';
+import type { CrmRetrocesoMotivo } from '../services/crmBackend';
 import {
   crmBackend,
   type CrmAdvisor,
@@ -59,7 +62,13 @@ import {
   sanitizarLead, validarNuevoLead,
   type LeadField,
   type LeadFormValues
-} from '../utils/crmLeadValidation'; const STAGE_TONES: Record<string, string> = {
+} from '../utils/crmLeadValidation';
+import { ejecutarExportacionExcelCompleta } from '../utils/crmExportExcel';
+
+// Funcionalidad pospuesta para un sprint futuro. No eliminar.
+const CRM_VISITAS_HABILITADAS = false;
+
+const STAGE_TONES: Record<string, string> = {
   NUEVO: 'bg-slate-100 text-slate-700 border-slate-200',
   CONTACTADO: 'bg-sky-50 text-sky-700 border-sky-200',
   EN_SEGUIMIENTO: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -230,6 +239,13 @@ export function Crm() {
       rol === 'Supervisor comercial'
   );
 
+  const puedeGestionarRetrocesos = user.roles.some(
+    (rol) =>
+      rol === 'Gerencia' ||
+      rol === 'Supervisor comercial' ||
+      rol === 'Administrador'
+  );
+
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
@@ -268,6 +284,8 @@ export function Crm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
 
   const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
   const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
@@ -425,6 +443,10 @@ export function Crm() {
   const [stageLead, setStageLead] = useState<CrmProspect | null>(null);
   const [newStageCode, setNewStageCode] = useState('');
   const [stageObservation, setStageObservation] = useState('');
+  const [retrocesoModalOpen, setRetrocesoModalOpen] = useState(false);
+  const [retrocesoProspecto, setRetrocesoProspecto] = useState<CrmProspect | null>(null);
+  const [retrocesoEtapaDestino, setRetrocesoEtapaDestino] = useState('');
+  const [motivosRetroceso, setMotivosRetroceso] = useState<CrmRetrocesoMotivo[]>([]);
 
   const [editLead, setEditLead] = useState<CrmProspect | null>(null);
   const [editOrigen, setEditOrigen] = useState('');
@@ -663,6 +685,18 @@ export function Crm() {
   useEffect(() => {
     void loadCatalogsAndAdvisors();
   }, [loadCatalogsAndAdvisors]);
+
+  useEffect(() => {
+    crmBackend.retrocesos.motivos()
+      .then((m) => setMotivosRetroceso(m || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!CRM_VISITAS_HABILITADAS && tab === 'visitas') {
+      setTab('leads');
+    }
+  }, [tab]);
 
   useEffect(() => {
     if (tab === 'leads' || tab === 'potenciales') {
@@ -1005,6 +1039,19 @@ export function Crm() {
       });
       return;
     }
+
+    const ETAPAS_POTENCIAL = ['INTERESADO', 'NEGOCIACION'];
+    const ETAPAS_LEAD = ['NUEVO', 'CONTACTADO', 'EN_SEGUIMIENTO'];
+    if (
+      ETAPAS_POTENCIAL.includes(stageLead.estado_codigo) &&
+      ETAPAS_LEAD.includes(newStageCode)
+    ) {
+      setRetrocesoProspecto(stageLead);
+      setRetrocesoEtapaDestino(newStageCode);
+      setRetrocesoModalOpen(true);
+      setStageLead(null);
+      return;
+    }
     setIsSubmitting(true);
     try {
       await crmBackend.etapa(stageLead.id_prospecto, newStageCode, stageObservation.trim() || undefined);
@@ -1203,27 +1250,51 @@ export function Crm() {
   const handleCompleteVisit = (visitaId: number) =>
     updateVisitStatusHelper(visitaId, 'REALIZADA', 'Visita realizada');
 
-  const handleExportCsv = async () => {
+  const construirFiltrosExportacion = (rango: { desde: string; hastaExclusivo: string }) => ({
+    consulta: query.trim() || undefined,
+    etapa: stage === 'all' ? undefined : stage,
+    origen: origin === 'all' ? undefined : origin,
+    idAsesor: puedeVerGestionGlobal && typeof advisorFilter === 'number'
+      ? advisorFilter : undefined,
+    sinAsignar: puedeVerGestionGlobal ? onlyUnassigned || undefined : undefined,
+    idProyecto: projectFilter === '' ? undefined : projectFilter,
+    desde: rango.desde,
+    hastaExclusivo: rango.hastaExclusivo
+  });
+
+  const ejecutarDescargaExcel = async (rango: { desde: string; hastaExclusivo: string }) => {
+    const qComp = (tab === 'compradores' ? buyersQuery.trim() : query.trim()) || undefined;
+    const res = await ejecutarExportacionExcelCompleta({
+      filtros: construirFiltrosExportacion(rango),
+      consultaCompradores: qComp,
+      notificarProgreso: (msg) => {
+        setExportStatus(msg);
+        toast.loading(msg, { id: 'crm-export' });
+      }
+    });
+    toast.success('Exportacion completada', {
+      id: 'crm-export',
+      description: `${res.nombre} generado: ${res.totalLeads} leads, ${res.totalPotenciales} potenciales, ${res.totalCompradores} compradores.`
+    });
+  };
+
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    const rango = rangoTabla ?? rangoPeriodo;
+    if (!rango) {
+      toast.error('Sin rango de fechas', { description: 'Complete un rango de fechas valido.' });
+      return;
+    }
+    setIsExporting(true);
+    setExportStatus('Iniciando...');
     try {
-      const csvData = await crmBackend.exportarCsv(
-        query.trim() || undefined,
-        stage === 'all' ? undefined : stage,
-        category,
-        5000
-      );
-      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'prospectos-crm.csv';
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success('Exportacion completada', {
-        description: 'Se ha descargado el archivo CSV con los datos reales del CRM.'
-      });
+      await ejecutarDescargaExcel(rango);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Fallo en la exportacion.';
-      toast.error('Error al exportar', { description: msg });
+      const msg = err instanceof Error ? err.message : 'Fallo al exportar Excel.';
+      toast.error('Error al exportar Excel', { id: 'crm-export', description: msg });
+    } finally {
+      setIsExporting(false);
+      setExportStatus('');
     }
   };
 
@@ -1235,8 +1306,8 @@ export function Crm() {
         actions={
           <>
             <Gate permission="crm.export">
-              <Button icon={DownloadIcon} onClick={handleExportCsv}>
-                Exportar
+              <Button icon={DownloadIcon} onClick={handleExportExcel} disabled={isExporting}>
+                {isExporting ? (exportStatus || 'Generando...') : 'Exportar Excel'}
               </Button>
             </Gate>
             <Gate permission="crm.create">
@@ -1398,16 +1469,26 @@ export function Crm() {
             label: 'Equipo de asesores',
             count: advisorsList.length
           },
-          {
+          ...(CRM_VISITAS_HABILITADAS ? [{
             id: 'visitas',
             label: 'Agenda de visitas',
             count: visitsList.length
-          }
-        ].filter(
-          (item) =>
+          }] : []),
+          ...(puedeGestionarRetrocesos
+            ? [
+                {
+                  id: 'retrocesos',
+                  label: 'Solicitudes de retroceso'
+                }
+              ]
+            : [])
+        ].filter((item) => {
+          if (item.id === 'retrocesos') return puedeGestionarRetrocesos;
+          return (
             puedeVerGestionGlobal ||
             !['fuentes', 'asesores'].includes(item.id)
-        )}
+          );
+        })}
       />
 
       {/* PESTANA 1: Leads y potenciales */}
@@ -1707,8 +1788,8 @@ export function Crm() {
                       }
                     }] : []),
 
-                    {
-                      label: 'Agendar visita', icon: CalendarIcon, permission: 'crm.edit',
+                    ...(CRM_VISITAS_HABILITADAS ? [{
+                      label: 'Agendar visita', icon: CalendarIcon, permission: 'crm.edit' as const,
                       onClick: () => {
                         setVisitForm({
                           prospectId: lead.id_prospecto,
@@ -1719,7 +1800,7 @@ export function Crm() {
                         });
                         setIsNewVisitOpen(true);
                       }
-                    },
+                    }] : []),
 
                     ...(puedeVerGestionGlobal ? [{
                       label: 'Desactivar prospecto',
@@ -2228,6 +2309,17 @@ export function Crm() {
         </Card>
       )}
 
+      {/* PESTAÑA: Solicitudes de retroceso */}
+      {tab === 'retrocesos' && puedeGestionarRetrocesos && (
+        <CrmSolicitudesRetroceso
+          rangoPeriodo={rangoPeriodo}
+          onDecisionSuccess={() => {
+            void loadLeads();
+            void loadCatalogsAndAdvisors();
+          }}
+        />
+      )}
+
       {/* MODAL: Expediente comercial (Detalle) */}
       <Modal
         open={detailModalOpen}
@@ -2457,26 +2549,28 @@ export function Crm() {
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Visitas guiadas ({detailVisitsList.length})
                 </h4>
-                <Gate permission="crm.edit">
-                  <Button
-                    size="sm"
-                    icon={CalendarIcon}
-                    onClick={() => {
-                      setVisitForm({
-                        prospectId: leadDetail.prospecto.id_prospecto,
-                        projectId: leadDetail.intereses?.[0]?.idProyecto || catalogs?.proyectos?.[0]?.id || 1,
-                        advisorId: leadDetail.prospecto.id_asesor || advisorsList[0]?.id_asesor || 0,
-                        visitDate: '',
-                        shift: '11:00',
-                        meetingPoint: 'Oficina de Ventas - Lurin',
-                        notes: ''
-                      });
-                      setIsNewVisitOpen(true);
-                    }}
-                  >
-                    Agendar visita
-                  </Button>
-                </Gate>
+                {CRM_VISITAS_HABILITADAS && (
+                  <Gate permission="crm.edit">
+                    <Button
+                      size="sm"
+                      icon={CalendarIcon}
+                      onClick={() => {
+                        setVisitForm({
+                          prospectId: leadDetail.prospecto.id_prospecto,
+                          projectId: leadDetail.intereses?.[0]?.idProyecto || catalogs?.proyectos?.[0]?.id || 1,
+                          advisorId: leadDetail.prospecto.id_asesor || advisorsList[0]?.id_asesor || 0,
+                          visitDate: '',
+                          shift: '11:00',
+                          meetingPoint: 'Oficina de Ventas - Lurin',
+                          notes: ''
+                        });
+                        setIsNewVisitOpen(true);
+                      }}
+                    >
+                      Agendar visita
+                    </Button>
+                  </Gate>
+                )}
               </div>
               {detailVisitsList.length === 0 ? (
                 <p className="text-xs text-brand-400 bg-brand-50 p-3 rounded text-center">
@@ -2807,7 +2901,12 @@ export function Crm() {
                 )
               }
             >
-              {isSubmitting ? 'Guardando...' : 'Actualizar etapa'}
+              {isSubmitting
+                ? 'Guardando...'
+                : ['INTERESADO', 'NEGOCIACION'].includes(stageLead?.estado_codigo || '') &&
+                  ['NUEVO', 'CONTACTADO', 'EN_SEGUIMIENTO'].includes(newStageCode)
+                ? 'Solicitar retroceso'
+                : 'Actualizar etapa'}
             </Button>
           </>
         }
@@ -2860,6 +2959,12 @@ export function Crm() {
                 Seleccione una etapa diferente a la actual ({stageLead?.estado_codigo}) para avanzar el prospecto.
               </p>
             )}
+            {['INTERESADO', 'NEGOCIACION'].includes(stageLead?.estado_codigo || '') &&
+              ['NUEVO', 'CONTACTADO', 'EN_SEGUIMIENTO'].includes(newStageCode) && (
+                <p className="mt-1 text-[11px] text-amber-600 font-medium">
+                  Atencion: Regresar este prospecto a una etapa de Lead requiere aprobacion de Gerencia o Supervisor comercial.
+                </p>
+              )}
             {catalogs?.estados.find((e) => e.codigo === newStageCode)?.final && (
               <p className="mt-1 text-[11px] text-rose-600 font-medium">
                 Atencion: La etapa seleccionada es definitiva. Una vez guardada, no podra revertirse.
@@ -3221,6 +3326,31 @@ export function Crm() {
           </p>
         </form>
       </Modal>
+
+      <CrmSolicitarRetrocesoModal
+        open={retrocesoModalOpen}
+        onClose={() => {
+          setRetrocesoModalOpen(false);
+          setRetrocesoProspecto(null);
+        }}
+        prospecto={retrocesoProspecto}
+        etapaDestinoCodigo={retrocesoEtapaDestino}
+        etapaDestinoNombre={
+          catalogs?.estados.find((e) => e.codigo === retrocesoEtapaDestino)?.nombre ||
+          retrocesoEtapaDestino
+        }
+        motivos={motivosRetroceso}
+        onSuccess={() => {
+          void loadLeads();
+          if (
+            leadDetail &&
+            retrocesoProspecto &&
+            leadDetail.prospecto.id_prospecto === retrocesoProspecto.id_prospecto
+          ) {
+            void crmBackend.detalle(retrocesoProspecto.id_prospecto).then(setLeadDetail).catch(() => {});
+          }
+        }}
+      />
     </div>
   );
 }
