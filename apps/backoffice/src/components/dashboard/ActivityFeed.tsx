@@ -1,4 +1,3 @@
-import React from 'react';
 import { RECENT_ACTIVITY } from '../../data/dashboard';
 
 export function ActivityFeed({ limit = 5 }: {limit?: number;}) {

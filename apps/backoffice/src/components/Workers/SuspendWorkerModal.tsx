@@ -131,8 +131,11 @@ export function SuspendWorkerModal({
       width="max-w-xl"
     >
       <div className="space-y-4">
-        {errorMsg && <Alert variant="danger">{errorMsg}</Alert>}
-
+        {errorMsg && (
+          <Alert tone="danger" title="No se pudo completar la operación">
+            {errorMsg}
+          </Alert>
+        )}
         {!confirmStep ? (
           <form onSubmit={handleContinuar} className="space-y-4">
             <div>

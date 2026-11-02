@@ -250,7 +250,7 @@ export function Crm() {
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
   const [origin, setOrigin] = useState('all');
-  const [category, setCategory] = useState<CrmCategory>('LEAD');
+  const [, setCategory] = useState<CrmCategory>('LEAD');
   const [advisorFilter, setAdvisorFilter] = useState<number | ''>('');
   const [projectFilter, setProjectFilter] = useState<number | ''>('');
   const [fechaTablaDesde, setFechaTablaDesde] = useState('');

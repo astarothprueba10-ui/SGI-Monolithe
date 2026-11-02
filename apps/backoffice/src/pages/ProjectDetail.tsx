@@ -12,7 +12,6 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
-import { EmptyState } from '../components/ui/Feedback';
 import { useAuth } from '../contexts/AuthContext';
 import { coreService } from '../services/coreService';
 import { ProjectFormModal } from '../components/projects/ProjectFormModal';

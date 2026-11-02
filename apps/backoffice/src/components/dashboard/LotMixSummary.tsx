@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { PROJECTS } from '../../data/projects';
 import { number, percent } from '../../utils/format';
