@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangleIcon, InboxIcon, InfoIcon, CheckCircle2Icon, BoxIcon } from "lucide-react";
+import { AlertTriangleIcon, InboxIcon, InfoIcon, CheckCircle2Icon, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
 const TONES = {
   info: {
@@ -53,10 +53,7 @@ export function EmptyState({
   action
 
 
-
-
-
-}: {title: string;description?: string;icon?: BoxIcon;action?: React.ReactNode;}) {
+}: {title: string;description?: string;icon?: LucideIcon;action?: React.ReactNode;}) {
   return <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
       <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-100 bg-brand-50 text-brand-400">
         <Icon className="h-5 w-5" aria-hidden="true" />

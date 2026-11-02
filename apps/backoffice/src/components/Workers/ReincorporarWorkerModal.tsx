@@ -102,8 +102,11 @@ export function ReincorporarWorkerModal({
       width="max-w-lg"
     >
       <div className="space-y-4">
-        {errorMsg && <Alert variant="danger">{errorMsg}</Alert>}
-
+        {errorMsg && (
+          <Alert tone="danger" title="No se pudo completar la operación">
+            {errorMsg}
+          </Alert>
+        )}
         {!confirmStep ? (
           <form onSubmit={handleRevisar} className="space-y-4">
             <div>

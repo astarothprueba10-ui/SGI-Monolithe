@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CheckIcon, DownloadIcon, EyeIcon, PlusIcon, XIcon, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -27,7 +27,7 @@ export function Financing() {
   const [installmentsList, setInstallmentsList] = useState<Installment[]>(INSTALLMENTS);
   const [vouchersList, setVouchersList] = useState<Voucher[]>(VOUCHERS);
   const [resolutoryAlerts, setResolutoryAlerts] = useState<OverdueContractAlert[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
 
   const canValidate = can('financing.approve');
 
@@ -197,9 +197,9 @@ export function Financing() {
           {installments.length === 0 ? (
             <EmptyState title="Sin cuotas" description="Ajusta los filtros aplicados." />
           ) : (
-            <Table>
-              <thead>
-                <TR isHeader>
+            <Table
+              head={
+                <>
                   <TH>Cliente</TH>
                   <TH>Contrato</TH>
                   <TH>Cuota</TH>
@@ -208,26 +208,25 @@ export function Financing() {
                   <TH align="right">Pagado</TH>
                   <TH align="right">Saldo</TH>
                   <TH>Estado</TH>
+                </>
+              }
+            >
+              {installments.map((row) => (
+                <TR key={row.id}>
+                  <TD className="font-medium text-brand-900">{row.buyer}</TD>
+                  <TD className="text-brand-500 font-mono text-[12px]">{row.saleCode}</TD>
+                  <TD className="tabular font-medium">{row.number}</TD>
+                  <TD className="text-brand-500">{row.dueDate}</TD>
+                  <TD align="right" className="font-mono">{currency(row.amount)}</TD>
+                  <TD align="right" className="font-mono text-emerald-600">{currency(row.paid)}</TD>
+                  <TD align="right" className="font-medium text-brand-900 font-mono">
+                    {currency(row.amount - row.paid)}
+                  </TD>
+                  <TD>
+                    <StatusBadge status={row.status} />
+                  </TD>
                 </TR>
-              </thead>
-              <tbody>
-                {installments.map((row) => (
-                  <TR key={row.id}>
-                    <TD className="font-medium text-brand-900">{row.buyer}</TD>
-                    <TD className="text-brand-500 font-mono text-[12px]">{row.saleCode}</TD>
-                    <TD className="tabular font-medium">{row.number}</TD>
-                    <TD className="text-brand-500">{row.dueDate}</TD>
-                    <TD align="right" className="font-mono">{currency(row.amount)}</TD>
-                    <TD align="right" className="font-mono text-emerald-600">{currency(row.paid)}</TD>
-                    <TD align="right" className="font-medium text-brand-900 font-mono">
-                      {currency(row.amount - row.paid)}
-                    </TD>
-                    <TD>
-                      <StatusBadge status={row.status} />
-                    </TD>
-                  </TR>
-                ))}
-              </tbody>
+              ))}
             </Table>
           )}
         </Card>
@@ -235,9 +234,9 @@ export function Financing() {
 
       {tab === 'vouchers' ? (
         <Card>
-          <Table>
-            <thead>
-              <TR isHeader>
+          <Table
+            head={
+              <>
                 <TH>Código</TH>
                 <TH>Cliente</TH>
                 <TH>Contrato / Lote</TH>
@@ -246,152 +245,153 @@ export function Financing() {
                 <TH>Cargado</TH>
                 <TH>Estado</TH>
                 <TH align="right">Acciones</TH>
+              </>
+            }
+          >
+            {vouchersList.map((v) => (
+              <TR key={v.id}>
+                <TD className="font-mono text-[12px] font-semibold text-brand-900">{v.code}</TD>
+                <TD className="font-medium">{v.buyer}</TD>
+                <TD className="text-brand-500 font-mono text-[12px]">{v.saleCode}</TD>
+                <TD>
+                  <Badge tone="neutral">{v.bank}</Badge>                  </TD>
+                <TD align="right" className="font-mono font-medium">{currency(v.amount)}</TD>
+                <TD className="text-brand-500">{v.uploadedAt}</TD>
+                <TD>
+                  <StatusBadge status={v.status} />
+                </TD>
+                <TD align="right">
+                  <div className="flex justify-end gap-1.5">
+                    <Button size="sm" icon={EyeIcon} onClick={() => setVoucher(v)}>
+                      Ver
+                    </Button>
+                    {v.status === 'En revisión' ? (
+                      <>
+                        <Gate permission="financing.approve">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={CheckIcon}
+                            onClick={() => handleProcessVoucher(v.id, 'APROBAR')}
+                          >
+                            Validar
+                          </Button>
+                        </Gate>
+                        <Gate permission="financing.reject">
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            icon={XIcon}
+                            onClick={() => handleProcessVoucher(v.id, 'RECHAZAR', 'Observado por tesorería')}
+                          >
+                            Rechazar
+                          </Button>
+                        </Gate>
+                      </>
+                    ) : null}
+                  </div>
+                </TD>
               </TR>
-            </thead>
-            <tbody>
-              {vouchersList.map((v) => (
-                <TR key={v.id}>
-                  <TD className="font-mono text-[12px] font-semibold text-brand-900">{v.code}</TD>
-                  <TD className="font-medium">{v.buyer}</TD>
-                  <TD className="text-brand-500 font-mono text-[12px]">{v.saleCode}</TD>
-                  <TD>
-                    <Badge variant="gray">{v.bank}</Badge>
-                  </TD>
-                  <TD align="right" className="font-mono font-medium">{currency(v.amount)}</TD>
-                  <TD className="text-brand-500">{v.uploadedAt}</TD>
-                  <TD>
-                    <StatusBadge status={v.status} />
-                  </TD>
-                  <TD align="right">
-                    <div className="flex justify-end gap-1.5">
-                      <Button size="sm" icon={EyeIcon} onClick={() => setVoucher(v)}>
-                        Ver
-                      </Button>
-                      {v.status === 'En revisión' ? (
-                        <>
-                          <Gate permission="financing.approve">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              icon={CheckIcon}
-                              onClick={() => handleProcessVoucher(v.id, 'APROBAR')}
-                            >
-                              Validar
-                            </Button>
-                          </Gate>
-                          <Gate permission="financing.reject">
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              icon={XIcon}
-                              onClick={() => handleProcessVoucher(v.id, 'RECHAZAR', 'Observado por tesorería')}
-                            >
-                              Rechazar
-                            </Button>
-                          </Gate>
-                        </>
-                      ) : null}
-                    </div>
-                  </TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
+            ))}
+        </Table>
         </Card>
-      ) : null}
+  ) : null
+}
 
-      {tab === 'planes' ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {FINANCING_PLANS.map((plan) => (
-            <Card key={plan.id} className="flex flex-col p-5">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-[14px] font-semibold leading-snug text-brand-900">
-                  {plan.name}
-                </h3>
-                <StatusBadge status={plan.status} />
-              </div>
-              <dl className="mt-4 space-y-2 text-[13px]">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-brand-400">Cuota inicial</dt>
-                  <dd className="font-medium tabular text-brand-800">
-                    {percent(plan.downPayment, 0)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-brand-400">Plazo</dt>
-                  <dd className="font-medium tabular text-brand-800">{plan.months} meses</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-brand-400">Tasa</dt>
-                  <dd className="font-medium tabular text-brand-800">
-                    {plan.rate === 0 ? 'Sin interés (TEA 0%)' : percent(plan.rate)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-brand-400">Contratos activos</dt>
-                  <dd className="font-medium tabular text-brand-800">{plan.activeContracts}</dd>
-                </div>
-              </dl>
-              <div className="mt-auto pt-4">
-                <Gate
-                  permission="financing.edit"
-                  fallback={
-                    <p className="text-[12px] text-brand-300">Consulta habilitada para tu rol.</p>
-                  }
-                >
-                  <Button size="sm" className="w-full">
-                    Editar plan
-                  </Button>
-                </Gate>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-
-      {/* Modal Detalle de Voucher */}
-      <Modal
-        open={Boolean(voucher)}
-        onClose={() => setVoucher(null)}
-        title={`Voucher ${voucher?.code ?? ''}`}
-        description={voucher ? `${voucher.buyer} · ${voucher.bank}` : undefined}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setVoucher(null)}>Cerrar</Button>
-            {voucher?.status === 'En revisión' && canValidate && (
-              <Button
-                variant="primary"
-                icon={CheckIcon}
-                onClick={() => handleProcessVoucher(voucher.id, 'APROBAR')}
-              >
-                Validar voucher
-              </Button>
-            )}
+{
+  tab === 'planes' ? (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {FINANCING_PLANS.map((plan) => (
+        <Card key={plan.id} className="flex flex-col p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-[14px] font-semibold leading-snug text-brand-900">
+              {plan.name}
+            </h3>
+            <StatusBadge status={plan.status} />
           </div>
-        }
-      >
-        {voucher ? (
-          <div className="space-y-4">
-            <div className="flex h-36 items-center justify-center rounded-md border border-dashed border-brand-200 bg-brand-50/60 text-[12px] text-brand-500 font-mono">
-              Vista previa del comprobante · {voucher.code}.pdf (SHA-256 Validado)
+          <dl className="mt-4 space-y-2 text-[13px]">
+            <div className="flex justify-between gap-3">
+              <dt className="text-brand-400">Cuota inicial</dt>
+              <dd className="font-medium tabular text-brand-800">
+                {percent(plan.downPayment, 0)}
+              </dd>
             </div>
-            <dl className="divide-y divide-brand-50">
-              {[
-                { label: 'Contrato / Lote', value: voucher.saleCode },
-                { label: 'Monto declarado', value: currency(voucher.amount) },
-                { label: 'Método / Banco', value: voucher.bank },
-                { label: 'Fecha de carga', value: voucher.uploadedAt },
-                { label: 'Estado', value: voucher.status }
-              ].map((row) => (
-                <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
-                  <dt className="text-[12px] text-brand-400">{row.label}</dt>
-                  <dd className="text-[13px] font-medium text-brand-800">{row.value}</dd>
-                </div>
-              ))}
-            </dl>
+            <div className="flex justify-between gap-3">
+              <dt className="text-brand-400">Plazo</dt>
+              <dd className="font-medium tabular text-brand-800">{plan.months} meses</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-brand-400">Tasa</dt>
+              <dd className="font-medium tabular text-brand-800">
+                {plan.rate === 0 ? 'Sin interés (TEA 0%)' : percent(plan.rate)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-brand-400">Contratos activos</dt>
+              <dd className="font-medium tabular text-brand-800">{plan.activeContracts}</dd>
+            </div>
+          </dl>
+          <div className="mt-auto pt-4">
+            <Gate
+              permission="financing.edit"
+              fallback={
+                <p className="text-[12px] text-brand-300">Consulta habilitada para tu rol.</p>
+              }
+            >
+              <Button size="sm" className="w-full">
+                Editar plan
+              </Button>
+            </Gate>
           </div>
-        ) : null}
-      </Modal>
+        </Card>
+      ))}
     </div>
+  ) : null
+}
+
+{/* Modal Detalle de Voucher */ }
+<Modal
+  open={Boolean(voucher)}
+  onClose={() => setVoucher(null)}
+  title={`Voucher ${voucher?.code ?? ''}`}
+  description={voucher ? `${voucher.buyer} · ${voucher.bank}` : undefined}
+  footer={
+    <div className="flex justify-end gap-2">
+      <Button onClick={() => setVoucher(null)}>Cerrar</Button>
+      {voucher?.status === 'En revisión' && canValidate && (
+        <Button
+          variant="primary"
+          icon={CheckIcon}
+          onClick={() => handleProcessVoucher(voucher.id, 'APROBAR')}
+        >
+          Validar voucher
+        </Button>
+      )}
+    </div>
+  }
+>
+  {voucher ? (
+    <div className="space-y-4">
+      <div className="flex h-36 items-center justify-center rounded-md border border-dashed border-brand-200 bg-brand-50/60 text-[12px] text-brand-500 font-mono">
+        Vista previa del comprobante · {voucher.code}.pdf (SHA-256 Validado)
+      </div>
+      <dl className="divide-y divide-brand-50">
+        {[
+          { label: 'Contrato / Lote', value: voucher.saleCode },
+          { label: 'Monto declarado', value: currency(voucher.amount) },
+          { label: 'Método / Banco', value: voucher.bank },
+          { label: 'Fecha de carga', value: voucher.uploadedAt },
+          { label: 'Estado', value: voucher.status }
+        ].map((row) => (
+          <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
+            <dt className="text-[12px] text-brand-400">{row.label}</dt>
+            <dd className="text-[13px] font-medium text-brand-800">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  ) : null}
+</Modal>
+    </div >
   );
 }

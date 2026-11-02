@@ -1,5 +1,4 @@
-import React from "react";
-import { ArrowDownRightIcon, ArrowUpRightIcon, BoxIcon } from "lucide-react";
+import { ArrowDownRightIcon, ArrowUpRightIcon, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
 export interface Kpi {
   id: string;
@@ -7,7 +6,7 @@ export interface Kpi {
   value: string;
   delta?: number;
   hint?: string;
-  icon: BoxIcon;
+  icon: LucideIcon;
   tone?: 'brand' | 'emerald' | 'amber' | 'rose' | 'sky';
 }
 const TONES: Record<NonNullable<Kpi['tone']>, string> = {

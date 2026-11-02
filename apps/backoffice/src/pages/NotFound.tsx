@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileQuestionIcon, ArrowLeftIcon, HomeIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
@@ -29,7 +28,7 @@ export function NotFound() {
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={() => navigate(-1)}
           className="flex items-center gap-2"
         >

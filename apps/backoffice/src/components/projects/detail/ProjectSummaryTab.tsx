@@ -9,9 +9,6 @@ interface Props {
 }
 
 export function ProjectSummaryTab({ project }: Props) {
-  const fullLocation = [project.direccion, project.distrito, project.provincia, project.departamento, project.pais]
-    .filter(Boolean)
-    .join(', ');
 
   return (
     <div className="space-y-6">
