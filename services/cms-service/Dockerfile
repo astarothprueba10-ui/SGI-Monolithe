@@ -12,8 +12,7 @@ WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-COPY --from=builder /build/target/*.jar app.jar
-RUN chown -R appuser:appgroup /app
+COPY --chown=appuser:appgroup --from=builder /build/target/*.jar app.jar
 
 USER appuser
 EXPOSE 8082
