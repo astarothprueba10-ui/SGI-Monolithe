@@ -9,6 +9,12 @@ import monolithe.core_service.dto.CancelarVentaPendienteRequest;
 import monolithe.core_service.dto.RegistrarEvidenciaContratoRequest;
 import monolithe.core_service.service.CrmContratoStorageService;
 import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
+import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
+import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
+import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
+import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
+import monolithe.core_service.service.CrmSeparacionStorageService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +36,7 @@ public class CrmVentaController {
 
         private final CrmVentaService service;
         private final CrmContratoStorageService storageService;
+        private final CrmSeparacionStorageService separacionStorageService;
 
         @PostMapping("/ventas/validar")
         @PreAuthorize("hasAuthority('sales.create')")
@@ -60,6 +67,74 @@ public class CrmVentaController {
 
                 return service.registrarVentaPendiente(
                                 obtenerActor(jwt),
+                                request);
+        }
+
+        @PostMapping("/separaciones/preparar-comprobante")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public EnlaceCargaVoucherResponse prepararComprobanteSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody PrepararCargaVoucherSeparacionRequest request) {
+
+                return separacionStorageService.prepararCarga(
+                                obtenerActor(jwt),
+                                request);
+        }
+
+        @PostMapping("/separaciones")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody RegistrarSeparacionCrmRequest request) {
+
+                return service.registrarSeparacion(
+                                obtenerActor(jwt),
+                                request);
+        }
+
+        @GetMapping("/separaciones/vouchers")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public JsonNode listarVouchersSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(required = false) String estado,
+                        @RequestParam(required = false) String busqueda,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "20") Integer tamano) {
+
+                return service.listarVouchersSeparacion(
+                                obtenerActor(jwt),
+                                estado,
+                                busqueda,
+                                pagina,
+                                tamano);
+        }
+
+        @GetMapping("/separaciones/vouchers/{idVoucher}/url-firmada")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> prepararLecturaVoucher(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVoucher) {
+
+                var enlace = separacionStorageService.prepararLectura(
+                                obtenerActor(jwt),
+                                idVoucher);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
+        @PutMapping("/separaciones/vouchers/{idVoucher}/decision")
+        @PreAuthorize("hasAuthority('finance.edit')")
+        public JsonNode revisarVoucherSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVoucher,
+                        @Valid @RequestBody RevisarVoucherSeparacionRequest request) {
+
+                return service.revisarVoucherSeparacion(
+                                obtenerActor(jwt),
+                                idVoucher,
                                 request);
         }
 

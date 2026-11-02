@@ -14,9 +14,12 @@ import { Gate } from '../components/auth/PermissionRoute';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
 import { lotsService } from '../services/lotsService';
-import { crmService } from '../services/crmService';
+import { crmBackend, type CrmProspect } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
-import type { Sale, Lot, Lead } from '../types';
+import type { Sale, Lot } from '../types';
+
+// Envio real habilitado tras validacion del flujo seguro con comprobante de pago S/ 500.
+const SEPARACION_ENVIO_DESHABILITADO = false;
 
 export function Sales() {
   const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
@@ -29,66 +32,82 @@ export function Sales() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [opType, setOpType] = useState<'Separacion' | 'Venta'>('Separacion');
   const [availableLots, setAvailableLots] = useState<Lot[]>([]);
-  const [leadsList, setLeadsList] = useState<Lead[]>([]);
-  const [selectedLeadId, setSelectedLeadId] = useState('');
+  const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
+  const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
   const [formLotId, setFormLotId] = useState('');
-  const [formModality, setFormModality] = useState<'Contado' | 'Financiado'>('Contado');
-  const [formTotal, setFormTotal] = useState('108000');
-  const [formInitial, setFormInitial] = useState('21600');
-  const [formInstallments, setFormInstallments] = useState('36');
   const [formObservations, setFormObservations] = useState('');
+  const [formPaymentMethod, setFormPaymentMethod] = useState<'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO'>('TRANSFERENCIA');
+  const [formOperationNumber, setFormOperationNumber] = useState('');
+  const [voucherFile, setVoucherFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
+  const [loadingFormData, setLoadingFormData] = useState(false);
+  const [formTouched, setFormTouched] = useState(false);
 
   const fetchSalesData = async () => {
     setLoading(true);
-
     try {
       const liveSales = await salesService.getSales();
       setSalesList(liveSales ?? []);
-
-    } catch (err: any) {
-      console.error('Error al cargar ventas:', err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al cargar ventas.';
       setSalesList([]);
-      toast.error('No se pudieron cargar las operaciones.');
+      toast.error('No se pudieron cargar las operaciones.', { description: msg });
     } finally {
       setLoading(false);
     }
   };
 
   const loadFormData = async () => {
+    setLoadingFormData(true);
     try {
-      const [lots, leads] = await Promise.all([
+      const [lots, prospects] = await Promise.all([
         lotsService.getLots(),
-        crmService.getLeads()
+        crmBackend.prospectos()
       ]);
-      setAvailableLots(lots.filter((l) => l.status === 'Disponible' || l.status === 'Separado'));
-      const validLeads = leads.filter((l) => l.personaId);
-      setLeadsList(validLeads.length > 0 ? validLeads : leads);
-      if (validLeads.length > 0) {
-        setSelectedLeadId(validLeads[0].id);
+      setAvailableLots(lots.filter((l) => l.status === 'Disponible'));
+      setProspectsList(prospects ?? []);
+      if (prospects && prospects.length > 0) {
+        setSelectedProspectId(prospects[0].id_prospecto);
       }
-    } catch (err: any) {
-      console.error('Error al cargar datos del formulario:', err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al cargar datos.';
+      toast.error('Error al cargar datos del formulario', { description: msg });
+    } finally {
+      setLoadingFormData(false);
     }
   };
 
   useEffect(() => {
-    fetchSalesData();
+    void fetchSalesData();
   }, []);
 
   const handleOpenModal = () => {
-    loadFormData();
+    void loadFormData();
+    setFormTouched(false);
+    setFormPaymentMethod('TRANSFERENCIA');
+    setFormOperationNumber('');
+    setVoucherFile(null);
+    setFormObservations('');
     setIsModalOpen(true);
   };
 
   const handleSelectLot = (lotIdStr: string) => {
     setFormLotId(lotIdStr);
-    const found = availableLots.find((l) => l.id === lotIdStr);
-    if (found && found.price) {
-      setFormTotal(found.price.toString());
-      setFormInitial((found.price * 0.2).toFixed(0));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Formato no permitido', { description: 'Utilice archivos PDF, JPG, PNG o WebP.' });
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Archivo demasiado grande', { description: 'El comprobante no debe superar 5 MB.' });
+      return;
+    }
+    setVoucherFile(file);
   };
 
   const handleExpireOverdue = async () => {
@@ -96,82 +115,93 @@ export function Sales() {
       const res = await salesService.expireOverdueReservations();
       toast.success(res?.mensaje || 'Control de caducidad ejecutado correctamente');
       await fetchSalesData();
-    } catch (err: any) {
-      toast.error('Error al ejecutar control de caducidad: ' + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al ejecutar control de caducidad.';
+      toast.error(msg);
     }
   };
 
-  const submitSeparation = async (lotIdNum: number, personaId: number) => {
-    const res = await salesService.registerSeparation({
-      lotId: lotIdNum,
-      personaId,
-      notes: formObservations || 'Separacion registrada desde Backoffice'
-    });
-    toast.success(`Separacion registrada exitosamente (#${res.id_reserva}). Vigencia: 7 dias.`);
+  const validarFormularioSeparacion = (): boolean => {
+    setFormTouched(true);
+    if (!selectedProspectId) {
+      toast.error('Debe seleccionar un prospecto del CRM.');
+      return false;
+    }
+    if (!formLotId) {
+      toast.error('Debe seleccionar un lote disponible.');
+      return false;
+    }
+    if (formPaymentMethod !== 'EFECTIVO' && !formOperationNumber.trim()) {
+      toast.error('El número de operación es obligatorio para este método de pago.');
+      return false;
+    }
+    if (!voucherFile) {
+      toast.error('Debe adjuntar el comprobante de pago de S/ 500.');
+      return false;
+    }
+    return true;
   };
 
-  const submitCashSale = async (lotIdNum: number, personaId: number, advisorId?: number | null) => {
-    const res = await salesService.formalizeCashSale({
-      lotId: lotIdNum,
-      personaId,
-      advisorId: advisorId ?? undefined,
-      totalAmount: parseFloat(formTotal),
-      notes: formObservations || 'Venta al contado formalizada'
-    });
-    toast.success(`Venta al contado formalizada: ${res.codigo_venta}`);
-  };
+  const ejecutarRegistroSeparacion = async () => {
+    setSubmitting(true);
+    try {
+      if (!voucherFile) throw new Error('Comprobante requerido.');
+      const prospectId = Number(selectedProspectId);
+      const lotIdNum = Number(formLotId);
 
-  const submitFinancedSale = async (lotIdNum: number, personaId: number, advisorId?: number | null) => {
-    const res = await salesService.formalizeFinancedSale({
-      lotId: lotIdNum,
-      personaId,
-      advisorId: advisorId ?? undefined,
-      totalAmount: parseFloat(formTotal),
-      downPayment: parseFloat(formInitial),
-      installmentsCount: parseInt(formInstallments, 10),
-      notes: formObservations || 'Venta financiada formalizada'
-    });
-    toast.success(`Venta financiada: ${res.codigo_venta} (${res.numero_cuotas} cuotas)`);
+      const carga = await crmBackend.subirComprobanteSeparacion(
+        prospectId,
+        lotIdNum,
+        voucherFile
+      );
+
+      const res = await crmBackend.registrarSeparacion({
+        idProspecto: prospectId,
+        idLote: lotIdNum,
+        metodoPago: formPaymentMethod,
+        numeroOperacion: formOperationNumber.trim() || null,
+        monto: 500.00,
+        observaciones: formObservations.trim() || null,
+        claveArchivo: carga.claveArchivo,
+        nombreArchivo: carga.nombreArchivo,
+        tipoMime: carga.tipoMime,
+        tamanioBytes: carga.tamanioBytes
+      });
+
+      const vencimiento = res.fecha_vencimiento
+        ? new Date(res.fecha_vencimiento).toLocaleDateString('es-PE')
+        : '7 días';
+
+      toast.success('Separación registrada exitosamente', {
+        description: `Código: ${res.codigo_reserva || res.id_reserva}. Monto: S/ 500.00 PEN. Vence: ${vencimiento}. Comprobante pendiente de auditoría.`
+      });
+
+      setIsModalOpen(false);
+      await fetchSalesData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al registrar separación.';
+      toast.error('Error al registrar separación', { description: msg });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formLotId) {
-      toast.error('Por favor seleccione un lote');
+    if (!validarFormularioSeparacion()) return;
+    if (opType === 'Venta') {
+      toast.info('Flujo de venta inactivo', {
+        description: 'La formalización de ventas se realiza desde el CRM.'
+      });
       return;
     }
-    const lead = leadsList.find((l) => l.id === selectedLeadId);
-
-    if (!lead?.personaId || lead.personaId <= 0) {
-      toast.error('Debe seleccionar un prospecto válido.');
+    if (SEPARACION_ENVIO_DESHABILITADO) {
+      toast.info('Envío deshabilitado', {
+        description: 'El envío real está deshabilitado temporalmente hasta implementar la evidencia de pago de S/ 500.'
+      });
       return;
     }
-
-    if (opType === 'Venta' && (!lead.advisorId || lead.advisorId <= 0)) {
-      toast.error('El prospecto necesita un asesor comercial asignado.');
-      return;
-    }
-
-    const personaId = lead.personaId;
-    const advisorId = lead.advisorId ?? null;
-    const lotIdNum = parseInt(formLotId, 10);
-
-    setSubmitting(true);
-    try {
-      if (opType === 'Separacion') {
-        await submitSeparation(lotIdNum, personaId);
-      } else if (formModality === 'Contado') {
-        await submitCashSale(lotIdNum, personaId, advisorId);
-      } else {
-        await submitFinancedSale(lotIdNum, personaId, advisorId);
-      }
-      setIsModalOpen(false);
-      await fetchSalesData();
-    } catch (err: any) {
-      toast.error('Error al procesar operacion: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
+    await ejecutarRegistroSeparacion();
   };
 
   const rows = useMemo(() => {
@@ -205,7 +235,7 @@ export function Sales() {
               <Button icon={DownloadIcon}>Exportar</Button>
             </Gate>
             <Gate permission="sales.create">
-              <Button icon={PlusIcon} variant="primary" disabled onClick={handleOpenModal}>
+              <Button icon={PlusIcon} variant="primary" onClick={handleOpenModal}>
                 Nueva operación
               </Button>
             </Gate>
@@ -236,25 +266,28 @@ export function Sales() {
             placeholder="Buscar por comprador, código o lote…"
             className="w-full sm:w-72"
           />
-          <Select
-            value={modality}
-            onChange={(e) => setModality(e.target.value as typeof modality)}
-            className="w-full sm:w-48"
-          >
-            <option value="all">Todas las modalidades</option>
-            <option value="Contado">Contado</option>
-            <option value="Financiado">Financiado</option>
-            <option value="Crédito bancario">Crédito bancario</option>
-          </Select>
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
+            <Select
+              value={modality}
+              onChange={(e) => setModality(e.target.value as typeof modality)}
+              className="w-36"
+            >
+              <option value="all">Todas</option>
+              <option value="Contado">Contado</option>
+              <option value="Financiado">Financiado</option>
+              <option value="Reserva">Reserva</option>
+            </Select>
+          </div>
         </div>
 
         {rows.length === 0 ? (
           <EmptyState
-            icon={FileTextIcon}
-            title="Sin operaciones"
-            description="No hay separaciones ni ventas con los filtros aplicados."
+            title="No hay operaciones registradas"
+            description="Las separaciones y ventas se registrarán aquí con su documentación asociada."
           />
         ) : (
+
           <Table
             head={
               <>
@@ -271,68 +304,55 @@ export function Sales() {
               </>
             }
           >
-            {rows.map((sale) => (
-              <TR key={sale.id} onClick={() => setDetail(sale)}>
-                <TD className="font-mono text-brand-900 font-semibold">{sale.code}</TD>
-                <TD>
-                  <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>
-                    {sale.type}
-                  </Badge>
-                </TD>
-                <TD>
-                  <div className="font-medium text-brand-900">{sale.buyer}</div>
-                  <div className="text-[11px] text-brand-400">{sale.document}</div>
-                </TD>
-                <TD>
-                  <div className="font-medium text-brand-800">{sale.lot}</div>
-                  <div className="text-[11px] text-brand-400">{sale.project}</div>
-                </TD>
-                <TD className="text-brand-600">{sale.modality}</TD>
-                <TD align="right" className="font-mono font-medium text-brand-900">
-                  {currency(sale.amount)}
-                </TD>
-                <TD className="text-brand-600">{sale.advisor}</TD>
-                <TD>
-                  <Badge tone={sale.contract === 'Firmado' ? 'brand' : 'info'}>
-                    {sale.contract}
-                  </Badge>
-                </TD>
-                <TD>
-                  <StatusBadge status={sale.status} />
-                </TD>
-                <TD align="right">
-                  <div className="flex items-center justify-end gap-1.5">
+            <tbody>
+              {rows.map((sale) => (
+                <TR key={sale.id}>
+                  <TD className="font-mono text-[12px] font-semibold text-brand-900">{sale.code}</TD>
+                  <TD>
+                    <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>                      {sale.type}
+                    </Badge>
+                  </TD>
+                  <TD className="font-medium text-brand-900">{sale.buyer}</TD>
+                  <TD className="font-mono text-[12px] text-brand-700">{sale.lot}</TD>
+                  <TD className="text-brand-600">{sale.project}</TD>
+                  <TD className="text-brand-600">{sale.modality}</TD>
+                  <TD className="text-right font-mono font-semibold text-brand-900">
+                    {currency(sale.amount)}
+                  </TD>
+                  <TD className="text-[12px] text-brand-500">{sale.date}</TD>
+                  <TD>
+                    <StatusBadge status={sale.status} />
+                  </TD>
+                  <TD className="text-right">
                     <Button
                       size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDetail(sale);
-                      }}
+                      variant="ghost"
+                      icon={FileTextIcon}
+                      onClick={() => setDetail(sale)}
                     >
-                      Ver detalle
+                      Ver
                     </Button>
-                  </div>
-                </TD>
-              </TR>
-            ))}
+                  </TD>
+                </TR>
+              ))}
+            </tbody>
           </Table>
         )}
       </Card>
 
-      {/* Modal Detalle de Operacion */}
+      {/* Modal Detalle de Operación */}
       <Modal
-        open={Boolean(detail)}
+        open={detail !== null}
         onClose={() => setDetail(null)}
-        title={detail?.code ?? ''}
-        description={detail ? `${detail.type} · ${detail.date}` : undefined}
-        footer={<Button onClick={() => setDetail(null)}>Cerrar</Button>}
+        title={detail ? `Operación ${detail.code}` : ''}
+        description={detail ? `${detail.type} · ${detail.buyer}` : ''}
       >
         {detail ? (
-          <dl className="divide-y divide-brand-50">
+          <dl className="divide-y divide-brand-100 text-sm">
             {[
+              { label: 'Código', value: detail.code },
+              { label: 'Tipo de operación', value: detail.type },
               { label: 'Comprador', value: detail.buyer },
-              { label: 'Documento', value: detail.document },
               { label: 'Lote', value: detail.lot },
               { label: 'Proyecto', value: detail.project },
               { label: 'Modalidad de venta', value: detail.modality },
@@ -361,144 +381,203 @@ export function Sales() {
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" disabled={submitting} onClick={handleProcessOperation}>
-              {submitting ? 'Procesando…' : opType === 'Separacion' ? 'Registrar Separación' : 'Formalizar Venta'}
+            <Button
+              variant="primary"
+              disabled={submitting || SEPARACION_ENVIO_DESHABILITADO || opType === 'Venta'}
+              onClick={handleProcessOperation}
+            >
+              {submitting
+                ? 'Procesando…'
+                : opType === 'Separacion'
+                  ? 'Registrar Separación'
+                  : 'Venta inactiva'}
             </Button>
           </div>
         }
       >
-        <form onSubmit={handleProcessOperation} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Tipo de Operación
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setOpType('Separacion')}
-                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Separacion'
-                  ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                  : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                  }`}
-              >
-                Separación (S/ 500)
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpType('Venta')}
-                className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Venta'
-                  ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                  : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                  }`}
-              >
-                Venta (Contado / Financiada)
-              </button>
-            </div>
+        {loadingFormData ? (
+          <div className="py-8 text-center text-xs text-brand-500">
+            Cargando prospectos y lotes disponibles…
           </div>
-
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Prospecto / Comprador (CRM)
-            </label>
-            <Select value={selectedLeadId} onChange={(e) => setSelectedLeadId(e.target.value)}>
-              {leadsList.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.name} - {lead.stage}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Lote Seleccionado
-            </label>
-            <Select value={formLotId} onChange={(e) => handleSelectLot(e.target.value)}>
-              <option value="">Seleccione un lote disponible o reservado…</option>
-              {availableLots.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.code} ({l.block}) - {l.area}m² - {currency(l.price || 108000)} [{l.status}]
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {opType === 'Separacion' ? (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
-              <p className="font-semibold text-amber-950">Condiciones de Separación:</p>
-              <p>Monto reglamentario: <span className="font-bold">S/ 500.00 PEN</span></p>
-              <p>Plazo de vigencia: <span className="font-bold">7 días calendario</span> (vence automáticamente si no se formaliza venta).</p>
-              <p>El lote cambiará a estado <span className="font-bold text-amber-800">RESERVADO</span> en el mapa interactivo.</p>
-            </div>
-          ) : (
-            <>
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                  Modalidad de Venta
-                </label>
-                <Select
-                  value={formModality}
-                  onChange={(e) => setFormModality(e.target.value as any)}
+        ) : (
+          <form onSubmit={handleProcessOperation} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Tipo de Operación
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpType('Separacion')}
+                  className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Separacion'
+                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                    }`}
                 >
-                  <option value="Contado">Al Contado</option>
-                  <option value="Financiado">Financiamiento Directo</option>
-                </Select>
+                  Separación (S/ 500)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpType('Venta')}
+                  className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Venta'
+                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
+                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
+                    }`}
+                >
+                  Venta (Inactiva)
+                </button>
               </div>
+            </div>
 
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                  Monto Total (PEN)
-                </label>
-                <Input
-                  type="number"
-                  value={formTotal}
-                  onChange={(e) => setFormTotal(e.target.value)}
-                />
-              </div>
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Prospecto (CRM) *
+              </label>
+              <Select
+                value={selectedProspectId === '' ? '' : String(selectedProspectId)}
+                onChange={(e) => setSelectedProspectId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">Seleccione un prospecto del CRM…</option>
+                {prospectsList.map((p) => (
+                  <option key={p.id_prospecto} value={p.id_prospecto}>
+                    {p.nombre_completo} ({p.codigo}) - {p.estado_nombre || p.estado_codigo}
+                  </option>
+                ))}
+              </Select>
+              {!selectedProspectId && formTouched && (
+                <p className="mt-1 text-[11px] font-medium text-rose-600">
+                  Debe seleccionar un prospecto del CRM.
+                </p>
+              )}
+            </div>
 
-              {formModality === 'Financiado' && (
-                <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Lote Disponible *
+              </label>
+              <Select value={formLotId} onChange={(e) => handleSelectLot(e.target.value)}>
+                <option value="">Seleccione un lote disponible…</option>
+                {availableLots.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.code} ({l.block}) - {l.area}m² - {currency(l.price)} [{l.status}]
+                  </option>
+                ))}
+              </Select>
+              {!formLotId && formTouched && (
+                <p className="mt-1 text-[11px] font-medium text-rose-600">
+                  Debe seleccionar un lote disponible.
+                </p>
+              )}
+            </div>
+
+            {opType === 'Separacion' ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Cuota Inicial (PEN)
-                    </label>
-                    <Input
-                      type="number"
-                      value={formInitial}
-                      onChange={(e) => setFormInitial(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Número de Cuotas
+                      Método de pago (S/ 500.00) *
                     </label>
                     <Select
-                      value={formInstallments}
-                      onChange={(e) => setFormInstallments(e.target.value)}
+                      value={formPaymentMethod}
+                      onChange={(e) => setFormPaymentMethod(e.target.value as any)}
                     >
-                      <option value="12">12 meses</option>
-                      <option value="24">24 meses</option>
-                      <option value="36">36 meses</option>
-                      <option value="48">48 meses</option>
+                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                      <option value="DEPOSITO">Depósito en Cuenta</option>
+                      <option value="YAPE_PLIN">Billetera (Yape / Plin)</option>
+                      <option value="EFECTIVO">Efectivo en Caja</option>
+                      <option value="OTRO">Otro Medio</option>
                     </Select>
                   </div>
-                </div>
-              )}
-            </>
-          )}
 
-          <div>
-            <label className="mb-1 block text-[12px] font-medium text-brand-700">
-              Observaciones (Opcional)
-            </label>
-            <Input
-              type="text"
-              placeholder="Detalle o nota interna..."
-              value={formObservations}
-              onChange={(e) => setFormObservations(e.target.value)}
-            />
-          </div>
-        </form>
+                  {formPaymentMethod !== 'EFECTIVO' ? (
+                    <div>
+                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                        N° de Operación *
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Ej: 00982341..."
+                        value={formOperationNumber}
+                        onChange={(e) => setFormOperationNumber(e.target.value)}
+                      />
+                      {!formOperationNumber.trim() && formTouched && (
+                        <p className="mt-1 text-[11px] font-medium text-rose-600">
+                          Número de operación obligatorio.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                        Caja / Modalidad
+                      </label>
+                      <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
+                        Pago directo en efectivo (S/ 500)
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                    Comprobante de Pago * (PDF, JPG, PNG - Máx. 5 MB)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      id="voucher-input"
+                      accept=".pdf,image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    <label
+                      htmlFor="voucher-input"
+                      className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-brand-300 rounded-md bg-white hover:bg-brand-50 text-brand-800"
+                    >
+                      <FileTextIcon className="w-3.5 h-3.5 text-brand-600" />
+                      {voucherFile ? 'Cambiar comprobante' : 'Adjuntar comprobante'}
+                    </label>
+                    {voucherFile && (
+                      <span className="text-xs text-brand-700 font-medium truncate max-w-[220px]">
+                        {voucherFile.name} ({(voucherFile.size / 1024).toFixed(0)} KB)
+                      </span>
+                    )}
+                  </div>
+                  {!voucherFile && formTouched && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">
+                      Debe adjuntar el comprobante o voucher de pago de S/ 500.00.
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
+                  <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
+                  <p>Monto reglamentario: <span className="font-bold">S/ 500.00 PEN</span></p>
+                  <p>Plazo de vigencia: <span className="font-bold">7 días calendario</span> (vence automáticamente si no se formaliza venta).</p>
+                  <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
+                  <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
+                </div>
+              </>
+            ) : (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-1">
+                <p className="font-semibold text-slate-900">Flujo de ventas inactivo:</p>
+                <p>La formalización de ventas se gestiona desde el expediente comercial en el CRM tras la separación.</p>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Observaciones (Opcional)
+              </label>
+              <Input
+                type="text"
+                placeholder="Detalle o nota interna..."
+                value={formObservations}
+                onChange={(e) => setFormObservations(e.target.value)}
+              />
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
