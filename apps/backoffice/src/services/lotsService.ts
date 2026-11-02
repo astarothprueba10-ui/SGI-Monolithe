@@ -25,10 +25,14 @@ function mapLotType(
   }
 }
 
+
 function mapLotStatus(
   codigoEstado?: string | null
 ): LotStatus {
   switch (codigoEstado?.trim().toUpperCase()) {
+    case 'DISPONIBLE':
+      return 'Disponible';
+
     case 'RESERVADO':
     case 'SEPARADO':
       return 'Separado';
@@ -36,9 +40,14 @@ function mapLotStatus(
     case 'VENDIDO':
       return 'Vendido';
 
-    case 'DISPONIBLE':
+    case 'BLOQUEADO':
+      return 'Bloqueado';
+
+    case 'NO_DISPONIBLE':
+      return 'No disponible';
+
     default:
-      return 'Disponible';
+      return 'No disponible';
   }
 }
 

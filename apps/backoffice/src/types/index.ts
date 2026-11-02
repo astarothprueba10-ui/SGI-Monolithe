@@ -55,7 +55,8 @@ export interface SessionUser {
   roles: RoleName[];
 }
 
-export type LotStatus = 'Disponible' | 'Separado' | 'Vendido';
+
+export type LotStatus = 'Disponible'| 'Separado'| 'Vendido'| 'Bloqueado'| 'No disponible';
 export type PaymentStatus = 'Pagado' | 'Pendiente' | 'Vencido';
 export type ReviewStatus = 'En revisión' | 'Aprobado' | 'Rechazado';
 export type ActivityStatus = 'Activo' | 'Inactivo';
@@ -121,8 +122,9 @@ export interface Sale {
   amount: number;
   advisor: string;
   date: string;
-  contract: 'Firmado' | 'Pendiente' | 'En revisión';
-  status: ReviewStatus | 'Pagado';
+  contract: 'Firmado' | 'Pendiente' | 'En revisión' | 'Vigente' | 'Vencida';
+  status: ReviewStatus | 'Pagado' | 'Pendiente';
+
 }
 
 export interface Installment {

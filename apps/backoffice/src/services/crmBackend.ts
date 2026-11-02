@@ -204,6 +204,102 @@ export interface CrmSearchPeriodo extends CrmSearch {
   hastaExclusivo: string;
 }
 
+
+export interface CrmSeparacionInput {
+  idProspecto: number;
+  idLote: number;
+  metodoPago: 'EFECTIVO' | 'DEPOSITO' | 'TRANSFERENCIA' | 'YAPE_PLIN' | 'OTRO';
+  numeroOperacion?: string | null;
+  monto: number;
+  observaciones?: string | null;
+  claveArchivo: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanioBytes: number;
+  hashSha256?: string | null;
+}
+
+export interface CrmSeparacionResult {
+  success: boolean;
+  id_reserva: number;
+  codigo_reserva: string;
+  id_pago: number;
+  codigo_pago: string;
+  id_voucher: number;
+  codigo_voucher: string;
+  id_lote: number;
+  monto_reserva: number;
+  fecha_reserva: string;
+  fecha_vencimiento: string;
+  estado_lote: 'RESERVADO';
+  estado_pago: 'REGISTRADO';
+  estado_voucher: 'PENDIENTE';
+  message: string;
+}
+
+export interface CrmSeparacionUpload {
+  bucket: string;
+  claveArchivo: string;
+  urlCarga: string;
+  tipoMime: string;
+  maxBytes: number;
+  expiresInSeconds: number;
+}
+
+export interface CrmSeparacionVoucherItem {
+  id_voucher: number;
+  codigo_voucher: string;
+  estado_voucher: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  nombre_estado_voucher: string;
+  nombre_archivo: string;
+  clave_archivo: string;
+  tipo_mime: string;
+  tamanio_bytes: number;
+  fecha_carga: string;
+  id_pago: number;
+  codigo_pago: string;
+  estado_pago: 'REGISTRADO' | 'CONFIRMADO' | 'ANULADO';
+  monto: number;
+  metodo_pago: string;
+  nombre_metodo_pago: string;
+  numero_operacion?: string | null;
+  id_reserva: number;
+  codigo_reserva: string;
+  fecha_reserva: string;
+  fecha_vencimiento: string;
+  id_lote: number;
+  codigo_lote: string;
+  id_persona: number;
+  nombre_cliente: string;
+  documento_cliente: string;
+  fecha_validacion?: string | null;
+  motivo_rechazo?: string | null;
+  observaciones_validacion?: string | null;
+}
+
+export interface CrmSeparacionVouchersResponse {
+  items: CrmSeparacionVoucherItem[];
+  total: number;
+  pagina: number;
+  tamano: number;
+  paginas: number;
+}
+
+export interface CrmVoucherReadUrl {
+  bucket: string;
+  claveArchivo: string;
+  urlDescarga: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  expiresInSeconds: number;
+}
+
+export interface CrmRevisarVoucherInput {
+  aprobar: boolean;
+  motivo?: string | null;
+  observaciones?: string | null;
+}
+
 export interface CrmSaleValidationInput {
   idProspecto: number;
   idLote: number;
@@ -534,6 +630,122 @@ export const crmBackend = {
         hastaExclusivo
       })}`
     ),
+
+  prepararComprobanteSeparacion: (body: {
+    idProspecto: number;
+    idLote: number;
+    nombreArchivo: string;
+    tipoMime: string;
+  }) =>
+    coreApi.post<CrmSeparacionUpload>(
+      '/crm/separaciones/preparar-comprobante',
+      body
+    ),
+
+  subirComprobanteSeparacion: async (
+    idProspecto: number,
+    idLote: number,
+    archivo: File
+  ): Promise<{ claveArchivo: string; nombreArchivo: string; tipoMime: string; tamanioBytes: number }> => {
+    const maxBytes = 5 * 1024 * 1024;
+    const mimesPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+    if (!Number.isSafeInteger(idProspecto) || idProspecto <= 0) {
+      throw new Error('El prospecto seleccionado no es valido.');
+    }
+    if (!Number.isSafeInteger(idLote) || idLote <= 0) {
+      throw new Error('El lote seleccionado no es valido.');
+    }
+    if (!archivo || archivo.size <= 0) {
+      throw new Error('Debe adjuntar el archivo del comprobante.');
+    }
+    if (archivo.size > maxBytes) {
+      throw new Error('El archivo excede el limite maximo de 5 MB.');
+    }
+    if (!mimesPermitidos.includes(archivo.type)) {
+      throw new Error('Formato no permitido. Utilice PDF, JPG, PNG o WebP.');
+    }
+
+    const carga = await coreApi.post<CrmSeparacionUpload>(
+      '/crm/separaciones/preparar-comprobante',
+      {
+        idProspecto,
+        idLote,
+        nombreArchivo: archivo.name,
+        tipoMime: archivo.type
+      }
+    );
+
+    const token = new URL(carga.urlCarga).searchParams.get('token');
+    if (!token) {
+      throw new Error('No se recibio token valido para la carga del comprobante.');
+    }
+
+    const { error } = await supabase.storage
+      .from(carga.bucket)
+      .uploadToSignedUrl(carga.claveArchivo, token, archivo, {
+        contentType: carga.tipoMime,
+        upsert: false
+      });
+
+    if (error) {
+      throw new Error(`Error al subir comprobante a almacenamiento privado: ${error.message}`);
+    }
+
+    return {
+      claveArchivo: carga.claveArchivo,
+      nombreArchivo: archivo.name,
+      tipoMime: carga.tipoMime,
+      tamanioBytes: archivo.size
+    };
+  },
+
+  registrarSeparacion: (body: CrmSeparacionInput) =>
+    coreApi.post<CrmSeparacionResult>(
+      '/crm/separaciones',
+      {
+        idProspecto: body.idProspecto,
+        idLote: body.idLote,
+        metodoPago: body.metodoPago,
+        numeroOperacion: body.numeroOperacion?.trim() || null,
+        monto: body.monto,
+        observaciones: body.observaciones?.trim() || null,
+        claveArchivo: body.claveArchivo,
+        nombreArchivo: body.nombreArchivo,
+        tipoMime: body.tipoMime,
+        tamanioBytes: body.tamanioBytes,
+        hashSha256: body.hashSha256 || null
+      }
+    ),
+
+  listarVouchersSeparacion: (params?: {
+    estado?: string;
+    busqueda?: string;
+    pagina?: number;
+    tamano?: number;
+  }) => {
+    const query = qs({
+      estado: params?.estado,
+      busqueda: params?.busqueda,
+      pagina: params?.pagina,
+      tamano: params?.tamano
+    });
+    return coreApi.get<CrmSeparacionVouchersResponse>(
+      `/crm/separaciones/vouchers${query}`
+    );
+  },
+
+  prepararLecturaVoucherSeparacion: (idVoucher: number) =>
+    coreApi.get<CrmVoucherReadUrl>(
+      `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
+    ),
+
+  revisarVoucherSeparacion: (idVoucher: number, body: CrmRevisarVoucherInput) =>
+    coreApi.put<any>(
+      `/crm/separaciones/vouchers/${idVoucher}/decision`,
+      { ...body }
+    ),
+
 
   validarVenta: (body: CrmSaleValidationInput) =>
     coreApi.post<CrmSaleValidationResult>(

@@ -6,6 +6,8 @@ import monolithe.core_service.dto.FormalizarVentaCrmRequest;
 import monolithe.core_service.dto.CancelarVentaPendienteRequest;
 import monolithe.core_service.dto.RegistrarEvidenciaContratoRequest;
 import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
+import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
+import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -124,6 +126,117 @@ public class CrmVentaService {
                 req.montoInicial(),
                 req.numeroCuotas(),
                 req.observaciones());
+    }
+
+    @Transactional(readOnly = true)
+    public void validarSeparacionPreviaCarga(Long actor, Long idProspecto, Long idLote) {
+        validarActor(actor);
+        if (idProspecto == null || idProspecto <= 0 || idLote == null || idLote <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Prospecto y lote son obligatorios.");
+        }
+    }
+
+    @Transactional
+    public JsonNode registrarSeparacion(
+            Long actor,
+            RegistrarSeparacionCrmRequest request) {
+        validarActor(actor);
+        validarDatosSeparacion(request);
+        return ejecutar("""
+                SELECT public.sp_crm_registrar_separacion_v2(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS numeric),
+                    CAST(? AS text),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS bigint),
+                    CAST(? AS varchar)
+                )::text
+                """,
+                actor,
+                request.idProspecto(),
+                request.idLote(),
+                request.metodoPago(),
+                request.numeroOperacion(),
+                request.monto(),
+                request.observaciones(),
+                request.claveArchivo(),
+                request.nombreArchivo(),
+                request.tipoMime(),
+                request.tamanioBytes(),
+                request.hashSha256());
+    }
+
+    private void validarDatosSeparacion(RegistrarSeparacionCrmRequest req) {
+        if (req == null || req.idProspecto() == null || req.idProspecto() <= 0
+                || req.idLote() == null || req.idLote() <= 0
+                || req.monto() == null || req.monto().compareTo(new java.math.BigDecimal("500.00")) != 0
+                || req.metodoPago() == null || req.metodoPago().isBlank()
+                || req.claveArchivo() == null || req.claveArchivo().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de separacion invalidos.");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarVouchersSeparacion(
+            Long actor, String estado, String busqueda, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        return ejecutar("""
+                SELECT public.sp_finanzas_listar_vouchers_separacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """,
+                actor, estado, busqueda, pagina, tamano);
+    }
+
+    @Transactional
+    public JsonNode revisarVoucherSeparacion(
+            Long actor, Long idVoucher, RevisarVoucherSeparacionRequest request) {
+        validarActor(actor);
+        validarRevisionVoucher(idVoucher, request);
+        return ejecutar("""
+                SELECT public.sp_finanzas_revisar_voucher_separacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS boolean),
+                    CAST(? AS text),
+                    CAST(? AS text)
+                )::text
+                """,
+                actor, idVoucher, request.aprobar(), request.motivo(), request.observaciones());
+    }
+
+    private void validarRevisionVoucher(Long idVoucher, RevisarVoucherSeparacionRequest req) {
+        if (idVoucher == null || idVoucher <= 0 || req == null || req.aprobar() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parametros de revision invalidos.");
+        }
+        if (Boolean.FALSE.equals(req.aprobar()) && (req.motivo() == null || req.motivo().trim().length() < 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Motivo de rechazo obligatorio (minimo 5 caracteres).");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode obtenerRutaVoucher(Long actor, Long idVoucher) {
+        validarActor(actor);
+        if (idVoucher == null || idVoucher <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identificador de voucher invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_finanzas_obtener_ruta_voucher_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor, idVoucher);
     }
 
     @Transactional
@@ -386,6 +499,25 @@ public class CrmVentaService {
         }
     }
 
+    private ResponseStatusException mapearErrorSeparacion(String msg, DataAccessException ex) {
+        if (msg.contains("fuera de su cartera") || msg.contains("No tiene autorizacion")) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN, "No autorizado para esta operacion.", ex);
+        }
+        if (msg.contains("no existe o esta inactivo") || msg.contains("no existe.")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND, "Recurso no encontrado.", ex);
+        }
+        if (msg.contains("exactamente S/ 500.00") || msg.contains("comprobante de pago es obligatorio")
+                || msg.contains("Formato de comprobante no permitido") || msg.contains("excede el tamano maximo")
+                || msg.contains("requiere numero de operacion") || msg.contains("motivo claro de rechazo")) {
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos invalidos para la separacion.", ex);
+        }
+        if (msg.contains("no se encuentra disponible") || msg.contains("ya cuenta con una reserva")
+                || msg.contains("proceso de venta en curso") || msg.contains("ya fue evaluado")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT, "El lote o voucher no esta disponible.", ex);
+        }
+        return null;
+    }
+
     private ResponseStatusException traducirError(
             DataAccessException ex) {
 
@@ -399,6 +531,11 @@ public class CrmVentaService {
         }
 
         String mensaje = errores.toString();
+
+        ResponseStatusException errorSep = mapearErrorSeparacion(mensaje, ex);
+        if (errorSep != null) {
+            return errorSep;
+        }
 
         if (mensaje.contains("DENEGADO|")) {
             return new ResponseStatusException(
