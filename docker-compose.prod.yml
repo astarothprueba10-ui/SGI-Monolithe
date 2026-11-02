@@ -1,0 +1,74 @@
+
+name: sgi-monolithe-prod
+
+services:
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      SERVER_PORT: "8081"
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      INTERNAL_MAIL_KEY: ${INTERNAL_MAIL_KEY}
+      BACKOFFICE_PASSWORD_RESET_URL: ${BACKOFFICE_PASSWORD_RESET_URL}
+      PORTAL_PASSWORD_RESET_URL: ${PORTAL_PASSWORD_RESET_URL}
+      SECURITY_PORTAL_ADMINISTRATIVO_URL: ${SECURITY_PORTAL_ADMINISTRATIVO_URL}
+      SECURITY_PORTAL_CLIENTE_URL: ${SECURITY_PORTAL_CLIENTE_URL}
+    volumes:
+      - ${JWT_PRIVATE_KEY_PATH_HOST:-./.secret/keys/jwt-private.pem}:/run/secrets/jwt-private.pem:ro
+      - ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}:/run/secrets/jwt-public.pem:ro
+
+  core-service:
+    build:
+      context: ./services/core-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      SERVER_PORT: "8083"
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      AUTH_SERVICE_URL: http://auth-service:8081
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      INTERNAL_MAIL_KEY: ${INTERNAL_MAIL_KEY}
+      SUPABASE_STORAGE_URL: ${SUPABASE_STORAGE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      WORKER_EMAIL_CONFIRMATION_URL: ${WORKER_EMAIL_CONFIRMATION_URL}
+    volumes:
+      - ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}:/run/secrets/jwt-public.pem:ro
+
+  cms-service:
+    build:
+      context: ./services/cms-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      SERVER_PORT: "8082"
+      DB_URL: ${SUPABASE_DB_URL}
+      DB_USERNAME: ${SUPABASE_DB_USERNAME}
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      CMS_STORAGE_BUCKET: ${CMS_STORAGE_BUCKET:-cms-public}
+    volumes:
+      - ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}:/run/secrets/jwt-public.pem:ro
