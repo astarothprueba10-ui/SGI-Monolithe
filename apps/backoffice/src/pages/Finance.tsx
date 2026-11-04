@@ -14,6 +14,7 @@ import { CASHFLOW, FINANCE_ENTRIES } from '../data/finance';
 import { RECEIVABLES } from '../data/financing';
 import { currency, number } from '../utils/format';
 import { SeparacionVouchersPanel } from '../components/finance/SeparacionVouchersPanel';
+import { ConciliacionesSeparacionPanel } from '../components/finance/ConciliacionesSeparacionPanel';
 
 export function Finance() {
   const { can } = useAuth();
@@ -107,12 +108,17 @@ export function Finance() {
           },
           ...(can('finance.view')
             ? [
-                {
-                  id: 'vouchers_separaciones',
-                  label: 'Vouchers de separaciones'
-                }
-              ]
+              {
+                id: 'vouchers_separaciones',
+                label: 'Vouchers de separaciones'
+              },
+              {
+                id: 'conciliaciones_separaciones',
+                label: 'Conciliación de separaciones'
+              }
+            ]
             : [])
+
         ]}
 
       />
@@ -191,6 +197,12 @@ export function Finance() {
             )}
           </Table>
         </Card>
+
+      ) : tab === 'conciliaciones_separaciones' && can('finance.view') ? (
+        <Gate permission="finance.view">
+          <ConciliacionesSeparacionPanel />
+        </Gate>
+
       ) : tab === 'vouchers_separaciones' && can('finance.view') ? (
         <Gate permission="finance.view">
           <SeparacionVouchersPanel />

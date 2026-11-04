@@ -405,6 +405,64 @@ export interface CrmCancelPendingSaleResult {
   mensaje: string;
 }
 
+export interface CrmConciliacionSeparacion {
+  id_pago: number;
+  codigo_pago: string;
+  monto: number;
+  moneda: string;
+  comprador: string;
+  codigo_lote: string;
+  codigo_reserva: string;
+  codigo_venta: string | null;
+  metodo_pago: string;
+  numero_operacion: string | null;
+  fecha_operacion: string;
+  fecha_confirmacion: string | null;
+  id_movimiento: number | null;
+  codigo_movimiento: string | null;
+  id_cuenta_financiera: number | null;
+  id_categoria: number | null;
+  codigo_cuenta: string;
+  cuenta_demo: boolean | null;
+  estado_conciliacion:
+  | 'PENDIENTE'
+  | 'CONCILIADO'
+  | 'REQUIERE_REVISION';
+}
+
+export interface CrmConciliarPagoResponse {
+  success: boolean;
+  estado: 'CONCILIADO' | 'YA_CONCILIADO';
+  idMovimiento: number;
+  idPago: number;
+  codigoPago: string;
+  idCuentaFinanciera: number;
+  idCategoria: number;
+  monto: number;
+}
+
+export interface CrmConciliacionesResponse {
+  items: CrmConciliacionSeparacion[];
+  total: number;
+  pagina: number;
+  tamano: number;
+  paginas: number;
+  cuentas: {
+    id_cuenta_financiera: number;
+    codigo: string;
+    nombre: string;
+    moneda: string;
+    tipo: string;
+    es_demo: boolean;
+  }[];
+  categorias: {
+    id_categoria: number;
+    codigo: string;
+    nombre: string;
+  }[];
+}
+
+
 function qs(filters: Record<string, string | number | boolean | null | undefined>) {
   const p = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
@@ -763,6 +821,40 @@ export const crmBackend = {
       `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
     ),
 
+  conciliarPagoSeparacion: (
+    idPago: number,
+    body: {
+      idCuentaFinanciera: number;
+      idCategoria: number;
+    }
+  ) =>
+    coreApi.post<CrmConciliarPagoResponse>(
+      `/crm/finanzas/conciliaciones/separaciones/${idPago}/conciliar`,
+      {
+        idCuentaFinanciera: body.idCuentaFinanciera,
+        idCategoria: body.idCategoria
+      }
+    ),
+
+  listarConciliacionesSeparacion: (params?: {
+    estado?:
+    | 'TODOS'
+    | 'PENDIENTE'
+    | 'CONCILIADO'
+    | 'REQUIERE_REVISION';
+    busqueda?: string;
+    pagina?: number;
+    tamano?: number;
+  }) =>
+    coreApi.get<CrmConciliacionesResponse>(
+      `/crm/finanzas/conciliaciones/separaciones${qs({
+        estado: params?.estado ?? 'TODOS',
+        busqueda: params?.busqueda?.trim(),
+        pagina: params?.pagina ?? 1,
+        tamano: params?.tamano ?? 20
+      })}`
+    ),
+
   listarVouchersSeparacion: (params?: {
     estado?: string;
     busqueda?: string;
@@ -826,6 +918,10 @@ export const crmBackend = {
   verificarCompra: (idProspecto: number) =>
     coreApi.get<CrmBuyerVerification>(
       `/crm/prospectos/${idProspecto}/verificar-compra`
+    ),
+  listarLotesReservadosDelProspecto: (idProspecto: number) =>
+    coreApi.get<{ idLotes: number[] }>(
+      `/crm/prospectos/${idProspecto}/lotes-reservados`
     ),
   listarContratosPendientes: (
     busqueda = '',

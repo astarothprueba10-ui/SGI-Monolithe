@@ -47,6 +47,17 @@ public class CrmVentaController {
                 return service.validar(obtenerActor(jwt), request);
         }
 
+        @GetMapping("/prospectos/{idProspecto}/lotes-reservados")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode listarLotesReservadosDelProspecto(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idProspecto) {
+
+                return service.listarLotesReservadosDelProspecto(
+                                obtenerActor(jwt),
+                                idProspecto);
+        }
+
         @GetMapping("/prospectos/{idProspecto}/verificar-compra")
         @PreAuthorize("hasAuthority('crm.view')")
         public JsonNode verificarComprador(
@@ -91,6 +102,37 @@ public class CrmVentaController {
                 return service.registrarSeparacion(
                                 obtenerActor(jwt),
                                 request);
+        }
+
+        @PostMapping("/finanzas/conciliaciones/separaciones/{idPago}/conciliar")
+        @PreAuthorize("hasAuthority('finance.edit')")
+        public JsonNode conciliarPagoSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idPago,
+                        @Valid @RequestBody ConciliarPagoSeparacionRequest request) {
+
+                return service.conciliarPagoSeparacion(
+                                obtenerActor(jwt),
+                                idPago,
+                                request.idCuentaFinanciera(),
+                                request.idCategoria());
+        }
+
+        @GetMapping("/finanzas/conciliaciones/separaciones")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public JsonNode listarConciliacionesSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(defaultValue = "TODOS") String estado,
+                        @RequestParam(required = false) String busqueda,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "20") Integer tamano) {
+
+                return service.listarConciliacionesSeparacion(
+                                obtenerActor(jwt),
+                                estado,
+                                busqueda,
+                                pagina,
+                                tamano);
         }
 
         @GetMapping("/separaciones/vouchers")
@@ -362,6 +404,12 @@ public class CrmVentaController {
                 return ResponseEntity.ok()
                                 .cacheControl(CacheControl.noStore())
                                 .body(enlace);
+        }
+
+        public record ConciliarPagoSeparacionRequest(
+                        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive Long idCuentaFinanciera,
+
+                        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive Long idCategoria) {
         }
 
         private static Long obtenerActor(Jwt jwt) {

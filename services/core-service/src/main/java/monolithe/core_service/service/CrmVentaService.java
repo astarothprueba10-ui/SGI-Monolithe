@@ -66,6 +66,28 @@ public class CrmVentaService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode listarLotesReservadosDelProspecto(
+            Long actor, Long idProspecto) {
+
+        validarActor(actor);
+
+        if (idProspecto == null || idProspecto <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de prospecto invalido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_lotes_reservados_prospecto_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idProspecto);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode verificarComprador(
             Long actor,
             Long idProspecto) {
@@ -203,6 +225,64 @@ public class CrmVentaService {
         }
     }
 
+    @Transactional
+    public JsonNode conciliarPagoSeparacion(
+            Long actor,
+            Long idPago,
+            Long idCuentaFinanciera,
+            Long idCategoria) {
+
+        validarActor(actor);
+
+        if (idPago == null || idPago <= 0
+                || idCuentaFinanciera == null || idCuentaFinanciera <= 0
+                || idCategoria == null || idCategoria <= 0) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Pago, cuenta financiera y categoría son obligatorios.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_finanzas_conciliar_pago_confirmado_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idPago,
+                idCuentaFinanciera,
+                idCategoria);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarConciliacionesSeparacion(
+            Long actor,
+            String estado,
+            String busqueda,
+            Integer pagina,
+            Integer tamano) {
+
+        validarActor(actor);
+
+        return ejecutar("""
+                SELECT public.sp_finanzas_listar_conciliaciones_separacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """,
+                actor,
+                estado,
+                busqueda,
+                pagina,
+                tamano);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode listarVouchersSeparacion(
             Long actor, String estado, String busqueda, Integer pagina, Integer tamano) {
@@ -303,16 +383,18 @@ public class CrmVentaService {
             Long actor, String tipo, String busqueda, Integer pagina, Integer tamano) {
         validarActor(actor);
 
-        String filtroTipo = tipo == null ? "" : tipo.trim()
-                .toUpperCase(java.util.Locale.ROOT).replace('Ó', 'O');
+        String filtroTipo = tipo == null ? ""
+                : tipo.trim()
+                        .toUpperCase(java.util.Locale.ROOT).replace('Ó', 'O');
         if (!filtroTipo.isEmpty() && !filtroTipo.equals("VENTA")
                 && !filtroTipo.equals("SEPARACION")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El tipo de operación debe ser VENTA o SEPARACION.");
         }
 
-        String filtroBusqueda = busqueda == null ? "" : busqueda.trim()
-                .toLowerCase(java.util.Locale.ROOT);
+        String filtroBusqueda = busqueda == null ? ""
+                : busqueda.trim()
+                        .toLowerCase(java.util.Locale.ROOT);
         if (filtroBusqueda.length() > 120) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "La búsqueda no puede superar los 120 caracteres.");

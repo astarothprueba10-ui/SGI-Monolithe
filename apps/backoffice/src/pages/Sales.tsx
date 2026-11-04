@@ -13,7 +13,7 @@ import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
-import { crmBackend, type CrmProspect } from '../services/crmBackend';
+import { crmBackend, type CrmProspect, type CrmSaleValidationInput } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
@@ -49,9 +49,20 @@ export function Sales() {
   const [formObservations, setFormObservations] = useState('');
   const [formPaymentMethod, setFormPaymentMethod] = useState<'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO'>('TRANSFERENCIA');
   const [formOperationNumber, setFormOperationNumber] = useState('');
+  const [formSaleModality, setFormSaleModality] = useState<
+    'CONTADO' | 'FINANCIADA'
+  >('CONTADO');
+  const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
+  const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [voucherFile, setVoucherFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
+  const registroVentaEnCursoRef = React.useRef(false);
+  const [confirmacionVenta, setConfirmacionVenta] = useState<{
+    datos: CrmSaleValidationInput;
+    codigoProspecto: string;
+    codigoLote: string;
+  } | null>(null);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
 
@@ -149,6 +160,9 @@ export function Sales() {
     void loadFormData();
     setFormTouched(false);
     setFormPaymentMethod('TRANSFERENCIA');
+    setFormSaleModality('CONTADO');
+    setFormSaleDownPayment('');
+    setFormSaleInstallments('12');
     setFormOperationNumber('');
     setVoucherFile(null);
     setFormObservations('');
@@ -156,9 +170,11 @@ export function Sales() {
   };
 
   const cerrarModalOperacion = () => {
-    if (registroSeparacionEnCursoRef.current) {
-      return;
-    }
+    if (
+      registroSeparacionEnCursoRef.current ||
+      registroVentaEnCursoRef.current ||
+      confirmacionVenta
+    ) return;
 
     setIsModalOpen(false);
   };
@@ -357,23 +373,268 @@ export function Sales() {
       setSubmitting(false);
     }
   };
-  
+
+
+  const ejecutarRegistroVentaPendiente = async () => {
+    if (submitting || registroVentaEnCursoRef.current) return;
+
+    const idProspecto = Number(selectedProspectId);
+    const idLote = Number(formLotId);
+    const lote = availableLots.find((item) => item.idLote === idLote);
+
+    if (
+      !Number.isSafeInteger(idProspecto) ||
+      idProspecto <= 0 ||
+      !lote ||
+      loadingLots ||
+      estadoPrecio !== 'disponible' ||
+      precioLote?.idLote !== idLote
+    ) {
+      toast.error('Seleccione un comprador y un lote con precio verificado.');
+      return;
+    }
+
+    const montoTotal = Number(precioLote.precio);
+    const esFinanciada = formSaleModality === 'FINANCIADA';
+    const montoInicial = Number(formSaleDownPayment);
+    const numeroCuotas = Number(formSaleInstallments);
+
+    if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
+      toast.error('El precio oficial no es válido.');
+      return;
+    }
+
+    if (
+      esFinanciada &&
+      (
+        !formSaleDownPayment.trim() ||
+        !Number.isFinite(montoInicial) ||
+        montoInicial <= 0 ||
+        montoInicial >= montoTotal ||
+        !Number.isInteger(numeroCuotas) ||
+        numeroCuotas < 1 ||
+        numeroCuotas > 36
+      )
+    ) {
+      toast.error('Revise el monto inicial y las cuotas de financiamiento.');
+      return;
+    }
+
+    const datos = {
+      idProspecto,
+      idLote,
+      modalidad: formSaleModality,
+      montoTotal,
+      montoInicial: esFinanciada ? montoInicial : null,
+      numeroCuotas: esFinanciada ? numeroCuotas : null,
+      observaciones: formObservations.trim() || null
+    };
+
+    registroVentaEnCursoRef.current = true;
+    setSubmitting(true);
+
+    try {
+      // Revalidación obligatoria antes de registrar.
+      const validacion = await crmBackend.validarVenta(datos);
+
+      if (
+        !validacion.elegible ||
+        validacion.idProspecto !== idProspecto ||
+        validacion.idLote !== idLote ||
+        validacion.modalidad !== formSaleModality ||
+        Number(validacion.precioVigente) !== montoTotal
+      ) {
+        throw new Error('La validación comercial no coincide con la operación.');
+      }
+
+      setConfirmacionVenta({
+        datos,
+        codigoProspecto: validacion.codigoProspecto,
+        codigoLote: validacion.codigoLote
+      });
+
+    } catch (err: unknown) {
+      toast.error('No se pudo confirmar el registro de venta', {
+        description:
+          (err instanceof Error ? err.message : 'Error inesperado.') +
+          ' Revise las operaciones existentes antes de volver a intentarlo.',
+        duration: 10000
+      });
+    } finally {
+      registroVentaEnCursoRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validarFormularioSeparacion()) return;
+
+    if (submitting || registroSeparacionEnCursoRef.current) return;
+
     if (opType === 'Venta') {
-      toast.info('Flujo de venta inactivo', {
-        description: 'La formalización de ventas se realiza desde el CRM.'
-      });
+      setFormTouched(true);
+
+      if (!selectedProspectId || !formLotId) {
+        toast.error('Seleccione un prospecto y un lote.');
+        return;
+      }
+
+      const idLote = Number(formLotId);
+      const loteSeleccionado = availableLots.find(
+        (lote) => lote.idLote === idLote
+      );
+
+      if (!loteSeleccionado) {
+        toast.error('El lote seleccionado ya no está disponible.');
+        return;
+      }
+
+      if (
+        estadoPrecio !== 'disponible' ||
+        !precioLote ||
+        precioLote.idLote !== idLote
+      ) {
+        toast.error('Debe verificarse el precio oficial del lote.');
+        return;
+      }
+
+      const montoTotal = Number(precioLote.precio);
+
+      if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
+        toast.error('El precio oficial no es válido.');
+        return;
+      }
+
+      const financiada = formSaleModality === 'FINANCIADA';
+      const montoInicial = Number(formSaleDownPayment);
+      const numeroCuotas = Number(formSaleInstallments);
+
+      if (financiada) {
+        if (
+          !formSaleDownPayment.trim() ||
+          !Number.isFinite(montoInicial) ||
+          montoInicial <= 0 ||
+          montoInicial >= montoTotal
+        ) {
+          toast.error('La inicial debe ser mayor que cero y menor que el precio.');
+          return;
+        }
+
+        if (
+          !Number.isInteger(numeroCuotas) ||
+          numeroCuotas < 1 ||
+          numeroCuotas > 36
+        ) {
+          toast.error('El número de cuotas debe estar entre 1 y 36.');
+          return;
+        }
+      }
+
+      setSubmitting(true);
+
+      try {
+        const resultado = await crmBackend.validarVenta({
+          idProspecto: Number(selectedProspectId),
+          idLote,
+          modalidad: formSaleModality,
+          montoTotal,
+          montoInicial: financiada ? montoInicial : null,
+          numeroCuotas: financiada ? numeroCuotas : null,
+          observaciones: formObservations.trim() || null
+        });
+
+        if (!resultado.elegible) {
+          toast.error(
+            resultado.mensaje || 'La operación no es elegible.'
+          );
+          return;
+        }
+
+        toast.success('Validación comercial satisfactoria', {
+          description:
+            `Lote: ${resultado.codigoLote}. ` +
+            `Modalidad: ${resultado.modalidad}. ` +
+            `Precio oficial: ${currency(resultado.precioVigente)}. ` +
+            'La venta todavía no ha sido registrada.',
+          duration: 8000
+        });
+      } catch (err: unknown) {
+        toast.error('No se pudo validar la venta', {
+          description:
+            err instanceof Error
+              ? err.message
+              : 'Error al consultar Core Service.'
+        });
+      } finally {
+        setSubmitting(false);
+      }
+
       return;
     }
+
+    // Flujo existente de separaciones de S/ 500.
+    if (!validarFormularioSeparacion()) return;
+
     if (SEPARACION_ENVIO_DESHABILITADO) {
-      toast.info('Envío deshabilitado', {
-        description: 'El envío real está deshabilitado temporalmente hasta implementar la evidencia de pago de S/ 500.'
-      });
+      toast.info('El registro de separaciones está deshabilitado.');
       return;
     }
+
     await ejecutarRegistroSeparacion();
+  };
+
+  const confirmarRegistroVentaPendiente = async () => {
+    if (
+      !confirmacionVenta ||
+      submitting ||
+      registroVentaEnCursoRef.current
+    ) return;
+
+    const solicitud = confirmacionVenta;
+
+    registroVentaEnCursoRef.current = true;
+    setSubmitting(true);
+
+    try {
+      const resultado = await crmBackend.registrarVentaPendiente(
+        solicitud.datos
+      );
+
+      if (
+        !resultado.success ||
+        resultado.estadoVenta !== 'PENDIENTE' ||
+        resultado.estadoContrato !== 'PENDIENTE_FIRMA'
+      ) {
+        throw new Error('La respuesta requiere revisión.');
+      }
+
+      setConfirmacionVenta(null);
+      setIsModalOpen(false);
+
+      toast.success('Venta pendiente registrada', {
+        description:
+          `Venta: ${resultado.codigoVenta}. ` +
+          `Contrato: ${resultado.codigoContrato}. ` +
+          'Pendiente de firma y aprobación.',
+        duration: 10000
+      });
+
+      await fetchSalesData();
+    } catch (err: unknown) {
+      setConfirmacionVenta(null);
+
+      toast.error('No se pudo confirmar el registro', {
+        description:
+          (err instanceof Error
+            ? err.message
+            : 'Error inesperado.') +
+          ' Revise las operaciones antes de reintentar.',
+        duration: 10000
+      });
+    } finally {
+      registroVentaEnCursoRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   const rows = useMemo(() => {
@@ -436,13 +697,14 @@ export function Sales() {
   }, [formProjectId]);
 
 
+
   useEffect(() => {
     let vigente = true;
 
     setAvailableLots([]);
     setFormLotId('');
 
-    if (!formProjectId || !formStageId) {
+    if (!formProjectId || !formStageId || !selectedProspectId) {
       setLoadingLots(false);
       return;
     }
@@ -452,45 +714,83 @@ export function Sales() {
 
     setLoadingLots(true);
 
-    void coreService
-      .searchLots({
-        idProyecto,
-        idEtapa,
-        activo: true
-      })
-      .then((lotes) => {
+    const cargarLotes = async () => {
+      try {
+        const [lotes, reservas] = await Promise.all([
+          coreService.searchLots({
+            idProyecto,
+            idEtapa,
+            activo: true
+          }),
+
+          opType === 'Venta'
+            ? crmBackend.listarLotesReservadosDelProspecto(
+              Number(selectedProspectId)
+            )
+            : Promise.resolve({ idLotes: [] as number[] })
+        ]);
+
         if (!vigente) return;
 
-        const disponibles = (lotes ?? []).filter(
-          (lote) =>
-            lote.activo === true &&
-            lote.idProyecto === idProyecto &&
-            lote.idEtapa === idEtapa &&
-            lote.codigoEstadoLote?.toUpperCase() === 'DISPONIBLE'
+        const idsReservados = new Set(
+          (reservas.idLotes ?? []).filter(
+            (id) => Number.isSafeInteger(id) && id > 0
+          )
         );
 
-        setAvailableLots(disponibles);
-      })
-      .catch((err: unknown) => {
+        const lotesPermitidos = (lotes ?? []).filter((lote) => {
+          if (
+            lote.activo !== true ||
+            lote.idProyecto !== idProyecto ||
+            lote.idEtapa !== idEtapa
+          ) {
+            return false;
+          }
+
+          const estado = lote.codigoEstadoLote?.toUpperCase();
+
+          if (estado === 'DISPONIBLE') {
+            return true;
+          }
+
+          return (
+            opType === 'Venta' &&
+            estado === 'RESERVADO' &&
+            idsReservados.has(lote.idLote)
+          );
+        });
+
+        setAvailableLots(lotesPermitidos);
+      } catch (err: unknown) {
         if (!vigente) return;
 
         setAvailableLots([]);
 
-        toast.error('No se pudieron cargar los lotes', {
+        toast.error('No se pudieron consultar los lotes', {
           description:
             err instanceof Error
               ? err.message
-              : 'Error al consultar los lotes.'
+              : 'Error al verificar los lotes autorizados.'
         });
-      })
-      .finally(() => {
-        if (vigente) setLoadingLots(false);
-      });
+      } finally {
+        if (vigente) {
+          setLoadingLots(false);
+        }
+      }
+    };
+
+    void cargarLotes();
 
     return () => {
       vigente = false;
     };
-  }, [formProjectId, formStageId]);
+  }, [
+    formProjectId,
+    formStageId,
+    selectedProspectId,
+    opType
+  ]);
+
 
 
   useEffect(() => {
@@ -719,15 +1019,29 @@ export function Sales() {
             </Button>
             <Button
               variant="primary"
-              disabled={submitting || SEPARACION_ENVIO_DESHABILITADO || opType === 'Venta'}
+
+              disabled={
+                submitting ||
+                (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
+              }
               onClick={handleProcessOperation}
             >
               {submitting
                 ? 'Procesando…'
                 : opType === 'Separacion'
                   ? 'Registrar Separación'
-                  : 'Venta inactiva'}
+                  : 'Validar Venta'}
             </Button>
+
+            {opType === 'Venta' && (
+              <Button
+                variant="primary"
+                disabled={submitting || loadingLots}
+                onClick={() => void ejecutarRegistroVentaPendiente()}
+              >
+                Registrar Venta Pendiente
+              </Button>
+            )}
           </div>
         }
       >
@@ -862,7 +1176,9 @@ export function Sales() {
 
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Lote disponible *
+
+                {opType === 'Venta' ? 'Lote para venta *' : 'Lote disponible *'}
+
               </label>
 
               <Select
@@ -876,12 +1192,23 @@ export function Sales() {
                     : 'Seleccione un lote disponible...'}
                 </option>
 
-                {availableLots.map((lote) => (
-                  <option key={lote.idLote} value={lote.idLote}>
-                    {lote.codigo} - {lote.nombreManzana ?? 'Manzana'} -
-                    {' '}{lote.areaM2 ?? 0} m² [Disponible]
-                  </option>
-                ))}
+
+                {availableLots.map((lote) => {
+                  const esReservado =
+                    lote.codigoEstadoLote?.toUpperCase() === 'RESERVADO';
+
+                  return (
+                    <option key={lote.idLote} value={lote.idLote}>
+                      {lote.codigo} - {lote.nombreManzana ?? 'Manzana'} -
+                      {' '}{lote.areaM2 ?? 0} m²
+                      {' '}
+                      [{esReservado
+                        ? 'Reservado para este comprador'
+                        : 'Disponible'}]
+                    </option>
+                  );
+                })}
+
               </Select>
 
 
@@ -931,7 +1258,10 @@ export function Sales() {
                 !loadingLots &&
                 availableLots.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    No hay lotes disponibles en esta etapa.
+
+                    {opType === 'Venta'
+                      ? 'No hay lotes disponibles ni reservas autorizadas en esta etapa.'
+                      : 'No hay lotes disponibles en esta etapa.'}
                   </p>
                 )}
 
@@ -1032,10 +1362,84 @@ export function Sales() {
                   <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
                 </div>
               </>
+
             ) : (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-1">
-                <p className="font-semibold text-slate-900">Flujo de ventas inactivo:</p>
-                <p>La formalización de ventas se gestiona desde el expediente comercial en el CRM tras la separación.</p>
+              <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-brand-700">
+                    Modalidad de venta *
+                  </label>
+
+                  <Select
+                    value={formSaleModality}
+                    onChange={(e) => {
+                      const modalidad = e.target.value as
+                        'CONTADO' | 'FINANCIADA';
+
+                      setFormSaleModality(modalidad);
+
+                      if (modalidad === 'CONTADO') {
+                        setFormSaleDownPayment('');
+                        setFormSaleInstallments('12');
+                      }
+                    }}
+                  >
+                    <option value="CONTADO">Venta al contado</option>
+                    <option value="FINANCIADA">Venta financiada</option>
+                  </Select>
+                </div>
+
+                {formSaleModality === 'FINANCIADA' && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-brand-700">
+                        Monto inicial (S/) *
+                      </label>
+
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Ej. 10000.00"
+                        value={formSaleDownPayment}
+                        onChange={(e) => setFormSaleDownPayment(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-brand-700">
+                        Número de cuotas (1 a 36) *
+                      </label>
+
+                      <Input
+                        type="number"
+                        min="1"
+                        max="36"
+                        step="1"
+                        value={formSaleInstallments}
+                        onChange={(e) => setFormSaleInstallments(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-md border border-brand-200 bg-white p-3">
+                  <p className="text-xs text-brand-600">
+                    Precio oficial de venta
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-brand-900">
+                    {precioLote
+                      ? currency(Number(precioLote.precio))
+                      : 'Seleccione un lote con precio vigente'}
+                  </p>
+                </div>
+
+                <p className="text-xs text-brand-700">
+                  La venta se registrará inicialmente como PENDIENTE.
+                  El contrato deberá firmarse y aprobarse antes de
+                  confirmar la venta y cambiar el lote a VENDIDO.
+                </p>
               </div>
             )}
 
@@ -1051,6 +1455,98 @@ export function Sales() {
               />
             </div>
           </form>
+        )}
+      </Modal>
+
+
+      <Modal
+        open={confirmacionVenta !== null}
+        onClose={() => {
+          if (!submitting && !registroVentaEnCursoRef.current) {
+            setConfirmacionVenta(null);
+          }
+        }}
+        title="Confirmar registro de venta"
+        description="Verifique los datos antes de registrar la operación."
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              disabled={submitting}
+              onClick={() => setConfirmacionVenta(null)}
+            >
+              Volver
+            </Button>
+
+            <Button
+              variant="primary"
+              disabled={submitting}
+              onClick={() => void confirmarRegistroVentaPendiente()}
+            >
+              {submitting ? 'Registrando…' : 'Confirmar registro'}
+            </Button>
+          </>
+        }
+      >
+        {confirmacionVenta && (
+          <div className="space-y-4 text-sm">
+            <dl className="grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-brand-500">Comprador</dt>
+                <dd className="font-semibold text-brand-900">
+                  {confirmacionVenta.codigoProspecto}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-brand-500">Lote</dt>
+                <dd className="font-semibold text-brand-900">
+                  {confirmacionVenta.codigoLote}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-brand-500">Modalidad</dt>
+                <dd className="font-semibold text-brand-900">
+                  {confirmacionVenta.datos.modalidad === 'FINANCIADA'
+                    ? 'Financiada'
+                    : 'Contado'}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-brand-500">Precio de venta</dt>
+                <dd className="font-semibold text-brand-900">
+                  {currency(confirmacionVenta.datos.montoTotal)}
+                </dd>
+              </div>
+
+              {confirmacionVenta.datos.modalidad === 'FINANCIADA' && (
+                <>
+                  <div>
+                    <dt className="text-brand-500">Inicial pactada</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {currency(confirmacionVenta.datos.montoInicial ?? 0)}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-brand-500">Número de cuotas</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {confirmacionVenta.datos.numeroCuotas}
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Al confirmar, se registrará una venta en estado
+              <strong> PENDIENTE</strong> y se generará un contrato
+              pendiente de firma. El lote permanecerá
+              <strong> RESERVADO</strong> hasta la aprobación contractual.
+            </div>
+          </div>
         )}
       </Modal>
     </div>
