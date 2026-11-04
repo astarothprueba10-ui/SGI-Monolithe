@@ -610,6 +610,176 @@ public class CrmVentaService {
                 idContrato);
     }
 
+    @Transactional
+    public JsonNode registrarAnexoContrato(
+            Long actor,
+            Long idContrato,
+            String tipoAnexo,
+            String claveArchivo,
+            String nombreOriginal,
+            String hashSha256) {
+
+        validarActor(actor);
+
+        if (idContrato == null || idContrato <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de contrato inválido.");
+        }
+
+        if (!"PLANO_LOTE".equals(tipoAnexo)
+                && !"MEMORIA_DESCRIPTIVA".equals(tipoAnexo)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tipo de anexo inválido.");
+        }
+
+        if (claveArchivo == null || claveArchivo.isBlank()
+                || nombreOriginal == null || nombreOriginal.isBlank()
+                || hashSha256 == null
+                || !hashSha256.matches("(?i)[a-f0-9]{64}")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Datos o huella SHA-256 del archivo inválidos.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_registrar_anexo_contrato_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar)
+                )::text
+                """,
+                actor,
+                idContrato,
+                tipoAnexo,
+                claveArchivo,
+                nombreOriginal,
+                hashSha256.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode autorizarLecturaAnexoContrato(
+            Long actor,
+            Long idContrato,
+            Long idAnexo) {
+
+        validarActor(actor);
+
+        if (idContrato == null || idContrato <= 0
+                || idAnexo == null || idAnexo <= 0) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificadores de contrato o anexo inválidos.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_lectura_anexo_contrato_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idContrato,
+                idAnexo);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode autorizarCargaAnexoContrato(
+            Long actor,
+            Long idContrato,
+            String tipoAnexo) {
+
+        validarActor(actor);
+
+        if (idContrato == null || idContrato <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de contrato inválido.");
+        }
+
+        if (!"PLANO_LOTE".equals(tipoAnexo)
+                && !"MEMORIA_DESCRIPTIVA".equals(tipoAnexo)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tipo de anexo contractual inválido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_carga_anexo_contrato_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS varchar)
+                )::text
+                """,
+                actor,
+                idContrato,
+                tipoAnexo);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarAnexosContrato(
+            Long actor,
+            Long idContrato) {
+
+        validarActor(actor);
+
+        if (idContrato == null || idContrato <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de contrato inválido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_anexos_contrato_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idContrato);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarContratosDocumentacion(
+            Long actor,
+            String busqueda,
+            Integer pagina,
+            Integer tamano) {
+
+        validarActor(actor);
+
+        int paginaSegura = pagina == null ? 1 : pagina;
+        int tamanoSeguro = tamano == null ? 20 : tamano;
+
+        if (paginaSegura < 1 || paginaSegura > 100000
+                || tamanoSeguro < 1 || tamanoSeguro > 100
+                || (busqueda != null && busqueda.length() > 120)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Parámetros de consulta inválidos.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_contratos_documentacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """,
+                actor,
+                busqueda == null ? null : busqueda.trim(),
+                paginaSegura,
+                tamanoSeguro);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode listarContratosPendientes(
             Long actor,

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DownloadIcon, FileTextIcon, PlusIcon, Clock } from 'lucide-react';
+import { DownloadIcon, FileTextIcon, PlusIcon, Clock, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -15,6 +15,7 @@ import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
 import { crmBackend, type CrmProspect, type CrmSaleValidationInput } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
+import { DocumentacionContratosPanel } from '../components/sales/DocumentacionContratosPanel';
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
@@ -22,10 +23,51 @@ import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/cor
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
+
+function AdvisorBadge({ advisor, type }: { advisor?: string | null; type: string }) {
+  if (advisor && advisor.trim()) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-800">
+        <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+        {advisor}
+      </span>
+    );
+  }
+  if (type === 'Venta') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+        <AlertTriangleIcon className="h-3 w-3 text-amber-600 shrink-0" />
+        Sin asesor
+      </span>
+    );
+  }
+  return <span className="text-xs text-brand-400 italic">No aplica</span>;
+}
+
+function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
+  if (!prospect) return null;
+  const tieneAsesor = Boolean(prospect.asesor_nombre?.trim());
+  return (
+    <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/50 p-2.5 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="text-brand-600 font-medium">Asesor asignado en CRM:</span>
+        <span className={`inline-flex items-center gap-1 font-semibold ${tieneAsesor ? 'text-emerald-800' : 'text-amber-800'}`}>
+          {tieneAsesor ? <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" /> : <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-600" />}
+          {tieneAsesor ? prospect.asesor_nombre : 'Sin asesor asignado'}
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-brand-500">
+        {tieneAsesor ? 'Continuidad confirmada: el backend asignará este asesor a la venta.' : 'Atención: prospecto sin asesor activo; la operación no tendrá asesor vinculado.'}
+      </p>
+    </div>
+  );
+}
+
 export function Sales() {
   const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
+  const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
   const [salesList, setSalesList] = useState<Sale[]>([]);
   const [, setLoading] = useState(false);
@@ -62,6 +104,7 @@ export function Sales() {
     datos: CrmSaleValidationInput;
     codigoProspecto: string;
     codigoLote: string;
+    idAsesor?: number | null;
   } | null>(null);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
@@ -450,7 +493,8 @@ export function Sales() {
       setConfirmacionVenta({
         datos,
         codigoProspecto: validacion.codigoProspecto,
-        codigoLote: validacion.codigoLote
+        codigoLote: validacion.codigoLote,
+        idAsesor: validacion.idAsesor
       });
 
     } catch (err: unknown) {
@@ -642,14 +686,17 @@ export function Sales() {
     return salesList.filter((sale) => {
       const byTab = tab === 'todas' || sale.type === tab;
       const byModality = modality === 'all' || sale.modality === modality;
-      const byQuery =
-        q.length === 0 ||
+      const byAdvisor = advisorFilter === 'all' ||
+        (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
+        (advisorFilter === 'without_advisor' && sale.type === 'Venta' && !sale.advisor?.trim());
+      const byQuery = q.length === 0 ||
         sale.buyer.toLowerCase().includes(q) ||
         sale.code.toLowerCase().includes(q) ||
-        sale.lot.toLowerCase().includes(q);
-      return byTab && byModality && byQuery;
+        sale.lot.toLowerCase().includes(q) ||
+        sale.advisor.toLowerCase().includes(q);
+      return byTab && byModality && byAdvisor && byQuery;
     });
-  }, [salesList, tab, query, modality]);
+  }, [salesList, tab, query, modality, advisorFilter]);
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
@@ -890,6 +937,10 @@ export function Sales() {
         <ContratosPendientesPanel />
       </Gate>
 
+      <Gate permission="sales.view">
+        <DocumentacionContratosPanel />
+      </Gate>
+
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
           <SearchInput
@@ -911,6 +962,18 @@ export function Sales() {
               <option value="Reserva">Reserva</option>
             </Select>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-medium text-brand-600">Asesor:</span>
+            <Select
+              value={advisorFilter}
+              onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
+              className="w-40"
+            >
+              <option value="all">Todos los asesores</option>
+              <option value="with_advisor">Con asesor</option>
+              <option value="without_advisor">Sin asesor</option>
+            </Select>
+          </div>
         </div>
 
         {rows.length === 0 ? (
@@ -930,6 +993,7 @@ export function Sales() {
                 <TH>Modalidad</TH>
                 <TH align="right">Monto</TH>
                 <TH>Asesor</TH>
+                <TH>Fecha</TH>
                 <TH>Contrato</TH>
                 <TH>Estado</TH>
                 <TH align="right">Acciones</TH>
@@ -941,17 +1005,24 @@ export function Sales() {
                 <TR key={sale.id}>
                   <TD className="font-mono text-[12px] font-semibold text-brand-900">{sale.code}</TD>
                   <TD>
-                    <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>                      {sale.type}
+                    <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>
+                      {sale.type}
                     </Badge>
                   </TD>
                   <TD className="font-medium text-brand-900">{sale.buyer}</TD>
-                  <TD className="font-mono text-[12px] text-brand-700">{sale.lot}</TD>
-                  <TD className="text-brand-600">{sale.project}</TD>
-                  <TD className="text-brand-600">{sale.modality}</TD>
+                  <TD>
+                    <p className="font-mono text-[12px] font-semibold text-brand-700">{sale.lot}</p>
+                    <p className="text-xs text-brand-500">{sale.project}</p>
+                  </TD>
+                  <TD className="text-brand-600">{sale.modality ?? '—'}</TD>
                   <TD className="text-right font-mono font-semibold text-brand-900">
                     {currency(sale.amount)}
                   </TD>
-                  <TD className="text-[12px] text-brand-500">{sale.date}</TD>
+                  <TD>
+                    <AdvisorBadge advisor={sale.advisor} type={sale.type} />
+                  </TD>
+                  <TD className="text-[12px] text-brand-500">{sale.date || '—'}</TD>
+                  <TD className="text-[12px] text-brand-600">{sale.contract ?? '—'}</TD>
                   <TD>
                     <StatusBadge status={sale.status} />
                   </TD>
@@ -987,11 +1058,29 @@ export function Sales() {
               { label: 'Comprador', value: detail.buyer },
               { label: 'Lote', value: detail.lot },
               { label: 'Proyecto', value: detail.project },
-              { label: 'Modalidad de venta', value: detail.modality },
+              { label: 'Modalidad de venta', value: detail.modality ?? '—' },
               { label: 'Monto de la operación', value: currency(detail.amount) },
-              { label: 'Asesor', value: detail.advisor },
-              { label: 'Contrato', value: detail.contract },
-              { label: 'Estado', value: detail.status }
+              {
+                label: 'Asesor comercial',
+                value: (
+                  detail.advisor && detail.advisor.trim() ? (
+                    <span className="inline-flex items-center gap-1.5 font-medium text-emerald-800">
+                      <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" />
+                      {detail.advisor}
+                    </span>
+                  ) : detail.type === 'Venta' ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      <AlertTriangleIcon className="h-3 w-3 text-amber-600" />
+                      Sin asesor vinculado
+                    </span>
+                  ) : (
+                    <span className="text-brand-400 italic">No aplica (Separación)</span>
+                  )
+                )
+              },
+              { label: 'Fecha de registro', value: detail.date || '—' },
+              { label: 'Contrato', value: detail.contract || '—' },
+              { label: 'Estado', value: <StatusBadge status={detail.status} /> }
             ].map((row) => (
               <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
                 <dt className="text-[12px] text-brand-400">{row.label}</dt>
@@ -1098,6 +1187,7 @@ export function Sales() {
                   </option>
                 ))}
               </Select>
+              <ProspectAdvisorInfo prospect={prospectsList.find((p) => p.id_prospecto === selectedProspectId)} />
             </div>
 
             <div>
@@ -1502,6 +1592,23 @@ export function Sales() {
                 <dt className="text-brand-500">Lote</dt>
                 <dd className="font-semibold text-brand-900">
                   {confirmacionVenta.codigoLote}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-brand-500">Asesor comercial</dt>
+                <dd className="font-semibold text-brand-900">
+                  {confirmacionVenta.idAsesor && confirmacionVenta.idAsesor > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-800">
+                      <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" />
+                      Asesor #{confirmacionVenta.idAsesor}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-amber-800 text-xs font-semibold">
+                      <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-600" />
+                      Sin asesor vinculado
+                    </span>
+                  )}
                 </dd>
               </div>
 

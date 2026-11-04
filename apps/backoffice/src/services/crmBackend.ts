@@ -531,6 +531,80 @@ export interface CrmContractReadUrl {
   expiresInSeconds: number;
 }
 
+export type CrmTipoAnexoContrato =
+  | 'PLANO_LOTE'
+  | 'MEMORIA_DESCRIPTIVA';
+
+export interface CrmAnexoContrato {
+  idAnexo: number;
+  tipoAnexo: CrmTipoAnexoContrato;
+  numeroVersion: number;
+  nombreArchivoOriginal: string;
+  tipoMime: string;
+  tamanoBytes: number;
+  vigente: boolean;
+  visibleCliente: boolean;
+  fechaCarga: string;
+  fechaPublicacionCliente: string | null;
+}
+
+export interface CrmAnexosContratoResponse {
+  idContrato: number;
+  codigoContrato: string;
+  idVenta: number;
+  codigoVenta: string;
+  idLote: number;
+  codigoLote: string;
+  estadoContrato: string;
+  documentos: CrmAnexoContrato[];
+  faltantes: CrmTipoAnexoContrato[];
+}
+
+export interface CrmAnexoRegistrado {
+  success: boolean;
+  estado: 'REGISTRADO' | 'YA_REGISTRADO';
+  idAnexo: number;
+  idContrato: number;
+  tipoAnexo: CrmTipoAnexoContrato;
+  numeroVersion: number;
+  vigente: boolean;
+  visibleCliente?: boolean;
+  tamanoBytes?: number;
+  mensaje?: string;
+}
+
+export interface CrmEnlaceLecturaAnexo {
+  idContrato: number;
+  idAnexo: number;
+  tipoAnexo: CrmTipoAnexoContrato;
+  nombreOriginal: string;
+  urlLectura: string;
+  expiresInSeconds: number;
+}
+
+export interface CrmContratoDocumentacion {
+  idContrato: number;
+  codigoContrato: string;
+  idVenta: number;
+  codigoVenta: string;
+  idLote: number;
+  codigoLote: string;
+  nombreProyecto: string;
+  comprador: string;
+  estadoContrato: string;
+  estadoVenta: string;
+  tienePdfContrato: boolean;
+  tienePlanoLote: boolean;
+  tieneMemoriaDescriptiva: boolean;
+}
+
+export interface CrmContratosDocumentacionPage {
+  items: CrmContratoDocumentacion[];
+  total: number;
+  pagina: number;
+  tamano: number;
+}
+
 
 export interface CrmAprobarFirmaRequest {
   idContratoArchivo: number;
@@ -923,6 +997,216 @@ export const crmBackend = {
     coreApi.get<{ idLotes: number[] }>(
       `/crm/prospectos/${idProspecto}/lotes-reservados`
     ),
+
+  listarContratosDocumentacion: (
+    busqueda = '',
+    pagina = 1,
+    tamano = 20
+  ): Promise<CrmContratosDocumentacionPage> =>
+    coreApi.get<CrmContratosDocumentacionPage>(
+      `/crm/contratos/documentacion${qs({
+        busqueda: busqueda.trim(),
+        pagina,
+        tamano
+      })}`
+    ),
+
+  listarAnexosContrato: (
+    idContrato: number
+  ): Promise<CrmAnexosContratoResponse> =>
+    coreApi.get<CrmAnexosContratoResponse>(
+      `/crm/contratos/${idContrato}/anexos`
+    ),
+
+  subirAnexoContrato: async (
+    idContrato: number,
+    tipoAnexo: CrmTipoAnexoContrato,
+    archivo: File
+  ): Promise<CrmAnexoRegistrado> => {
+
+    const maxBytes = 10 * 1024 * 1024;
+
+    if (!Number.isSafeInteger(idContrato) || idContrato <= 0) {
+      throw new Error('El contrato seleccionado no es válido.');
+    }
+
+    if (
+      tipoAnexo !== 'PLANO_LOTE' &&
+      tipoAnexo !== 'MEMORIA_DESCRIPTIVA'
+    ) {
+      throw new Error('Tipo de anexo no permitido.');
+    }
+
+    if (
+      archivo.type !== 'application/pdf' ||
+      !/\.pdf$/i.test(archivo.name)
+    ) {
+      throw new Error('Solo se permiten archivos PDF.');
+    }
+
+    if (
+      archivo.name.length < 5 ||
+      archivo.name.length > 255 ||
+      /[/\\\x00-\x1f\x7f]/.test(archivo.name)
+    ) {
+      throw new Error('El nombre del archivo PDF no es válido.');
+    }
+
+    if (archivo.size <= 0 || archivo.size > maxBytes) {
+      throw new Error('El PDF debe tener un tamaño máximo de 10 MB.');
+    }
+
+    const cabecera = await archivo.slice(0, 5).text();
+
+    if (cabecera !== '%PDF-') {
+      throw new Error('El archivo no tiene una cabecera PDF válida.');
+    }
+
+    const carga = await coreApi.post<CrmContractUpload>(
+      `/crm/contratos/${idContrato}/anexos/preparar-carga`,
+      { tipoAnexo }
+    );
+
+    const prefijo = `anexos/${idContrato}/${tipoAnexo}/`;
+    const patronUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$/;
+
+    if (
+      carga.bucket !== 'contratos-firmados-private' ||
+      carga.tipoMime !== 'application/pdf' ||
+      carga.maxBytes !== maxBytes ||
+      !carga.claveArchivo.startsWith(prefijo) ||
+      !patronUuid.test(carga.claveArchivo.slice(prefijo.length))
+    ) {
+      throw new Error('La configuración de carga del anexo no es válida.');
+    }
+
+    const url = new URL(carga.urlCarga);
+
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname.endsWith('.supabase.co') ||
+      url.pathname !==
+      `/storage/v1/object/upload/sign/${carga.bucket}/${carga.claveArchivo}`
+    ) {
+      throw new Error('La URL firmada de carga no es válida.');
+    }
+
+    const token = url.searchParams.get('token');
+
+    if (!token) {
+      throw new Error('No se recibió un token válido de carga.');
+    }
+
+    const { error } = await supabase.storage
+      .from(carga.bucket)
+      .uploadToSignedUrl(
+        carga.claveArchivo,
+        token,
+        archivo,
+        {
+          contentType: 'application/pdf',
+          upsert: false
+        }
+      );
+
+    if (error) {
+      throw new Error(
+        `No se pudo subir el anexo: ${error.message}`
+      );
+    }
+
+    try {
+      const registro = await coreApi.post<CrmAnexoRegistrado>(
+        `/crm/contratos/${idContrato}/anexos`,
+        {
+          tipoAnexo,
+          claveArchivo: carga.claveArchivo,
+          nombreOriginal: archivo.name
+        }
+      );
+
+      if (!registro.success) {
+        throw new Error(
+          registro.mensaje || 'No se confirmó el registro.'
+        );
+      }
+
+      return registro;
+
+    } catch (error) {
+      const motivo =
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido.';
+
+      throw new Error(
+        'El PDF se subió a Storage, pero no se confirmó ' +
+        `su registro en el contrato: ${motivo}`
+      );
+    }
+  },
+
+  prepararLecturaAnexoContrato: async (
+    idContrato: number,
+    idAnexo: number
+  ): Promise<CrmEnlaceLecturaAnexo> => {
+
+    if (
+      !Number.isSafeInteger(idContrato) ||
+      idContrato <= 0 ||
+      !Number.isSafeInteger(idAnexo) ||
+      idAnexo <= 0
+    ) {
+      throw new Error(
+        'Los identificadores del contrato y anexo no son válidos.'
+      );
+    }
+
+    const resultado =
+      await coreApi.post<CrmEnlaceLecturaAnexo>(
+        `/crm/contratos/${idContrato}/anexos/${idAnexo}/preparar-lectura`
+      );
+
+    if (
+      resultado.idContrato !== idContrato ||
+      resultado.idAnexo !== idAnexo ||
+      !resultado.urlLectura
+    ) {
+      throw new Error(
+        'La respuesta de lectura del anexo no es válida.'
+      );
+    }
+
+    let url: URL;
+
+    try {
+      url = new URL(resultado.urlLectura);
+    } catch {
+      throw new Error('El enlace privado recibido no es válido.');
+    }
+
+    const prefijo =
+      '/storage/v1/object/sign/contratos-firmados-private/anexos/';
+
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname.endsWith('.supabase.co') ||
+      url.username !== '' ||
+      url.password !== '' ||
+      url.port !== '' ||
+      !url.pathname.startsWith(prefijo) ||
+      !url.searchParams.has('token') ||
+      url.hash !== ''
+    ) {
+      throw new Error(
+        'El enlace de lectura no corresponde al Storage privado.'
+      );
+    }
+
+    return resultado;
+  },
+
   listarContratosPendientes: (
     busqueda = '',
     pagina = 1,

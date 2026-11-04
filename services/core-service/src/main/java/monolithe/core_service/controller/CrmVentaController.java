@@ -278,6 +278,34 @@ public class CrmVentaController {
                 return resultado;
         }
 
+        @PostMapping("/contratos/{idContrato}/anexos")
+        @PreAuthorize("hasAuthority('sales.edit')")
+        public JsonNode registrarAnexoContrato(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idContrato,
+                        @Valid @RequestBody RegistrarAnexoContratoRequest request) {
+
+                return storageService.registrarAnexoVerificado(
+                                obtenerActor(jwt),
+                                idContrato,
+                                request.tipoAnexo(),
+                                request.claveArchivo(),
+                                request.nombreOriginal());
+        }
+
+        @PostMapping("/contratos/{idContrato}/anexos/preparar-carga")
+        @PreAuthorize("hasAuthority('sales.edit')")
+        public CrmContratoStorageService.EnlaceCargaPdf prepararCargaAnexoContrato(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idContrato,
+                        @Valid @RequestBody PrepararCargaAnexoRequest request) {
+
+                return storageService.prepararCargaAnexo(
+                                obtenerActor(jwt),
+                                idContrato,
+                                request.tipoAnexo());
+        }
+
         @PostMapping("/contratos/{idContrato}/evidencias/preparar-carga")
         @PreAuthorize("hasAuthority('sales.edit')")
         public CrmContratoStorageService.EnlaceCargaPdf prepararCargaContrato(
@@ -361,6 +389,32 @@ public class CrmVentaController {
                                 "fallidos", fallidos);
         }
 
+        @GetMapping("/contratos/{idContrato}/anexos")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public JsonNode listarAnexosContrato(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idContrato) {
+
+                return service.listarAnexosContrato(
+                                obtenerActor(jwt),
+                                idContrato);
+        }
+
+        @GetMapping("/contratos/documentacion")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public JsonNode listarContratosDocumentacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(required = false) String busqueda,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "20") Integer tamano) {
+
+                return service.listarContratosDocumentacion(
+                                obtenerActor(jwt),
+                                busqueda,
+                                pagina,
+                                tamano);
+        }
+
         @GetMapping("/contratos/pendientes")
         @PreAuthorize("hasAuthority('sales.view')")
         public JsonNode listarContratosPendientes(
@@ -389,6 +443,23 @@ public class CrmVentaController {
                                 request);
         }
 
+        @PostMapping("/contratos/{idContrato}/anexos/{idAnexo}/preparar-lectura")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<CrmContratoStorageService.EnlaceLecturaAnexo> prepararLecturaAnexoContrato(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idContrato,
+                        @PathVariable Long idAnexo) {
+
+                var enlace = storageService.prepararLecturaAnexo(
+                                obtenerActor(jwt),
+                                idContrato,
+                                idAnexo);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
         @PostMapping("/contratos/{idContrato}/evidencias/{idContratoArchivo}/preparar-lectura")
         @PreAuthorize("hasAuthority('sales.approve')")
         public ResponseEntity<CrmContratoStorageService.EnlaceLecturaPdf> prepararLecturaContrato(
@@ -410,6 +481,19 @@ public class CrmVentaController {
                         @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive Long idCuentaFinanciera,
 
                         @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive Long idCategoria) {
+        }
+
+        public record PrepararCargaAnexoRequest(
+                        @jakarta.validation.constraints.NotBlank String tipoAnexo) {
+        }
+
+        public record RegistrarAnexoContratoRequest(
+
+                        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "PLANO_LOTE|MEMORIA_DESCRIPTIVA") String tipoAnexo,
+
+                        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 512) String claveArchivo,
+
+                        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 255) String nombreOriginal) {
         }
 
         private static Long obtenerActor(Jwt jwt) {
