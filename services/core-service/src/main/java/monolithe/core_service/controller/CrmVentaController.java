@@ -138,6 +138,23 @@ public class CrmVentaController {
                                 request);
         }
 
+        @GetMapping("/operaciones")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public JsonNode listarOperaciones(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(required = false) String tipo,
+                        @RequestParam(required = false) String busqueda,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "20") Integer tamano) {
+
+                return service.listarOperaciones(
+                                obtenerActor(jwt),
+                                tipo,
+                                busqueda,
+                                pagina,
+                                tamano);
+        }
+
         @PostMapping("/ventas/{idVenta}/cancelar")
         @PreAuthorize("hasAuthority('sales.reject')")
         public JsonNode cancelarVentaPendiente(

@@ -20,8 +20,7 @@ import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 
-// Envio real habilitado tras validacion del flujo seguro con comprobante de pago S/ 500.
-const SEPARACION_ENVIO_DESHABILITADO = true;
+const SEPARACION_ENVIO_DESHABILITADO = false;
 
 export function Sales() {
   const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
@@ -52,6 +51,7 @@ export function Sales() {
   const [formOperationNumber, setFormOperationNumber] = useState('');
   const [voucherFile, setVoucherFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const registroSeparacionEnCursoRef = React.useRef(false);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
 
@@ -155,20 +155,68 @@ export function Sales() {
     setIsModalOpen(true);
   };
 
+  const cerrarModalOperacion = () => {
+    if (registroSeparacionEnCursoRef.current) {
+      return;
+    }
+
+    setIsModalOpen(false);
+  };
+
   const handleSelectLot = (lotIdStr: string) => {
     setFormLotId(lotIdStr);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  useEffect(() => {
+    setVoucherFile(null);
+  }, [
+    selectedProspectId,
+    formProjectId,
+    formStageId,
+    formLotId
+  ]);
+
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0] ?? null;
+
+    // Permite volver a seleccionar el mismo archivo.
+    e.target.value = '';
+
+    // Evita conservar un comprobante anterior.
+    setVoucherFile(null);
+
     if (!file) return;
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+    const allowed = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp'
+    ];
     if (!allowed.includes(file.type)) {
-      toast.error('Formato no permitido', { description: 'Utilice archivos PDF, JPG, PNG o WebP.' });
+      toast.error('Formato no permitido', {
+        description: 'Utilice archivos PDF, JPG, PNG o WebP.'
+      });
+      return;
+    }
+    if (file.size <= 0) {
+      toast.error('Archivo vacío', {
+        description: 'El comprobante debe contener información.'
+      });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Archivo demasiado grande', { description: 'El comprobante no debe superar 5 MB.' });
+      toast.error('Archivo demasiado grande', {
+        description: 'El comprobante no debe superar 5 MB.'
+      });
+      return;
+    }
+    if (!file.name.trim() || file.name.length > 255) {
+      toast.error('Nombre de archivo inválido', {
+        description: 'El nombre del comprobante no debe superar 255 caracteres.'
+      });
       return;
     }
     setVoucherFile(file);
@@ -201,10 +249,20 @@ export function Sales() {
       );
       return false;
     }
-    if (formPaymentMethod !== 'EFECTIVO' && !formOperationNumber.trim()) {
-      toast.error('El número de operación es obligatorio para este método de pago.');
+
+    const requiereNumeroOperacion = [
+      'TRANSFERENCIA',
+      'DEPOSITO',
+      'YAPE_PLIN'
+    ].includes(formPaymentMethod);
+
+    if (requiereNumeroOperacion && !formOperationNumber.trim()) {
+      toast.error(
+        'El número de operación es obligatorio para el método de pago seleccionado.'
+      );
       return false;
     }
+
     if (!voucherFile) {
       toast.error('Debe adjuntar el comprobante de pago de S/ 500.');
       return false;
@@ -212,19 +270,36 @@ export function Sales() {
     return true;
   };
 
+
+
   const ejecutarRegistroSeparacion = async () => {
+    if (registroSeparacionEnCursoRef.current) {
+      return;
+    }
+
+    registroSeparacionEnCursoRef.current = true;
     setSubmitting(true);
+
+    let comprobanteCargado = false;
+
     try {
-      if (!voucherFile) throw new Error('Comprobante requerido.');
+      if (!voucherFile) {
+        throw new Error('Comprobante requerido.');
+      }
+
       const prospectId = Number(selectedProspectId);
       const lotIdNum = Number(formLotId);
 
+      // 1. Subir comprobante al Storage privado.
       const carga = await crmBackend.subirComprobanteSeparacion(
         prospectId,
         lotIdNum,
         voucherFile
       );
 
+      comprobanteCargado = true;
+
+      // 2. Registrar la separación mediante Core Service.
       const res = await crmBackend.registrarSeparacion({
         idProspecto: prospectId,
         idLote: lotIdNum,
@@ -239,23 +314,50 @@ export function Sales() {
       });
 
       const vencimiento = res.fecha_vencimiento
-        ? new Date(res.fecha_vencimiento).toLocaleDateString('es-PE')
-        : '7 días';
+        ? new Date(res.fecha_vencimiento).toLocaleDateString(
+          'es-PE',
+          { timeZone: 'America/Lima' }
+        )
+        : 'Fecha pendiente de confirmar';
 
       toast.success('Separación registrada exitosamente', {
-        description: `Código: ${res.codigo_reserva || res.id_reserva}. Monto: S/ 500.00 PEN. Vence: ${vencimiento}. Comprobante pendiente de auditoría.`
+        description:
+          `Código: ${res.codigo_reserva || res.id_reserva}. ` +
+          `Monto: S/ 500.00 PEN. ` +
+          `Vence: ${vencimiento}. ` +
+          'Comprobante pendiente de revisión por Finanzas.'
       });
 
       setIsModalOpen(false);
       await fetchSalesData();
+
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al registrar separación.';
-      toast.error('Error al registrar separación', { description: msg });
+      const mensaje = err instanceof Error
+        ? err.message
+        : 'Error inesperado durante la operación.';
+
+      if (comprobanteCargado) {
+        toast.error('No se pudo confirmar la separación', {
+          description:
+            'El comprobante fue cargado, pero el registro ' +
+            'comercial no pudo confirmarse. ' +
+            'Verifica las operaciones existentes antes ' +
+            'de intentar nuevamente. Detalle: ' + mensaje,
+          duration: 10000
+        });
+      } else {
+        toast.error('No se confirmó la carga del comprobante', {
+          description: mensaje,
+          duration: 8000
+        });
+      }
+
     } finally {
+      registroSeparacionEnCursoRef.current = false;
       setSubmitting(false);
     }
   };
-
+  
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validarFormularioSeparacion()) return;
@@ -603,12 +705,16 @@ export function Sales() {
       {/* Modal Operación Inmobiliaria: Separación o Venta */}
       <Modal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={cerrarModalOperacion}
         title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
         description="Selecciona prospecto, lote y condiciones comerciales para registrar en Supabase."
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+            <Button
+              variant="secondary"
+              disabled={submitting}
+              onClick={cerrarModalOperacion}
+            >
               Cancelar
             </Button>
             <Button
@@ -858,7 +964,7 @@ export function Sales() {
                   {formPaymentMethod !== 'EFECTIVO' ? (
                     <div>
                       <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                        N° de Operación *
+                        N° de Operación {formPaymentMethod === 'OTRO' ? '(Opcional)' : '*'}
                       </label>
                       <Input
                         type="text"
@@ -866,11 +972,13 @@ export function Sales() {
                         value={formOperationNumber}
                         onChange={(e) => setFormOperationNumber(e.target.value)}
                       />
-                      {!formOperationNumber.trim() && formTouched && (
-                        <p className="mt-1 text-[11px] font-medium text-rose-600">
-                          Número de operación obligatorio.
-                        </p>
-                      )}
+                      {formPaymentMethod !== 'OTRO' &&
+                        !formOperationNumber.trim() &&
+                        formTouched && (
+                          <p className="mt-1 text-[11px] font-medium text-rose-600">
+                            Número de operación obligatorio.
+                          </p>
+                        )}
                     </div>
                   ) : (
                     <div>
