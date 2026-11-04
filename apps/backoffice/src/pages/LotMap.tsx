@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   LayersIcon,
@@ -17,7 +17,7 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/Feedback';
 
 import { useAuth } from '../contexts/AuthContext';
-import { coreService } from '../services/coreService';
+import { coreService, type LotePrecioProyectoItem } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
 
 import { area as fmtArea, number } from '../utils/format';
@@ -366,6 +366,7 @@ export function LotMap() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
+  const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
 
   const [query, setQuery] = useState('');
   const [activeStatuses, setActiveStatuses] = useState<string[]>(
@@ -399,46 +400,83 @@ export function LotMap() {
     };
   }, []);
 
-  // Al cambiar de proyecto, cargar lotes y plano en paralelo
-  useEffect(() => {
-    if (!selectedProjectId) {
+  const handleLoadLotsResult = (
+    result: PromiseSettledResult<LoteResponse[]>
+  ): void => {
+    if (result.status === 'fulfilled') {
+      setLots(result.value);
+    } else {
       setLots([]);
-      setPlanDetail(null);
-      return;
+      const err = result.reason;
+      const msg = err instanceof ApiError ? err.message : 'Error al cargar lotes del proyecto';
+      toast.error(msg);
     }
+  };
 
+  const handleLoadPricesResult = (
+    result: PromiseSettledResult<LotePrecioProyectoItem[]>
+  ): void => {
+    if (result.status === 'fulfilled') {
+      const map = new Map<number, number>();
+      result.value.forEach((item) => map.set(item.idLote, item.precio));
+      setPricesMap(map);
+    } else {
+      setPricesMap(new Map());
+    }
+  };
+
+  const loadProjectData = useCallback((projectId: number, preserveSelection = false) => {
     let isMounted = true;
     setLoadingPlan(true);
-    setSelectedLotId(null);
+    if (!preserveSelection) {
+      setSelectedLotId(null);
+    }
 
     Promise.allSettled([
-      coreService.searchLots({ idProyecto: selectedProjectId, activo: true }),
-      coreService.getCurrentPlanDetail(selectedProjectId)
-    ]).then(([lotsResult, planResult]) => {
+      coreService.searchLots({ idProyecto: projectId, activo: true }),
+      coreService.getCurrentPlanDetail(projectId),
+      coreService.getProjectLotPrices(projectId)
+    ]).then(([lotsResult, planResult, pricesResult]) => {
       if (!isMounted) return;
-
-      if (lotsResult.status === 'fulfilled') {
-        setLots(lotsResult.value);
-      } else {
-        setLots([]);
-        const err = lotsResult.reason;
-        const msg = err instanceof ApiError ? err.message : 'Error al cargar lotes del proyecto';
-        toast.error(msg);
-      }
-
+      handleLoadLotsResult(lotsResult);
       if (planResult.status === 'fulfilled') {
         setPlanDetail(planResult.value);
       } else {
         setPlanDetail(null);
       }
-
+      handleLoadPricesResult(pricesResult);
       setLoadingPlan(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [selectedProjectId]);
+  }, []);
+
+  // Al cambiar de proyecto, cargar datos completos
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setLots([]);
+      setPlanDetail(null);
+      setPricesMap(new Map());
+      return;
+    }
+    const cleanup = loadProjectData(selectedProjectId, false);
+    return cleanup;
+  }, [selectedProjectId, loadProjectData]);
+
+  // Refrescar al enfocar la ventana preservando la seleccion del lote
+  useEffect(() => {
+    const handleFocus = () => {
+      if (selectedProjectId) {
+        loadProjectData(selectedProjectId, true);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [selectedProjectId, loadProjectData]);
 
   const currentProject = useMemo(() => {
     return projects.find((p) => p.idProyecto === selectedProjectId) ?? null;
@@ -1207,6 +1245,15 @@ export function LotMap() {
                 <dt className="text-[12px] text-brand-400">Área</dt>
                 <dd className="text-right text-[13px] font-medium text-brand-800">
                   {selectedLot.areaM2 != null ? fmtArea(selectedLot.areaM2) : '-'}
+                </dd>
+              </div>
+
+              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
+                <dt className="text-[12px] text-brand-400">Precio</dt>
+                <dd className="text-right text-[13px] font-medium text-brand-800">
+                  {pricesMap.has(selectedLot.idLote)
+                    ? new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(pricesMap.get(selectedLot.idLote)!)
+                    : <span className="text-brand-400 text-xs">Sin precio</span>}
                 </dd>
               </div>
 

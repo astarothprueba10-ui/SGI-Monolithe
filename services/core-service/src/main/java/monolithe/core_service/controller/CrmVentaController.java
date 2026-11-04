@@ -195,15 +195,21 @@ public class CrmVentaController {
                                                 service.marcarPdfReemplazoEliminado(
                                                                 actor, idContrato, idReemplazo);
 
-                                        } catch (Exception ex) {
+                                        }
+
+                                        catch (Exception ex) {
                                                 log.warn(
                                                                 "Limpieza documental pendiente. Contrato {}, reemplazo {}",
                                                                 idContrato, idReemplazo);
                                         }
+
                                 }
+
                         }
 
-                } catch (Exception ex) {
+                }
+
+                catch (Exception ex) {
                         log.error(
                                         "Error consultando limpieza documental del contrato {}",
                                         idContrato,
@@ -237,7 +243,9 @@ public class CrmVentaController {
                 try {
                         pendientes = service.listarPdfReemplazosPendientes(
                                         actor, idContrato);
-                } catch (Exception ex) {
+                }
+
+                catch (Exception ex) {
                         log.error(
                                         "Error consultando reemplazos del contrato {}",
                                         idContrato, ex);
@@ -278,12 +286,15 @@ public class CrmVentaController {
 
                                 eliminados++;
 
-                        } catch (Exception ex) {
+                        }
+
+                        catch (Exception ex) {
                                 fallidos++;
                                 log.error(
                                                 "Error eliminando PDF anterior. Contrato {}, reemplazo {}",
                                                 idContrato, idReemplazo, ex);
                         }
+
                 }
 
                 return java.util.Map.of(
@@ -353,10 +364,14 @@ public class CrmVentaController {
 
                         return idActor;
 
-                } catch (NumberFormatException ex) {
+                }
+
+                catch (NumberFormatException ex) {
                         throw new ResponseStatusException(
                                         HttpStatus.UNAUTHORIZED,
                                         "Identidad de usuario invalida.");
                 }
+
         }
+
 }

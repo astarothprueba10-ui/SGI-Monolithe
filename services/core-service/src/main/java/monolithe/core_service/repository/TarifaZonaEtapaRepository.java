@@ -10,31 +10,32 @@ import java.util.Optional;
 
 public interface TarifaZonaEtapaRepository extends JpaRepository<TarifaZonaEtapa, Long> {
 
-    List<TarifaZonaEtapa> findByProyecto_IdProyectoOrderByFechaDesdeDesc(
-            Long idProyecto
-    );
+        List<TarifaZonaEtapa> findByProyecto_IdProyectoOrderByFechaDesdeDesc(
+                        Long idProyecto);
 
-    List<TarifaZonaEtapa> findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(
-            Long idProyecto
-    );
+        List<TarifaZonaEtapa> findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(
+                        Long idProyecto);
 
-    @Query("""
-        SELECT t
-        FROM TarifaZonaEtapa t
-        WHERE t.proyecto.idProyecto = :idProyecto
-          AND t.zona.idZona = :idZona
-          AND t.etapaComercial.idEtapaComercial = :idEtapaComercial
-          AND t.moneda.idMoneda = :idMoneda
-          AND t.tipoTarifa.idTipoTarifa = :idTipoTarifa
-          AND t.activo = true
-          AND t.fechaHasta IS NULL
-    """)
-    Optional<TarifaZonaEtapa> buscarVigente(
-            @Param("idProyecto") Long idProyecto,
-            @Param("idZona") Long idZona,
-            @Param("idEtapaComercial") Long idEtapaComercial,
-            @Param("idMoneda") Integer idMoneda,
-            @Param("idTipoTarifa") Integer idTipoTarifa
-    );
+        @Query("""
+                            SELECT t
+                            FROM TarifaZonaEtapa t
+                            WHERE t.proyecto.idProyecto = :idProyecto
+                              AND t.zona.idZona = :idZona
+                              AND t.etapaComercial.idEtapaComercial = :idEtapaComercial
+                              AND t.moneda.idMoneda = :idMoneda
+                              AND t.tipoTarifa.idTipoTarifa = :idTipoTarifa
+                              AND t.activo = true
+                              AND t.fechaDesde <= CURRENT_TIMESTAMP
+                              AND (
+                                  t.fechaHasta IS NULL
+                                  OR t.fechaHasta > CURRENT_TIMESTAMP
+                              )
+                        """)
+
+        Optional<TarifaZonaEtapa> buscarVigente(
+                        @Param("idProyecto") Long idProyecto,
+                        @Param("idZona") Long idZona,
+                        @Param("idEtapaComercial") Long idEtapaComercial,
+                        @Param("idMoneda") Integer idMoneda,
+                        @Param("idTipoTarifa") Integer idTipoTarifa);
 }
-

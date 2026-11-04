@@ -92,6 +92,64 @@ export interface PersonaIdentificadaResponse {
   correoVerificado: boolean;
 }
 
+
+export interface LotePrecioVigente {
+  idLotePrecio: number;
+  idLote: number;
+  codigoLote: string;
+  codigoMoneda: string;
+  precio: number;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  activo: boolean;
+}
+
+
+
+export interface LotePrecioProyectoItem {
+  idLote: number;
+  precio: number;
+  moneda: string;
+  codigoMoneda: string;
+  idLotePrecio: number;
+}
+
+export interface ActualizarPrecioManualPayload {
+  monto: number;
+  observaciones?: string;
+}
+
+export interface EtapaComercialResponse {
+  idEtapaComercial: number;
+  idProyecto: number;
+  codigo: string;
+  nombre: string;
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  activo: boolean;
+}
+
+export interface TarifaZonaEtapaResponse {
+  idTarifa: number;
+  idProyecto: number;
+  idZona: number;
+  idEtapaComercial: number;
+  codigoMoneda: string;
+  codigoTipoTarifa: string;
+  nombreTipoTarifa: string;
+  valor: number;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  activo: boolean;
+}
+
+export interface CrearLoteConPrecioRequest {
+  lote: LoteRequest;
+  precio: {
+    monto: number;
+  } | null;
+}
+
 export const coreService = {
   // RECURSOS HUMANOS - TRABAJADORES
   getWorkers(): Promise<TrabajadorResponse[]> {
@@ -358,12 +416,67 @@ export const coreService = {
   getLotById(idLote: number): Promise<LoteResponse> {
     return coreApi.get<LoteResponse>(`/lotes/${idLote}`);
   },
+
+  getCurrentLotPrice(
+    idLote: number,
+    moneda = 'PEN'
+  ): Promise<LotePrecioVigente> {
+    return coreApi.get<LotePrecioVigente>(
+      `/lotes-precios/lote/${idLote}/vigente?moneda=${encodeURIComponent(moneda)}`
+    );
+  },
+
+  getProjectLotPrices(
+    idProyecto: number,
+    moneda = 'PEN'
+  ): Promise<LotePrecioProyectoItem[]> {
+    return coreApi.get<LotePrecioProyectoItem[]>(
+      `/lotes-precios/proyecto/${idProyecto}/vigentes?moneda=${encodeURIComponent(moneda)}`
+    );
+  },
+
+  updateLotManualPrice(
+    idLote: number,
+    payload: ActualizarPrecioManualPayload
+  ): Promise<LotePrecioVigente> {
+    return coreApi.put<LotePrecioVigente>(
+      `/lotes-precios/lote/${idLote}/manual`,
+      { ...payload }
+    );
+  },
+
   searchLots(filters: LoteFiltroRequest = {}): Promise<LoteResponse[]> {
     return coreApi.get<LoteResponse[]>(buildLotSearchParams(filters));
   },
   createLot(data: LoteRequest): Promise<LoteResponse> {
     return coreApi.post<LoteResponse>('/lotes', data);
   },
+
+  createLotWithPrice(
+    data: CrearLoteConPrecioRequest
+  ): Promise<LoteResponse> {
+    return coreApi.post<LoteResponse>(
+      '/lotes/con-precio',
+      { ...data }
+    );
+  },
+
+  getActiveCommercialStagesByProject(
+    idProyecto: number
+  ): Promise<EtapaComercialResponse[]> {
+    return coreApi.get<EtapaComercialResponse[]>(
+      `/etapas-comerciales/proyecto/${idProyecto}/activas`
+    );
+  },
+
+  getActiveTariffsByProject(
+    idProyecto: number
+  ): Promise<TarifaZonaEtapaResponse[]> {
+    return coreApi.get<TarifaZonaEtapaResponse[]>(
+      `/tarifas/proyecto/${idProyecto}/activas`
+    );
+  },
+
   updateLot(idLote: number, data: LoteRequest): Promise<LoteResponse> {
     return coreApi.put<LoteResponse>(`/lotes/${idLote}`, data);
   },

@@ -13,13 +13,15 @@ import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
-import { lotsService } from '../services/lotsService';
 import { crmBackend, type CrmProspect } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
-import type { Sale, Lot } from '../types';
+import type { Sale } from '../types';
+import { coreService, type LotePrecioVigente } from '../services/coreService';
+import { ApiError } from '../lib/apiClient';
+import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 
 // Envio real habilitado tras validacion del flujo seguro con comprobante de pago S/ 500.
-const SEPARACION_ENVIO_DESHABILITADO = false;
+const SEPARACION_ENVIO_DESHABILITADO = true;
 
 export function Sales() {
   const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
@@ -31,10 +33,20 @@ export function Sales() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [opType, setOpType] = useState<'Separacion' | 'Venta'>('Separacion');
-  const [availableLots, setAvailableLots] = useState<Lot[]>([]);
-  const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
+  const [availableLots, setAvailableLots] = useState<LoteResponse[]>([]);
+  const [loadingLots, setLoadingLots] = useState(false); const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
   const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
+  const [availableProjects, setAvailableProjects] = useState<ProyectoResponse[]>([]);
+  const [formProjectId, setFormProjectId] = useState('');
+  const [availableStages, setAvailableStages] = useState<EtapaResponse[]>([]);
+  const [formStageId, setFormStageId] = useState('');
+  const [loadingStages, setLoadingStages] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [formLotId, setFormLotId] = useState('');
+  const [precioLote, setPrecioLote] = useState<LotePrecioVigente | null>(null);
+  const [estadoPrecio, setEstadoPrecio] = useState<
+    'inicial' | 'cargando' | 'disponible' | 'sin_precio' | 'error'
+  >('inicial');
   const [formObservations, setFormObservations] = useState('');
   const [formPaymentMethod, setFormPaymentMethod] = useState<'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO'>('TRANSFERENCIA');
   const [formOperationNumber, setFormOperationNumber] = useState('');
@@ -57,23 +69,75 @@ export function Sales() {
     }
   };
 
+
   const loadFormData = async () => {
     setLoadingFormData(true);
+
+    setSelectedProspectId('');
+    setAvailableProjects([]);
+    setFormProjectId('');
+    setAvailableLots([]);
+    setFormLotId('');
+
     try {
-      const [lots, prospects] = await Promise.all([
-        lotsService.getLots(),
-        crmBackend.prospectos()
-      ]);
-      setAvailableLots(lots.filter((l) => l.status === 'Disponible'));
-      setProspectsList(prospects ?? []);
-      if (prospects && prospects.length > 0) {
-        setSelectedProspectId(prospects[0].id_prospecto);
-      }
+      const prospects = await crmBackend.prospectos();
+
+      const elegibles = (prospects ?? []).filter((p) =>
+        ['INTERESADO', 'NEGOCIACION'].includes(
+          p.estado_codigo?.toUpperCase() ?? ''
+        )
+      );
+
+      setProspectsList(elegibles);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al cargar datos.';
-      toast.error('Error al cargar datos del formulario', { description: msg });
+      const msg =
+        err instanceof Error ? err.message : 'Error al cargar prospectos.';
+
+      toast.error('Error al consultar la cartera', {
+        description: msg
+      });
+      setProspectsList([]);
     } finally {
       setLoadingFormData(false);
+    }
+  };
+
+
+  const handleSelectProspect = async (id: number | '') => {
+    setSelectedProspectId(id);
+    setFormProjectId('');
+    setAvailableProjects([]);
+    setAvailableLots([]);
+    setFormLotId('');
+
+    if (id === '') return;
+
+    setLoadingProjects(true);
+
+    try {
+      const [detail, projects] = await Promise.all([
+        crmBackend.detalle(id),
+        coreService.getActiveProjects()
+      ]);
+
+      const intereses = new Set(
+        (detail.intereses ?? []).map((i) => i.idProyecto)
+      );
+
+      setAvailableProjects(
+        projects.filter(
+          (p) => p.activo && intereses.has(p.idProyecto)
+        )
+      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al consultar proyectos.';
+
+      toast.error('No se pudieron cargar los proyectos de interés', {
+        description: msg
+      });
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -129,6 +193,12 @@ export function Sales() {
     }
     if (!formLotId) {
       toast.error('Debe seleccionar un lote disponible.');
+      return false;
+    }
+    if (estadoPrecio !== 'disponible' || !precioLote) {
+      toast.error(
+        'No se puede continuar sin un precio oficial vigente.'
+      );
       return false;
     }
     if (formPaymentMethod !== 'EFECTIVO' && !formOperationNumber.trim()) {
@@ -220,6 +290,166 @@ export function Sales() {
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
+
+  useEffect(() => {
+    let vigente = true;
+
+    setAvailableStages([]);
+
+    if (!formProjectId) {
+      setLoadingStages(false);
+      return;
+    }
+
+    setLoadingStages(true);
+
+    void coreService
+      .getActiveStagesByProject(Number(formProjectId))
+      .then((etapas) => {
+        if (!vigente) return;
+
+        setAvailableStages(
+          (etapas ?? []).filter(
+            (etapa) =>
+              etapa.activo &&
+              etapa.idProyecto === Number(formProjectId)
+          )
+        );
+      })
+      .catch((err: unknown) => {
+        if (!vigente) return;
+
+        toast.error('No se pudieron cargar las etapas', {
+          description:
+            err instanceof Error ? err.message : 'Error de consulta.'
+        });
+      })
+      .finally(() => {
+        if (vigente) setLoadingStages(false);
+      });
+
+    return () => {
+      vigente = false;
+    };
+  }, [formProjectId]);
+
+
+  useEffect(() => {
+    let vigente = true;
+
+    setAvailableLots([]);
+    setFormLotId('');
+
+    if (!formProjectId || !formStageId) {
+      setLoadingLots(false);
+      return;
+    }
+
+    const idProyecto = Number(formProjectId);
+    const idEtapa = Number(formStageId);
+
+    setLoadingLots(true);
+
+    void coreService
+      .searchLots({
+        idProyecto,
+        idEtapa,
+        activo: true
+      })
+      .then((lotes) => {
+        if (!vigente) return;
+
+        const disponibles = (lotes ?? []).filter(
+          (lote) =>
+            lote.activo === true &&
+            lote.idProyecto === idProyecto &&
+            lote.idEtapa === idEtapa &&
+            lote.codigoEstadoLote?.toUpperCase() === 'DISPONIBLE'
+        );
+
+        setAvailableLots(disponibles);
+      })
+      .catch((err: unknown) => {
+        if (!vigente) return;
+
+        setAvailableLots([]);
+
+        toast.error('No se pudieron cargar los lotes', {
+          description:
+            err instanceof Error
+              ? err.message
+              : 'Error al consultar los lotes.'
+        });
+      })
+      .finally(() => {
+        if (vigente) setLoadingLots(false);
+      });
+
+    return () => {
+      vigente = false;
+    };
+  }, [formProjectId, formStageId]);
+
+
+  useEffect(() => {
+    let vigente = true;
+
+    setPrecioLote(null);
+
+    if (!formLotId) {
+      setEstadoPrecio('inicial');
+      return;
+    }
+
+    const idLote = Number(formLotId);
+
+    setEstadoPrecio('cargando');
+
+    void coreService
+      .getCurrentLotPrice(idLote, 'PEN')
+      .then((resultado) => {
+        if (!vigente) return;
+
+        const precio = Number(resultado.precio);
+
+        if (
+          resultado.idLote !== idLote ||
+          resultado.codigoMoneda !== 'PEN' ||
+          resultado.activo !== true ||
+          !Number.isFinite(precio) ||
+          precio <= 0
+        ) {
+          setEstadoPrecio('error');
+          return;
+        }
+
+        setPrecioLote(resultado);
+        setEstadoPrecio('disponible');
+      })
+      .catch((err: unknown) => {
+        if (!vigente) return;
+
+        setPrecioLote(null);
+
+        if (err instanceof ApiError && err.status === 404) {
+          setEstadoPrecio('sin_precio');
+        } else {
+          setEstadoPrecio('error');
+
+          toast.error('No se pudo consultar el precio del lote', {
+            description:
+              err instanceof Error
+                ? err.message
+                : 'Error de comunicación con Core.'
+          });
+        }
+      });
+
+    return () => {
+      vigente = false;
+    };
+  }, [formLotId]);
+
 
   return (
     <div>
@@ -435,36 +665,172 @@ export function Sales() {
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
-                onChange={(e) => setSelectedProspectId(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) =>
+                  void handleSelectProspect(
+                    e.target.value ? Number(e.target.value) : ''
+                  )
+                }
               >
-                <option value="">Seleccione un prospecto del CRM…</option>
-                {prospectsList.map((p) => (
-                  <option key={p.id_prospecto} value={p.id_prospecto}>
-                    {p.nombre_completo} ({p.codigo}) - {p.estado_nombre || p.estado_codigo}
+                <option value="">Seleccione un prospecto del CRM...</option>
+                {prospectsList.map((prospect) => (
+                  <option key={prospect.id_prospecto} value={prospect.id_prospecto}>
+                    {prospect.nombre_completo} ({prospect.codigo}) - {prospect.estado_nombre}
                   </option>
                 ))}
               </Select>
-              {!selectedProspectId && formTouched && (
-                <p className="mt-1 text-[11px] font-medium text-rose-600">
-                  Debe seleccionar un prospecto del CRM.
-                </p>
-              )}
             </div>
 
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Lote Disponible *
+                Proyecto inmobiliario *
               </label>
-              <Select value={formLotId} onChange={(e) => handleSelectLot(e.target.value)}>
-                <option value="">Seleccione un lote disponible…</option>
-                {availableLots.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.code} ({l.block}) - {l.area}m² - {currency(l.price)} [{l.status}]
+
+              <Select
+                value={formProjectId}
+                disabled={!selectedProspectId || loadingProjects}
+                onChange={(e) => {
+                  setFormProjectId(e.target.value);
+                  setFormStageId('');
+                  setAvailableStages([]);
+                  setFormLotId('');
+                  setAvailableLots([]);
+                }}
+              >
+                <option value="">
+                  {loadingProjects
+                    ? 'Cargando proyectos...'
+                    : 'Seleccione un proyecto...'}
+                </option>
+
+                {availableProjects.map((project) => (
+                  <option key={project.idProyecto} value={project.idProyecto}>
+                    {project.nombre}
                   </option>
                 ))}
               </Select>
+
+              {selectedProspectId &&
+                !loadingProjects &&
+                availableProjects.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Este potencial no tiene proyectos de interés activos.
+                  </p>
+                )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Etapa del proyecto *
+              </label>
+
+              <Select
+                value={formStageId}
+                disabled={!formProjectId || loadingStages}
+                onChange={(e) => {
+                  setFormStageId(e.target.value);
+                  setFormLotId('');
+                  setAvailableLots([]);
+                }}
+              >
+                <option value="">
+                  {loadingStages
+                    ? 'Cargando etapas...'
+                    : 'Seleccione una etapa...'}
+                </option>
+
+                {availableStages.map((etapa) => (
+                  <option key={etapa.idEtapa} value={etapa.idEtapa}>
+                    {etapa.nombre}
+                  </option>
+                ))}
+              </Select>
+
+              {formProjectId &&
+                !loadingStages &&
+                availableStages.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Este proyecto no tiene etapas activas disponibles.
+                  </p>
+                )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Lote disponible *
+              </label>
+
+              <Select
+                value={formLotId}
+                disabled={!formProjectId || !formStageId || loadingLots}
+                onChange={(e) => handleSelectLot(e.target.value)}
+              >
+                <option value="">
+                  {loadingLots
+                    ? 'Cargando lotes disponibles...'
+                    : 'Seleccione un lote disponible...'}
+                </option>
+
+                {availableLots.map((lote) => (
+                  <option key={lote.idLote} value={lote.idLote}>
+                    {lote.codigo} - {lote.nombreManzana ?? 'Manzana'} -
+                    {' '}{lote.areaM2 ?? 0} m² [Disponible]
+                  </option>
+                ))}
+              </Select>
+
+
+              {formLotId && (
+                <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
+                  <p className="text-xs font-medium text-brand-600">
+                    Precio oficial del lote
+                  </p>
+
+                  {(estadoPrecio === 'cargando' ||
+                    estadoPrecio === 'inicial') && (
+                      <p className="mt-1 text-sm text-brand-600">
+                        Consultando precio vigente...
+                      </p>
+                    )}
+
+                  {estadoPrecio === 'disponible' && precioLote && (
+                    <>
+                      <p className="mt-1 text-lg font-bold text-brand-900">
+                        {new Intl.NumberFormat('es-PE', {
+                          style: 'currency',
+                          currency: 'PEN'
+                        }).format(Number(precioLote.precio))}
+                      </p>
+
+                      <p className="mt-1 text-xs text-brand-600">
+                        Moneda: {precioLote.codigoMoneda}
+                      </p>
+                    </>
+                  )}
+
+                  {estadoPrecio === 'sin_precio' && (
+                    <p className="mt-1 text-sm font-medium text-amber-700">
+                      Precio no configurado para este lote en PEN.
+                    </p>
+                  )}
+
+                  {estadoPrecio === 'error' && (
+                    <p className="mt-1 text-sm font-medium text-rose-600">
+                      No se pudo verificar el precio. Intente nuevamente.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {formStageId &&
+                !loadingLots &&
+                availableLots.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No hay lotes disponibles en esta etapa.
+                  </p>
+                )}
+
               {!formLotId && formTouched && (
-                <p className="mt-1 text-[11px] font-medium text-rose-600">
+                <p className="mt-1 text-xs font-medium text-rose-600">
                   Debe seleccionar un lote disponible.
                 </p>
               )}

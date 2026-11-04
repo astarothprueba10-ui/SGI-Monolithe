@@ -151,7 +151,7 @@ public class CrmSeparacionStorageService {
             if (signedUrl.isBlank() || !signedUrl.startsWith("/object/sign/")) {
                 throw new IllegalStateException("Formato inesperado de URL firmada.");
             }
-            String urlCompleta = base.replace("/storage/v1", "") + signedUrl;
+            String urlCompleta = base + signedUrl;
             return new EnlaceLecturaVoucherResponse(
                     BUCKET, clave, urlCompleta, nombre, mime, EXPIRY_SECONDS);
         } catch (JacksonException | IllegalStateException ex) {
@@ -179,4 +179,3 @@ public class CrmSeparacionStorageService {
                 : storageBaseUrl + "/storage/v1";
     }
 }
-

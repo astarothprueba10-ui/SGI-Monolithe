@@ -56,7 +56,7 @@ export interface SessionUser {
 }
 
 
-export type LotStatus = 'Disponible'| 'Separado'| 'Vendido'| 'Bloqueado'| 'No disponible';
+export type LotStatus = 'Disponible' | 'Separado' | 'Vendido' | 'Bloqueado' | 'No disponible';
 export type PaymentStatus = 'Pagado' | 'Pendiente' | 'Vencido';
 export type ReviewStatus = 'En revisión' | 'Aprobado' | 'Rechazado';
 export type ActivityStatus = 'Activo' | 'Inactivo';
@@ -118,12 +118,12 @@ export interface Sale {
   document: string;
   lot: string;
   project: string;
-  modality: 'Contado' | 'Financiado' | 'Crédito bancario';
+  modality?: 'Contado' | 'Financiado' | 'Crédito bancario';
   amount: number;
   advisor: string;
   date: string;
-  contract: 'Firmado' | 'Pendiente' | 'En revisión' | 'Vigente' | 'Vencida';
-  status: ReviewStatus | 'Pagado' | 'Pendiente';
+  contract?: string;
+  status: string;
 
 }
 

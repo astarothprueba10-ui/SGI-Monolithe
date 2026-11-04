@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PlusIcon, PencilIcon, History } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
@@ -99,6 +99,7 @@ export function ProjectLotsTab({ project }: Props) {
   const [zones, setZones] = useState<ZonaResponse[]>([]);
   const [lotStatuses, setLotStatuses] = useState<EstadoLoteResponse[]>([]);
   const [lotTypes, setLotTypes] = useState<CatalogoResponse[]>([]);
+  const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
 
   // Estados de carga
   const [lotsLoading, setLotsLoading] = useState(true);
@@ -148,6 +149,20 @@ export function ProjectLotsTab({ project }: Props) {
     return () => {
       mounted = false;
     };
+  }, [project.idProyecto]);
+
+  // Cargar precios de lotes del proyecto
+  useEffect(() => {
+    let mounted = true;
+    coreService.getProjectLotPrices(project.idProyecto).then((items) => {
+      if (!mounted) return;
+      const map = new Map<number, number>();
+      items.forEach((item) => map.set(item.idLote, item.precio));
+      setPricesMap(map);
+    }).catch(() => {
+      if (mounted) setPricesMap(new Map());
+    });
+    return () => { mounted = false; };
   }, [project.idProyecto]);
 
   // Cargar manzanas cuando cambia etapa
@@ -228,6 +243,11 @@ export function ProjectLotsTab({ project }: Props) {
 
   const handleFormSuccess = async () => {
     await loadLots();
+    coreService.getProjectLotPrices(project.idProyecto).then((items) => {
+      const map = new Map<number, number>();
+      items.forEach((item) => map.set(item.idLote, item.precio));
+      setPricesMap(map);
+    }).catch(() => {});
   };
 
   return (
@@ -389,6 +409,7 @@ export function ProjectLotsTab({ project }: Props) {
                   <TH className="text-brand-900 font-bold bg-brand-50/80">Etapa</TH>
                   <TH className="text-brand-900 font-bold bg-brand-50/80">Zona</TH>
                   <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Área</TH>
+                  <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Precio</TH>
                   <TH className="text-brand-900 font-bold bg-brand-50/80">Estado</TH>
                   {(canEdit || canViewLots) && (
                     <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Acciones</TH>
@@ -419,6 +440,9 @@ export function ProjectLotsTab({ project }: Props) {
                   </TD>
                   <TD align="right" className="text-brand-900 font-medium">
                     {lot.areaM2 ? `${lot.areaM2} m²` : '—'}
+                  </TD>
+                  <TD align="right" className="text-brand-900 font-medium">
+                    {(() => { const p = pricesMap.get(lot.idLote); return p != null ? new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(p) : <span className="text-brand-400 text-xs">Sin precio</span>; })()}
                   </TD>
                   <TD>
                     <LotStatusBadge lot={lot} />

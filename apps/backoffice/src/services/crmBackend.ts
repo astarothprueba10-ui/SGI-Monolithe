@@ -300,6 +300,31 @@ export interface CrmRevisarVoucherInput {
   observaciones?: string | null;
 }
 
+
+export interface CrmOperacionItem {
+  id: number;
+  tipo: 'VENTA' | 'SEPARACION';
+  codigo: string;
+  id_lote: number;
+  lote: string;
+  proyecto: string;
+  comprador: string;
+  documento: string | null;
+  modalidad: 'CONTADO' | 'FINANCIADA' | null;
+  monto: number;
+  estado: string;
+  fecha: string;
+  fecha_vencimiento: string | null;
+  contrato: string | null;
+  estado_contrato: string | null;
+  asesor: string | null;
+}
+
+export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
+  paginas: number;
+}
+
+
 export interface CrmSaleValidationInput {
   idProspecto: number;
   idLote: number;
@@ -718,6 +743,26 @@ export const crmBackend = {
       }
     ),
 
+  listarOperaciones: (params?: {
+    tipo?: 'VENTA' | 'SEPARACION';
+    busqueda?: string;
+    pagina?: number;
+    tamano?: number;
+  }) =>
+    coreApi.get<CrmOperacionesResponse>(
+      `/crm/operaciones${qs({
+        tipo: params?.tipo,
+        busqueda: params?.busqueda,
+        pagina: params?.pagina,
+        tamano: params?.tamano
+      })}`
+    ),
+
+  prepararLecturaVoucherSeparacion: (idVoucher: number) =>
+    coreApi.get<CrmVoucherReadUrl>(
+      `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
+    ),
+
   listarVouchersSeparacion: (params?: {
     estado?: string;
     busqueda?: string;
@@ -730,15 +775,11 @@ export const crmBackend = {
       pagina: params?.pagina,
       tamano: params?.tamano
     });
+
     return coreApi.get<CrmSeparacionVouchersResponse>(
       `/crm/separaciones/vouchers${query}`
     );
   },
-
-  prepararLecturaVoucherSeparacion: (idVoucher: number) =>
-    coreApi.get<CrmVoucherReadUrl>(
-      `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
-    ),
 
   revisarVoucherSeparacion: (idVoucher: number, body: CrmRevisarVoucherInput) =>
     coreApi.put<any>(

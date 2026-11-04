@@ -57,6 +57,9 @@ public class LoteEstadoService {
                 }
 
                 String motivo = normalizarMotivo(request.motivo());
+                if ("DISPONIBLE".equals(codigoNuevoEstado)) {
+                        validarPrecioParaHabilitar(idLote);
+                }
 
                 String jsonResultado = ejecutarFuncionPostgres(
                                 idLote, idUsuario, codigoNuevoEstado, motivo);
@@ -85,9 +88,36 @@ public class LoteEstadoService {
                                 .toList();
         }
 
-        // =========================================================
         // HELPERS PRIVADOS
-        // =========================================================
+
+        private void validarPrecioParaHabilitar(Long idLote) {
+
+                Number cantidad = (Number) entityManager.createNativeQuery("""
+                                SELECT COUNT(*)
+                                FROM public.inm_lotes_precios p
+                                INNER JOIN public.cfg_monedas m
+                                    ON m.id_moneda = p.id_moneda
+                                WHERE p.id_lote = :idLote
+                                  AND p.activo = TRUE
+                                  AND p.precio > 0
+                                  AND p.fecha_desde <= NOW()
+                                  AND (
+                                      p.fecha_hasta IS NULL
+                                      OR p.fecha_hasta > NOW()
+                                  )
+                                  AND m.activo = TRUE
+                                  AND TRIM(m.codigo) = 'PEN'
+                                """)
+                                .setParameter("idLote", idLote)
+                                .getSingleResult();
+
+                if (cantidad.longValue() != 1L) {
+                        throw new ReglaNegocioException(
+                                        "No se puede habilitar el lote. " +
+                                                        "Debe tener exactamente un precio oficial " +
+                                                        "vigente en soles. Configure primero su precio.");
+                }
+        }
 
         private String ejecutarFuncionPostgres(
                         Long idLote,
