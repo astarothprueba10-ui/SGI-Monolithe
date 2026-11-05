@@ -19,6 +19,7 @@ import { SectionHeading } from '../components/ui/Primitives';
 import { contactInfo } from '../data/site';
 import { IMAGES, projects } from '../data/projects';
 import { enviarConsulta } from '../services/api';
+import { esDniPublicoValido, esCelularPublicoValido, esNombrePublicoValido, insertarTextoPublico, normalizarCampoPublico } from '../lib/publicContactPolicy';
 
 type State = 'idle' | 'loading' | 'success';
 
@@ -41,16 +42,27 @@ export function Contact() {
   const [codigoSeguimiento, setCodigoSeguimiento] = useState<string>('CW-2026-001');
 
   function update(key: keyof typeof initial, value: string) {
-    setValues((v) => ({ ...v, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: '' }));
+    setValues((v) => ({ ...v, [key]: normalizarCampoPublico(key, value, v[key]) }));
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function paste(key: keyof typeof initial, event: React.ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const input = event.currentTarget;
+    update(key, insertarTextoPublico(input.value, event.clipboardData.getData('text'), input.selectionStart, input.selectionEnd));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    if (!values.nombres.trim()) next.nombres = 'Ingresa tus nombres';
-    if (!values.apellidos.trim()) next.apellidos = 'Ingresa tus apellidos';
-    if (!/^[0-9+\s]{9,15}$/.test(values.telefono.trim())) next.telefono = 'Teléfono inválido';
+    if (!esNombrePublicoValido(values.nombres)) next.nombres = 'Ingresa tus nombres utilizando solo letras y espacios.';
+    if (!esNombrePublicoValido(values.apellidos)) next.apellidos = 'Ingresa tus apellidos utilizando solo letras y espacios.';
+    if (!esCelularPublicoValido(values.telefono)) next.telefono = 'El celular debe tener 9 dígitos y comenzar por 9.';
+    if (!esDniPublicoValido(values.dni)) next.dni = 'El DNI debe tener exactamente 8 dígitos.';
     if (!/^\S+@\S+\.\S+$/.test(values.correo.trim())) next.correo = 'Correo inválido';
     if (!values.motivo) next.motivo = 'Selecciona un motivo';
     if (!accept) next.accept = 'Debes aceptar la política de privacidad';
@@ -126,39 +138,54 @@ export function Contact() {
               }
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <Field label="Nombres" htmlFor="nombres" required error={errors.nombres}>
+                  <Field label="Nombres" htmlFor="nombres" required hint="Solo letras y espacios." error={errors.nombres}>
                     <Input
                     id="nombres"
                     value={values.nombres}
                     error={errors.nombres}
+                    aria-invalid={Boolean(errors.nombres)}
                     onChange={(e) => update('nombres', e.target.value)}
                     autoComplete="given-name" />
                   
                   </Field>
-                  <Field label="Apellidos" htmlFor="apellidos" required error={errors.apellidos}>
+                  <Field label="Apellidos" htmlFor="apellidos" required hint="Solo letras y espacios." error={errors.apellidos}>
                     <Input
                     id="apellidos"
                     value={values.apellidos}
                     error={errors.apellidos}
+                    aria-invalid={Boolean(errors.apellidos)}
                     onChange={(e) => update('apellidos', e.target.value)}
                     autoComplete="family-name" />
                   
                   </Field>
-                  <Field label="DNI" htmlFor="dni" hint="Nos ayuda a preparar tu contrato.">
+                  <Field label="DNI" htmlFor="dni" hint="8 dígitos, sin letras ni espacios." error={errors.dni}>
                     <Input
                     id="dni"
                     value={values.dni}
+                    error={errors.dni}
+                    aria-invalid={Boolean(errors.dni)}
                     inputMode="numeric"
+                    minLength={8}
                     maxLength={8}
+                    pattern="[0-9]{8}"
+                    onPaste={(event) => paste('dni', event)}
                     onChange={(e) => update('dni', e.target.value)} />
                   
                   </Field>
-                  <Field label="Teléfono" htmlFor="telefono" required error={errors.telefono}>
+                  <Field label="Teléfono" htmlFor="telefono" required hint="9 dígitos; debe comenzar por 9." error={errors.telefono}>
                     <Input
                     id="telefono"
                     value={values.telefono}
                     error={errors.telefono}
-                    inputMode="tel"
+                    aria-invalid={Boolean(errors.telefono)}
+                    type="tel"
+                    inputMode="numeric"
+                    minLength={9}
+                    maxLength={9}
+                    pattern="9[0-9]{8}"
+                    placeholder="987654321"
+                    autoComplete="tel-national"
+                    onPaste={(event) => paste('telefono', event)}
                     onChange={(e) => update('telefono', e.target.value)} />
                   
                   </Field>
@@ -218,7 +245,11 @@ export function Contact() {
                 checked={accept}
                 onChange={(e) => {
                   setAccept(e.target.checked);
-                  setErrors((prev) => ({ ...prev, accept: '' }));
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.accept;
+                    return next;
+                  });
                 }}
                 label={
                 <span>
