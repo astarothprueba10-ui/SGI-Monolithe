@@ -33,7 +33,9 @@ function imagenPublica(valor: unknown): string | undefined {
   try {
     const url = new URL(cadena);
     if (url.protocol !== 'https:' || url.username || url.password) return undefined;
-    if (decodeURIComponent(url.pathname).toLowerCase().includes('cms-drafts-private')) return undefined;
+    const ruta = decodeURIComponent(url.pathname + url.search + url.hash).toLowerCase();
+    if (ruta.includes('cms-drafts-private')) return undefined;
+    if (/[?&](?:token|apikey|authorization)=/i.test(url.search)) return undefined;
     return url.href;
   } catch {
     return undefined;
