@@ -155,3 +155,17 @@ test('da prioridad a FONDO en promociones frente a otras asignaciones', () => {
   })]));
   assert.equal(cms.proyecto.imagen, 'https://example.com/fondo.jpg');
 });
+
+test('descarta URL privada codificada y URL con tokens de acceso', () => {
+  const cms = extraerSlidesCmsPublicados(publica([
+    seccion('HERO_SLIDE_2_PROMO', { multimedia: [{
+      urlPublica: 'https://example.com/publico.jpg?origen=cms-drafts-private'
+    }] }),
+    seccion('HERO_SLIDE_3_PROMO', { multimedia: [{
+      urlPublica: 'https://example.com/imagen.jpg?token=secreto'
+    }] })
+  ]));
+  const resultado = aplicarSlidesCmsPublicados(originales, cms, true);
+  assert.equal(resultado[1].image, '/2.jpg');
+  assert.equal(resultado[2].image, '/3.jpg');
+});
