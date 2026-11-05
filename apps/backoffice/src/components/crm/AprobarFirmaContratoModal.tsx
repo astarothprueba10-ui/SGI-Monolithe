@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { crmBackend } from '../../services/crmBackend';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   idContrato: number;
@@ -207,20 +208,7 @@ export function AprobarFirmaContratoModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="aprobar-firma-titulo"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    >
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-        <h2
-          id="aprobar-firma-titulo"
-          className="text-lg font-semibold text-slate-900"
-        >
-          Aprobar firma contractual
-        </h2>
-
+    <Modal open onClose={onClose} title="Aprobar firma contractual" width="max-w-lg">
         <p className="mt-2 text-sm text-slate-600">
           Contrato: <strong>{codigoContrato}</strong>
         </p>
@@ -302,12 +290,12 @@ export function AprobarFirmaContratoModal({
             </p>
           )}
 
-          <div className="flex justify-end gap-3 pt-3">
+          <div className="dialog-actions flex flex-wrap justify-end gap-3 pt-3">
             <button
               type="button"
               disabled={guardando}
               onClick={onClose}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm"
             >
               Cancelar
             </button>
@@ -321,7 +309,7 @@ export function AprobarFirmaContratoModal({
                 !fechaFirma ||
                 observaciones.trim().length < 15
               }
-              className="rounded-lg bg-blue-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-blue-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando
                 ? 'Procesando...'
@@ -329,7 +317,6 @@ export function AprobarFirmaContratoModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

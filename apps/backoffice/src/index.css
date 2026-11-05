@@ -39,3 +39,123 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+html, body, #root {
+  min-width: 0;
+  width: 100%;
+}
+body {
+  overflow-wrap: anywhere;
+}
+.grid > * {
+  min-width: 0;
+}
+img, video, iframe {
+  max-width: 100%;
+}
+.viewport-dialog {
+  position: fixed;
+  inset: var(--dialog-top, 0px) 0 auto;
+  width: 100%;
+  max-width: none;
+  height: var(--dialog-height, 100dvh);
+  max-height: none;
+  margin: 0 !important;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.viewport-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.viewport-dialog::backdrop, .mobile-drawer::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+.dialog-panel {
+  min-width: 0;
+  max-height: 100%;
+  overscroll-behavior: contain;
+}
+.mobile-drawer {
+  margin: 0 !important;
+  top: var(--dialog-top, 0px);
+  bottom: auto;
+  width: min(20rem, calc(100vw - 2rem));
+  max-width: none;
+  height: var(--dialog-height, 100dvh);
+  max-height: none;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.mobile-drawer-content {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not([type="file"]),
+  select, textarea {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .dialog-actions > div, .dialog-actions > form {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .dialog-actions button, .dialog-actions a {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.backoffice-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+@media (max-width: 639px) {
+  .filter-bar > * {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.backoffice-shell {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+@media (max-width: 767px) {
+  .header-popover {
+    position: fixed;
+    inset: calc(4.5rem + env(safe-area-inset-top)) 12px auto;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 5.5rem - env(safe-area-inset-top));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+.header-actions > div {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.header-popover {
+  max-height: calc(100dvh - 5.5rem - env(safe-area-inset-top));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='hidden']):not([type='file']), select, textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

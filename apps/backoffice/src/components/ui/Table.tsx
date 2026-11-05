@@ -11,8 +11,9 @@ export function Table({
 
 }: {head: React.ReactNode;children: React.ReactNode;className?: string;}) {
   return (
-    <div className={cn('w-full overflow-x-auto', className)}>
-      <table className="w-full border-collapse text-left text-[13px]">
+    <div className={cn('min-w-0 max-w-full w-full overflow-x-auto overscroll-x-contain', className)}
+      role="region" aria-label="Tabla de datos: desplázate horizontalmente para ver todas las columnas" tabIndex={0}>
+      <table className="w-full min-w-[36rem] border-collapse text-left text-[13px] sm:min-w-full">
         <thead className="bg-brand-50/60">
           <tr className="border-b border-brand-100">{head}</tr>
         </thead>

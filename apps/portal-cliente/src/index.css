@@ -18,3 +18,97 @@ body {
   -webkit-font-smoothing: antialiased;
   background-color: #f7f8fa;
 }
+
+html, body, #root {
+  min-width: 0;
+  width: 100%;
+}
+body {
+  overflow-wrap: anywhere;
+}
+.grid > * {
+  min-width: 0;
+}
+img, video, iframe {
+  max-width: 100%;
+}
+.viewport-dialog {
+  position: fixed;
+  inset: var(--dialog-top, 0px) 0 auto;
+  width: 100%;
+  max-width: none;
+  height: var(--dialog-height, 100dvh);
+  max-height: none;
+  margin: 0 !important;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.viewport-dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.viewport-dialog::backdrop, .mobile-drawer::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+.dialog-panel {
+  min-width: 0;
+  max-height: 100%;
+  overscroll-behavior: contain;
+}
+.mobile-drawer {
+  margin: 0 !important;
+  top: var(--dialog-top, 0px);
+  bottom: auto;
+  width: min(20rem, calc(100vw - 2rem));
+  max-width: none;
+  height: var(--dialog-height, 100dvh);
+  max-height: none;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.mobile-drawer-content {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not([type="file"]),
+  select, textarea {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .dialog-actions > div, .dialog-actions > form {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .dialog-actions button, .dialog-actions a {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 1023px) {
+  .portal-header-popover {
+    position: fixed;
+    inset: var(--popover-top, 4.5rem) 12px auto;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--popover-top, 4.5rem) - 12px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='hidden']):not([type='file']), select, textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

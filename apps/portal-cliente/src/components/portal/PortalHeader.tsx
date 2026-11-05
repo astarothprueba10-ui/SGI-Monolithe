@@ -22,15 +22,34 @@ const nivelDot: Record<string, string> = {
   info: 'bg-ink-600'
 };
 
+
+function usePopoverPosition(ref: React.RefObject<HTMLDivElement>, open: boolean) {
+  const [top, setTop] = useState(72);
+  useEffect(() => {
+    if (!open) return;
+    const update = () => setTop((ref.current?.getBoundingClientRect().bottom ?? 64) + 8);
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, ref]);
+  return top;
+}
+
 type PortalHeaderProps = {
   onOpenMenu: () => void;
+  menuOpen: boolean;
 };
 
-export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
+export function PortalHeader({ onOpenMenu, menuOpen }: PortalHeaderProps) {
   const [openPanel, setOpenPanel] = useState<'none' | 'notif' | 'perfil'>('none');
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverTop = usePopoverPosition(containerRef, openPanel !== 'none');
   const navigate = useNavigate();
   const { nombreMostrar, iniciales } = getPortalVisualIdentity();
 
@@ -40,8 +59,13 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
         setOpenPanel('none');
       }
     }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpenPanel('none'); };
     document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   async function handleLogout() {
@@ -87,12 +111,15 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slateux-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slateux-200 bg-white/95 px-4 lg:backdrop-blur sm:px-6">
         <button
           type="button"
           onClick={onOpenMenu}
           aria-label="Abrir navegación"
-          className="flex h-9 w-9 items-center justify-center rounded-field border border-slateux-200 text-ink-700 outline-none transition-colors duration-150 ease-out hover:bg-slateux-50 focus-visible:ring-2 focus-visible:ring-ink-700/25 lg:hidden">
+          aria-expanded={menuOpen}
+          aria-controls="portal-mobile-navigation"
+          aria-haspopup="dialog"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-field border border-slateux-200 text-ink-700 outline-none transition-colors duration-150 ease-out hover:bg-slateux-50 focus-visible:ring-2 focus-visible:ring-ink-700/25 lg:hidden">
 
           <MenuIcon className="h-[18px] w-[18px]" aria-hidden="true" />
         </button>
@@ -107,7 +134,8 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
           </p>
         </div>
 
-        <div ref={containerRef} className="ml-auto flex items-center gap-1.5">
+        <div ref={containerRef} className="ml-auto flex shrink-0 items-center gap-1.5"
+          style={{ '--popover-top': `${popoverTop}px` } as React.CSSProperties}>
           <div className="relative">
             <button
               type="button"
@@ -116,7 +144,7 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
               }
               aria-label="Notificaciones"
               aria-expanded={openPanel === 'notif'}
-              className="relative flex h-9 w-9 items-center justify-center rounded-field text-slateux-500 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-field text-slateux-500 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
 
               <BellIcon className="h-[19px] w-[19px]" aria-hidden="true" />
               {noLeidas > 0 ?
@@ -133,7 +161,7 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
                   transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-                  className="absolute right-0 top-11 w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-card border border-slateux-200 bg-white shadow-card">
+                  className="portal-header-popover absolute right-0 top-11 w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-card border border-slateux-200 bg-white shadow-card">
 
                   <div className="flex items-center justify-between border-b border-slateux-200 px-4 py-3">
                     <p className="text-[13.5px] font-semibold text-ink-800">
@@ -206,7 +234,7 @@ export function PortalHeader({ onOpenMenu }: PortalHeaderProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
                   transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-                  className="absolute right-0 top-11 w-64 overflow-hidden rounded-card border border-slateux-200 bg-white shadow-card">
+                  className="portal-header-popover absolute right-0 top-11 w-64 overflow-hidden rounded-card border border-slateux-200 bg-white shadow-card">
 
                   <div className="border-b border-slateux-200 px-4 py-3">
                     <p className="text-[13.5px] font-semibold text-ink-800">

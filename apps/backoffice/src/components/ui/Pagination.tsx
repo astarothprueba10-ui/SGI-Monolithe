@@ -22,13 +22,13 @@ export function Pagination({
       <p className="text-[12px] text-brand-400 tabular">
         Mostrando {from}–{to} de {total} registros
       </p>
-      <div className="flex items-center gap-1">
+      <div className="flex max-w-full flex-wrap items-center gap-1">
         <button
           type="button"
           aria-label="Página anterior"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-brand-200 text-brand-500 transition-colors duration-150 ease-smooth hover:bg-brand-50 disabled:opacity-40">
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-brand-200 text-brand-500 transition-colors duration-150 ease-smooth hover:bg-brand-50 disabled:opacity-40 sm:h-8 sm:w-8">
           
           <ChevronLeftIcon className="h-4 w-4" />
         </button>
@@ -44,7 +44,7 @@ export function Pagination({
             onClick={() => onPageChange(p)}
             aria-current={p === page ? 'page' : undefined}
             className={cn(
-              'inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-[13px] tabular transition-colors duration-150 ease-smooth',
+              'inline-flex h-11 min-w-11 items-center justify-center rounded-md border px-2 text-[13px] tabular transition-colors duration-150 ease-smooth sm:h-8 sm:min-w-8',
               p === page ?
               'border-brand-900 bg-brand-900 text-white shadow-sm font-semibold' :
               'border-brand-200 text-brand-600 hover:bg-brand-50'
@@ -59,7 +59,7 @@ export function Pagination({
           aria-label="Página siguiente"
           disabled={page >= pages}
           onClick={() => onPageChange(page + 1)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-brand-200 text-brand-500 transition-colors duration-150 ease-smooth hover:bg-brand-50 disabled:opacity-40">
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-brand-200 text-brand-500 transition-colors duration-150 ease-smooth hover:bg-brand-50 disabled:opacity-40 sm:h-8 sm:w-8">
           
           <ChevronRightIcon className="h-4 w-4" />
         </button>

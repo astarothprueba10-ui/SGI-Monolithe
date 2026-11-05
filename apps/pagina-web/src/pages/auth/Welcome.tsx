@@ -24,7 +24,7 @@ export function Welcome() {
       
       <div className="absolute inset-0 bg-night/80" aria-hidden="true" />
 
-      <header className="relative flex items-center justify-between px-6 py-6 lg:px-12">
+      <header className="relative flex flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-12">
         <Logo light />
         <Button
           variant="secondary"
@@ -37,12 +37,12 @@ export function Welcome() {
         </Button>
       </header>
 
-      <main className="relative flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-2xl rounded-2xl border border-white/12 bg-white/[0.05] p-8 backdrop-blur sm:p-12">
+      <main className="relative flex min-w-0 flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+        <div className="min-w-0 w-full max-w-2xl rounded-2xl border border-white/12 bg-white/[0.05] p-5 backdrop-blur sm:p-12">
           <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-gold-400">
             SGI MONOLITHE
           </p>
-          <h1 className="mt-4 font-display text-4xl leading-tight text-white sm:text-[44px]">
+          <h1 className="mt-4 font-display text-3xl leading-tight text-white sm:text-[44px]">
             Bienvenido a MONOLITHE
           </h1>
 

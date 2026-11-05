@@ -83,7 +83,7 @@ export function PortalSidebar({
       {/* Navegación */}
       <nav
         aria-label="Navegación del portal"
-        className="flex-1 px-3 py-5"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-5"
       >
         <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">
           Mi compra
@@ -130,7 +130,7 @@ export function PortalSidebar({
       </nav>
 
       {/* Identidad del cliente autenticado */}
-      <div className="border-t border-white/10 p-4">
+      <div className="shrink-0 border-t border-white/10 p-4">
         <div className="flex items-center gap-3">
 
           {/* Avatar con iniciales reales */}

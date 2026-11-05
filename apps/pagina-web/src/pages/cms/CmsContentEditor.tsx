@@ -207,13 +207,13 @@ export function CmsContentEditor() {
 
             <div>
               <p className="mb-2 text-[13px] font-semibold text-night">Imagen de la sección</p>
-              <div className="flex flex-col gap-4 rounded-xl border border-line p-4 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-4 rounded-xl border border-line p-4 sm:flex-row sm:flex-wrap sm:items-center">
                 <img
                   src={current.image}
                   alt={`Imagen actual de ${current.name}`}
-                  className="h-28 w-full rounded-lg object-cover sm:w-44" />
+                  className="h-28 w-full rounded-lg object-cover sm:w-44 sm:shrink-0" />
                 
-                <div className="flex-1">
+                <div className="min-w-0 flex-1 sm:basis-48">
                   <p className="text-sm font-medium text-night">Imagen actual</p>
                   <p className="mt-1 text-[12.5px] text-muted">
                     Recomendado 1920×1080 px · máximo 3 MB
