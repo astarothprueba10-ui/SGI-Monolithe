@@ -21,7 +21,7 @@ export function Tabs({
     <div
       role="tablist"
       aria-label="Secciones del módulo"
-      className={cn('flex items-center gap-1 border-b border-brand-100', className)}>
+      className={cn('flex min-w-0 max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain border-b border-brand-100', className)}>
       
       {items.map((item) => {
         const isActive = item.id === active;
@@ -33,7 +33,7 @@ export function Tabs({
             aria-selected={isActive}
             onClick={() => onChange(item.id)}
             className={cn(
-              '-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 ease-smooth',
+              '-mb-px inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 ease-smooth',
               isActive ?
               'border-[#4cbb17] text-brand-950 font-semibold bg-brand-50/80 rounded-t-md' :
               'border-transparent text-brand-400 hover:text-brand-700 hover:bg-brand-50/40 rounded-t-md'

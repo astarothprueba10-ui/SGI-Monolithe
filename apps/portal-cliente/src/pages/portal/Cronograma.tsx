@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useModalDialog } from '../../hooks/useModalDialog';
 import {
   CalendarClockIcon,
   DownloadIcon,
@@ -280,29 +280,14 @@ function DetalleCuota({
 
 
 }: {cuota: Cuota | null;onClose: () => void;}) {
+  const ref = useModalDialog(Boolean(cuota));
   return (
-    <AnimatePresence>
-      {cuota ?
-      <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
-          <motion.div
-          className="absolute inset-0 bg-ink-900/45"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-          onClick={onClose} />
-        
-          <motion.div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Detalle de la cuota ${cuota.numero}`}
-          className="relative w-full max-w-md rounded-card border border-slateux-200 bg-white shadow-card"
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
-          transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}>
-          
-            <div className="flex items-start justify-between gap-4 border-b border-slateux-200 px-5 py-4">
+    <dialog ref={ref} className="viewport-dialog" aria-label={`Detalle de la cuota ${cuota?.numero ?? ''}`}
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onClose={event => { if (cuota && !event.currentTarget.open) onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+      {cuota && <div className="dialog-panel relative flex w-full max-w-md flex-col overflow-hidden rounded-card border border-slateux-200 bg-white shadow-card">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slateux-200 px-5 py-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brass-500">
                   Cuota {String(cuota.numero).padStart(2, '0')}
@@ -315,13 +300,13 @@ function DetalleCuota({
               type="button"
               onClick={onClose}
               aria-label="Cerrar detalle"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slateux-400 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slateux-400 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
               
                 <XIcon className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
-            <dl className="divide-y divide-slateux-200 px-5">
+            <dl className="min-h-0 flex-1 divide-y divide-slateux-200 overflow-y-auto overscroll-contain px-5">
               <DetalleRow
               label="Estado"
               value={
@@ -345,7 +330,7 @@ function DetalleCuota({
             
             </dl>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slateux-200 px-5 py-4 sm:flex-row sm:justify-end">
+            <div className="dialog-actions flex shrink-0 flex-col-reverse gap-2 border-t border-slateux-200 px-5 py-4 sm:flex-row sm:justify-end">
               <Button variant="secondary" onClick={onClose}>
                 Cerrar
               </Button>
@@ -355,10 +340,8 @@ function DetalleCuota({
                 </Link> :
             null}
             </div>
-          </motion.div>
-        </div> :
-      null}
-    </AnimatePresence>);
+      </div>}
+    </dialog>);
 
 }
 

@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useModalDialog } from '../../hooks/useModalDialog';
 import { Link } from 'react-router-dom';
 import { ChevronRightIcon, XIcon } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -187,36 +188,23 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  const ref = useModalDialog(open);
 
-  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6">
-      <div
-        className="absolute inset-0 bg-night/60 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden="true" />
-      
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
+    <dialog ref={ref} aria-label={title} className="viewport-dialog"
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onClose={event => { if (open && !event.currentTarget.open) onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+      {open && <div
         className={cn(
-          'relative w-full overflow-hidden rounded-t-2xl bg-white shadow-lift sm:rounded-2xl',
+          'dialog-panel relative flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-lift',
           size === 'sm' && 'sm:max-w-md',
           size === 'md' && 'sm:max-w-lg',
           size === 'lg' && 'sm:max-w-3xl'
         )}>
         
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-4 sm:px-6 sm:py-5">
           <div>
             <h2 className="font-display text-xl text-night">{title}</h2>
             {description && <p className="mt-1 text-sm text-muted">{description}</p>}
@@ -225,18 +213,18 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-lg p-1.5 text-muted transition-colors duration-150 ease-out hover:bg-bone hover:text-night">
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted transition-colors duration-150 ease-out hover:bg-bone hover:text-night">
             
             <XIcon className="h-5 w-5" />
           </button>
         </div>
-        {children && <div className="max-h-[60vh] overflow-y-auto px-6 py-5">{children}</div>}
+        {children && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">{children}</div>}
         {footer &&
-        <div className="flex flex-wrap justify-end gap-3 border-t border-line bg-bone/60 px-6 py-4">
+        <div className="dialog-actions flex shrink-0 flex-wrap justify-end gap-3 border-t border-line bg-bone/60 px-4 py-4 sm:px-6">
             {footer}
           </div>
         }
-      </div>
-    </div>);
+      </div>}
+    </dialog>);
 
 }

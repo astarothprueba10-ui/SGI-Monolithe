@@ -10,7 +10,7 @@ export function Card({ children, className = '', as = 'div' }: CardProps) {
   const Tag = as;
   return (
     <Tag
-      className={`rounded-card border border-slateux-200 bg-white shadow-card ${className}`}>
+      className={`min-w-0 max-w-full rounded-card border border-slateux-200 bg-white shadow-card ${className}`}>
       
       {children}
     </Tag>);
@@ -31,7 +31,7 @@ export function CardHeader({
   action
 }: CardHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slateux-200 px-5 py-4">
+    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slateux-200 px-4 py-4 sm:px-5">
       <div className="flex min-w-0 items-start gap-3">
         {icon ? <span className="mt-0.5 text-slateux-400">{icon}</span> : null}
         <div className="min-w-0">
@@ -45,7 +45,7 @@ export function CardHeader({
           null}
         </div>
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="max-w-full">{action}</div> : null}
     </div>);
 
 }

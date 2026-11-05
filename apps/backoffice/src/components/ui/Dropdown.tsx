@@ -6,13 +6,14 @@ export function Dropdown({
   trigger,
   children,
   align = 'right',
-  width = 'w-56'
+  width = 'w-56',
+  mobilePlacement = 'anchor'
 
 
 
 
 
-}: {trigger: (props: {open: boolean;toggle: () => void;}) => React.ReactNode;children: (props: {close: () => void;}) => React.ReactNode;align?: 'left' | 'right';width?: string;}) {
+}: {trigger: (props: {open: boolean;toggle: () => void;}) => React.ReactNode;children: (props: {close: () => void;}) => React.ReactNode;align?: 'left' | 'right';width?: string;mobilePlacement?: 'anchor' | 'header';}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,6 +46,8 @@ export function Dropdown({
           className={cn(
             'absolute z-40 mt-2 overflow-hidden rounded-lg border border-brand-100 bg-white py-1 shadow-pop',
             width,
+            'max-w-[calc(100vw-1.5rem)]',
+            mobilePlacement === 'header' && 'header-popover',
             align === 'right' ? 'right-0' : 'left-0'
           )}>
           

@@ -3,7 +3,7 @@ import { SearchIcon } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 const BASE =
-  'h-9 w-full rounded-md border border-brand-200 bg-white px-3 text-[13px] text-brand-800 placeholder:text-brand-300 transition-colors duration-150 ease-smooth hover:border-brand-300 focus:border-brand-500';
+  'h-11 min-w-0 max-w-full w-full rounded-md border border-brand-200 bg-white px-3 text-base sm:h-9 sm:text-[13px] text-brand-800 placeholder:text-brand-300 transition-colors duration-150 ease-smooth hover:border-brand-300 focus:border-brand-500';
 
 export const Input = React.forwardRef<
   HTMLInputElement,
@@ -46,7 +46,7 @@ export function SearchInput({
 
 }: { value: string; onValueChange: (value: string) => void; placeholder?: string; className?: string; label?: string; }) {
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('relative min-w-0 max-w-full', className)}>
       <SearchIcon
         className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-300"
         aria-hidden="true" />

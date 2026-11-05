@@ -7,7 +7,7 @@ type Variant = 'primary' | 'secondary' | 'gold' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 const base =
-'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold tracking-tight transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+'inline-flex min-w-0 max-w-full items-center justify-center gap-2 whitespace-normal text-center rounded-lg font-semibold tracking-tight transition-[background-color,color,border-color,box-shadow,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:whitespace-nowrap';
 
 const variants: Record<Variant, string> = {
   primary: 'bg-brand text-white shadow-sm hover:bg-brand-700 active:translate-y-px',
@@ -19,8 +19,8 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-9 px-3.5 text-[13px]',
-  md: 'h-11 px-5 text-sm',
+  sm: 'min-h-11 px-3.5 py-2 text-[13px] sm:min-h-0 sm:h-9 sm:py-0',
+  md: 'min-h-11 px-5 py-2 text-sm sm:h-11 sm:py-0',
   lg: 'px-7 py-3.5 text-[15px]'
 };
 

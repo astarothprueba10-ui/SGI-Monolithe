@@ -76,10 +76,10 @@ export function AlertasPanel() {
                     {a.detalle}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-1 sm:shrink-0">
                   <Link
                   to={a.ruta}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-field px-3 text-[13px] font-semibold text-ink-700 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 focus-visible:ring-2 focus-visible:ring-ink-700/25">
+                  className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-field px-3 text-[13px] font-semibold text-ink-700 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 focus-visible:ring-2 focus-visible:ring-ink-700/25">
                   
                     {a.accion}
                     <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -90,7 +90,7 @@ export function AlertasPanel() {
                   onClick={() =>
                   setDescartadas((prev) => [...prev, a.id])
                   }
-                  className="h-9 rounded-field px-2.5 text-[13px] font-medium text-slateux-400 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
+                  className="min-h-11 shrink-0 rounded-field px-2.5 text-[13px] font-medium text-slateux-400 outline-none transition-colors duration-150 ease-out hover:bg-slateux-100 hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
                   
                       Descartar
                     </button> :

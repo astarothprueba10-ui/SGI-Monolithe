@@ -43,8 +43,8 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
       </aside>
 
       {/* Form */}
-      <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-line px-6 py-5 lg:px-12">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-4 py-5 sm:px-6 lg:px-12">
           <div className="lg:hidden">
             <Logo />
           </div>
@@ -57,7 +57,7 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
           </Link>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-6 py-12 lg:px-12">
+        <div className="flex min-w-0 flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-12 lg:px-12">
           <div className="w-full max-w-[420px]">
             <h1 className="font-display text-[32px] leading-tight text-night">{title}</h1>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">{subtitle}</p>

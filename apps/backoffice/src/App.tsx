@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { Toaster } from 'sonner';
+import { ToastHost } from './components/ui/ToastHost';
 import { AuthProvider } from './contexts/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 import { AccountAdminPermissionRoute, PermissionRoute } from './components/auth/PermissionRoute';
@@ -240,17 +240,7 @@ export function App({
           </Route>
         </Routes>
 
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              borderRadius: '8px',
-              border: '1px solid #E5EDF5',
-              fontSize: '13px',
-              color: '#152B45'
-            }
-          }}
-        />
+        <ToastHost />
       </BrowserRouter>
     </AuthProvider>
   );

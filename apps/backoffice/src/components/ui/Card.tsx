@@ -9,7 +9,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-lg border border-brand-100 bg-white shadow-card',
+        'min-w-0 max-w-full rounded-lg border border-brand-100 bg-white shadow-card',
         className
       )}
       {...props}>
@@ -43,7 +43,7 @@ export function CardHeader({
         <p className="mt-0.5 text-[13px] text-brand-400">{description}</p> :
         null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="header-actions flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
     </div>);
 
 }

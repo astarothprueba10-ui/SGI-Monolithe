@@ -52,7 +52,7 @@ export function Inicio() {
 
       <section className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
         <Card className="flex flex-col p-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[12.5px] font-medium uppercase tracking-[0.1em] text-slateux-400">
                 Próxima cuota

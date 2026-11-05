@@ -17,6 +17,7 @@ import {
 import { Logo } from '../../components/layout/Logo';
 import { cmsNav } from '../../data/cms';
 import { cn } from '../../utils/cn';
+import { MobileDrawer } from '../../components/ui/MobileDrawer';
 
 const icons: Record<string, React.ComponentType<{className?: string;strokeWidth?: number | string;}>> = {
   LayoutDashboard: LayoutDashboardIcon,
@@ -33,14 +34,14 @@ export function CmsLayout() {
   const [open, setOpen] = useState(false);
 
   const sidebar =
-  <div className="flex h-full flex-col bg-night text-white">
-      <div className="flex items-center justify-between px-6 py-6">
+  <div className="flex h-full min-h-0 flex-col bg-night text-white">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-6">
         <Logo light to="/cms" />
         <button
         type="button"
         onClick={() => setOpen(false)}
         aria-label="Cerrar menú"
-        className="rounded-lg p-2 text-white/60 hover:bg-white/10 lg:hidden">
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 lg:hidden">
         
           <XIcon className="h-5 w-5" />
         </button>
@@ -48,7 +49,7 @@ export function CmsLayout() {
       <p className="px-6 pb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-400">
         CMS Marketing
       </p>
-      <nav aria-label="Navegación del CMS" className="flex-1 overflow-y-auto px-3">
+      <nav aria-label="Navegación del CMS" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3">
         <ul className="space-y-1">
           {cmsNav.map((item) => {
           const IconCmp = icons[item.icon] ?? LayoutDashboardIcon;
@@ -83,7 +84,7 @@ export function CmsLayout() {
         </ul>
       </nav>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="shrink-0 border-t border-white/10 p-4">
         <Link
         to="/"
         target="_blank"
@@ -109,12 +110,9 @@ export function CmsLayout() {
         <div className="fixed inset-y-0 w-[270px]">{sidebar}</div>
       </aside>
 
-      {open &&
-      <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-night/60" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute inset-y-0 left-0 w-[280px]">{sidebar}</div>
-        </div>
-      }
+      <MobileDrawer open={open} onClose={() => setOpen(false)} id="cms-mobile-navigation" label="Navegación del CMS">
+        {sidebar}
+      </MobileDrawer>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-line bg-white px-5 lg:px-8">
@@ -122,7 +120,10 @@ export function CmsLayout() {
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Abrir menú"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line text-night lg:hidden">
+            aria-controls="cms-mobile-navigation"
+            aria-expanded={open}
+            aria-haspopup="dialog"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line text-night lg:hidden">
             
             <MenuIcon className="h-5 w-5" />
           </button>
@@ -145,7 +146,7 @@ export function CmsLayout() {
           </div>
         </header>
 
-        <main className="flex-1 px-5 py-8 lg:px-8">
+        <main className="min-w-0 flex-1 px-3 py-5 sm:px-5 sm:py-8 lg:px-8">
           <Outlet />
         </main>
       </div>

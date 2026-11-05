@@ -62,7 +62,7 @@ export function Header({
   }, [query, can]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-brand-100 bg-white/95 px-3 backdrop-blur md:gap-4 md:px-5">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-brand-100 bg-white/95 px-3 md:backdrop-blur md:gap-4 md:px-5">
       <button
         type="button"
         onClick={onOpenMenu}
@@ -70,7 +70,7 @@ export function Header({
         aria-controls="mobile-navigation"
         aria-expanded={mobileMenuOpen}
         aria-haspopup="dialog"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-brand-200 text-brand-700 hover:bg-brand-50 md:hidden"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-brand-200 text-brand-700 hover:bg-brand-50 md:hidden"
       >
         <MenuIcon className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -116,7 +116,7 @@ export function Header({
         </kbd>
 
         {results.length > 0 ? (
-          <div className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-lg border border-brand-100 bg-white py-1 shadow-pop">
+          <div className="header-popover absolute left-0 right-0 top-11 z-40 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-brand-100 bg-white py-1 shadow-pop">
             <DropdownLabel>Módulos autorizados</DropdownLabel>
 
             {results.map((r) => (
@@ -138,6 +138,7 @@ export function Header({
       </div>
 
       <Dropdown
+        mobilePlacement="header"
         width="w-80"
         trigger={({ toggle, open }) => (
           <button
@@ -218,6 +219,7 @@ export function Header({
       </Dropdown>
 
       <Dropdown
+        mobilePlacement="header"
         trigger={({ toggle }) => (
           <button
             type="button"
