@@ -101,3 +101,10 @@ test('prefiere el FONDO publicado del CMS frente a otro recurso de sección', ()
   ] }));
   assert.equal(hero.imagen, 'https://example.com/nuevo.jpg');
 });
+
+test('rechaza tokens en multimedia aunque use dominio HTTPS', () => {
+  const hero = extraerHeroPublicado(publicado({ multimedia: [
+    { urlPublica: 'https://example.com/imagen.jpg?apikey=secreto' }
+  ] }));
+  assert.equal(hero.imagen, undefined);
+});
