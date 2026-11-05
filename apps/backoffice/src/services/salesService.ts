@@ -1,5 +1,4 @@
 
-import { supabase } from '../lib/supabase';
 import type { Sale } from '../types';
 import { crmBackend, type CrmOperacionItem } from './crmBackend';
 
@@ -103,89 +102,4 @@ export const salesService = {
     );
   },
 
-  // Métodos heredados. Pendientes de migración a Core.
-  async registerSeparation(input: RegisterSeparationInput) {
-    const { data, error } = await supabase.rpc(
-      'sp_registrar_separacion',
-      {
-        p_id_lote: input.lotId,
-        p_id_persona: input.personaId,
-        p_id_usuario: input.userId || 5,
-        p_observaciones:
-          input.notes || 'Separacion regular de lote S/ 500'
-      }
-    );
-
-    if (error) throw new Error(error.message);
-
-    if (data && data.success === false) {
-      throw new Error(
-        data.message || 'Error al registrar separacion'
-      );
-    }
-
-    return data;
-  },
-
-  async formalizeCashSale(input: FormalizeCashInput) {
-    const { data, error } = await supabase.rpc(
-      'sp_formalizar_venta_contado',
-      {
-        p_id_lote: input.lotId,
-        p_id_persona: input.personaId,
-        p_id_asesor: input.advisorId || 4,
-        p_monto_total: input.totalAmount,
-        p_id_usuario: input.userId || 5,
-        p_observaciones:
-          input.notes || 'Venta al contado formalizada'
-      }
-    );
-
-    if (error) throw new Error(error.message);
-
-    if (data && data.success === false) {
-      throw new Error(
-        data.message || 'Error al formalizar venta al contado'
-      );
-    }
-
-    return data;
-  },
-
-  async formalizeFinancedSale(input: FormalizeFinancedInput) {
-    const { data, error } = await supabase.rpc(
-      'sp_formalizar_venta_financiada',
-      {
-        p_id_lote: input.lotId,
-        p_id_persona: input.personaId,
-        p_id_asesor: input.advisorId || 4,
-        p_monto_total: input.totalAmount,
-        p_monto_inicial: input.downPayment,
-        p_numero_cuotas: input.installmentsCount,
-        p_id_usuario: input.userId || 5,
-        p_observaciones:
-          input.notes || 'Venta financiada formalizada'
-      }
-    );
-
-    if (error) throw new Error(error.message);
-
-    if (data && data.success === false) {
-      throw new Error(
-        data.message || 'Error al formalizar venta financiada'
-      );
-    }
-
-    return data;
-  },
-
-  async expireOverdueReservations() {
-    const { data, error } = await supabase.rpc(
-      'sp_caducar_separaciones_vencidas'
-    );
-
-    if (error) throw new Error(error.message);
-
-    return data;
-  }
 };

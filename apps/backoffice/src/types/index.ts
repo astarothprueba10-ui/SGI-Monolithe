@@ -124,7 +124,7 @@ export interface Sale {
   date: string;
   contract?: string;
   status: string;
-
+  paymentMethod?: string | null;
 }
 
 export interface Installment {

@@ -434,145 +434,18 @@ public class CrmVentaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Paginación inválida. Tamaño permitido: 1 a 100.");
         }
-        long desplazamiento = ((long) paginaActual - 1L) * tamanoActual;
 
         return ejecutar("""
-                WITH contexto AS (
-                    SELECT CAST(? AS bigint) AS actor,
-                           CAST(? AS text) AS tipo,
-                           CAST(? AS text) AS busqueda
-                ), autorizacion AS (
-                    SELECT c.*,
-                           EXISTS (
-                               SELECT 1 FROM public.seg_usuarios_roles ur
-                               JOIN public.seg_roles rol ON rol.id_rol=ur.id_rol
-                               WHERE ur.id_usuario=c.actor AND ur.activo
-                                 AND ur.fecha_revocacion IS NULL AND rol.activo
-                                 AND rol.codigo IN ('ADMINISTRADOR','GERENCIA','FINANZAS')
-                           ) AS acceso_global
-                    FROM contexto c
-                ), operaciones AS (
-                    SELECT v.id_venta AS id, 'VENTA'::text AS tipo,
-                           v.codigo::text AS codigo, l.id_lote AS id_lote,
-                           l.codigo::text AS lote, proyecto.nombre::text AS proyecto,
-                           concat_ws(' ',per.nombres,per.apellido_paterno,
-                                     per.apellido_materno)::text AS comprador,
-                           doc.numero_documento::text AS documento,
-                           modalidad.codigo::text AS modalidad,
-                           v.precio_venta AS monto,
-                           estado.codigo::text AS estado,
-                           v.fecha_venta AS fecha,
-                           NULL::timestamptz AS fecha_vencimiento,
-                           contrato.codigo::text AS contrato,
-                           estado_contrato.codigo::text AS estado_contrato,
-                           NULLIF(concat_ws(' ',ad.nombres,ad.apellido_paterno,
-                                          ad.apellido_materno),'')::text AS asesor
-                    FROM public.ven_ventas v
-                    JOIN public.inm_lotes l ON l.id_lote=v.id_lote
-                    JOIN public.inm_proyectos proyecto ON proyecto.id_proyecto=l.id_proyecto
-                    JOIN public.cfg_modalidades_venta modalidad
-                      ON modalidad.id_modalidad_venta=v.id_modalidad_venta
-                    JOIN public.cfg_estados_venta estado
-                      ON estado.id_estado_venta=v.id_estado_venta
-                    LEFT JOIN public.ven_ventas_clientes vc
-                      ON vc.id_venta=v.id_venta AND vc.titular
-                    LEFT JOIN public.crm_clientes cl ON cl.id_cliente=vc.id_cliente
-                    LEFT JOIN public.core_personas per ON per.id_persona=cl.id_persona
-                    LEFT JOIN LATERAL (
-                        SELECT d.numero_documento
-                        FROM public.core_personas_documentos d
-                        WHERE d.id_persona=per.id_persona AND d.principal AND d.activo
-                        ORDER BY d.id_persona_documento DESC LIMIT 1
-                    ) doc ON true
-                    LEFT JOIN LATERAL (
-                        SELECT c.codigo,c.id_estado_contrato
-                        FROM public.ven_contratos c WHERE c.id_venta=v.id_venta
-                        ORDER BY c.id_contrato DESC LIMIT 1
-                    ) contrato ON true
-                    LEFT JOIN public.cfg_estados_contrato estado_contrato
-                      ON estado_contrato.id_estado_contrato=contrato.id_estado_contrato
-                    LEFT JOIN LATERAL (
-                        SELECT va.id_asesor
-                        FROM public.com_ventas_asesores va
-                        WHERE va.id_venta=v.id_venta
-                        ORDER BY va.es_principal DESC,va.id_venta_asesor LIMIT 1
-                    ) va ON true
-                    LEFT JOIN public.com_asesores asesor ON asesor.id_asesor=va.id_asesor
-                    LEFT JOIN public.core_personas ad ON ad.id_persona=asesor.id_persona
-                    CROSS JOIN autorizacion a
-                    WHERE public.fn_usuario_tiene_permiso_seguridad(
-                        a.actor, 'sales.view'::varchar)
-                      AND (a.acceso_global OR v.id_usuario_registro=a.actor
-                           OR EXISTS (
-                              SELECT 1 FROM public.com_ventas_asesores x
-                              JOIN public.com_asesores ca ON ca.id_asesor=x.id_asesor
-                              JOIN public.seg_usuarios u ON u.id_persona=ca.id_persona
-                              WHERE x.id_venta=v.id_venta AND u.id_usuario=a.actor
-                           ))
-                    UNION ALL
-                    SELECT r.id_reserva, 'SEPARACION'::text, r.codigo::text,
-                           l.id_lote, l.codigo::text, proyecto.nombre::text,
-                           concat_ws(' ',per.nombres,per.apellido_paterno,
-                                     per.apellido_materno)::text,
-                           doc.numero_documento::text,
-                           NULL::text, r.monto_reserva, estado.codigo::text,
-                           r.fecha_reserva, r.fecha_vencimiento,
-                           NULL::text, NULL::text, NULL::text
-                    FROM public.ven_reservas r
-                    JOIN public.inm_lotes l ON l.id_lote=r.id_lote
-                    JOIN public.inm_proyectos proyecto ON proyecto.id_proyecto=l.id_proyecto
-                    JOIN public.core_personas per ON per.id_persona=r.id_persona
-                    JOIN public.cfg_estados_reserva estado
-                      ON estado.id_estado_reserva=r.id_estado_reserva
-                    LEFT JOIN LATERAL (
-                        SELECT d.numero_documento
-                        FROM public.core_personas_documentos d
-                        WHERE d.id_persona=per.id_persona AND d.principal AND d.activo
-                        ORDER BY d.id_persona_documento DESC LIMIT 1
-                    ) doc ON true
-                    CROSS JOIN autorizacion a
-                    WHERE public.fn_usuario_tiene_permiso_seguridad(
-                        a.actor, 'sales.view'::varchar)
-                      AND (a.acceso_global OR r.id_usuario_registro=a.actor
-                           OR EXISTS (
-                               SELECT 1 FROM public.crm_prospectos p
-                               JOIN public.crm_prospectos_intereses i
-                                 ON i.id_prospecto=p.id_prospecto
-                                AND i.id_proyecto=l.id_proyecto AND i.activo
-                               WHERE p.id_persona=r.id_persona
-                                 AND public.fn_crm_puede_consultar_prospecto(
-                                     a.actor,p.id_prospecto)
-                           ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM public.ven_ventas v
-                          WHERE v.id_reserva=r.id_reserva
-                      )
-                ), filtradas AS (
-                    SELECT op.* FROM operaciones op CROSS JOIN autorizacion a
-                    WHERE (a.tipo='' OR op.tipo=a.tipo)
-                      AND (a.busqueda='' OR
-                          lower(op.codigo) LIKE '%'||a.busqueda||'%' OR
-                          lower(op.lote) LIKE '%'||a.busqueda||'%' OR
-                          lower(op.proyecto) LIKE '%'||a.busqueda||'%' OR
-                          lower(op.comprador) LIKE '%'||a.busqueda||'%')
-                )
-                SELECT jsonb_build_object(
-                    'items',COALESCE((
-                        SELECT jsonb_agg(to_jsonb(f) ORDER BY f.fecha DESC,f.id DESC)
-                        FROM (SELECT * FROM filtradas
-                              ORDER BY fecha DESC,id DESC
-                              LIMIT CAST(? AS integer) OFFSET CAST(? AS bigint)) f
-                    ),'[]'::jsonb),
-                    'total',(SELECT COUNT(*) FROM filtradas),
-                    'pagina',CAST(? AS integer),
-                    'tamano',CAST(? AS integer),
-                    'paginas',CEIL((SELECT COUNT(*) FROM filtradas)::numeric
-                                   /CAST(? AS integer))::integer
+                SELECT public.sp_crm_listar_operaciones_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS text),
+                    CAST(? AS text),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
                 )::text
                 """,
                 actor, filtroTipo, filtroBusqueda,
-                tamanoActual, desplazamiento,
-                paginaActual, tamanoActual, tamanoActual);
+                paginaActual, tamanoActual);
     }
 
     @Transactional

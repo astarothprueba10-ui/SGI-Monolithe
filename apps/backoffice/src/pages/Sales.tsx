@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DownloadIcon, FileTextIcon, PlusIcon, Clock, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
+import { DownloadIcon, FileTextIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -63,8 +63,61 @@ function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
   );
 }
 
+
+const ESTADOS_SEPARACION = {
+  PENDIENTE: {
+    etiqueta: 'Pendiente',
+    estilo: 'bg-amber-50 text-amber-800 border-amber-200',
+    punto: 'bg-amber-500'
+  },
+  VIGENTE: {
+    etiqueta: 'Vigente',
+    estilo: 'bg-sky-50 text-sky-800 border-sky-200',
+    punto: 'bg-sky-500'
+  },
+  CONVERTIDA: {
+    etiqueta: 'Convertida',
+    estilo: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    punto: 'bg-emerald-500'
+  },
+  VENCIDA: {
+    etiqueta: 'Vencida',
+    estilo: 'bg-red-50 text-red-800 border-red-200',
+    punto: 'bg-red-500'
+  },
+  CANCELADA: {
+    etiqueta: 'Anulada',
+    estilo: 'bg-slate-100 text-slate-700 border-slate-300',
+    punto: 'bg-slate-500'
+  }
+} as const;
+
+function EstadoSeparacionBadge({ estado }: { estado: string }) {
+  const codigo = estado.trim().toUpperCase();
+
+  const config = ESTADOS_SEPARACION[
+    codigo as keyof typeof ESTADOS_SEPARACION
+  ];
+
+  if (!config) {
+    return <StatusBadge status={estado} />;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${config.estilo}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${config.punto}`}
+      />
+      {config.etiqueta}
+    </span>
+  );
+}
+
+
 export function Sales() {
-  const [tab, setTab] = useState<'todas' | 'Separación' | 'Venta'>('todas');
+  const [tab, setTab] = useState<'Separación' | 'Venta' | 'Contratos'>('Separación');
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
   const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
@@ -279,17 +332,6 @@ export function Sales() {
       return;
     }
     setVoucherFile(file);
-  };
-
-  const handleExpireOverdue = async () => {
-    try {
-      const res = await salesService.expireOverdueReservations();
-      toast.success(res?.mensaje || 'Control de caducidad ejecutado correctamente');
-      await fetchSalesData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al ejecutar control de caducidad.';
-      toast.error(msg);
-    }
   };
 
   const validarFormularioSeparacion = (): boolean => {
@@ -684,7 +726,7 @@ export function Sales() {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return salesList.filter((sale) => {
-      const byTab = tab === 'todas' || sale.type === tab;
+      const byTab = sale.type === tab;
       const byModality = modality === 'all' || sale.modality === modality;
       const byAdvisor = advisorFilter === 'all' ||
         (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
@@ -907,9 +949,6 @@ export function Sales() {
         description="Operaciones comerciales con su comprador, lote, modalidad de venta y contrato asociado."
         actions={
           <div className="flex items-center gap-2">
-            <Button icon={Clock} variant="secondary" disabled onClick={handleExpireOverdue}>
-              Control de caducidad (7 d)
-            </Button>
             <Gate permission="sales.export">
               <Button icon={DownloadIcon}>Exportar</Button>
             </Gate>
@@ -925,123 +964,236 @@ export function Sales() {
       <Tabs
         className="mb-5"
         active={tab}
-        onChange={(id) => setTab(id as typeof tab)}
+        onChange={(id) => {
+          setTab(id as typeof tab);
+          setQuery('');
+          setModality('all');
+          setAdvisorFilter('all');
+        }}
         items={[
-          { id: 'todas', label: 'Todas', count: salesList.length },
-          { id: 'Separación', label: 'Separaciones', count: separationsCount },
-          { id: 'Venta', label: 'Ventas', count: salesCount }
+          {
+            id: 'Separación',
+            label: 'Separaciones',
+            count: separationsCount
+          },
+          {
+            id: 'Venta',
+            label: 'Ventas',
+            count: salesCount
+          },
+          {
+            id: 'Contratos',
+            label: 'Contratos pendientes de firma'
+          }
         ]}
       />
 
-      <Gate permission="sales.view">
-        <ContratosPendientesPanel />
-      </Gate>
+      {/* Contratos pendientes de firma */}
+      {tab === 'Contratos' && (
+        <Gate permission="sales.view">
+          <ContratosPendientesPanel />
+        </Gate>
+      )}
 
-      <Gate permission="sales.view">
-        <DocumentacionContratosPanel />
-      </Gate>
+      {/* Documentación contractual de las ventas */}
+      {tab === 'Venta' && (
+        <Gate permission="sales.view">
+          <DocumentacionContratosPanel />
+        </Gate>
+      )}
 
-      <Card>
-        <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
-          <SearchInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Buscar por comprador, código o lote…"
-            className="w-full sm:w-72"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
-            <Select
-              value={modality}
-              onChange={(e) => setModality(e.target.value as typeof modality)}
-              className="w-36"
-            >
-              <option value="all">Todas</option>
-              <option value="Contado">Contado</option>
-              <option value="Financiado">Financiado</option>
-              <option value="Reserva">Reserva</option>
-            </Select>
+      {tab !== 'Contratos' && (
+
+        <Card>
+          <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
+            <SearchInput
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Buscar por comprador, código o lote…"
+              className="w-full sm:w-72"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
+              <Select
+                value={modality}
+                onChange={(e) => setModality(e.target.value as typeof modality)}
+                className="w-36"
+              >
+                <option value="all">Todas</option>
+                <option value="Contado">Contado</option>
+                <option value="Financiado">Financiado</option>
+                <option value="Reserva">Reserva</option>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-brand-600">Asesor:</span>
+              <Select
+                value={advisorFilter}
+                onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
+                className="w-40"
+              >
+                <option value="all">Todos los asesores</option>
+                <option value="with_advisor">Con asesor</option>
+                <option value="without_advisor">Sin asesor</option>
+              </Select>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-brand-600">Asesor:</span>
-            <Select
-              value={advisorFilter}
-              onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
-              className="w-40"
+
+          {rows.length === 0 ? (
+            <EmptyState
+              title="No hay operaciones registradas"
+              description="Las separaciones y ventas se registrarán aquí con su documentación asociada."
+            />
+          ) : (
+
+
+            <Table
+              className={tab === 'Separación'
+                ? '[&_table]:min-w-[1280px]'
+                : '[&_table]:min-w-[1250px]'
+              }
+              head={tab === 'Separación' ? (
+                <>
+                  <TH>Fecha de separación</TH>
+                  <TH>Código</TH>
+                  <TH>Cliente</TH>
+                  <TH>Proyecto</TH>
+                  <TH>Lote</TH>
+                  <TH align="right">Monto</TH>
+                  <TH>Modalidad de pago</TH>
+                  <TH>Asesor</TH>
+                  <TH>Estado</TH>
+                  <TH align="right">Acciones</TH>
+                </>
+              ) : (
+                <>
+                  <TH>Código</TH>
+                  <TH>Tipo</TH>
+                  <TH>Comprador</TH>
+                  <TH>Lote / Proyecto</TH>
+                  <TH>Modalidad</TH>
+                  <TH align="right">Monto</TH>
+                  <TH>Asesor</TH>
+                  <TH>Fecha</TH>
+                  <TH>Contrato</TH>
+                  <TH>Estado</TH>
+                  <TH align="right">Acciones</TH>
+                </>
+              )}
             >
-              <option value="all">Todos los asesores</option>
-              <option value="with_advisor">Con asesor</option>
-              <option value="without_advisor">Sin asesor</option>
-            </Select>
-          </div>
-        </div>
-
-        {rows.length === 0 ? (
-          <EmptyState
-            title="No hay operaciones registradas"
-            description="Las separaciones y ventas se registrarán aquí con su documentación asociada."
-          />
-        ) : (
-
-          <Table
-            head={
-              <>
-                <TH>Código</TH>
-                <TH>Tipo</TH>
-                <TH>Comprador</TH>
-                <TH>Lote / Proyecto</TH>
-                <TH>Modalidad</TH>
-                <TH align="right">Monto</TH>
-                <TH>Asesor</TH>
-                <TH>Fecha</TH>
-                <TH>Contrato</TH>
-                <TH>Estado</TH>
-                <TH align="right">Acciones</TH>
-              </>
-            }
-          >
-            <tbody>
               {rows.map((sale) => (
-                <TR key={sale.id}>
-                  <TD className="font-mono text-[12px] font-semibold text-brand-900">{sale.code}</TD>
-                  <TD>
-                    <Badge tone={sale.type === 'Venta' ? 'brand' : 'neutral'}>
-                      {sale.type}
-                    </Badge>
-                  </TD>
-                  <TD className="font-medium text-brand-900">{sale.buyer}</TD>
-                  <TD>
-                    <p className="font-mono text-[12px] font-semibold text-brand-700">{sale.lot}</p>
-                    <p className="text-xs text-brand-500">{sale.project}</p>
-                  </TD>
-                  <TD className="text-brand-600">{sale.modality ?? '—'}</TD>
-                  <TD className="text-right font-mono font-semibold text-brand-900">
-                    {currency(sale.amount)}
-                  </TD>
-                  <TD>
-                    <AdvisorBadge advisor={sale.advisor} type={sale.type} />
-                  </TD>
-                  <TD className="text-[12px] text-brand-500">{sale.date || '—'}</TD>
-                  <TD className="text-[12px] text-brand-600">{sale.contract ?? '—'}</TD>
-                  <TD>
-                    <StatusBadge status={sale.status} />
-                  </TD>
-                  <TD className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={FileTextIcon}
-                      onClick={() => setDetail(sale)}
-                    >
-                      Ver
-                    </Button>
-                  </TD>
-                </TR>
+                tab === 'Separación' ? (
+                  <TR key={sale.id}>
+                    <TD className="whitespace-nowrap text-xs text-brand-600">
+                      {sale.date || '—'}
+                    </TD>
+
+                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-900">
+                      {sale.code}
+                    </TD>
+
+                    <TD className="min-w-[150px] font-medium text-brand-900">
+                      {sale.buyer || '—'}
+                    </TD>
+
+                    <TD className="min-w-[170px] text-brand-700">
+                      {sale.project || '—'}
+                    </TD>
+
+                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-800">
+                      {sale.lot || '—'}
+                    </TD>
+
+                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
+                      {currency(sale.amount)}
+                    </TD>
+
+
+                    <TD className="min-w-[125px] text-brand-700">
+                      {sale.modality ?? 'Por definir'}
+                    </TD>
+
+
+                    <TD className="min-w-[130px] text-brand-700">
+                      {sale.advisor?.trim() || '—'}
+                    </TD>
+
+                    <TD>
+                      <EstadoSeparacionBadge estado={sale.status} />
+                    </TD>
+
+                    <TD align="right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={FileTextIcon}
+                        onClick={() => setDetail(sale)}
+                      >
+                        Ver
+                      </Button>
+                    </TD>
+                  </TR>
+                ) : (
+                  <TR key={sale.id}>
+                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-900">
+                      {sale.code}
+                    </TD>
+
+                    <TD>
+                      <Badge tone="brand">{sale.type}</Badge>
+                    </TD>
+
+                    <TD className="font-medium text-brand-900">
+                      {sale.buyer}
+                    </TD>
+
+                    <TD>
+                      <p className="font-mono text-xs font-semibold text-brand-700">
+                        {sale.lot}
+                      </p>
+                      <p className="text-xs text-brand-500">
+                        {sale.project}
+                      </p>
+                    </TD>
+
+                    <TD>{sale.modality ?? '—'}</TD>
+
+                    <TD align="right" className="whitespace-nowrap font-semibold">
+                      {currency(sale.amount)}
+                    </TD>
+
+                    <TD>
+                      <AdvisorBadge advisor={sale.advisor} type={sale.type} />
+                    </TD>
+
+                    <TD className="whitespace-nowrap text-xs">
+                      {sale.date || '—'}
+                    </TD>
+
+                    <TD>{sale.contract ?? '—'}</TD>
+
+                    <TD>
+                      <StatusBadge status={sale.status} />
+                    </TD>
+
+                    <TD align="right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={FileTextIcon}
+                        onClick={() => setDetail(sale)}
+                      >
+                        Ver
+                      </Button>
+                    </TD>
+                  </TR>
+                )
               ))}
-            </tbody>
-          </Table>
-        )}
-      </Card>
+            </Table>
+
+          )}
+        </Card>
+      )}
 
       {/* Modal Detalle de Operación */}
       <Modal

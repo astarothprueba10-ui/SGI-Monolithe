@@ -5,16 +5,19 @@ import monolithe.core_service.dto.ConfirmacionCambioCorreoResponse;
 import monolithe.core_service.dto.SolicitudCambioCorreoResponse;
 import monolithe.core_service.repository.TrabajadorProcedureRepository;
 import monolithe.core_service.repository.TrabajadorProcedureRepository.ResultadoProcedimiento;
+import monolithe.core_service.dto.ResolverCorreccionRequest;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-import org.mockito.ArgumentCaptor;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.OffsetDateTime;
 
 class TrabajadorServiceCambioCorreoTest {
 
@@ -83,51 +86,92 @@ class TrabajadorServiceCambioCorreoTest {
 
         @Test
         void debeRechazarCambioCuandoUsuarioSinPermisos() {
+
+                String motivo = "Solicitud de cambio de correo laboral";
+
                 ResultadoProcedimiento respuesta = new ResultadoProcedimiento(
-                                null, "DENEGADO", "Sin autorizacion para modificar trabajadores");
-                when(repository.solicitarCambioCorreo(anyLong(), anyLong(), anyString(), anyString(), any()))
+                                null, "DENEGADO",
+                                "Sin autorizacion para modificar trabajadores");
+
+                when(repository.solicitarCambioCorreo(
+                                eq(99L),
+                                eq(10L),
+                                eq("nuevo@monolithe.pe"),
+                                eq(motivo)))
                                 .thenReturn(respuesta);
 
                 ResponseStatusException ex = assertThrows(
                                 ResponseStatusException.class,
-                                () -> service.solicitarCambioCorreo(99L, 10L, "nuevo@monolithe.pe", "jwt"));
+                                () -> service.solicitarCambioCorreo(
+                                                99L, 10L, "nuevo@monolithe.pe", motivo));
 
                 assertEquals(403, ex.getStatusCode().value());
+
                 verifyNoInteractions(emailNotificationClient);
         }
 
         @Test
         void debeLanzarBadGatewayCuandoFallaEnvioSmtp() {
-                ResultadoProcedimiento respuesta = new ResultadoProcedimiento(
-                                jsonMapper.createObjectNode(), "OK", null);
-                when(repository.solicitarCambioCorreo(anyLong(), anyLong(), anyString(), anyString(), any()))
+
+                var resultado = jsonMapper.createObjectNode()
+                                .put("tipoDato", "CONTACTO")
+                                .put("correoPropuesto", "nuevo@monolithe.pe");
+
+                ResultadoProcedimiento respuesta = new ResultadoProcedimiento(resultado, "OK", null);
+
+                when(repository.resolverCorreccionIdentidad(
+                                anyLong(),
+                                anyLong(),
+                                eq("APROBAR"),
+                                isNull(),
+                                anyString(),
+                                any(OffsetDateTime.class)))
                                 .thenReturn(respuesta);
+
                 doThrow(new RuntimeException("Falla conexion SMTP"))
                                 .when(emailNotificationClient)
-                                .enviarConfirmacionCambioCorreo(anyString(), anyString(), anyLong(), anyString());
+                                .enviarConfirmacionCambioCorreo(
+                                                eq("nuevo@monolithe.pe"),
+                                                anyString(),
+                                                anyLong(),
+                                                eq("jwt-test"));
+
+                ResolverCorreccionRequest request = new ResolverCorreccionRequest("APROBAR", null);
 
                 ResponseStatusException ex = assertThrows(
                                 ResponseStatusException.class,
-                                () -> service.solicitarCambioCorreo(1L, 10L, "nuevo@monolithe.pe", "jwt"));
+                                () -> service.resolverCorreccion(
+                                                1L, 3L, request, "jwt-test"));
 
                 assertEquals(502, ex.getStatusCode().value());
         }
 
         @Test
         void debeConservarCorreoAnteriorAntesDeConfirmar() {
+
+                String motivo = "Correccion del correo laboral";
+
                 ResultadoProcedimiento respuesta = new ResultadoProcedimiento(
                                 jsonMapper.createObjectNode(), "OK", null);
-                when(repository.solicitarCambioCorreo(anyLong(), anyLong(), anyString(), anyString(), any()))
+
+                when(repository.solicitarCambioCorreo(
+                                1L, 10L, "nuevo@monolithe.pe", motivo))
                                 .thenReturn(respuesta);
 
-                service.solicitarCambioCorreo(1L, 10L, "nuevo@monolithe.pe", "jwt");
+                service.solicitarCambioCorreo(
+                                1L, 10L, "nuevo@monolithe.pe", motivo);
 
-                ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(String.class);
                 verify(repository).solicitarCambioCorreo(
-                                eq(1L), eq(10L), eq("nuevo@monolithe.pe"), hashCaptor.capture(), any());
-                assertTrue(hashCaptor.getValue().matches("[a-f0-9]{64}"));
-                verify(repository, never()).actualizarTrabajador(anyLong(), anyLong(), anyString());
-                verify(repository, never()).confirmarCambioCorreo(anyString());
+                                1L, 10L, "nuevo@monolithe.pe", motivo);
+
+                verify(repository, never())
+                                .actualizarTrabajador(
+                                                anyLong(), anyLong(), anyString());
+
+                verify(repository, never())
+                                .confirmarCambioCorreo(anyString());
+
+                verifyNoInteractions(emailNotificationClient);
         }
 
         @Test
