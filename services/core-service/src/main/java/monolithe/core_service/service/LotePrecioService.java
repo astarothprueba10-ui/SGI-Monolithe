@@ -1,6 +1,8 @@
 package monolithe.core_service.service;
 
 import lombok.RequiredArgsConstructor;
+import monolithe.core_service.dto.ActualizarPrecioManualRequest;
+import monolithe.core_service.dto.LotePrecioVigenteResponse;
 import monolithe.core_service.dto.LotePrecioRequest;
 import monolithe.core_service.dto.LotePrecioResponse;
 import monolithe.core_service.entity.*;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
@@ -40,14 +43,12 @@ public class LotePrecioService {
             TipoTarifa tipoTarifa,
             TarifaZonaEtapa tarifa,
             TipoAjustePrecio tipoAjustePrecio,
-            AjusteTipoLote ajuste
-    ) {
+            AjusteTipoLote ajuste) {
     }
 
     private record AjusteContexto(
             TipoAjustePrecio tipoAjustePrecio,
-            AjusteTipoLote ajuste
-    ) {
+            AjusteTipoLote ajuste) {
     }
 
     private record ResultadoCalculo(
@@ -56,8 +57,7 @@ public class LotePrecioService {
             BigDecimal precioBase,
             BigDecimal valorAjusteAplicado,
             BigDecimal montoAjuste,
-            BigDecimal precioFinal
-    ) {
+            BigDecimal precioFinal) {
     }
 
     @Transactional(readOnly = true)
@@ -80,14 +80,30 @@ public class LotePrecioService {
                         "No existe un precio vigente para el lote "
                                 + idLote
                                 + " en moneda "
-                                + codigoNormalizado
-                ));
+                                + codigoNormalizado));
+    }
+
+    @Transactional
+    public List<LotePrecioVigenteResponse> listarVigentesPorProyecto(
+            Long idProyecto,
+            String codigoMoneda) {
+        if (idProyecto == null) {
+            throw new ReglaNegocioException("El ID del proyecto es obligatorio.");
+        }
+        String normalizado = normalizarCodigo(codigoMoneda);
+        String moneda = (normalizado != null && !normalizado.isBlank()) ? normalizado : "PEN";
+        return lotePrecioRepository.buscarVigentesPorProyecto(idProyecto, moneda);
     }
 
     @Transactional
     public LotePrecioResponse calcularYRegistrar(LotePrecioRequest request) {
         ContextoPrecio ctx = resolverContexto(request);
         ResultadoCalculo resultado = calcular(ctx);
+        if (resultado.precioFinal() == null
+                || resultado.precioFinal().signum() <= 0) {
+            throw new ReglaNegocioException(
+                    "El precio calculado del lote debe ser mayor a cero.");
+        }
         OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
 
         cerrarPrecioVigente(ctx.lote().getIdLote(), ctx.moneda().getIdMoneda(), ahora);
@@ -95,6 +111,135 @@ public class LotePrecioService {
         LotePrecio guardado = lotePrecioRepository.save(nuevoPrecio);
 
         return toResponse(guardado);
+    }
+
+    @Transactional
+    public LotePrecioResponse registrarManual(
+            Long idLote,
+            BigDecimal monto) {
+        if (monto == null
+                || monto.signum() <= 0
+                || monto.scale() > 2
+                || monto.precision() - monto.scale() > 12) {
+            throw new ReglaNegocioException(
+                    "El precio manual debe ser mayor a cero " +
+                            "y tener como máximo dos decimales.");
+        }
+
+        Lote lote = obtenerLote(idLote);
+
+        if (!Boolean.TRUE.equals(lote.getActivo())) {
+            throw new ReglaNegocioException(
+                    "No se puede registrar precio en un lote inactivo.");
+        }
+
+        Moneda moneda = obtenerMonedaActiva("PEN");
+
+        OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
+
+        cerrarPrecioVigente(
+                idLote,
+                moneda.getIdMoneda(),
+                ahora);
+
+        LotePrecio nuevo = new LotePrecio();
+
+        nuevo.setLote(lote);
+        nuevo.setMoneda(moneda);
+        nuevo.setTarifa(null);
+        nuevo.setAjusteTipoLote(null);
+
+        nuevo.setAreaM2Aplicada(lote.getAreaM2());
+        nuevo.setValorTarifaAplicado(null);
+        nuevo.setPrecioBase(monto);
+        nuevo.setValorAjusteAplicado(null);
+        nuevo.setMontoAjuste(BigDecimal.ZERO);
+        nuevo.setPrecio(monto);
+
+        nuevo.setFechaDesde(ahora);
+        nuevo.setFechaHasta(null);
+        nuevo.setActivo(true);
+
+        nuevo.setObservaciones(
+                "Precio de venta ingresado manualmente");
+
+        LotePrecio guardado = lotePrecioRepository.saveAndFlush(nuevo);
+
+        return toResponse(guardado);
+    }
+
+    @Transactional
+    public LotePrecioResponse actualizarPrecioManual(
+            Long idLote,
+            ActualizarPrecioManualRequest request) {
+        validarMontoPrecio(request.monto());
+        Lote lote = obtenerLote(idLote);
+        validarOperacionesLoteParaPrecio(lote);
+        Moneda moneda = obtenerMonedaActiva("PEN");
+        Optional<LotePrecio> vigenteOpt = lotePrecioRepository
+                .buscarVigente(idLote, moneda.getIdMoneda());
+        if (vigenteOpt.isPresent()
+                && vigenteOpt.get().getPrecio().compareTo(request.monto()) == 0) {
+            return toResponse(vigenteOpt.get());
+        }
+        OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
+        cerrarPrecioVigente(idLote, moneda.getIdMoneda(), ahora);
+        LotePrecio nuevo = crearEntidadPrecioManual(
+                lote, moneda, request.monto(), request.observaciones(), ahora);
+        return toResponse(lotePrecioRepository.saveAndFlush(nuevo));
+    }
+
+    private void validarMontoPrecio(BigDecimal monto) {
+        if (monto == null || monto.signum() <= 0) {
+            throw new ReglaNegocioException("El precio debe ser mayor a cero.");
+        }
+        if (monto.scale() > 2) {
+            throw new ReglaNegocioException("El precio admite máximo dos decimales.");
+        }
+        if (monto.precision() - monto.scale() > 12) {
+            throw new ReglaNegocioException("El precio no puede exceder 12 digitos enteros.");
+        }
+    }
+
+    private void validarOperacionesLoteParaPrecio(Lote lote) {
+        if (!Boolean.TRUE.equals(lote.getActivo())) {
+            throw new ReglaNegocioException("No se puede modificar el precio de un lote inactivo.");
+        }
+        if (lote.getEstadoLote() != null) {
+            String cod = lote.getEstadoLote().getCodigo();
+            if ("VENDIDO".equals(cod)) {
+                throw new ReglaNegocioException("No se puede modificar el precio de un lote vendido.");
+            }
+            if ("RESERVADO".equals(cod)) {
+                throw new ReglaNegocioException("No se puede modificar el precio de un lote reservado.");
+            }
+        }
+        if (lotePrecioRepository.contarReservasActivas(lote.getIdLote()) > 0) {
+            throw new ReglaNegocioException("El lote tiene una reserva activa vigente.");
+        }
+        if (lotePrecioRepository.contarVentasActivas(lote.getIdLote()) > 0) {
+            throw new ReglaNegocioException("El lote tiene un proceso de venta activo.");
+        }
+    }
+
+    private LotePrecio crearEntidadPrecioManual(
+            Lote lote, Moneda moneda, BigDecimal monto,
+            String observaciones, OffsetDateTime ahora) {
+        LotePrecio nuevo = new LotePrecio();
+        nuevo.setLote(lote);
+        nuevo.setMoneda(moneda);
+        nuevo.setAreaM2Aplicada(lote.getAreaM2());
+        nuevo.setPrecioBase(monto);
+        nuevo.setMontoAjuste(BigDecimal.ZERO);
+        nuevo.setPrecio(monto);
+        nuevo.setFechaDesde(ahora);
+        nuevo.setFechaHasta(null);
+        nuevo.setActivo(true);
+        String obs = (observaciones != null && !observaciones.isBlank())
+                ? observaciones.trim()
+                : "Actualizacion manual de precio por Gerencia";
+        nuevo.setObservaciones(obs);
+        return nuevo;
     }
 
     private ContextoPrecio resolverContexto(LotePrecioRequest request) {
@@ -106,21 +251,18 @@ public class LotePrecioService {
         TipoTarifa tipoTarifa = obtenerTipoTarifaActivo(normalizarCodigo(request.codigoTipoTarifa()));
         TarifaZonaEtapa tarifa = buscarTarifaVigente(
                 lote.getIdProyecto(), zona.getIdZona(), etapaComercial.getIdEtapaComercial(),
-                moneda.getIdMoneda(), tipoTarifa.getIdTipoTarifa()
-        );
+                moneda.getIdMoneda(), tipoTarifa.getIdTipoTarifa());
         AjusteContexto ajusteCtx = resolverAjuste(lote, request.codigoTipoAjustePrecio(), moneda);
 
         return new ContextoPrecio(
                 lote, proyecto, zona, etapaComercial, moneda, tipoTarifa, tarifa,
-                ajusteCtx.tipoAjustePrecio(), ajusteCtx.ajuste()
-        );
+                ajusteCtx.tipoAjustePrecio(), ajusteCtx.ajuste());
     }
 
     private Lote obtenerLote(Long idLote) {
         return loteRepository.findById(idLote)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "Lote no encontrado con ID: " + idLote
-                ));
+                        "Lote no encontrado con ID: " + idLote));
     }
 
     private Lote obtenerLoteCalculable(Long idLote) {
@@ -146,30 +288,53 @@ public class LotePrecioService {
         if (lote.getZona() == null || !Boolean.TRUE.equals(lote.getZona().getActivo())) {
             throw new ReglaNegocioException("El lote no tiene una zona asociada y no puede calcularse su precio");
         }
-        if (lote.getZona().getProyecto() == null || !lote.getZona().getProyecto().getIdProyecto().equals(lote.getIdProyecto())) {
+        if (lote.getZona().getProyecto() == null
+                || !lote.getZona().getProyecto().getIdProyecto().equals(lote.getIdProyecto())) {
             throw new ReglaNegocioException("La zona del lote no pertenece al proyecto del lote");
         }
     }
 
-    private EtapaComercial obtenerEtapaComercialActiva(Long idEtapaComercial, Long idProyecto) {
-        EtapaComercial etapa = etapaComercialRepository.findById(idEtapaComercial)
+    private EtapaComercial obtenerEtapaComercialActiva(
+            Long idEtapaComercial,
+            Long idProyecto) {
+        EtapaComercial etapa = etapaComercialRepository
+                .findById(idEtapaComercial)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "Etapa comercial no encontrada con ID: " + idEtapaComercial
-                ));
+                        "Etapa comercial no encontrada: " + idEtapaComercial));
+
         if (!Boolean.TRUE.equals(etapa.getActivo())) {
-            throw new ReglaNegocioException("La etapa comercial no está activa: " + idEtapaComercial);
+            throw new ReglaNegocioException(
+                    "La etapa comercial no está activa.");
         }
-        if (etapa.getProyecto() == null || !etapa.getProyecto().getIdProyecto().equals(idProyecto)) {
-            throw new ReglaNegocioException("La etapa comercial no pertenece al proyecto del lote");
+
+        if (etapa.getProyecto() == null
+                || !idProyecto.equals(
+                        etapa.getProyecto().getIdProyecto())) {
+            throw new ReglaNegocioException(
+                    "La etapa comercial no pertenece al proyecto del lote.");
         }
+
+        LocalDate hoy = LocalDate.now(ZoneOffset.UTC);
+
+        if (etapa.getFechaInicio() != null
+                && hoy.isBefore(etapa.getFechaInicio())) {
+            throw new ReglaNegocioException(
+                    "La etapa comercial todavía no ha iniciado.");
+        }
+
+        if (etapa.getFechaFin() != null
+                && hoy.isAfter(etapa.getFechaFin())) {
+            throw new ReglaNegocioException(
+                    "La etapa comercial ya finalizó.");
+        }
+
         return etapa;
     }
 
     private Moneda obtenerMonedaActiva(String codigoMoneda) {
         Moneda moneda = monedaRepository.findByCodigo(codigoMoneda)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "Moneda no encontrada con código: " + codigoMoneda
-                ));
+                        "Moneda no encontrada con código: " + codigoMoneda));
         if (!Boolean.TRUE.equals(moneda.getActivo())) {
             throw new ReglaNegocioException("La moneda no está activa: " + codigoMoneda);
         }
@@ -179,8 +344,7 @@ public class LotePrecioService {
     private TipoTarifa obtenerTipoTarifaActivo(String codigoTipoTarifa) {
         TipoTarifa tipo = tipoTarifaRepository.findByCodigo(codigoTipoTarifa)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "Tipo de tarifa no encontrado con código: " + codigoTipoTarifa
-                ));
+                        "Tipo de tarifa no encontrado con código: " + codigoTipoTarifa));
         if (!Boolean.TRUE.equals(tipo.getActivo())) {
             throw new ReglaNegocioException("El tipo de tarifa no está activo: " + codigoTipoTarifa);
         }
@@ -191,13 +355,11 @@ public class LotePrecioService {
     }
 
     private TarifaZonaEtapa buscarTarifaVigente(
-            Long idProyecto, Long idZona, Long idEtapaComercial, Integer idMoneda, Integer idTipoTarifa
-    ) {
+            Long idProyecto, Long idZona, Long idEtapaComercial, Integer idMoneda, Integer idTipoTarifa) {
         return tarifaZonaEtapaRepository.buscarVigente(
-                idProyecto, idZona, idEtapaComercial, idMoneda, idTipoTarifa
-        ).orElseThrow(() -> new RecursoNoEncontradoException(
-                "No existe una tarifa vigente para el lote y configuración seleccionada"
-        ));
+                idProyecto, idZona, idEtapaComercial, idMoneda, idTipoTarifa)
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una tarifa vigente para el lote y configuración seleccionada"));
     }
 
     private AjusteContexto resolverAjuste(Lote lote, String codigoTipoAjustePrecio, Moneda moneda) {
@@ -210,16 +372,14 @@ public class LotePrecioService {
         }
         TipoAjustePrecio tipoAjuste = obtenerTipoAjusteActivo(codigoNormalizado);
         AjusteTipoLote ajuste = buscarAjusteVigente(
-                lote.getIdProyecto(), lote.getTipoLote().getIdTipoLote(), tipoAjuste, moneda.getIdMoneda()
-        );
+                lote.getIdProyecto(), lote.getTipoLote().getIdTipoLote(), tipoAjuste, moneda.getIdMoneda());
         return new AjusteContexto(tipoAjuste, ajuste);
     }
 
     private TipoAjustePrecio obtenerTipoAjusteActivo(String codigoTipoAjuste) {
         TipoAjustePrecio tipo = tipoAjustePrecioRepository.findByCodigo(codigoTipoAjuste)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "Tipo de ajuste no encontrado con código: " + codigoTipoAjuste
-                ));
+                        "Tipo de ajuste no encontrado con código: " + codigoTipoAjuste));
         if (!Boolean.TRUE.equals(tipo.getActivo())) {
             throw new ReglaNegocioException("El tipo de ajuste no está activo: " + codigoTipoAjuste);
         }
@@ -230,24 +390,20 @@ public class LotePrecioService {
     }
 
     private AjusteTipoLote buscarAjusteVigente(
-            Long idProyecto, Integer idTipoLote, TipoAjustePrecio tipoAjuste, Integer idMoneda
-    ) {
+            Long idProyecto, Integer idTipoLote, TipoAjustePrecio tipoAjuste, Integer idMoneda) {
         Optional<AjusteTipoLote> opt = ajusteTipoLoteRepository.buscarVigente(
-                idProyecto, idTipoLote, tipoAjuste.getIdTipoAjustePrecio(), idMoneda
-        );
+                idProyecto, idTipoLote, tipoAjuste.getIdTipoAjustePrecio(), idMoneda);
         if (opt.isPresent()) {
             return opt.get();
         }
         if ("PORCENTAJE".equals(tipoAjuste.getCodigo())) {
             return ajusteTipoLoteRepository.buscarVigenteSinMoneda(
-                    idProyecto, idTipoLote, tipoAjuste.getIdTipoAjustePrecio()
-            ).orElseThrow(() -> new RecursoNoEncontradoException(
-                    "No existe un ajuste vigente para el tipo de lote y configuración seleccionada"
-            ));
+                    idProyecto, idTipoLote, tipoAjuste.getIdTipoAjustePrecio())
+                    .orElseThrow(() -> new RecursoNoEncontradoException(
+                            "No existe un ajuste vigente para el tipo de lote y configuración seleccionada"));
         }
         throw new RecursoNoEncontradoException(
-                "No existe un ajuste vigente para el tipo de lote y configuración seleccionada"
-        );
+                "No existe un ajuste vigente para el tipo de lote y configuración seleccionada");
     }
 
     private ResultadoCalculo calcular(ContextoPrecio ctx) {
@@ -260,8 +416,7 @@ public class LotePrecioService {
 
         return new ResultadoCalculo(
                 areaM2Aplicada, valorTarifaAplicado, precioBase,
-                valorAjusteAplicado, montoAjuste, precioFinal
-        );
+                valorAjusteAplicado, montoAjuste, precioFinal);
     }
 
     private BigDecimal calcularPrecioBase(Lote lote, TarifaZonaEtapa tarifa, TipoTarifa tipoTarifa) {
@@ -301,8 +456,7 @@ public class LotePrecioService {
     }
 
     private LotePrecio construirPrecio(
-            ContextoPrecio ctx, ResultadoCalculo resultado, String observaciones, OffsetDateTime ahora
-    ) {
+            ContextoPrecio ctx, ResultadoCalculo resultado, String observaciones, OffsetDateTime ahora) {
         LotePrecio p = new LotePrecio();
         p.setLote(ctx.lote());
         p.setMoneda(ctx.moneda());
@@ -368,8 +522,7 @@ public class LotePrecioService {
                 p.getFechaDesde(),
                 p.getFechaHasta(),
                 p.getObservaciones(),
-                p.getActivo()
-        );
+                p.getActivo());
     }
 
     private Proyecto resolverProyectoResponse(Lote lote, TarifaZonaEtapa tarifa) {

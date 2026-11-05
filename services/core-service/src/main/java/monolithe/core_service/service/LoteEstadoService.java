@@ -6,11 +6,9 @@ import monolithe.core_service.dto.CambiarEstadoLoteRequest;
 import monolithe.core_service.dto.CambioEstadoLoteResponse;
 import monolithe.core_service.dto.LoteHistorialEstadoResponse;
 import monolithe.core_service.entity.EstadoLote;
-import monolithe.core_service.entity.LoteHistorialEstado;
 import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.EstadoLoteRepository;
-import monolithe.core_service.repository.LoteHistorialEstadoRepository;
 import monolithe.core_service.repository.LoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,13 +24,8 @@ public class LoteEstadoService {
 
         private final LoteRepository loteRepository;
         private final EstadoLoteRepository estadoLoteRepository;
-        private final LoteHistorialEstadoRepository loteHistorialEstadoRepository;
         private final EntityManager entityManager;
         private final ObjectMapper objectMapper;
-
-        // =========================================================
-        // 1. CAMBIAR ESTADO DEL LOTE
-        // =========================================================
 
         @Transactional
         public CambioEstadoLoteResponse cambiarEstado(
@@ -57,6 +50,9 @@ public class LoteEstadoService {
                 }
 
                 String motivo = normalizarMotivo(request.motivo());
+                if ("DISPONIBLE".equals(codigoNuevoEstado)) {
+                        validarPrecioParaHabilitar(idLote);
+                }
 
                 String jsonResultado = ejecutarFuncionPostgres(
                                 idLote, idUsuario, codigoNuevoEstado, motivo);
@@ -68,26 +64,60 @@ public class LoteEstadoService {
                 return respuesta;
         }
 
-        // =========================================================
-        // 2. CONSULTAR HISTORIAL
-        // =========================================================
-
         @Transactional(readOnly = true)
-        public List<LoteHistorialEstadoResponse> listarHistorial(Long idLote) {
-                if (!loteRepository.existsById(idLote)) {
-                        throw new RecursoNoEncontradoException(
-                                        "Lote no encontrado: " + idLote);
+        public List<LoteHistorialEstadoResponse> listarHistorial(
+                        Long idLote,
+                        Long idActor) {
+
+                String resultado = (String) entityManager.createNativeQuery(
+                                "SELECT public.sp_lotes_listar_historial_estados_v1(" +
+                                                ":idActor, :idLote)::text")
+                                .setParameter("idActor", idActor)
+                                .setParameter("idLote", idLote)
+                                .getSingleResult();
+
+                try {
+                        return objectMapper.readValue(
+                                        resultado,
+                                        new tools.jackson.core.type.TypeReference<List<LoteHistorialEstadoResponse>>() {
+                                        });
+                } catch (Exception ex) {
+                        throw new IllegalStateException(
+                                        "No fue posible interpretar el historial del lote.",
+                                        ex);
                 }
-                return loteHistorialEstadoRepository
-                                .findByLote_IdLoteOrderByFechaCambioDesc(idLote)
-                                .stream()
-                                .map(this::toHistorialResponse)
-                                .toList();
         }
 
-        // =========================================================
         // HELPERS PRIVADOS
-        // =========================================================
+
+        private void validarPrecioParaHabilitar(Long idLote) {
+
+                Number cantidad = (Number) entityManager.createNativeQuery("""
+                                SELECT COUNT(*)
+                                FROM public.inm_lotes_precios p
+                                INNER JOIN public.cfg_monedas m
+                                    ON m.id_moneda = p.id_moneda
+                                WHERE p.id_lote = :idLote
+                                  AND p.activo = TRUE
+                                  AND p.precio > 0
+                                  AND p.fecha_desde <= NOW()
+                                  AND (
+                                      p.fecha_hasta IS NULL
+                                      OR p.fecha_hasta > NOW()
+                                  )
+                                  AND m.activo = TRUE
+                                  AND TRIM(m.codigo) = 'PEN'
+                                """)
+                                .setParameter("idLote", idLote)
+                                .getSingleResult();
+
+                if (cantidad.longValue() != 1L) {
+                        throw new ReglaNegocioException(
+                                        "No se puede habilitar el lote. " +
+                                                        "Debe tener exactamente un precio oficial " +
+                                                        "vigente en soles. Configure primero su precio.");
+                }
+        }
 
         private String ejecutarFuncionPostgres(
                         Long idLote,
@@ -140,27 +170,6 @@ public class LoteEstadoService {
                                         "No fue posible interpretar la respuesta del cambio de estado del lote",
                                         e);
                 }
-        }
-
-        private LoteHistorialEstadoResponse toHistorialResponse(
-                        LoteHistorialEstado historial) {
-                EstadoLote anterior = historial.getEstadoAnterior();
-                EstadoLote nuevo = historial.getEstadoNuevo();
-
-                return new LoteHistorialEstadoResponse(
-                                historial.getIdHistorial(),
-                                historial.getLote().getIdLote(),
-                                historial.getLote().getCodigo(),
-                                historial.getLote().getNumero(),
-                                anterior != null ? anterior.getIdEstadoLote() : null,
-                                anterior != null ? anterior.getCodigo() : null,
-                                anterior != null ? anterior.getNombre() : null,
-                                nuevo.getIdEstadoLote(),
-                                nuevo.getCodigo(),
-                                nuevo.getNombre(),
-                                historial.getMotivo(),
-                                historial.getFechaCambio(),
-                                historial.getIdUsuario());
         }
 
         private String normalizarMotivo(String motivo) {

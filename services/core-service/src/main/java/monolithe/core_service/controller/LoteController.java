@@ -6,6 +6,8 @@ import monolithe.core_service.dto.LoteRequest;
 import monolithe.core_service.dto.LoteResponse;
 import monolithe.core_service.service.LoteService;
 import monolithe.core_service.dto.LoteFiltroRequest;
+import monolithe.core_service.dto.CrearLoteConPrecioRequest;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,6 +45,18 @@ public class LoteController {
     @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<LoteResponse> obtenerPorId(@PathVariable Long idLote) {
         return ResponseEntity.ok(loteService.obtenerPorId(idLote));
+    }
+
+    @PostMapping("/con-precio")
+    @PreAuthorize("hasAuthority('lots.edit')")
+    public ResponseEntity<LoteResponse> crearConPrecio(
+            @Valid @RequestBody CrearLoteConPrecioRequest request) {
+
+        LoteResponse creado = loteService.crearConPrecio(request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(creado);
     }
 
     @PostMapping

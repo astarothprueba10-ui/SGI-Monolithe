@@ -32,7 +32,7 @@ interface ChartConfig {
   valuePrefix?: string;
 }
 
-const CHART_BY_ROLE: Record<RoleName, ChartConfig> = {
+const CHART_BY_ROLE: Record<Exclude<RoleName, 'Asesoría Legal'>, ChartConfig> = {
   Administrador: {
     title: 'Ventas y separaciones por mes',
     description: 'Operaciones cerradas frente a separaciones registradas',
@@ -126,13 +126,31 @@ export function Dashboard() {
   const [managerialKpis, setManagerialKpis] = React.useState<ManagerialKpis | null>(null);
 
   React.useEffect(() => {
+    if (role === 'Asesoría Legal') return;
     commissionsService.getManagerialKpis().then((res) => {
       if (res) setManagerialKpis(res);
     });
-  }, []);
+  }, [role]);
 
   const kpis = buildDynamicKpis(ROLE_KPIS[role], managerialKpis);
   const intro = DASHBOARD_INTRO[role];
+
+  if (role === 'Asesoría Legal') {
+    return (
+      <div>
+        <PageHeader title={intro.title} description={intro.description} />
+        <Card className="p-5">
+          <h2 className="text-sm font-semibold text-brand-900">Expedientes legales</h2>
+          <p className="mt-2 text-sm text-brand-600">
+            Consulta las solicitudes derivadas y sus evidencias jurídicas.
+          </p>
+          <Link to="/anulaciones">
+            <Button className="mt-4">Abrir bandeja de anulaciones</Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
   const chart = CHART_BY_ROLE[role];
 
   return (

@@ -139,6 +139,10 @@ test('Visitas: no permite visitas mas alla de 180 dias ni en el pasado', () => {
 
   const muyFutura = new Date();
   muyFutura.setDate(muyFutura.getDate() + 200);
+  // El test verifica el límite de 180 días: evitar lunes y martes, que tienen otra validación.
+  while (muyFutura.getDay() === 1 || muyFutura.getDay() === 2) {
+    muyFutura.setDate(muyFutura.getDate() + 1);
+  }
   const pad2 = (n) => String(n).padStart(2, '0');
   const muyFuturaStr = `${muyFutura.getFullYear()}-${pad2(muyFutura.getMonth() + 1)}-${pad2(muyFutura.getDate())}`;
   const resExcedida = validateVisit({

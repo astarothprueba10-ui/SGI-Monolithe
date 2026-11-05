@@ -8,6 +8,9 @@ import monolithe.core_service.exception.ConflictoNegocioException;
 import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.*;
+import monolithe.core_service.dto.CrearLoteConPrecioRequest;
+import monolithe.core_service.dto.LotePrecioResponse;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import monolithe.core_service.dto.LoteFiltroRequest;
@@ -26,6 +29,8 @@ public class LoteService {
     private final ZonaRepository zonaRepository;
     private final EstadoLoteRepository estadoLoteRepository;
     private final TipoLoteRepository tipoLoteRepository;
+    private final LotePrecioRepository lotePrecioRepository;
+    private final LotePrecioService lotePrecioService;
 
     @Transactional(readOnly = true)
     public List<LoteResponse> listarPorManzana(Long idManzana) {
@@ -65,11 +70,73 @@ public class LoteService {
 
     @Transactional
     public LoteResponse crear(LoteRequest request) {
+
+        if (!"NO_DISPONIBLE".equals(
+                normalizarCodigo(request.codigoEstadoLote()))) {
+            throw new ReglaNegocioException(
+                    "El alta tradicional solo permite lotes NO_DISPONIBLE. " +
+                            "Para crear un lote comercializable utilice el registro con precio.");
+        }
+
+        return guardarLoteNuevo(request);
+    }
+
+    @Transactional
+    public LoteResponse crearConPrecio(
+            CrearLoteConPrecioRequest solicitud) {
+        LoteRequest datos = solicitud.lote();
+
+        CrearLoteConPrecioRequest.ConfiguracionPrecio configuracion = solicitud.precio();
+
+        String estado = normalizarCodigo(datos.codigoEstadoLote());
+
+        if (!"DISPONIBLE".equals(estado)
+                && !"NO_DISPONIBLE".equals(estado)) {
+            throw new ReglaNegocioException(
+                    "El lote debe iniciar como DISPONIBLE " +
+                            "o NO_DISPONIBLE.");
+        }
+
+        if ("DISPONIBLE".equals(estado)
+                && configuracion == null) {
+            throw new ReglaNegocioException(
+                    "Un lote DISPONIBLE requiere un precio de venta.");
+        }
+
+        if (configuracion != null
+                && Boolean.FALSE.equals(datos.activo())) {
+            throw new ReglaNegocioException(
+                    "No se puede registrar un precio " +
+                            "para un lote inactivo.");
+        }
+
+        LoteResponse creado = guardarLoteNuevo(datos);
+
+        if (configuracion != null) {
+            LotePrecioResponse registrado = lotePrecioService.registrarManual(
+                    creado.idLote(),
+                    configuracion.monto());
+
+            if (registrado.precio() == null
+                    || registrado.precio().signum() <= 0
+                    || !creado.idLote().equals(registrado.idLote())) {
+                throw new ReglaNegocioException(
+                        "No fue posible registrar el precio oficial.");
+            }
+        }
+
+        return creado;
+    }
+
+    private LoteResponse guardarLoteNuevo(LoteRequest request) {
+
         Manzana manzana = obtenerManzanaActiva(request.idManzana());
         Long idProyecto = manzana.getEtapa().getProyecto().getIdProyecto();
+
         Zona zona = resolverZonaValida(request.idZona(), idProyecto);
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
         EstadoLote estado = obtenerEstadoActivo(request.codigoEstadoLote());
+
         validarEstadoInicial(estado);
 
         String codigo = normalizarCodigo(request.codigo());
@@ -79,8 +146,21 @@ public class LoteService {
         validarUnicidadCrear(manzana.getIdManzana(), codigo, numero);
 
         Lote lote = new Lote();
-        asignarValoresLote(lote, manzana, zona, idProyecto, tipo, estado, codigo, numero, observaciones, request);
-        lote.setActivo(request.activo() != null ? request.activo() : Boolean.TRUE);
+
+        asignarValoresLote(
+                lote,
+                manzana,
+                zona,
+                idProyecto,
+                tipo,
+                estado,
+                codigo,
+                numero,
+                observaciones,
+                request);
+
+        lote.setActivo(
+                request.activo() != null ? request.activo() : Boolean.TRUE);
 
         return toResponse(loteRepository.save(lote));
     }
@@ -97,6 +177,7 @@ public class LoteService {
 
         Zona zona = resolverZonaValida(request.idZona(), idProyectoDestino);
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
+        validarCambiosConPrecioActivo(lote, request, zona, tipo);
 
         EstadoLote estadoActual = lote.getEstadoLote();
         String codigoEstadoSolicitado = normalizarCodigo(request.codigoEstadoLote());
@@ -136,6 +217,52 @@ public class LoteService {
 
             lote.setActivo(false);
             loteRepository.save(lote);
+        }
+    }
+
+    private void validarCambiosConPrecioActivo(
+            Lote lote,
+            LoteRequest request,
+            Zona nuevaZona,
+            TipoLote nuevoTipo) {
+        boolean tienePrecioActivo = !lotePrecioRepository
+                .findByLote_IdLoteAndActivoTrueOrderByFechaDesdeDesc(
+                        lote.getIdLote())
+                .isEmpty();
+
+        if (!tienePrecioActivo) {
+            return;
+        }
+
+        boolean cambiaArea = lote.getAreaM2() == null
+                || request.areaM2() == null
+                || lote.getAreaM2().compareTo(request.areaM2()) != 0;
+
+        Long zonaActual = lote.getZona() != null
+                ? lote.getZona().getIdZona()
+                : null;
+
+        Long zonaNueva = nuevaZona != null
+                ? nuevaZona.getIdZona()
+                : null;
+
+        boolean cambiaZona = !java.util.Objects.equals(zonaActual, zonaNueva);
+
+        Integer tipoActual = lote.getTipoLote() != null
+                ? lote.getTipoLote().getIdTipoLote()
+                : null;
+
+        Integer tipoNuevo = nuevoTipo != null
+                ? nuevoTipo.getIdTipoLote()
+                : null;
+
+        boolean cambiaTipo = !java.util.Objects.equals(tipoActual, tipoNuevo);
+
+        if (cambiaArea || cambiaZona || cambiaTipo) {
+            throw new ReglaNegocioException(
+                    "El lote tiene un precio activo. " +
+                            "No se puede modificar el area, zona o tipo de lote " +
+                            "sin actualizar su configuracion comercial y precio.");
         }
     }
 

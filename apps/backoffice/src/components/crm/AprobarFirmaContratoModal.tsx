@@ -33,9 +33,11 @@ export function AprobarFirmaContratoModal({
   const [observaciones, setObservaciones] = useState('');
   const [firmaRevisada, setFirmaRevisada] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [confirmacionPendiente, setConfirmacionPendiente] = useState(false);
 
-  const confirmarAprobacion = async (e: FormEvent) => {
-    e.preventDefault();
+
+  const confirmarAprobacion = async (e?: FormEvent) => {
+    e?.preventDefault();
 
     if (guardando) return;
 
@@ -61,16 +63,10 @@ export function AprobarFirmaContratoModal({
       return;
     }
 
-    const aceptado = window.confirm(
-      `¿Confirmas la aprobación del contrato ${codigoContrato}?\n\n` +
-      'Esta operación registrará la venta como contratada, ' +
-      'marcará el lote como vendido y convertirá al prospecto ' +
-      'en comprador.\n\n' +
-      'Si la venta es financiada, también activará su plan ' +
-      'de pagos y generará las cuotas.'
-    );
-
-    if (!aceptado) return;
+    if (!confirmacionPendiente) {
+      setConfirmacionPendiente(true);
+      return;
+    }
 
     setGuardando(true);
 
@@ -106,6 +102,109 @@ export function AprobarFirmaContratoModal({
       setGuardando(false);
     }
   };
+
+
+  if (confirmacionPendiente) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmacion-firma-titulo"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      >
+        <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
+
+          <div className="border-b border-brand-100 px-6 py-4">
+            <h2
+              id="confirmacion-firma-titulo"
+              className="text-lg font-semibold text-brand-900"
+            >
+              Confirmar aprobación contractual
+            </h2>
+
+            <p className="mt-1 text-sm text-brand-500">
+              Revise las consecuencias antes de continuar.
+            </p>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+              <p className="text-xs text-brand-500">
+                Contrato
+              </p>
+
+              <p className="mt-1 font-semibold text-brand-900">
+                {codigoContrato}
+              </p>
+
+              <p className="mt-3 text-xs text-brand-500">
+                Fecha de firma declarada
+              </p>
+
+              <p className="font-medium text-brand-900">
+                {fechaFirma}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">
+                Esta operación modificará los registros comerciales
+              </p>
+
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-xs text-amber-900">
+                <li>
+                  La venta pasará a estado CONTRATADA.
+                </li>
+                <li>
+                  El lote cambiará a VENDIDO.
+                </li>
+                <li>
+                  El prospecto se convertirá en comprador.
+                </li>
+                <li>
+                  Si corresponde, se activará el plan financiado
+                  y se generarán las cuotas.
+                </li>
+                <li>
+                  Los S/ 500 de separación confirmados se
+                  aplicarán a la venta correspondiente.
+                </li>
+              </ul>
+            </div>
+
+            <p className="text-xs text-brand-600">
+              Confirme únicamente si comprobó que el documento
+              contiene las firmas reales y corresponde a esta
+              operación. Esta acción no debe utilizarse con
+              documentos de prueba.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-brand-100 bg-brand-50/50 px-6 py-4">
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => setConfirmacionPendiente(false)}
+              className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-brand-800 disabled:opacity-50"
+            >
+              Volver
+            </button>
+
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={() => void confirmarAprobacion()}
+              className="rounded-lg bg-brand-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {guardando
+                ? 'Aprobando...'
+                : 'Confirmar aprobación definitiva'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -225,8 +324,8 @@ export function AprobarFirmaContratoModal({
               className="rounded-lg bg-blue-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando
-                ? 'Aprobando...'
-                : 'Confirmar aprobación'}
+                ? 'Procesando...'
+                : 'Continuar a confirmación'}
             </button>
           </div>
         </form>

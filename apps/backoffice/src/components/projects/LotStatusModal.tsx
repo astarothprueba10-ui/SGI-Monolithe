@@ -7,10 +7,12 @@ import { FieldLabel, Select } from '../ui/Field';
 
 import { coreService } from '../../services/coreService';
 
+import { HistorialLotePanel } from '../lots/HistorialLotePanel';
+import { HistorialComercialLotePanel } from '../lots/HistorialComercialLotePanel';
+import { Gate } from '../auth/PermissionRoute';
 import type {
   LoteResponse,
-  EstadoLoteResponse,
-  LoteHistorialEstadoResponse
+  EstadoLoteResponse
 } from '../../types/core';
 
 interface Props {
@@ -33,32 +35,14 @@ export function LotStatusModal({
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [motivo, setMotivo] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [history, setHistory] = useState<LoteHistorialEstadoResponse[]>([]);
+  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0);
 
   useEffect(() => {
     if (open && lot) {
-      loadHistory();
       setSelectedStatus('');
       setMotivo('');
-    } else {
-      setHistory([]);
     }
   }, [open, lot]);
-
-  const loadHistory = async () => {
-    if (!lot) return;
-    try {
-      setHistoryLoading(true);
-      const data = await coreService.getLotStatusHistory(lot.idLote);
-      setHistory(data);
-    } catch (err: unknown) {
-      console.error(err);
-      toast.error('No se pudo cargar el historial de estados');
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
 
   const getValidDestinations = (currentCode?: string): string[] => {
     if (!currentCode) return [];
@@ -113,7 +97,7 @@ export function LotStatusModal({
       setSelectedStatus('');
       setMotivo('');
 
-      await loadHistory();
+      setRefreshHistoryKey((k) => k + 1);
       await onSuccess();
       // Notice: Modal remains open per requirement
     } catch (err: unknown) {
@@ -210,40 +194,20 @@ export function LotStatusModal({
         )}
 
         <div className="border-t pt-4 mt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Historial de estados</h3>
-          {historyLoading ? (
-            <p className="text-sm text-gray-500">Cargando historial...</p>
-          ) : history.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">Este lote aún no registra cambios de estado.</p>
-          ) : (
-            <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
-              {history.map((h) => (
-                <div key={h.idHistorial} className="bg-white border rounded-md p-3 shadow-sm text-sm">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-semibold text-gray-800">
-                      {new Intl.DateTimeFormat('es-PE', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short'
-                      }).format(new Date(h.fechaCambio))}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2 text-gray-700">
-                    <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                      {h.nombreEstadoAnterior || 'N/A'}
-                    </span>
-                    <span>→</span>
-                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium">
-                      {h.nombreEstadoNuevo}
-                    </span>
-                  </div>
-                  {h.motivo && (
-                    <p className="text-gray-600 italic">"{h.motivo}"</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <HistorialLotePanel
+            idLote={lot.idLote}
+            codigoLote={lot.codigo}
+            refreshKey={refreshHistoryKey}
+          />
         </div>
+        <Gate permission="sales.view">
+          <div className="border-t pt-4">
+            <HistorialComercialLotePanel
+              idLote={lot.idLote}
+              refreshKey={refreshHistoryKey}
+            />
+          </div>
+        </Gate>
       </div>
     </Modal>
   );

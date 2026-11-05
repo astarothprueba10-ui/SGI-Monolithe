@@ -2,8 +2,10 @@ package monolithe.core_service.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import monolithe.core_service.dto.ActualizarPrecioManualRequest;
 import monolithe.core_service.dto.LotePrecioRequest;
 import monolithe.core_service.dto.LotePrecioResponse;
+import monolithe.core_service.dto.LotePrecioVigenteResponse;
 import monolithe.core_service.service.LotePrecioService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,10 +38,29 @@ public class LotePrecioController {
             @RequestParam("moneda") String codigoMoneda
     ) {
         return ResponseEntity.ok(
-                lotePrecioService.obtenerVigente(
-                        idLote,
-                        codigoMoneda
-                )
+                lotePrecioService.obtenerVigente(idLote, codigoMoneda)
+        );
+    }
+
+    @GetMapping("/proyecto/{idProyecto}/vigentes")
+    @PreAuthorize("hasAuthority('lots.view')")
+    public ResponseEntity<List<LotePrecioVigenteResponse>> listarVigentesPorProyecto(
+            @PathVariable Long idProyecto,
+            @RequestParam(value = "moneda", defaultValue = "PEN") String codigoMoneda
+    ) {
+        return ResponseEntity.ok(
+                lotePrecioService.listarVigentesPorProyecto(idProyecto, codigoMoneda)
+        );
+    }
+
+    @PutMapping("/lote/{idLote}/manual")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('lots.edit')")
+    public ResponseEntity<LotePrecioResponse> actualizarPrecioManual(
+            @PathVariable Long idLote,
+            @Valid @RequestBody ActualizarPrecioManualRequest request
+    ) {
+        return ResponseEntity.ok(
+                lotePrecioService.actualizarPrecioManual(idLote, request)
         );
     }
 

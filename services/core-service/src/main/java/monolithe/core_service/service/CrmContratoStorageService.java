@@ -4,6 +4,9 @@ package monolithe.core_service.service;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -146,6 +149,111 @@ public class CrmContratoStorageService {
                 }
         }
 
+        public EnlaceCargaPdf prepararCargaAnexo(
+                        Long actor,
+                        Long idContrato,
+                        String tipoAnexo) {
+
+                JsonNode autorizacion = ventaService.autorizarCargaAnexoContrato(
+                                actor, idContrato, tipoAnexo);
+
+                String prefijo = "anexos/" + idContrato + "/" + tipoAnexo + "/";
+
+                if (!autorizacion.path("autorizado").asBoolean(false)
+                                || !BUCKET.equals(autorizacion.path("bucket").asString(""))
+                                || !prefijo.equals(autorizacion.path("prefijo").asString(""))) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Carga del anexo no autorizada.");
+                }
+
+                if (supabaseUrl == null || supabaseUrl.isBlank()
+                                || secretKey == null || secretKey.isBlank()) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Storage no está configurado.");
+                }
+
+                String base = supabaseUrl.trim().replaceAll("/+$", "");
+                URI servidor;
+
+                try {
+                        servidor = URI.create(base);
+                } catch (IllegalArgumentException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "URL de Storage inválida.", ex);
+                }
+
+                if (!"https".equalsIgnoreCase(servidor.getScheme())
+                                || servidor.getHost() == null
+                                || !servidor.getHost().endsWith(".supabase.co")
+                                || servidor.getUserInfo() != null
+                                || servidor.getPort() != -1
+                                || servidor.getRawQuery() != null
+                                || servidor.getRawFragment() != null
+                                || (servidor.getRawPath() != null
+                                                && !servidor.getRawPath().isEmpty())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Servidor de Storage no autorizado.");
+                }
+
+                String claveArchivo = prefijo + UUID.randomUUID() + ".pdf";
+                String ruta = "/object/upload/sign/" + BUCKET + "/" + claveArchivo;
+                String storageBase = base + "/storage/v1";
+
+                String respuesta;
+
+                try {
+                        respuesta = restClient.post()
+                                        .uri(storageBase + ruta)
+                                        .header("apikey", secretKey)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(Map.of())
+                                        .retrieve()
+                                        .body(String.class);
+                } catch (RestClientException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "No se pudo generar el enlace firmado.", ex);
+                }
+
+                try {
+                        if (respuesta == null || respuesta.isBlank()) {
+                                throw new IllegalStateException("Respuesta vacía.");
+                        }
+
+                        JsonNode json = jsonMapper.readTree(respuesta);
+                        String rutaFirmada = json.path("url").asString("");
+                        URI enlace = URI.create(rutaFirmada);
+
+                        String consulta = enlace.getRawQuery();
+
+                        if (enlace.isAbsolute()
+                                        || !ruta.equals(enlace.getRawPath())
+                                        || consulta == null
+                                        || !consulta.matches("token=[A-Za-z0-9._~%+-]+")) {
+                                throw new IllegalStateException(
+                                                "Enlace firmado inválido.");
+                        }
+
+                        return new EnlaceCargaPdf(
+                                        BUCKET,
+                                        claveArchivo,
+                                        storageBase + rutaFirmada,
+                                        "application/pdf",
+                                        10485760L,
+                                        7200);
+
+                } catch (JacksonException | IllegalArgumentException
+                                | IllegalStateException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "Respuesta de Storage inválida.", ex);
+                }
+        }
+
         public record EnlaceCargaPdf(
                         String bucket,
                         String claveArchivo,
@@ -172,7 +280,53 @@ public class CrmContratoStorageService {
                                         "No tienes autorización para revisar este contrato.");
                 }
 
-                // 2. Obtener la clave validada por el procedimiento.
+                return generarEnlacePdfAutorizado(
+                                idContrato,
+                                idContratoArchivo,
+                                autorizacion);
+        }
+
+        /**
+         * Consulta de un PDF contractual cuya firma ya fue aprobada.
+         * No modifica contratos ni aprueba firmas.
+         */
+        public EnlaceLecturaPdf prepararLecturaAprobado(
+                        Long actor,
+                        Long idContrato) {
+
+                JsonNode autorizacion = ventaService.autorizarLecturaPdfAprobado(
+                                actor,
+                                idContrato);
+
+                long idArchivo = autorizacion
+                                .path("idContratoArchivo")
+                                .asLong(0L);
+
+                if (!autorizacion.path("autorizado").asBoolean(false)
+                                || idContrato == null
+                                || autorizacion.path("idContrato").asLong(0L) != idContrato.longValue()
+                                || idArchivo <= 0L) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "No se autorizó la lectura del contrato aprobado.");
+                }
+
+                return generarEnlacePdfAutorizado(
+                                idContrato,
+                                idArchivo,
+                                autorizacion);
+        }
+
+        /**
+         * Genera el enlace privado después de que Supabase
+         * haya autorizado la operación.
+         */
+        private EnlaceLecturaPdf generarEnlacePdfAutorizado(
+                        Long idContrato,
+                        Long idContratoArchivo,
+                        JsonNode autorizacion) {
+
                 String claveArchivo = autorizacion.path("claveArchivo").asString("");
 
                 String bucket = autorizacion.path("bucket").asString("");
@@ -296,6 +450,136 @@ public class CrmContratoStorageService {
                 }
         }
 
+        public EnlaceLecturaAnexo prepararLecturaAnexo(
+                        Long actor,
+                        Long idContrato,
+                        Long idAnexo) {
+
+                JsonNode autorizacion = ventaService.autorizarLecturaAnexoContrato(
+                                actor, idContrato, idAnexo);
+
+                String bucket = autorizacion.path("bucket").asString("");
+                String tipo = autorizacion.path("tipoAnexo").asString("");
+                String clave = autorizacion.path("claveArchivo").asString("");
+                String nombre = autorizacion.path("nombreOriginal").asString("");
+
+                String prefijo = "anexos/" + idContrato + "/" + tipo + "/";
+                String patron = "^"
+                                + java.util.regex.Pattern.quote(prefijo)
+                                + "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                                + "[0-9a-f]{4}-[0-9a-f]{12}\\.pdf$";
+
+                if (!autorizacion.path("autorizado").asBoolean(false)
+                                || !BUCKET.equals(bucket)
+                                || (!"PLANO_LOTE".equals(tipo)
+                                                && !"MEMORIA_DESCRIPTIVA".equals(tipo))
+                                || !clave.matches(patron)) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Lectura del anexo no autorizada.");
+                }
+
+                if (supabaseUrl == null || supabaseUrl.isBlank()
+                                || secretKey == null || secretKey.isBlank()) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Storage no está configurado.");
+                }
+
+                String base = supabaseUrl.trim().replaceAll("/+$", "");
+                URI servidor;
+
+                try {
+                        servidor = URI.create(base);
+                } catch (IllegalArgumentException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "URL de Storage inválida.", ex);
+                }
+
+                if (!"https".equalsIgnoreCase(servidor.getScheme())
+                                || servidor.getHost() == null
+                                || !servidor.getHost().endsWith(".supabase.co")
+                                || servidor.getUserInfo() != null
+                                || servidor.getPort() != -1
+                                || servidor.getRawQuery() != null
+                                || servidor.getRawFragment() != null
+                                || (servidor.getRawPath() != null
+                                                && !servidor.getRawPath().isEmpty())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Servidor de Storage no autorizado.");
+                }
+
+                String storageBase = base + "/storage/v1";
+                String ruta = "/object/sign/" + BUCKET + "/" + clave;
+
+                final String respuesta;
+
+                try {
+                        respuesta = restClient.post()
+                                        .uri(storageBase + ruta)
+                                        .header("apikey", secretKey)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(Map.of("expiresIn", 120))
+                                        .retrieve()
+                                        .body(String.class);
+
+                } catch (RestClientException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "No se pudo generar el enlace privado.", ex);
+                }
+
+                try {
+                        if (respuesta == null || respuesta.isBlank()) {
+                                throw new IllegalStateException("Respuesta vacía.");
+                        }
+
+                        JsonNode json = jsonMapper.readTree(respuesta);
+                        String rutaFirmada = json.path("signedURL").asString("");
+                        URI enlace = URI.create(rutaFirmada);
+
+                        String consulta = enlace.getRawQuery();
+
+                        if (enlace.isAbsolute()
+                                        || !ruta.equals(enlace.getRawPath())
+                                        || consulta == null
+                                        || !consulta.matches("token=[A-Za-z0-9._~%+-]+")) {
+
+                                throw new IllegalStateException(
+                                                "Enlace privado inválido.");
+                        }
+
+                        return new EnlaceLecturaAnexo(
+                                        idContrato,
+                                        idAnexo,
+                                        tipo,
+                                        nombre,
+                                        storageBase + rutaFirmada,
+                                        120);
+
+                } catch (JacksonException | IllegalArgumentException
+                                | IllegalStateException ex) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "Respuesta de Storage inválida.", ex);
+                }
+        }
+
+        public record EnlaceLecturaAnexo(
+                        Long idContrato,
+                        Long idAnexo,
+                        String tipoAnexo,
+                        String nombreOriginal,
+                        String urlLectura,
+                        int expiresInSeconds) {
+        }
+
         public record EnlaceLecturaPdf(
                         Long idContrato,
                         Long idContratoArchivo,
@@ -378,6 +662,160 @@ public class CrmContratoStorageService {
                                         "No se pudo eliminar el PDF anterior.",
                                         ex);
                 }
+        }
+
+        public JsonNode registrarAnexoVerificado(
+                        Long actor,
+                        Long idContrato,
+                        String tipoAnexo,
+                        String claveArchivo,
+                        String nombreOriginal) {
+
+                JsonNode autorizacion = ventaService.autorizarCargaAnexoContrato(
+                                actor, idContrato, tipoAnexo);
+
+                String prefijo = "anexos/" + idContrato + "/"
+                                + tipoAnexo + "/";
+
+                String patron = "^"
+                                + java.util.regex.Pattern.quote(prefijo)
+                                + "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                                + "[0-9a-f]{4}-[0-9a-f]{12}\\.pdf$";
+
+                if (!autorizacion.path("autorizado").asBoolean(false)
+                                || !BUCKET.equals(
+                                                autorizacion.path("bucket").asString(""))
+                                || !prefijo.equals(
+                                                autorizacion.path("prefijo").asString(""))
+                                || claveArchivo == null
+                                || !claveArchivo.matches(patron)) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Anexo no autorizado.");
+                }
+
+                if (supabaseUrl == null || supabaseUrl.isBlank()
+                                || secretKey == null || secretKey.isBlank()) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Storage no está configurado.");
+                }
+
+                String base = supabaseUrl.trim().replaceAll("/+$", "");
+                URI servidor;
+
+                try {
+                        servidor = URI.create(base);
+                } catch (IllegalArgumentException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "URL de Storage inválida.", ex);
+                }
+
+                if (!"https".equalsIgnoreCase(servidor.getScheme())
+                                || servidor.getHost() == null
+                                || !servidor.getHost().endsWith(".supabase.co")
+                                || servidor.getUserInfo() != null
+                                || servidor.getPort() != -1
+                                || servidor.getRawQuery() != null
+                                || servidor.getRawFragment() != null
+                                || (servidor.getRawPath() != null
+                                                && !servidor.getRawPath().isEmpty())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.SERVICE_UNAVAILABLE,
+                                        "Servidor de Storage no autorizado.");
+                }
+
+                String storageBase = base + "/storage/v1";
+                String ruta = "/object/sign/" + BUCKET
+                                + "/" + claveArchivo;
+
+                byte[] documento;
+
+                try {
+                        String respuesta = restClient.post()
+                                        .uri(storageBase + ruta)
+                                        .header("apikey", secretKey)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .body(Map.of("expiresIn", 120))
+                                        .retrieve()
+                                        .body(String.class);
+
+                        if (respuesta == null || respuesta.isBlank()) {
+                                throw new IllegalStateException(
+                                                "Respuesta vacía de Storage.");
+                        }
+
+                        JsonNode json = jsonMapper.readTree(respuesta);
+                        String rutaFirmada = json.path("signedURL").asString("");
+
+                        URI enlace = URI.create(rutaFirmada);
+                        String consulta = enlace.getRawQuery();
+
+                        if (enlace.isAbsolute()
+                                        || !ruta.equals(enlace.getRawPath())
+                                        || consulta == null
+                                        || !consulta.matches(
+                                                        "token=[A-Za-z0-9._~%+-]+")) {
+
+                                throw new IllegalStateException(
+                                                "URL firmada inválida.");
+                        }
+
+                        documento = restClient.get()
+                                        .uri(storageBase + rutaFirmada)
+                                        .retrieve()
+                                        .body(byte[].class);
+
+                } catch (RestClientException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "No se pudo verificar el PDF en Storage.", ex);
+
+                } catch (JacksonException
+                                | IllegalArgumentException
+                                | IllegalStateException ex) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_GATEWAY,
+                                        "Respuesta documental inválida.", ex);
+                }
+
+                if (documento == null
+                                || documento.length < 5
+                                || documento.length > 10485760
+                                || documento[0] != '%'
+                                || documento[1] != 'P'
+                                || documento[2] != 'D'
+                                || documento[3] != 'F'
+                                || documento[4] != '-') {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "El archivo no es un PDF válido o supera 10 MB.");
+                }
+
+                String hashSha256;
+
+                try {
+                        byte[] digest = MessageDigest
+                                        .getInstance("SHA-256")
+                                        .digest(documento);
+
+                        hashSha256 = HexFormat.of().formatHex(digest);
+
+                } catch (NoSuchAlgorithmException ex) {
+                        throw new IllegalStateException(
+                                        "SHA-256 no disponible.", ex);
+                }
+
+                return ventaService.registrarAnexoContrato(
+                                actor,
+                                idContrato,
+                                tipoAnexo,
+                                claveArchivo,
+                                nombreOriginal,
+                                hashSha256);
         }
 
 }

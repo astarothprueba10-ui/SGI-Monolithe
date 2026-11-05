@@ -30,7 +30,9 @@ export function Sidebar({
     ...group,
     items: group.items.filter(
       (item) =>
-        can(item.permission) &&
+        (item.anyPermissions
+          ? item.anyPermissions.some((permission) => can(permission))
+          : can(item.permission)) &&
         (!item.allowedRoles ||
           item.allowedRoles.some((role) =>
             user.roles.includes(role)

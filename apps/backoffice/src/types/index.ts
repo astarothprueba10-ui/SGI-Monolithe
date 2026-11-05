@@ -20,6 +20,7 @@ export type Action =
   | 'edit'
   | 'delete'
   | 'approve'
+  | 'annul'
   | 'reject'
   | 'export'
   | 'configure'
@@ -28,13 +29,14 @@ export type Action =
   | 'assign_role'
   | 'assign_permissions';
 
-export type Permission = `${ModuleKey}.${Action}`;
+export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review';
 
 export type RoleName =
   | 'Administrador'
   | 'Gerencia'
   | 'Asesor'
   | 'Finanzas'
+  | 'Asesoría Legal'
   | 'Marketing'
   | 'RRHH'
   | 'Supervisor comercial';
@@ -56,7 +58,7 @@ export interface SessionUser {
 }
 
 
-export type LotStatus = 'Disponible'| 'Separado'| 'Vendido'| 'Bloqueado'| 'No disponible';
+export type LotStatus = 'Disponible' | 'Separado' | 'Vendido' | 'Bloqueado' | 'No disponible';
 export type PaymentStatus = 'Pagado' | 'Pendiente' | 'Vencido';
 export type ReviewStatus = 'En revisión' | 'Aprobado' | 'Rechazado';
 export type ActivityStatus = 'Activo' | 'Inactivo';
@@ -118,13 +120,13 @@ export interface Sale {
   document: string;
   lot: string;
   project: string;
-  modality: 'Contado' | 'Financiado' | 'Crédito bancario';
+  modality?: 'Contado' | 'Financiado' | 'Crédito bancario';
   amount: number;
   advisor: string;
   date: string;
-  contract: 'Firmado' | 'Pendiente' | 'En revisión' | 'Vigente' | 'Vencida';
-  status: ReviewStatus | 'Pagado' | 'Pendiente';
-
+  contract?: string;
+  status: string;
+  paymentMethod?: string | null;
 }
 
 export interface Installment {

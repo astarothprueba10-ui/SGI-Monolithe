@@ -15,6 +15,7 @@ const ROLE_MAP: Record<string, RoleName> = {
     ROLE_MARKETING: 'Marketing',
     ROLE_ASESOR: 'Asesor',
     ROLE_FINANZAS: 'Finanzas',
+    ROLE_ASESORIA_LEGAL: 'Asesoría Legal',
     ROLE_RRHH: 'RRHH',
     ROLE_SUPERVISOR_COMERCIAL: 'Supervisor comercial'
 };

@@ -10,14 +10,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 public class JwtSessionVersionValidator implements OAuth2TokenValidator<Jwt> {
 
-    private static final String SQL_TOKEN_VIGENTE =
-            "SELECT public.fn_seguridad_token_vigente(?, ?)";
+    private static final String SQL_TOKEN_VIGENTE = "SELECT public.fn_seguridad_token_vigente(?, ?)";
 
-    private static final OAuth2Error ERROR_TOKEN_INVALIDO =
-            new OAuth2Error(
-                    OAuth2ErrorCodes.INVALID_TOKEN,
-                    "El token no está vigente o la sesión ha sido invalidada.",
-                    null);
+    private static final OAuth2Error ERROR_TOKEN_INVALIDO = new OAuth2Error(
+            OAuth2ErrorCodes.INVALID_TOKEN,
+            "El token no está vigente o la sesión ha sido invalidada.",
+            null);
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -72,15 +70,60 @@ public class JwtSessionVersionValidator implements OAuth2TokenValidator<Jwt> {
     }
 
     private boolean consultarVigencia(Long idUsuario, Long sessionVersion) {
+        long inicio = System.nanoTime();
+
+        final long[] inicioSql = { 0L };
+        final long[] finSql = { 0L };
+
         try {
-            Boolean vigente = jdbcTemplate.queryForObject(
-                    SQL_TOKEN_VIGENTE,
-                    Boolean.class,
-                    idUsuario,
-                    sessionVersion);
+            Boolean vigente = jdbcTemplate.execute(
+                    (org.springframework.jdbc.core.ConnectionCallback<Boolean>) connection -> {
+                        inicioSql[0] = System.nanoTime();
+
+                        try (java.sql.PreparedStatement stmt = connection.prepareStatement(SQL_TOKEN_VIGENTE)) {
+
+                            stmt.setLong(1, idUsuario);
+                            stmt.setLong(2, sessionVersion);
+
+                            try (java.sql.ResultSet rs = stmt.executeQuery()) {
+                                if (!rs.next()) {
+                                    return false;
+                                }
+
+                                boolean valor = rs.getBoolean(1);
+                                return !rs.wasNull() && valor;
+                            }
+                        } finally {
+                            finSql[0] = System.nanoTime();
+                        }
+                    });
+
             return Boolean.TRUE.equals(vigente);
+
         } catch (Exception e) {
             return false;
+
+        } finally {
+            long fin = System.nanoTime();
+
+            double totalMs = (fin - inicio) / 1_000_000.0;
+
+            double adquisicionMs = inicioSql[0] == 0
+                    ? -1
+                    : (inicioSql[0] - inicio) / 1_000_000.0;
+
+            double sqlMs = finSql[0] == 0
+                    ? -1
+                    : (finSql[0] - inicioSql[0]) / 1_000_000.0;
+
+            org.slf4j.LoggerFactory
+                    .getLogger(JwtSessionVersionValidator.class)
+                    .info(
+                            "PERF_JWT_DB total_ms={} adquisicion_ms={} sql_ms={}",
+                            totalMs,
+                            adquisicionMs,
+                            sqlMs);
         }
     }
+
 }

@@ -5,6 +5,9 @@ import { Button } from '../ui/Button';
 import { FieldLabel, Input, Select } from '../ui/Field';
 import { ApiError } from '../../lib/apiClient';
 import { coreService } from '../../services/coreService';
+import { useAuth } from '../../contexts/AuthContext';
+import { getStoredAuthUser } from '../../lib/authSession';
+
 import type {
   LoteRequest,
   LoteResponse,
@@ -44,7 +47,34 @@ interface FormState {
   observaciones: string;
 }
 
-type FieldErrors = Partial<Record<keyof FormState | 'general', string>>;
+type FieldErrors = Partial<Record<keyof FormState | 'general' | 'precio', string>>;
+
+function validatePrecioManual(
+  precioManual: string,
+  estado: string
+): string | undefined {
+  const trimmed = precioManual.trim();
+  if (!trimmed) {
+    return estado === 'DISPONIBLE'
+      ? 'El precio es obligatorio para lotes disponibles.'
+      : undefined;
+  }
+  const num = Number(trimmed);
+  if (Number.isNaN(num) || num <= 0) {
+    return 'El precio debe ser un número mayor a 0.';
+  }
+  const parts = trimmed.split('.');
+  if (parts[0].length > 12) {
+    return 'El precio no puede exceder 12 dígitos enteros.';
+  }
+  if (parts.length > 1 && parts[1].length > 2) {
+    return 'El precio admite un máximo de 2 decimales.';
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    return 'Formato de precio inválido.';
+  }
+  return undefined;
+}
 
 type BackendErrorData = {
   errores?: Record<string, unknown>;
@@ -211,8 +241,23 @@ export function LotFormModal({
   lot
 }: Props) {
   const isEditing = Boolean(lot);
+  const { user, role, can } = useAuth();
+  const storedUser = getStoredAuthUser();
+  const isGerencia = Boolean(
+    role === 'Gerencia' ||
+    user?.primaryRole === 'Gerencia' ||
+    user?.roles?.includes('Gerencia') ||
+    storedUser?.autoridades?.includes('ROLE_GERENCIA')
+  );
+  const canEditPrice = isGerencia && can('lots.edit');
+  const isLotSoldOrReserved = Boolean(
+    lot && (lot.codigoEstadoLote === 'VENDIDO' || lot.codigoEstadoLote === 'RESERVADO')
+  );
 
-  const defaultStatus = lotStatuses.find((s) => s.codigo === 'DISPONIBLE') ?? lotStatuses[0];
+  const defaultStatus =
+    lotStatuses.find((s) => s.codigo === 'DISPONIBLE') ??
+    lotStatuses.find((s) => s.codigo === 'NO_DISPONIBLE') ??
+    lotStatuses[0];
   const [form, setForm] = useState<FormState>(() =>
     initForm(lot, defaultStatus?.codigo)
   );
@@ -220,6 +265,9 @@ export function LotFormModal({
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [precioManual, setPrecioManual] = useState('');
+  const [loadingPrice, setLoadingPrice] = useState(false);
+  const [precioVigenteActual, setPrecioVigenteActual] = useState<number | null>(null);
 
   // Load blocks when stage changes
   useEffect(() => {
@@ -250,8 +298,36 @@ export function LotFormModal({
   // Reset form when modal opens
   useEffect(() => {
     if (!open) return;
-    const defStatus = lotStatuses.find((s) => s.codigo === 'DISPONIBLE') ?? lotStatuses[0];
+    const defStatus =
+      lotStatuses.find((s) => s.codigo === 'DISPONIBLE') ??
+      lotStatuses.find((s) => s.codigo === 'NO_DISPONIBLE') ??
+      lotStatuses[0];
     setForm(initForm(lot, defStatus?.codigo));
+    if (lot) {
+      let mounted = true;
+      setLoadingPrice(true);
+      coreService.getCurrentLotPrice(lot.idLote, 'PEN')
+        .then((data) => {
+          if (!mounted) return;
+          const p = data?.precio ?? null;
+          setPrecioVigenteActual(p);
+          setPrecioManual(p != null ? String(p) : '');
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setPrecioVigenteActual(null);
+          setPrecioManual('');
+        })
+        .finally(() => {
+          if (mounted) setLoadingPrice(false);
+        });
+      return () => {
+        mounted = false;
+      };
+    } else {
+      setPrecioVigenteActual(null);
+      setPrecioManual('');
+    }
     setErrors({});
     setSubmitting(false);
     setStageBlocks([]);
@@ -270,6 +346,7 @@ export function LotFormModal({
       setErrors((prevErr) => ({
         ...prevErr,
         [field]: nextErrors[field],
+        precio: field === 'codigoEstadoLote' ? undefined : prevErr.precio,
         general: undefined
       }));
 
@@ -277,60 +354,163 @@ export function LotFormModal({
     });
   };
 
+  const hasDimensionsChanged = (): boolean => {
+    if (!lot) return false;
+    if (parsePositiveFloat(form.areaM2) !== (lot.areaM2 ?? null)) return true;
+    if (parsePositiveFloat(form.frenteM) !== (lot.frenteM ?? null)) return true;
+    if (parsePositiveFloat(form.fondoM) !== (lot.fondoM ?? null)) return true;
+    if (parsePositiveFloat(form.lateralDerechoM) !== (lot.lateralDerechoM ?? null)) return true;
+    if (parsePositiveFloat(form.lateralIzquierdoM) !== (lot.lateralIzquierdoM ?? null)) return true;
+    return false;
+  };
+
+  const hasGeneralChanges = (): boolean => {
+    if (!lot) return true;
+    if (form.idManzana !== (lot.idManzana ? String(lot.idManzana) : '')) return true;
+    if (form.idZona !== (lot.idZona ? String(lot.idZona) : '')) return true;
+    if ((form.codigoTipoLote || '') !== (lot.codigoTipoLote || '')) return true;
+    if (form.codigo.trim() !== (lot.codigo || '').trim()) return true;
+    if (form.numero.trim() !== (lot.numero || '').trim()) return true;
+    if ((form.observaciones || '').trim() !== (lot.observaciones || '').trim()) return true;
+    return hasDimensionsChanged();
+  };
+
+  const hasPriceChanges = (): boolean => {
+    if (!isEditing) return precioManual.trim() !== '';
+    const currentNum = precioVigenteActual;
+    const newTrimmed = precioManual.trim();
+    if (newTrimmed === '' && currentNum == null) return false;
+    if (newTrimmed === '' && currentNum != null) return true;
+    const newNum = Number(newTrimmed);
+    if (Number.isNaN(newNum)) return true;
+    return currentNum == null || currentNum !== newNum;
+  };
+
+  const validateEditingSubmit = (errs: FieldErrors): void => {
+    const generalChanged = hasGeneralChanges();
+    const priceChanged = hasPriceChanges();
+    if (generalChanged && priceChanged) {
+      errs.general = 'No es posible modificar simultaneamente los datos generales del lote y el precio de venta. Guarde primero los datos generales y luego actualice el precio.';
+    }
+    if (priceChanged) {
+      if (isLotSoldOrReserved) {
+        errs.precio = 'No se puede modificar el precio de un lote vendido o reservado.';
+      } else if (!canEditPrice) {
+        errs.precio = 'Solo los usuarios con rol Gerencia pueden modificar el precio oficial.';
+      } else {
+        const errorPrecio = validatePrecioManual(precioManual, lot?.codigoEstadoLote || 'DISPONIBLE');
+        if (errorPrecio) errs.precio = errorPrecio;
+      }
+    }
+  };
+
+  const validateCreationSubmit = (errs: FieldErrors): void => {
+    const estado = form.codigoEstadoLote.trim().toUpperCase();
+    if (estado !== 'DISPONIBLE' && estado !== 'NO_DISPONIBLE') {
+      errs.codigoEstadoLote = 'El lote nuevo debe iniciar como DISPONIBLE o NO_DISPONIBLE.';
+    }
+    const errorPrecio = validatePrecioManual(precioManual, estado);
+    if (errorPrecio) errs.precio = errorPrecio;
+  };
+
+  const validateFormOnSubmit = (): FieldErrors => {
+    const errs = validate(form, isEditing);
+    if (isEditing) {
+      validateEditingSubmit(errs);
+    } else {
+      validateCreationSubmit(errs);
+    }
+    return errs;
+  };
+
+  const executeSaveEditingLot = async (payload: LoteRequest): Promise<void> => {
+    if (!lot) return;
+    const generalChanged = hasGeneralChanges();
+    const priceChanged = hasPriceChanges();
+
+    if (priceChanged && !generalChanged) {
+      const nuevoMonto = Number(precioManual.trim());
+      await coreService.updateLotManualPrice(lot.idLote, {
+        monto: nuevoMonto,
+        observaciones: 'Actualizacion manual de precio por Gerencia'
+      });
+      toast.success('Precio oficial actualizado correctamente', {
+        description: `Nuevo precio: S/ ${nuevoMonto.toFixed(2)}`
+      });
+      return;
+    }
+
+    if (generalChanged && !priceChanged) {
+      await coreService.updateLot(lot.idLote, payload);
+      toast.success('Lote actualizado correctamente');
+      return;
+    }
+
+    if (!generalChanged && !priceChanged) {
+      toast.info('No se detectaron cambios en el lote');
+    }
+  };
+
+  const executeSaveCreatingLot = async (payload: LoteRequest): Promise<void> => {
+    const tienePrecio = precioManual.trim() !== '';
+    const precio = tienePrecio ? { monto: Number(precioManual.trim()) } : null;
+    const res = await coreService.createLotWithPrice({ lote: payload, precio });
+    toast.success('Lote creado correctamente', {
+      description: precio
+        ? `Lote ${res.codigo}: precio de S/ ${precio.monto.toFixed(2)} registrado.`
+        : `Lote ${res.codigo}: registrado sin precio (NO_DISPONIBLE).`
+    });
+  };
+
+  const executeSaveLot = async (payload: LoteRequest): Promise<void> => {
+    if (isEditing) {
+      await executeSaveEditingLot(payload);
+    } else {
+      await executeSaveCreatingLot(payload);
+    }
+  };
+
+  const handleSaveError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const data = getBackendErrorData(err.data);
+      const fieldErrors = data?.errores ? mapBackendFieldErrors(data.errores) : {};
+      const msg = typeof data?.mensaje === 'string'
+        ? data.mensaje
+        : typeof data?.message === 'string'
+        ? data.message
+        : err.status === 409
+        ? 'Ya existe un lote con ese código o número en la manzana.'
+        : err.status === 404
+        ? 'No se encontró el lote o la manzana solicitada.'
+        : err.status === 400
+        ? 'Revise los datos del lote y el precio de venta.'
+        : err.message || 'Error al guardar el lote.';
+      setErrors({ ...fieldErrors, general: msg });
+    } else {
+      setErrors({ general: err instanceof Error ? err.message : 'Error inesperado al guardar el lote.' });
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const validationErrors = validate(form, isEditing);
+    const validationErrors = validateFormOnSubmit();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
-
     setSubmitting(true);
     setErrors({});
-
     try {
-      const payload = buildRequest(form, isEditing, lot);
-
-      if (isEditing && lot) {
-        await coreService.updateLot(lot.idLote, payload);
-        toast.success('Lote actualizado correctamente');
-      } else {
-        await coreService.createLot(payload);
-        toast.success('Lote creado correctamente');
-      }
-
+      await executeSaveLot(buildRequest(form, isEditing, lot));
       await onSuccess();
       onClose();
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        const data = getBackendErrorData(err.data);
-        const fieldErrors = data?.errores ? mapBackendFieldErrors(data.errores) : {};
-
-        let generalMessage: string;
-        if (typeof data?.mensaje === 'string') {
-          generalMessage = data.mensaje;
-        } else if (typeof data?.message === 'string') {
-          generalMessage = data.message;
-        } else if (err.status === 409) {
-          generalMessage = 'Ya existe un lote con ese código o número en la manzana seleccionada.';
-        } else if (err.status === 404) {
-          generalMessage = 'La manzana, etapa o zona especificada no existe.';
-        } else if (err.status === 400) {
-          generalMessage = 'Los datos del lote no son válidos.';
-        } else {
-          generalMessage = err.message || 'Error al guardar el lote.';
-        }
-
-        setErrors({ ...fieldErrors, general: generalMessage });
-      } else {
-        setErrors({
-          general: err instanceof Error ? err.message : 'Error al guardar el lote.'
-        });
-      }
+      handleSaveError(err);
     } finally {
       setSubmitting(false);
     }
   };
+
 
   return (
     <Modal
@@ -451,11 +631,13 @@ export function LotFormModal({
                     className={errors.codigoEstadoLote ? 'border-red-400 focus:border-red-500' : ''}
                   >
                     <option value="">Seleccionar estado…</option>
-                    {lotStatuses.filter((s) => s.activo).map((st) => (
-                      <option key={st.codigo} value={st.codigo}>
-                        {st.nombre}
-                      </option>
-                    ))}
+                    {lotStatuses
+                      .filter((s) => s.activo && (s.codigo === 'DISPONIBLE' || s.codigo === 'NO_DISPONIBLE'))
+                      .map((st) => (
+                        <option key={st.codigo} value={st.codigo}>
+                          {st.nombre}
+                        </option>
+                      ))}
                   </Select>
                   {errors.codigoEstadoLote && (
                     <p className="mt-1 text-xs text-red-600">{errors.codigoEstadoLote}</p>
@@ -584,6 +766,88 @@ export function LotFormModal({
             </div>
           </div>
         </div>
+
+
+        {/* Seccion Precio de venta (Creacion y Edicion) */}
+        <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+              Precio de venta {isEditing ? 'oficial (PEN)' : ''}
+            </p>
+            {isEditing && !canEditPrice && (
+              <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                Solo Gerencia
+              </span>
+            )}
+            {isEditing && isLotSoldOrReserved && (
+              <span className="inline-flex items-center rounded bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                Operacion activa
+              </span>
+            )}
+          </div>
+
+          <p className="mb-4 text-xs text-brand-500">
+            {isEditing
+              ? isLotSoldOrReserved
+                ? `Este lote esta en estado ${lot?.nombreEstadoLote || lot?.codigoEstadoLote}. Su precio no puede ser modificado.`
+                : !canEditPrice
+                ? 'Modificacion restringida: Solo usuarios con rol Gerencia pueden modificar el precio oficial.'
+                : 'Ingrese el nuevo precio oficial en soles (PEN). Al guardar, se cerrara la vigencia anterior y se conservara el historial.'
+              : form.codigoEstadoLote === 'NO_DISPONIBLE'
+              ? 'Ingrese el precio de venta en soles (PEN) o dejelo en blanco si aun no esta definido.'
+              : 'Ingrese el precio de venta del lote en soles (PEN).'}
+          </p>
+
+          <div>
+            <FieldLabel htmlFor="lot-precio-manual">
+              Precio en soles (PEN){' '}
+              {(!isEditing && form.codigoEstadoLote === 'DISPONIBLE') || isEditing ? '*' : '(Opcional)'}
+            </FieldLabel>
+            <Input
+              id="lot-precio-manual"
+              type="number"
+              min={0}
+              step="0.01"
+              value={loadingPrice ? '' : precioManual}
+              disabled={submitting || loadingPrice || (isEditing && (!canEditPrice || isLotSoldOrReserved))}
+              onChange={(e) => {
+                setPrecioManual(e.target.value);
+                if (errors.precio) {
+                  setErrors((prev) => ({ ...prev, precio: undefined, general: undefined }));
+                }
+              }}
+              placeholder={loadingPrice ? 'Cargando precio...' : 'Ej. 30000.00'}
+              className={errors.precio ? 'border-red-400 focus:border-red-500' : ''}
+            />
+            {errors.precio && (
+              <p className="mt-1 text-xs text-red-600">{errors.precio}</p>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-md border border-brand-200 bg-white p-3">
+            <p className="text-xs font-medium text-brand-600">
+              Importe PEN
+            </p>
+
+            <p className="mt-1 text-xl font-bold text-brand-900">
+              {loadingPrice
+                ? 'Cargando...'
+                : precioManual.trim() && !Number.isNaN(Number(precioManual)) && Number(precioManual) > 0
+                ? new Intl.NumberFormat('es-PE', {
+                    style: 'currency',
+                    currency: 'PEN'
+                  }).format(Number(precioManual))
+                : 'S/ 0.00'}
+            </p>
+          </div>
+
+          {!isEditing && form.codigoEstadoLote === 'NO_DISPONIBLE' && !precioManual.trim() && (
+            <p className="mt-3 text-xs text-amber-700">
+              El lote NO DISPONIBLE se creara sin precio mientras se define su valor comercial.
+            </p>
+          )}
+        </div>
+
 
         {/* Observaciones */}
         <div>

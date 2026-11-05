@@ -20,6 +20,7 @@ export interface NavItem {
   icon: LucideIcon;
   module: ModuleKey;
   permission: Permission;
+  anyPermissions?: readonly Permission[];
   allowedRoles?: readonly RoleName[];
 }
 
@@ -71,6 +72,14 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: ClipboardListIcon,
     module: 'sales',
     permission: 'sales.view'
+  },
+  {
+    label: 'Anulaciones',
+    to: '/anulaciones',
+    icon: ScrollTextIcon,
+    module: 'sales',
+    permission: 'sales.view',
+    anyPermissions: ['sales.view', 'finance.edit', 'sales.legal.review']
   },
   {
     label: 'Marketing',

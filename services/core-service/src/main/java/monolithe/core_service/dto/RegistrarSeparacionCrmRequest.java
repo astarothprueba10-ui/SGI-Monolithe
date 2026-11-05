@@ -5,47 +5,33 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public record RegistrarSeparacionCrmRequest(
 
-    @NotNull
-    @Positive
-    Long idProspecto,
+        @NotNull @Positive Long idProspecto,
 
-    @NotNull
-    @Positive
-    Long idLote,
+        @NotNull @Positive Long idLote,
 
-    @NotBlank
-    String metodoPago,
+        @NotBlank String metodoPago,
 
-    @Size(max = 100)
-    String numeroOperacion,
+        @Size(max = 100) String numeroOperacion,
 
-    @NotNull
-    BigDecimal monto,
+        @NotNull BigDecimal monto,
 
-    @Size(max = 500)
-    String observaciones,
+        @Size(max = 500) String observaciones,
 
-    @NotBlank
-    @Size(max = 500)
-    String claveArchivo,
+        @NotBlank @Size(max = 500) String claveArchivo,
 
-    @NotBlank
-    @Size(max = 255)
-    String nombreArchivo,
+        @NotBlank @Size(max = 255) String nombreArchivo,
 
-    @NotBlank
-    @Size(max = 100)
-    String tipoMime,
+        @NotBlank @Size(max = 100) String tipoMime,
 
-    @NotNull
-    @Positive
-    Long tamanioBytes,
+        @NotNull @Positive Long tamanioBytes,
 
-    @Size(max = 64)
-    String hashSha256
+        @Size(max = 64) String hashSha256,
+
+        @NotBlank @Pattern(regexp = "CONTADO|FINANCIADA") String modalidadPrevista
 
 ) {
 

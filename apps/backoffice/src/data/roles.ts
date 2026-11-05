@@ -26,6 +26,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   delete: 'Eliminar',
   approve: 'Aprobar',
   reject: 'Rechazar',
+  annul: 'Gestionar anulaciones',
   export: 'Exportar',
   configure: 'Configurar',
   activate: 'Activar',
@@ -41,7 +42,7 @@ export const MODULE_ACTIONS: Record<ModuleKey, Action[]> = {
   lots: ['view', 'edit', 'configure', 'export'],
   crm: ['view', 'create', 'edit', 'delete', 'export'],
   marketing: ['view', 'create', 'edit', 'export'],
-  sales: ['view', 'create', 'edit', 'approve', 'reject', 'export'],
+  sales: ['view', 'create', 'edit', 'approve', 'reject', 'annul', 'export'],
   financing: ['view', 'create', 'edit', 'approve', 'reject', 'export'],
   finance: ['view', 'create', 'edit', 'export'],
   advisors: ['view', 'create', 'edit', 'approve', 'export'],
@@ -75,7 +76,7 @@ export const ROLES: Record<RoleName, Role> = {
       ...perms('lots', ['view', 'export']),
       ...perms('crm', ['view', 'export']),
       ...perms('marketing', ['view', 'export']),
-      ...perms('sales', ['view', 'export']),
+      ...perms('sales', ['view', 'annul', 'export']),
       ...perms('financing', ['view', 'export']),
       ...perms('finance', ['view', 'export']),
       ...perms('advisors', ['view', 'export']),
@@ -104,6 +105,11 @@ export const ROLES: Record<RoleName, Role> = {
       ...perms('financing', ['view', 'create', 'edit', 'approve', 'reject', 'export']),
       ...perms('finance', ['view', 'create', 'edit', 'export'])]
 
+  },
+  'Asesoría Legal': {
+    name: 'Asesoría Legal',
+    description: 'Emite dictámenes jurídicos independientes, sin aprobar anulaciones.',
+    permissions: ['sales.legal.review']
   },
   Marketing: {
     name: 'Marketing',
@@ -172,6 +178,15 @@ export const DEMO_USERS: Record<RoleName, SessionUser> = {
     initials: 'JB',
     primaryRole: 'Finanzas',
     roles: ['Finanzas']
+  },
+  'Asesoría Legal': {
+    id: 'DEMO-LEGAL',
+    name: 'Usuario de demostración',
+    email: '',
+    jobTitle: 'Asesoría Legal',
+    initials: 'AL',
+    primaryRole: 'Asesoría Legal',
+    roles: ['Asesoría Legal']
   },
   Marketing: {
     id: 'U-021',
