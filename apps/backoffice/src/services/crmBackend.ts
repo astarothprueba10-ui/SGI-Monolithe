@@ -594,6 +594,7 @@ export interface CrmContratoDocumentacion {
   estadoContrato: string;
   estadoVenta: string;
   tienePdfContrato: boolean;
+  tienePdfAprobado: boolean;
   tienePlanoLote: boolean;
   tieneMemoriaDescriptiva: boolean;
 }
@@ -1257,6 +1258,58 @@ export const crmBackend = {
     coreApi.post<CrmContractReadUrl>(
       `/crm/contratos/${idContrato}/evidencias/${idContratoArchivo}/preparar-lectura`
     ),
+  prepararLecturaContratoAprobado: async (
+    idContrato: number
+  ): Promise<CrmContractReadUrl> => {
+    if (!Number.isSafeInteger(idContrato) || idContrato <= 0) {
+      throw new Error('El identificador del contrato no es válido.');
+    }
+
+    const resultado = await coreApi.post<CrmContractReadUrl>(
+      `/crm/contratos/${idContrato}/pdf-aprobado/preparar-lectura`
+    );
+
+    if (
+      resultado.idContrato !== idContrato ||
+      !Number.isSafeInteger(resultado.idContratoArchivo) ||
+      resultado.idContratoArchivo <= 0 ||
+      !resultado.urlLectura
+    ) {
+      throw new Error('La respuesta del contrato aprobado no es válida.');
+    }
+
+    let url: URL;
+
+    try {
+      url = new URL(resultado.urlLectura);
+    } catch {
+      throw new Error('El enlace privado recibido no es válido.');
+    }
+
+    const patron = new RegExp(
+      '^/storage/v1/object/sign/contratos-firmados-private/' +
+      `contratos/${idContrato}/` +
+      '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-' +
+      '[0-9a-f]{4}-[0-9a-f]{12}\\.pdf$'
+    );
+
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname.endsWith('.supabase.co') ||
+      url.username !== '' ||
+      url.password !== '' ||
+      url.port !== '' ||
+      !patron.test(url.pathname) ||
+      !url.searchParams.has('token') ||
+      url.hash !== ''
+    ) {
+      throw new Error(
+        'El enlace no corresponde a un contrato privado autorizado.'
+      );
+    }
+
+    return resultado;
+  },
 
   subirEvidenciaContrato: async (
     idContrato: number,

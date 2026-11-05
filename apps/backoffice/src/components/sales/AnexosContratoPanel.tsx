@@ -6,7 +6,8 @@ import {
   FileText,
   History,
   RefreshCw,
-  Upload
+  Upload,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Gate } from '../auth/PermissionRoute';
@@ -20,6 +21,7 @@ import {
 type Props = {
   idContrato: number;
   codigoContrato: string;
+  soloConsulta?: boolean;
   onUpdated?: () => void;
 };
 
@@ -28,17 +30,17 @@ const TIPOS: ReadonlyArray<{
   titulo: string;
   descripcion: string;
 }> = [
-  {
-    codigo: 'PLANO_LOTE',
-    titulo: 'Plano individual del lote',
-    descripcion: 'Plano correspondiente al lote asociado a este contrato.'
-  },
-  {
-    codigo: 'MEMORIA_DESCRIPTIVA',
-    titulo: 'Memoria descriptiva',
-    descripcion: 'Documento técnico descriptivo del inmueble.'
-  }
-];
+    {
+      codigo: 'PLANO_LOTE',
+      titulo: 'Plano individual del lote',
+      descripcion: 'Plano correspondiente al lote asociado a este contrato.'
+    },
+    {
+      codigo: 'MEMORIA_DESCRIPTIVA',
+      titulo: 'Memoria descriptiva',
+      descripcion: 'Documento técnico descriptivo del inmueble.'
+    }
+  ];
 
 function fechaLocal(fecha?: string | null): string {
   if (!fecha) return 'No disponible';
@@ -59,7 +61,8 @@ function tamanoArchivo(bytes: number): string {
 export function AnexosContratoPanel({
   idContrato,
   codigoContrato,
-  onUpdated
+  onUpdated,
+  soloConsulta = false
 }: Props) {
   const [datos, setDatos] = useState<CrmAnexosContratoResponse | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -71,6 +74,11 @@ export function AnexosContratoPanel({
     PLANO_LOTE: null,
     MEMORIA_DESCRIPTIVA: null
   });
+  const [estadoPdfAprobado, setEstadoPdfAprobado] = useState<
+    'verificando' | 'disponible' | 'oculto'
+  >('oculto');
+
+  const [procesandoPdfContrato, setProcesandoPdfContrato] = useState(false);
   const [historialAbierto, setHistorialAbierto] = useState<Record<CrmTipoAnexoContrato, boolean>>({
     PLANO_LOTE: false,
     MEMORIA_DESCRIPTIVA: false
@@ -98,6 +106,39 @@ export function AnexosContratoPanel({
       });
     return () => { activo = false; };
   }, [idContrato, revision]);
+
+  useEffect(() => {
+    if (
+      !soloConsulta ||
+      cargando ||
+      datos?.idContrato !== idContrato ||
+      datos?.estadoContrato !== 'VIGENTE'
+    ) {
+      setEstadoPdfAprobado('oculto');
+      return;
+    }
+
+    let activo = true;
+    setEstadoPdfAprobado('verificando');
+
+    void crmBackend.prepararLecturaContratoAprobado(idContrato)
+      .then(() => {
+        if (activo) setEstadoPdfAprobado('disponible');
+      })
+      .catch(() => {
+        if (activo) setEstadoPdfAprobado('oculto');
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [
+    soloConsulta,
+    cargando,
+    idContrato,
+    datos?.idContrato,
+    datos?.estadoContrato
+  ]);
 
   const subir = async (tipo: CrmTipoAnexoContrato) => {
     const archivo = archivos[tipo];
@@ -143,6 +184,255 @@ export function AnexosContratoPanel({
       setAbriendo(null);
     }
   };
+
+  const descargarDocumento = async (anexo: CrmAnexoContrato) => {
+    if (abriendo !== null) return;
+
+    setAbriendo(anexo.idAnexo);
+
+    try {
+      const enlace = await crmBackend.prepararLecturaAnexoContrato(
+        idContrato,
+        anexo.idAnexo
+      );
+
+      if (
+        enlace.idContrato !== idContrato ||
+        enlace.idAnexo !== anexo.idAnexo
+      ) {
+        throw new Error('El documento no corresponde al contrato.');
+      }
+
+      const respuesta = await fetch(enlace.urlLectura, {
+        cache: 'no-store'
+      });
+
+      if (!respuesta.ok) {
+        throw new Error('No se pudo descargar el documento.');
+      }
+
+      const archivo = await respuesta.blob();
+
+      if (archivo.size === 0 || archivo.size > 10 * 1024 * 1024) {
+        throw new Error('El archivo PDF no tiene un tamaño válido.');
+      }
+
+      const urlTemporal = URL.createObjectURL(archivo);
+      const enlaceDescarga = document.createElement('a');
+
+      enlaceDescarga.href = urlTemporal;
+      enlaceDescarga.download = anexo.nombreArchivoOriginal;
+      document.body.appendChild(enlaceDescarga);
+      enlaceDescarga.click();
+      enlaceDescarga.remove();
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(urlTemporal);
+      }, 30000);
+
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'No fue posible descargar el PDF.'
+      );
+    } finally {
+      setAbriendo(null);
+    }
+  };
+  const consultarPdfAprobado = async (
+    accion: 'visualizar' | 'descargar'
+  ) => {
+    if (
+      procesandoPdfContrato ||
+      estadoPdfAprobado !== 'disponible'
+    ) return;
+
+    const ventana =
+      accion === 'visualizar'
+        ? window.open('about:blank', '_blank')
+        : null;
+
+    if (accion === 'visualizar' && !ventana) {
+      toast.error('El navegador bloqueó la ventana emergente.');
+      return;
+    }
+
+    if (ventana) ventana.opener = null;
+
+    setProcesandoPdfContrato(true);
+
+    try {
+      const enlace =
+        await crmBackend.prepararLecturaContratoAprobado(idContrato);
+
+      if (accion === 'visualizar') {
+        if (!ventana || ventana.closed) return;
+        ventana.location.replace(enlace.urlLectura);
+        return;
+      }
+
+      const respuesta = await fetch(enlace.urlLectura, {
+        cache: 'no-store'
+      });
+
+      if (!respuesta.ok) {
+        throw new Error('No fue posible descargar el contrato.');
+      }
+
+      const archivo = await respuesta.blob();
+
+      if (!archivo.size || archivo.size > 10485760) {
+        throw new Error('El archivo PDF no tiene un tamaño válido.');
+      }
+
+      const urlTemporal = URL.createObjectURL(archivo);
+      const enlaceDescarga = document.createElement('a');
+
+      enlaceDescarga.href = urlTemporal;
+      enlaceDescarga.download =
+        enlace.nombreOriginal.split(/[\\/]/).pop() ||
+        `contrato-${idContrato}.pdf`;
+
+      document.body.appendChild(enlaceDescarga);
+      enlaceDescarga.click();
+      enlaceDescarga.remove();
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(urlTemporal);
+      }, 30000);
+
+    } catch (error) {
+      if (ventana && !ventana.closed) ventana.close();
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo consultar el contrato.'
+      );
+    } finally {
+      setProcesandoPdfContrato(false);
+    }
+  };
+
+  if (soloConsulta) {
+    const tipos = [
+      { codigo: 'PLANO_LOTE', titulo: 'Plano individual del lote' },
+      { codigo: 'MEMORIA_DESCRIPTIVA', titulo: 'Memoria descriptiva' }
+    ] as const;
+
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-brand-900">
+          Documentación asociada a la venta
+        </h3>
+
+        {cargando && <p>Consultando documentos...</p>}
+
+        {error && (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
+
+        {!cargando && !error && (
+          <>
+            {estadoPdfAprobado === 'verificando' && (
+              <p className="text-xs text-brand-500">
+                Verificando contrato firmado...
+              </p>
+            )}
+
+            {estadoPdfAprobado === 'disponible' && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-white p-3">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-emerald-600" />
+
+                  <div>
+                    <p className="text-sm font-medium text-brand-900">
+                      Contrato firmado
+                    </p>
+                    <p className="text-xs text-emerald-700">
+                      Firma aprobada · PDF disponible
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={procesandoPdfContrato}
+                    onClick={() => void consultarPdfAprobado('visualizar')}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-xs font-medium text-brand-800 disabled:opacity-50"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Visualizar
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={procesandoPdfContrato}
+                    onClick={() => void consultarPdfAprobado('descargar')}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-xs font-medium text-brand-800 disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Descargar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {tipos.map(({ codigo, titulo }) => {
+              const documento = datos?.documentos
+                .filter((d) => d.tipoAnexo === codigo && d.vigente)
+                .sort((a, b) => b.numeroVersion - a.numeroVersion)[0];
+
+              return (
+                <div
+                  key={codigo}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-100 p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-brand-600" />
+                    <div>
+                      <p className="text-sm font-medium">{titulo}</p>
+                      <p className="text-xs text-brand-500">
+                        {documento ? 'Disponible' : 'Pendiente de registro'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {documento && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={abriendo !== null}
+                        onClick={() => void abrirDocumento(documento)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-xs font-medium text-brand-800 disabled:opacity-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Visualizar
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={abriendo !== null}
+                        onClick={() => void descargarDocumento(documento)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-xs font-medium text-brand-800 disabled:opacity-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        Descargar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 rounded-xl border border-brand-100 bg-brand-50 p-4">

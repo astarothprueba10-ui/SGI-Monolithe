@@ -280,7 +280,53 @@ public class CrmContratoStorageService {
                                         "No tienes autorización para revisar este contrato.");
                 }
 
-                // 2. Obtener la clave validada por el procedimiento.
+                return generarEnlacePdfAutorizado(
+                                idContrato,
+                                idContratoArchivo,
+                                autorizacion);
+        }
+
+        /**
+         * Consulta de un PDF contractual cuya firma ya fue aprobada.
+         * No modifica contratos ni aprueba firmas.
+         */
+        public EnlaceLecturaPdf prepararLecturaAprobado(
+                        Long actor,
+                        Long idContrato) {
+
+                JsonNode autorizacion = ventaService.autorizarLecturaPdfAprobado(
+                                actor,
+                                idContrato);
+
+                long idArchivo = autorizacion
+                                .path("idContratoArchivo")
+                                .asLong(0L);
+
+                if (!autorizacion.path("autorizado").asBoolean(false)
+                                || idContrato == null
+                                || autorizacion.path("idContrato").asLong(0L) != idContrato.longValue()
+                                || idArchivo <= 0L) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "No se autorizó la lectura del contrato aprobado.");
+                }
+
+                return generarEnlacePdfAutorizado(
+                                idContrato,
+                                idArchivo,
+                                autorizacion);
+        }
+
+        /**
+         * Genera el enlace privado después de que Supabase
+         * haya autorizado la operación.
+         */
+        private EnlaceLecturaPdf generarEnlacePdfAutorizado(
+                        Long idContrato,
+                        Long idContratoArchivo,
+                        JsonNode autorizacion) {
+
                 String claveArchivo = autorizacion.path("claveArchivo").asString("");
 
                 String bucket = autorizacion.path("bucket").asString("");

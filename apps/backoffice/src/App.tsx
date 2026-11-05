@@ -11,6 +11,7 @@ import { LotMap } from './pages/LotMap';
 import { Crm } from './pages/Crm';
 import { Marketing } from './pages/Marketing';
 import { Sales } from './pages/Sales';
+import { Anulaciones } from './pages/Anulaciones';
 import { Financing } from './pages/Financing';
 import { Finance } from './pages/Finance';
 import { Advisors } from './pages/Advisors';
@@ -179,6 +180,8 @@ export function App({
                 </PermissionRoute>
               }
             />
+
+            <Route path="/anulaciones" element={<Anulaciones />} />
 
             <Route
               path="/financiamiento"

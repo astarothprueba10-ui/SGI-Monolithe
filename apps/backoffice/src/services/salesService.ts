@@ -38,11 +38,11 @@ export interface SalesFilter {
 function mapOperacion(row: CrmOperacionItem): Sale {
   const esVenta = row.tipo === 'VENTA';
 
-   let modalidad: Sale['modality'] = undefined;
+  let modalidad: Sale['modality'] = undefined;
 
-  if (esVenta && row.modalidad === 'CONTADO') {
+  if (row.modalidad === 'CONTADO') {
     modalidad = 'Contado';
-  } else if (esVenta && row.modalidad === 'FINANCIADA') {
+  } else if (row.modalidad === 'FINANCIADA') {
     modalidad = 'Financiado';
   }
 
@@ -58,7 +58,17 @@ function mapOperacion(row: CrmOperacionItem): Sale {
     amount: Number(row.monto),
     advisor: row.asesor ?? '',
     date: row.fecha
-      ? new Date(row.fecha).toLocaleDateString('es-PE', {
+      ? esVenta
+        ? new Date(row.fecha).toLocaleString('es-PE', {
+          timeZone: 'America/Lima',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
+        : new Date(row.fecha).toLocaleDateString('es-PE', {
           timeZone: 'America/Lima'
         })
       : '',

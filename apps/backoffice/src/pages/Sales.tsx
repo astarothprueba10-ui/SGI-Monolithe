@@ -1,25 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DownloadIcon, FileTextIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
+import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { SearchInput, Select, Input } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
-import { StatusBadge, Badge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
-import { crmBackend, type CrmProspect, type CrmSaleValidationInput } from '../services/crmBackend';
+import {
+  crmBackend,
+  type CrmProspect,
+  type CrmSaleValidationInput,
+  type CrmContratoDocumentacion
+} from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
 import { DocumentacionContratosPanel } from '../components/sales/DocumentacionContratosPanel';
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
+import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -117,12 +123,21 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 
 export function Sales() {
-  const [tab, setTab] = useState<'Separación' | 'Venta' | 'Contratos'>('Separación');
+  const [tab, setTab] = useState<
+    'Separación' | 'Venta' | 'Contratos' | 'Anexos'
+  >('Separación');
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
   const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
   const [salesList, setSalesList] = useState<Sale[]>([]);
+  const [documentosPorVenta, setDocumentosPorVenta] = useState<
+    Record<string, CrmContratoDocumentacion>
+  >({});
+
+  const [estadoDocumentos, setEstadoDocumentos] = useState<
+    'cargando' | 'listo' | 'error'
+  >('cargando');
   const [, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -175,7 +190,64 @@ export function Sales() {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    if (tab !== 'Venta') return;
 
+    let activo = true;
+    setEstadoDocumentos('cargando');
+
+    const cargarDocumentacion = async () => {
+      try {
+        const documentos: Record<string, CrmContratoDocumentacion> = {};
+        let consultados = 0;
+
+        for (let pagina = 1; pagina <= 100; pagina++) {
+          const respuesta = await crmBackend.listarContratosDocumentacion(
+            '', pagina, 50
+          );
+
+          if (!Array.isArray(respuesta.items)) {
+            throw new Error('Respuesta documental inválida.');
+          }
+
+          respuesta.items.forEach((contrato) => {
+            documentos[`VENTA-${contrato.idVenta}`] = contrato;
+          });
+
+          consultados += respuesta.items.length;
+
+          if (consultados >= respuesta.total) {
+            if (activo) {
+              setDocumentosPorVenta(documentos);
+              setEstadoDocumentos('listo');
+            }
+            return;
+          }
+
+          if (respuesta.items.length === 0) {
+            throw new Error('Listado documental incompleto.');
+          }
+        }
+
+        throw new Error('Se excedió el límite de paginación documental.');
+      } catch (error) {
+        if (activo) {
+          setEstadoDocumentos('error');
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'No se pudo consultar la documentación.'
+          );
+        }
+      }
+    };
+
+    void cargarDocumentacion();
+
+    return () => {
+      activo = false;
+    };
+  }, [tab, salesList]);
 
   const loadFormData = async () => {
     setLoadingFormData(true);
@@ -984,6 +1056,10 @@ export function Sales() {
           {
             id: 'Contratos',
             label: 'Contratos pendientes de firma'
+          },
+          {
+            id: 'Anexos',
+            label: 'Gestionar anexos de ventas'
           }
         ]}
       />
@@ -995,14 +1071,14 @@ export function Sales() {
         </Gate>
       )}
 
-      {/* Documentación contractual de las ventas */}
-      {tab === 'Venta' && (
+      {/* Gestión de anexos de ventas */}
+      {tab === 'Anexos' && (
         <Gate permission="sales.view">
           <DocumentacionContratosPanel />
         </Gate>
       )}
 
-      {tab !== 'Contratos' && (
+      {(tab === 'Separación' || tab === 'Venta') && (
 
         <Card>
           <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
@@ -1050,11 +1126,11 @@ export function Sales() {
             <Table
               className={tab === 'Separación'
                 ? '[&_table]:min-w-[1280px]'
-                : '[&_table]:min-w-[1250px]'
+                : '[&_table]:min-w-[1560px]'
               }
               head={tab === 'Separación' ? (
                 <>
-                  <TH>Fecha de separación</TH>
+                  <TH>Fecha</TH>
                   <TH>Código</TH>
                   <TH>Cliente</TH>
                   <TH>Proyecto</TH>
@@ -1067,16 +1143,16 @@ export function Sales() {
                 </>
               ) : (
                 <>
-                  <TH>Código</TH>
-                  <TH>Tipo</TH>
-                  <TH>Comprador</TH>
-                  <TH>Lote / Proyecto</TH>
-                  <TH>Modalidad</TH>
-                  <TH align="right">Monto</TH>
-                  <TH>Asesor</TH>
                   <TH>Fecha</TH>
-                  <TH>Contrato</TH>
+                  <TH>Código</TH>
+                  <TH>Cliente</TH>
+                  <TH>Proyecto</TH>
+                  <TH>Lote</TH>
+                  <TH align="right">Monto</TH>
+                  <TH>Modalidad</TH>
+                  <TH>Asesor</TH>
                   <TH>Estado</TH>
+                  <TH>Documentación</TH>
                   <TH align="right">Acciones</TH>
                 </>
               )}
@@ -1135,56 +1211,76 @@ export function Sales() {
                   </TR>
                 ) : (
                   <TR key={sale.id}>
+                    <TD className="whitespace-nowrap text-xs text-brand-700">
+                      {sale.date || '—'}
+                    </TD>
+
                     <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-900">
                       {sale.code}
                     </TD>
 
-                    <TD>
-                      <Badge tone="brand">{sale.type}</Badge>
+                    <TD className="min-w-[150px] font-medium text-brand-900">
+                      {sale.buyer || '—'}
                     </TD>
 
-                    <TD className="font-medium text-brand-900">
-                      {sale.buyer}
+                    <TD className="min-w-[170px] text-brand-700">
+                      {sale.project || '—'}
                     </TD>
 
-                    <TD>
-                      <p className="font-mono text-xs font-semibold text-brand-700">
-                        {sale.lot}
-                      </p>
-                      <p className="text-xs text-brand-500">
-                        {sale.project}
-                      </p>
+                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-800">
+                      {sale.lot || '—'}
                     </TD>
 
-                    <TD>{sale.modality ?? '—'}</TD>
-
-                    <TD align="right" className="whitespace-nowrap font-semibold">
+                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
                       {currency(sale.amount)}
                     </TD>
 
-                    <TD>
+                    <TD className="whitespace-nowrap text-brand-700">
+                      {sale.modality ?? 'Por definir'}
+                    </TD>
+
+                    <TD className="min-w-[140px]">
                       <AdvisorBadge advisor={sale.advisor} type={sale.type} />
                     </TD>
-
-                    <TD className="whitespace-nowrap text-xs">
-                      {sale.date || '—'}
-                    </TD>
-
-                    <TD>{sale.contract ?? '—'}</TD>
 
                     <TD>
                       <StatusBadge status={sale.status} />
                     </TD>
 
-                    <TD align="right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={FileTextIcon}
-                        onClick={() => setDetail(sale)}
+                    <TD align="center" className="min-w-[135px]">
+                      <span
+                        className={`flex w-full items-center justify-center ${estadoDocumentos !== 'listo'
+                          ? 'text-slate-400'
+                          : documentosPorVenta[sale.id]?.tienePdfAprobado &&
+                            documentosPorVenta[sale.id]?.tienePlanoLote &&
+                            documentosPorVenta[sale.id]?.tieneMemoriaDescriptiva
+                            ? 'text-emerald-600'
+                            : 'text-red-600'
+                          }`}
+                        title={
+                          estadoDocumentos !== 'listo'
+                            ? 'Estado documental no disponible'
+                            : documentosPorVenta[sale.id]?.tienePdfAprobado &&
+                              documentosPorVenta[sale.id]?.tienePlanoLote &&
+                              documentosPorVenta[sale.id]?.tieneMemoriaDescriptiva
+                              ? 'Documentación completa'
+                              : 'Documentación pendiente'
+                        }
                       >
-                        Ver
-                      </Button>
+                        <FileTextIcon className="h-5 w-5" />
+                      </span>
+                    </TD>
+
+                    <TD align="right">
+                      <button
+                        type="button"
+                        onClick={() => setDetail(sale)}
+                        title="Ver ficha de venta"
+                        aria-label={`Ver ficha de ${sale.buyer}`}
+                        className="inline-flex items-center justify-center rounded-lg p-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900"
+                      >
+                        <EyeIcon className="h-5 w-5" />
+                      </button>
                     </TD>
                   </TR>
                 )
@@ -1201,10 +1297,11 @@ export function Sales() {
         onClose={() => setDetail(null)}
         title={detail ? `Operación ${detail.code}` : ''}
         description={detail ? `${detail.type} · ${detail.buyer}` : ''}
+        width="max-w-3xl"
       >
         {detail ? (
-          <dl className="divide-y divide-brand-100 text-sm">
-            {[
+          <div className="space-y-5">
+            <dl className="divide-y divide-brand-100 text-sm">            {[
               { label: 'Código', value: detail.code },
               { label: 'Tipo de operación', value: detail.type },
               { label: 'Comprador', value: detail.buyer },
@@ -1239,7 +1336,22 @@ export function Sales() {
                 <dd className="text-right text-[13px] font-medium text-brand-800">{row.value}</dd>
               </div>
             ))}
-          </dl>
+            </dl>
+
+            {detail.type === 'Venta' && documentosPorVenta[detail.id] && (
+              <section className="border-t border-brand-100 pt-4">
+                <h3 className="mb-3 text-sm font-semibold text-brand-900">
+                  Documentación asociada a la venta
+                </h3>
+
+                <AnexosContratoPanel
+                  idContrato={documentosPorVenta[detail.id].idContrato}
+                  codigoContrato={documentosPorVenta[detail.id].codigoContrato}
+                  soloConsulta
+                />
+              </section>
+            )}
+          </div>
         ) : null}
       </Modal>
 

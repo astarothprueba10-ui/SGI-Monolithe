@@ -100,6 +100,10 @@ export const BASE_DASHBOARD_INTRO: Record<Exclude<RoleName, 'Gerencia'>, { title
     title: 'Dashboard financiero',
     description: 'Cobranza del periodo, cartera vencida y vouchers pendientes de validación.'
   },
+  'Asesoría Legal': {
+    title: 'Revisión jurídica de anulaciones',
+    description: 'Consulta los expedientes pendientes de dictamen y sus documentos legales.'
+  },
   Marketing: {
     title: 'Dashboard de marketing',
     description: 'Rendimiento de campañas, costo por lead y calidad de la captación.'

@@ -20,6 +20,7 @@ export type Action =
   | 'edit'
   | 'delete'
   | 'approve'
+  | 'annul'
   | 'reject'
   | 'export'
   | 'configure'
@@ -28,13 +29,14 @@ export type Action =
   | 'assign_role'
   | 'assign_permissions';
 
-export type Permission = `${ModuleKey}.${Action}`;
+export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review';
 
 export type RoleName =
   | 'Administrador'
   | 'Gerencia'
   | 'Asesor'
   | 'Finanzas'
+  | 'Asesoría Legal'
   | 'Marketing'
   | 'RRHH'
   | 'Supervisor comercial';

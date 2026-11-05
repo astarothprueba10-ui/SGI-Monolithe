@@ -195,6 +195,10 @@ export const BASE_ROLE_KPIS: Record<Exclude<RoleName, 'Gerencia'>, Kpi[]> = {
     tone: 'rose'
   }],
 
+  // Sin KPIs comerciales simulados para Asesoría Legal.
+
+  'Asesoría Legal': [],
+
   Marketing: [
   {
     id: 'm1',

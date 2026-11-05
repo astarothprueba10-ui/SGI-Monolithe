@@ -1,4 +1,3 @@
-
 package monolithe.core_service.service;
 
 import lombok.RequiredArgsConstructor;
@@ -511,6 +510,70 @@ public class CrmVentaService {
     }
 
     @Transactional
+    public JsonNode registrarEvidenciaLegal(
+            Long actor,
+            Long idSolicitud,
+            String tipoDocumento,
+            String claveArchivo,
+            String nombreOriginal,
+            String hashSha256) {
+
+        validarActor(actor);
+
+        if (idSolicitud == null || idSolicitud <= 0
+                || tipoDocumento == null
+                || claveArchivo == null || claveArchivo.isBlank()
+                || nombreOriginal == null || nombreOriginal.isBlank()
+                || hashSha256 == null
+                || !hashSha256.matches("(?i)[a-f0-9]{64}")) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Datos de evidencia legal inválidos.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_registrar_evidencia_legal_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar),
+                    CAST(? AS varchar)
+                )::text
+                """,
+                actor,
+                idSolicitud,
+                tipoDocumento,
+                claveArchivo,
+                nombreOriginal,
+                hashSha256.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode autorizarCargaEvidenciaLegal(
+            Long actor,
+            Long idSolicitud) {
+
+        validarActor(actor);
+
+        if (idSolicitud == null || idSolicitud <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de solicitud inválido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_carga_evidencia_legal_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idSolicitud);
+    }
+
+    @Transactional
     public JsonNode registrarAnexoContrato(
             Long actor,
             Long idContrato,
@@ -794,6 +857,226 @@ public class CrmVentaService {
                 idContratoArchivo);
     }
 
+    @Transactional(readOnly = true)
+    public JsonNode autorizarLecturaPdfAprobado(
+            Long actor,
+            Long idContrato) {
+
+        validarActor(actor);
+
+        if (idContrato == null || idContrato <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El identificador del contrato es invalido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_lectura_pdf_aprobado_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idContrato);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarEvidenciasLegales(
+            Long actor, Long idSolicitud) {
+
+        validarActor(actor);
+
+        if (idSolicitud == null || idSolicitud <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Solicitud de anulación inválida.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_evidencias_legales_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idSolicitud);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode autorizarLecturaEvidenciaLegal(
+            Long actor, Long idSolicitud, Long idEvidencia) {
+
+        validarActor(actor);
+
+        if (idSolicitud == null || idSolicitud <= 0
+                || idEvidencia == null || idEvidencia <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Solicitud o evidencia legal inválida.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_lectura_evidencia_legal_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """, actor, idSolicitud, idEvidencia);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarCasosRevisionLegal(
+            Long actor, Integer pagina, Integer tamano) {
+
+        validarActor(actor);
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_casos_revision_legal_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """, actor, pagina, tamano);
+    }
+
+    @Transactional
+    public JsonNode registrarRevisionLegal(
+            Long actor, Long idSolicitud,
+            Integer versionEsperada, String resultado,
+            String sustento, Long idEvidencia) {
+
+        validarActor(actor);
+
+        return ejecutar("""
+                SELECT public.sp_crm_registrar_revision_legal_anulacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint),
+                    CAST(? AS integer),
+                    CAST(? AS varchar),
+                    CAST(? AS text),
+                    CAST(? AS bigint)
+                )::text
+                """, actor, idSolicitud, versionEsperada,
+                resultado, sustento, idEvidencia);
+    }
+
+    // ===== CRM: solicitudes y revisiones de anulaciones =====
+    @Transactional
+    public JsonNode solicitarAnulacion(
+            Long actor, String tipoOperacion, Long idOperacion,
+            String categoriaMotivo, String motivo) {
+
+        validarActor(actor);
+        if (idOperacion == null || idOperacion <= 0
+                || tipoOperacion == null || categoriaMotivo == null
+                || motivo == null || motivo.trim().length() < 20
+                || motivo.trim().length() > 2000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos inválidos para solicitar la anulación.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_solicitar_anulacion_v1(
+                    CAST(? AS bigint), CAST(? AS varchar),
+                    CAST(? AS bigint), CAST(? AS varchar),
+                    CAST(? AS text)
+                )::text
+                """, actor, tipoOperacion.trim(), idOperacion,
+                categoriaMotivo.trim(), motivo.trim());
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarSolicitudesAnulacion(
+            Long actor, String tipo, String estado, String busqueda,
+            Integer pagina, Integer tamano) {
+
+        validarActor(actor);
+        validarPaginacionAnulaciones(pagina, tamano);
+        if (busqueda != null && busqueda.length() > 120) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La búsqueda no puede superar los 120 caracteres.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_listar_solicitudes_anulacion_v1(
+                    CAST(? AS bigint), CAST(? AS varchar),
+                    CAST(? AS varchar), CAST(? AS varchar),
+                    CAST(? AS integer), CAST(? AS integer)
+                )::text
+                """, actor, tipo, estado, busqueda, pagina, tamano);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarHistorialAnulaciones(
+            Long actor, String tipo, Long idOperacion,
+            Integer pagina, Integer tamano) {
+
+        validarActor(actor);
+        validarPaginacionAnulaciones(pagina, tamano);
+        if (idOperacion != null && idOperacion <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El identificador de operación es inválido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_listar_historial_anulaciones_v1(
+                    CAST(? AS bigint), CAST(? AS varchar),
+                    CAST(? AS bigint), CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """, actor, tipo, idOperacion, pagina, tamano);
+    }
+
+    @Transactional
+    public JsonNode decidirSolicitudAnulacion(
+            Long actor, Long idSolicitud, Integer versionEsperada,
+            String accion, String justificacion) {
+
+        validarActor(actor);
+        if (idSolicitud == null || idSolicitud <= 0
+                || versionEsperada == null || versionEsperada <= 0
+                || accion == null || justificacion == null
+                || justificacion.trim().length() < 20
+                || justificacion.trim().length() > 2000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos de decisión de anulación inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_decidir_solicitud_anulacion_v1(
+                    CAST(? AS bigint), CAST(? AS bigint),
+                    CAST(? AS integer), CAST(? AS varchar),
+                    CAST(? AS text)
+                )::text
+                """, actor, idSolicitud, versionEsperada,
+                accion.trim(), justificacion.trim());
+    }
+
+    @Transactional
+    public JsonNode registrarRevisionFinancieraAnulacion(
+            Long actor, Long idSolicitud, Integer versionEsperada,
+            String resultado, String sustento) {
+
+        validarActor(actor);
+        if (idSolicitud == null || idSolicitud <= 0
+                || versionEsperada == null || versionEsperada <= 0
+                || resultado == null || sustento == null
+                || sustento.trim().length() < 40
+                || sustento.trim().length() > 2000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos de revisión financiera inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_registrar_revision_financiera_anulacion_v1(
+                    CAST(? AS bigint), CAST(? AS bigint),
+                    CAST(? AS integer), CAST(? AS varchar),
+                    CAST(? AS text)
+                )::text
+                """, actor, idSolicitud, versionEsperada,
+                resultado.trim(), sustento.trim());
+    }
+
+    private void validarPaginacionAnulaciones(Integer pagina, Integer tamano) {
+        if (pagina == null || pagina < 1 || pagina > 100000
+                || tamano == null || tamano < 1 || tamano > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación inválida: página 1-100000 y tamaño 1-100.");
+        }
+    }
+
     private void validarActor(Long actor) {
 
         if (actor == null || actor <= 0) {
@@ -861,6 +1144,48 @@ public class CrmVentaService {
         return null;
     }
 
+    /**
+     * Errores funcionales de anulaciones y códigos heredados antes no alcanzables.
+     * Evita que rechazos de negocio se devuelvan equivocadamente como HTTP 503.
+     */
+    private ResponseStatusException mapearErrorAnulacion(
+            String mensaje, DataAccessException ex) {
+
+        if (mensaje.contains("SOLICITUD_NO_EXISTE|")
+                || mensaje.contains("EVIDENCIA_NO_EXISTE|")
+                || mensaje.contains("VENTA_NO_EXISTE|")
+                || mensaje.contains("OPERACION_NO_EXISTE|")
+                || mensaje.contains("LOTE_NO_EXISTE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "La solicitud, evidencia o venta indicada no existe.", ex);
+        }
+
+        if (mensaje.contains("CONFIGURACION_INVALIDA|")) {
+            return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "La configuración de Storage o del módulo requiere revisión.", ex);
+        }
+
+        if (mensaje.contains("SOLICITUD_DUPLICADA|")
+                || mensaje.contains("VERSION_DESACTUALIZADA|")
+                || mensaje.contains("SOLICITUD_CERRADA|")
+                || mensaje.contains("SOLICITUD_NO_ADMISIBLE|")
+                || mensaje.contains("TRANSICION_INVALIDA|")
+                || mensaje.contains("OPERACION_NO_SOLICITABLE|")
+                || mensaje.contains("OPERACION_INVALIDA|")
+                || mensaje.contains("VENTA_NO_CANCELABLE|")
+                || mensaje.contains("REVISION_OBLIGATORIA|")
+                || mensaje.contains("REVISION_DESACTUALIZADA|")
+                || mensaje.contains("REVISION_LEGAL_OBLIGATORIA|")
+                || mensaje.contains("REVISION_LEGAL_DESACTUALIZADA|")
+                || mensaje.contains("EVIDENCIA_REQUERIDA|")
+                || mensaje.contains("EVIDENCIA_ALTERADA|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La solicitud no cumple las condiciones actuales. Revise su estado y documentación.", ex);
+        }
+
+        return null;
+    }
+
     private ResponseStatusException traducirError(
             DataAccessException ex) {
 
@@ -878,6 +1203,11 @@ public class CrmVentaService {
         ResponseStatusException errorSep = mapearErrorSeparacion(mensaje, ex);
         if (errorSep != null) {
             return errorSep;
+        }
+
+        ResponseStatusException errorAnulacion = mapearErrorAnulacion(mensaje, ex);
+        if (errorAnulacion != null) {
+            return errorAnulacion;
         }
 
         if (mensaje.contains("DENEGADO|")) {
