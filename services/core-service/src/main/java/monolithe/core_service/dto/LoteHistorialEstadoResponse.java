@@ -4,25 +4,26 @@ import java.time.OffsetDateTime;
 
 public record LoteHistorialEstadoResponse(
 
-        Long idHistorial,
+                Long idHistorial,
 
-        Long idLote,
-        String codigoLote,
-        String numeroLote,
+                Long idLote,
+                String codigoLote,
+                String numeroLote,
 
-        Integer idEstadoAnterior,
-        String codigoEstadoAnterior,
-        String nombreEstadoAnterior,
+                Integer idEstadoAnterior,
+                String codigoEstadoAnterior,
+                String nombreEstadoAnterior,
 
-        Integer idEstadoNuevo,
-        String codigoEstadoNuevo,
-        String nombreEstadoNuevo,
+                Integer idEstadoNuevo,
+                String codigoEstadoNuevo,
+                String nombreEstadoNuevo,
 
-        String motivo,
+                String motivo,
 
-        OffsetDateTime fechaCambio,
+                OffsetDateTime fechaCambio,
 
-        Long idUsuario
+                Long idUsuario,
+                String nombreResponsable
 
 ) {
 }

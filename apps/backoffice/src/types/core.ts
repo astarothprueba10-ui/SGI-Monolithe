@@ -236,6 +236,19 @@ export interface LoteHistorialEstadoResponse {
   motivo?: string | null;
   fechaCambio: string;
   idUsuario?: number | null;
+  nombreResponsable?: string | null;
+}
+
+/** Operaciones registradas para un lote, con el estado ACTUAL de cada operación. */
+export interface LoteHistorialComercialItem {
+  tipo: 'SEPARACION' | 'VENTA' | 'CONTRATO';
+  id: number;
+  codigo: string;
+  estado: string;
+  fecha: string;
+  monto: number | null;
+  referencia: string | null;
+  fecha_firma: string | null;
 }
 
 export type PuntoPlano = { x: number; y: number };

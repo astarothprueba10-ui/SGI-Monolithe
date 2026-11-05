@@ -8,6 +8,8 @@ import { FieldLabel, Select } from '../ui/Field';
 import { coreService } from '../../services/coreService';
 
 import { HistorialLotePanel } from '../lots/HistorialLotePanel';
+import { HistorialComercialLotePanel } from '../lots/HistorialComercialLotePanel';
+import { Gate } from '../auth/PermissionRoute';
 import type {
   LoteResponse,
   EstadoLoteResponse
@@ -198,6 +200,14 @@ export function LotStatusModal({
             refreshKey={refreshHistoryKey}
           />
         </div>
+        <Gate permission="sales.view">
+          <div className="border-t pt-4">
+            <HistorialComercialLotePanel
+              idLote={lot.idLote}
+              refreshKey={refreshHistoryKey}
+            />
+          </div>
+        </Gate>
       </div>
     </Modal>
   );

@@ -22,28 +22,29 @@ import java.util.List;
 @Validated
 public class LoteEstadoController {
 
-    private final LoteEstadoService loteEstadoService;
+        private final LoteEstadoService loteEstadoService;
 
-    @PatchMapping("/{idLote}/estado")
-    @PreAuthorize("hasAuthority('lots.edit')")
-    public ResponseEntity<CambioEstadoLoteResponse> cambiarEstado(
-            @PathVariable @Positive Long idLote,
-            @Valid @RequestBody CambiarEstadoLoteRequest request,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long idUsuario = Long.valueOf(jwt.getSubject());
-        return ResponseEntity.ok(
-                loteEstadoService.cambiarEstado(idLote, idUsuario, request)
-        );
-    }
+        @PatchMapping("/{idLote}/estado")
+        @PreAuthorize("hasAuthority('lots.edit')")
+        public ResponseEntity<CambioEstadoLoteResponse> cambiarEstado(
+                        @PathVariable @Positive Long idLote,
+                        @Valid @RequestBody CambiarEstadoLoteRequest request,
+                        @AuthenticationPrincipal Jwt jwt) {
+                Long idUsuario = Long.valueOf(jwt.getSubject());
+                return ResponseEntity.ok(
+                                loteEstadoService.cambiarEstado(idLote, idUsuario, request));
+        }
 
-    @GetMapping("/{idLote}/historial-estados")
-    @PreAuthorize("hasAuthority('lots.view')")
-    public ResponseEntity<List<LoteHistorialEstadoResponse>> listarHistorial(
-            @PathVariable @Positive Long idLote
-    ) {
-        return ResponseEntity.ok(
-                loteEstadoService.listarHistorial(idLote)
-        );
-    }
+        @GetMapping("/{idLote}/historial-estados")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<List<LoteHistorialEstadoResponse>> listarHistorial(
+                        @PathVariable @Positive Long idLote,
+                        @AuthenticationPrincipal Jwt jwt) {
+
+                Long idActor = Long.valueOf(jwt.getSubject());
+
+                return ResponseEntity.ok(
+                                loteEstadoService.listarHistorial(idLote, idActor));
+        }
+
 }

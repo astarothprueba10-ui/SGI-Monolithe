@@ -47,6 +47,15 @@ public class CrmVentaController {
                 return service.validar(obtenerActor(jwt), request);
         }
 
+        // Expediente de lote: lectura de operaciones comerciales con alcance por actor.
+        @GetMapping("/lotes/{idLote}/historial-comercial")
+        @PreAuthorize("hasAuthority('lots.view') and hasAuthority('sales.view')")
+        public JsonNode historialComercialLote(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idLote) {
+                return service.historialComercialLote(obtenerActor(jwt), idLote);
+        }
+
         @GetMapping("/prospectos/{idProspecto}/lotes-reservados")
         @PreAuthorize("hasAuthority('sales.create')")
         public JsonNode listarLotesReservadosDelProspecto(

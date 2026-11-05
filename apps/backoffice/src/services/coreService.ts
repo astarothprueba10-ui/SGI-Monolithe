@@ -35,6 +35,7 @@ import type {
   CambiarEstadoLoteRequest,
   CambioEstadoLoteResponse,
   LoteHistorialEstadoResponse,
+  LoteHistorialComercialItem,
   PlanoInteractivoResponse,
   PlanoInteractivoDetalleResponse,
   PlanoInteractivoRequest,
@@ -494,6 +495,11 @@ export const coreService = {
   ): Promise<LoteHistorialEstadoResponse[]> {
     return coreApi.get<LoteHistorialEstadoResponse[]>(
       `/lotes/${idLote}/historial-estados`
+    );
+  },
+  getLotCommercialHistory(idLote: number): Promise<LoteHistorialComercialItem[]> {
+    return coreApi.get<LoteHistorialComercialItem[]>(
+      `/crm/lotes/${idLote}/historial-comercial`
     );
   },
 

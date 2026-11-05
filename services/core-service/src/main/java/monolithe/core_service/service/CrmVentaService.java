@@ -27,6 +27,33 @@ public class CrmVentaService {
     private final JdbcTemplate jdbc;
     private final JsonMapper jsonMapper;
 
+    /**
+     * Historial de operaciones del lote. Los estados son actuales, no eventos de
+     * cambio.
+     */
+
+    /** Historial comercial del lote, consultado mediante función almacenada. */
+    @Transactional(readOnly = true)
+    public JsonNode historialComercialLote(Long actor, Long idLote) {
+
+        validarActor(actor);
+
+        if (idLote == null || idLote <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Identificador de lote invalido.");
+        }
+
+        return ejecutar("""
+                SELECT public.sp_crm_listar_historial_comercial_lote_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor,
+                idLote);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode validar(
             Long actor,
@@ -928,11 +955,11 @@ public class CrmVentaService {
         try {
             JsonNode resultado = jsonMapper.readTree(respuesta);
 
-            if (resultado == null || !resultado.isObject()) {
+            if (resultado == null
+                    || (!resultado.isObject() && !resultado.isArray())) {
                 throw new IllegalStateException(
                         "Formato de respuesta inesperado.");
             }
-
             return resultado;
 
         } catch (JacksonException ex) {

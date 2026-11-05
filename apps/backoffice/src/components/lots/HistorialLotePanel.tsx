@@ -37,11 +37,23 @@ function formatFechaPeru(fechaIso: string): string {
   }
 }
 
-function formatResponsable(idUsuario?: number | null): string {
-  if (idUsuario !== null && idUsuario !== undefined && idUsuario > 0) {
-    return `Usuario #${idUsuario}`;
+
+
+function formatResponsable(
+  idUsuario?: number | null,
+  nombreResponsable?: string | null
+): string {
+  const nombre = nombreResponsable?.trim();
+
+  if (nombre) {
+    return idUsuario != null
+      ? `${nombre} (Usuario #${idUsuario})`
+      : nombre;
   }
-  return 'Sistema / No disponible';
+
+  return idUsuario != null
+    ? `Usuario #${idUsuario}`
+    : 'Sistema / No disponible';
 }
 
 function getStatusBadgeClass(codigo?: string | null): string {
@@ -96,27 +108,36 @@ function useHistorialLote(idLote: number, refreshKey?: number) {
   return { items, loading, error, refresh: fetchHistorial };
 }
 
+
 function HistorialItemHeader({
   fechaStr,
-  idUsuario
+  idUsuario,
+  nombreResponsable
 }: {
   fechaStr: string;
   idUsuario?: number | null;
+  nombreResponsable?: string | null;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-50 pb-2">
       <div className="flex items-center gap-1.5 text-xs text-brand-500">
         <ClockIcon className="h-3.5 w-3.5 shrink-0 text-brand-400" aria-hidden="true" />
         <span className="font-medium text-brand-800">{fechaStr}</span>
-        <span className="text-[11px] text-brand-400">(PET / America/Lima)</span>
+        <span className="text-[11px] text-brand-400">
+          (PET / America/Lima)
+        </span>
       </div>
+
       <div className="flex items-center gap-1 text-xs text-brand-500">
         <UserIcon className="h-3.5 w-3.5 shrink-0 text-brand-400" aria-hidden="true" />
-        <span className="font-medium text-brand-700">{formatResponsable(idUsuario)}</span>
+        <span className="font-medium text-brand-700">
+          {formatResponsable(idUsuario, nombreResponsable)}
+        </span>
       </div>
     </div>
   );
 }
+
 
 function HistorialItemTransitions({
   item,
@@ -149,7 +170,11 @@ function HistorialItemCard({ item }: { item: LoteHistorialEstadoResponse }) {
 
   return (
     <div className="rounded-lg border border-brand-100 bg-white p-3.5 shadow-xs">
-      <HistorialItemHeader fechaStr={fechaStr} idUsuario={item.idUsuario} />
+      <HistorialItemHeader
+        fechaStr={fechaStr}
+        idUsuario={item.idUsuario}
+        nombreResponsable={item.nombreResponsable}
+      />
       <HistorialItemTransitions item={item} badgeAnt={badgeAnt} badgeNuevo={badgeNuevo} />
       {item.motivo ? (
         <p className="mt-2 text-xs text-brand-600 bg-brand-50/50 rounded p-2 italic">
