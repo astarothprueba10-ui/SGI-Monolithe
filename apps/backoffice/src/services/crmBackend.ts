@@ -326,6 +326,21 @@ export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
 }
 
 
+export interface CrmReservaVigenteVenta {
+  idReserva: number;
+  codigoReserva: string;
+  idLote: number;
+  idProyecto: number;
+  idEtapa: number;
+  montoReserva: number;
+  fechaVencimiento: string;
+}
+
+export interface CrmReservasVigentesVenta {
+  idLotes: number[];
+  reservas: CrmReservaVigenteVenta[];
+}
+
 export interface CrmSaleValidationInput {
   idProspecto: number;
   idLote: number;
@@ -333,6 +348,7 @@ export interface CrmSaleValidationInput {
   montoTotal: number;
   montoInicial?: number | null;
   numeroCuotas?: number | null;
+  tasaInteresMensualPct?: number | null;
   observaciones?: string | null;
 }
 
@@ -347,6 +363,9 @@ export interface CrmSaleValidationResult {
   idProyecto: number;
   modalidad: 'CONTADO' | 'FINANCIADA';
   precioVigente: number;
+  montoReservaAplicable: number;
+  saldoContado: number;
+  planAleman: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number } | null;
   idMoneda: number;
   mensaje: string;
 }
@@ -987,6 +1006,7 @@ export const crmBackend = {
         montoTotal: body.montoTotal,
         montoInicial: body.montoInicial ?? null,
         numeroCuotas: body.numeroCuotas ?? null,
+        tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
         observaciones: body.observaciones ?? null
       }
     ),
@@ -1001,6 +1021,7 @@ export const crmBackend = {
         montoTotal: body.montoTotal,
         montoInicial: body.montoInicial ?? null,
         numeroCuotas: body.numeroCuotas ?? null,
+        tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
         observaciones: body.observaciones ?? null
       }
     ),
@@ -1016,6 +1037,11 @@ export const crmBackend = {
     coreApi.get<CrmBuyerVerification>(
       `/crm/prospectos/${idProspecto}/verificar-compra`
     ),
+  listarReservasVigentesParaVenta: (idProspecto: number) =>
+    coreApi.get<CrmReservasVigentesVenta>(
+      `/crm/prospectos/${idProspecto}/reservas-vigentes-venta`
+    ),
+
   listarLotesReservadosDelProspecto: (idProspecto: number) =>
     coreApi.get<{ idLotes: number[] }>(
       `/crm/prospectos/${idProspecto}/lotes-reservados`
