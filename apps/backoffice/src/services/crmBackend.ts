@@ -341,6 +341,28 @@ export interface CrmReservasVigentesVenta {
   reservas: CrmReservaVigenteVenta[];
 }
 
+export type EstadoCivilReniec = 'SOLTERO' | 'CASADO' | 'DIVORCIADO' | 'VIUDO';
+export interface CrmDatosConyugeVenta {
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono: string;
+  correo: string;
+  tipoDocumento: 'DNI' | 'CE' | 'RUC' | 'PASAPORTE';
+  numeroDocumento: string;
+}
+export interface CrmVoucherVenta {
+  claveArchivo: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanioBytes: number;
+}
+export interface CrmDatosPagoVenta {
+  metodoPago: 'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO';
+  numeroOperacion: string | null;
+  comprobantes: CrmVoucherVenta[];
+}
+
 export interface CrmDatosCompradorVenta {
   idProspecto: number;
   nombres: string;
@@ -361,6 +383,8 @@ export interface CrmDatosCompradorVenta {
   idProvincia: number | null;
   idDistrito: number | null;
   idAsesor: number | null;
+  estadoCivil: EstadoCivilReniec | null;
+  conyuge: CrmDatosConyugeVenta | null;
 }
 
 export interface CrmSaleValidationInput {
@@ -373,6 +397,7 @@ export interface CrmSaleValidationInput {
   tasaInteresMensualPct?: number | null;
   observaciones?: string | null;
   datosComprador?: CrmDatosCompradorVenta;
+  datosPago?: CrmDatosPagoVenta;
 }
 
 export interface CrmSaleValidationResult {
@@ -832,6 +857,41 @@ export const crmBackend = {
       })}`
     ),
 
+  subirComprobanteVenta: async (
+    condiciones: Pick<CrmSaleValidationInput,
+      'idProspecto' | 'idLote' | 'modalidad' | 'montoTotal' | 'montoInicial' | 'numeroCuotas'>,
+    archivo: File
+  ): Promise<CrmVoucherVenta> => {
+    if (!archivo || archivo.size < 1 || archivo.size > 5 * 1024 * 1024
+        || archivo.name.length > 255 || !archivo.name.trim()
+        || !['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)) {
+      throw new Error('El comprobante debe ser PDF o imagen de hasta 5 MB.');
+    }
+    const carga = await coreApi.post<CrmSeparacionUpload>(
+      '/crm/ventas/preparar-comprobante',
+      {
+        ...condiciones,
+        nombreArchivo: archivo.name,
+        tipoMime: archivo.type
+      }
+    );
+    const token = new URL(carga.urlCarga).searchParams.get('token');
+    if (!token || carga.bucket !== 'vouchers-ventas-private') {
+      throw new Error('Enlace de carga de venta inválido.');
+    }
+    const { error } = await supabase.storage.from(carga.bucket)
+      .uploadToSignedUrl(carga.claveArchivo, token, archivo, {
+        contentType: carga.tipoMime, upsert: false
+      });
+    if (error) throw new Error('No se pudo cargar el comprobante: ' + error.message);
+    return {
+      claveArchivo: carga.claveArchivo,
+      nombreArchivo: archivo.name,
+      tipoMime: archivo.type,
+      tamanioBytes: archivo.size
+    };
+  },
+
   prepararComprobanteSeparacion: (body: {
     idProspecto: number;
     idLote: number;
@@ -1046,7 +1106,8 @@ export const crmBackend = {
         numeroCuotas: body.numeroCuotas ?? null,
         tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
         observaciones: body.observaciones ?? null,
-        datosComprador: body.datosComprador ?? null
+        datosComprador: body.datosComprador ?? null,
+        datosPago: body.datosPago ?? null
       }
     ),
   cancelarVentaPendiente: (
