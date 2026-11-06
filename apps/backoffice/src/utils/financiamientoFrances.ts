@@ -2,8 +2,8 @@
  * Sistema francés: cuota mensual constante, interés sobre saldo pendiente y
  * amortización creciente. Se ajusta la ÚLTIMA cuota por redondeo a céntimos.
  *
- * La política comercial existente fija una TASA NOMINAL ANUAL del 5%;
- * la tasa mensual aplicada es 10% / 12 (no se trata de una TEA del 5%).
+ * La política comercial para nuevas ventas fija una TASA NOMINAL ANUAL del 10%;
+ * la tasa mensual aplicada es 10% / 12 (no se trata de una TEA del 10%).
  */
 export interface CuotaFrancesa {
   numero: number;
