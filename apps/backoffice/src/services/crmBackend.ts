@@ -208,7 +208,6 @@ export interface CrmSearchPeriodo extends CrmSearch {
 export interface CrmSeparacionInput {
   idProspecto: number;
   idLote: number;
-  modalidadPrevista: 'CONTADO' | 'FINANCIADA';
   metodoPago: 'EFECTIVO' | 'DEPOSITO' | 'TRANSFERENCIA' | 'YAPE_PLIN' | 'OTRO';
   numeroOperacion?: string | null;
   monto: number;
@@ -235,7 +234,6 @@ export interface CrmSeparacionResult {
   estado_lote: 'RESERVADO';
   estado_pago: 'REGISTRADO';
   estado_voucher: 'PENDIENTE';
-  modalidad_prevista: 'CONTADO' | 'FINANCIADA';
   message: string;
 }
 
@@ -313,6 +311,7 @@ export interface CrmOperacionItem {
   comprador: string;
   documento: string | null;
   modalidad: 'CONTADO' | 'FINANCIADA' | null;
+  metodo_pago: string | null;
   monto: number;
   estado: string;
   fecha: string;
@@ -866,7 +865,6 @@ export const crmBackend = {
       {
         idProspecto: body.idProspecto,
         idLote: body.idLote,
-        modalidadPrevista: body.modalidadPrevista,
         metodoPago: body.metodoPago,
         numeroOperacion: body.numeroOperacion?.trim() || null,
         monto: body.monto,
