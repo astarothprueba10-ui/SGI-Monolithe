@@ -79,6 +79,10 @@ services:
       VITE_AUTH_API_URL: /api/auth
       VITE_CMS_API_URL: /cms-api
       VITE_CORE_API_URL: /api/core
+      # Ningún botón de publicación se activa sin opt-in explícito del entorno.
+      VITE_CMS_PUBLICACION_TEXTOS_HABILITADA: ${VITE_CMS_PUBLICACION_TEXTOS_HABILITADA:-false}
+      VITE_CMS_PUBLICACION_IMAGENES_HABILITADA: ${VITE_CMS_PUBLICACION_IMAGENES_HABILITADA:-false}
+      VITE_CMS_PUBLICACION_VISIBILIDAD_HABILITADA: ${VITE_CMS_PUBLICACION_VISIBILIDAD_HABILITADA:-false}
 
       AUTH_PROXY_TARGET: http://auth-service:8081
       CMS_PROXY_TARGET: http://pagina-web-backend:8082
@@ -109,8 +113,12 @@ services:
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
       SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      # Se admite la clave heredada de servicio, siempre solo dentro del backend.
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}
       CMS_STORAGE_BUCKET: ${CMS_STORAGE_BUCKET:-cms-public}
+      # El backend vuelve a verificar permisos y restricciones antes de publicar.
+      CMS_PUBLICACION_IMAGENES_HABILITADA: ${CMS_PUBLICACION_IMAGENES_HABILITADA:-false}
+      CMS_PUBLICACION_VISIBILIDAD_ENABLED: ${CMS_PUBLICACION_VISIBILIDAD_ENABLED:-false}
     volumes:
       - type: bind
         source: ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}
@@ -129,6 +137,9 @@ services:
       - "${WEB_FRONTEND_PORT:-5175}:5175"
     environment:
       VITE_API_URL: /cms-api
+      # La lectura pública también permanece apagada hasta validar el despliegue.
+      VITE_CMS_HERO_PUBLICADO_ENABLED: ${VITE_CMS_HERO_PUBLICADO_ENABLED:-false}
+      VITE_CMS_HERO_PROMO_SLIDES_ENABLED: ${VITE_CMS_HERO_PROMO_SLIDES_ENABLED:-false}
       API_PROXY_TARGET: http://pagina-web-backend:8082
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
