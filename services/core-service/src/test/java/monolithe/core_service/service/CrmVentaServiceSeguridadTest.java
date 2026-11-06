@@ -113,7 +113,7 @@ class CrmVentaServiceSeguridadTest {
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v7"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v8"));
     }
 
     @Test
