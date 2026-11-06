@@ -190,18 +190,23 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-[13px]">
+      <div
+        className="min-w-0 w-full max-w-full overflow-x-auto overscroll-x-contain"
+        role="region"
+        aria-label="Matriz de permisos: desplázate horizontalmente para consultar todas las acciones"
+        tabIndex={0}
+      >
+        <table className="w-max min-w-full table-auto border-collapse text-left text-[13px]">
           <thead className="bg-brand-50/60">
             <tr className="border-b border-brand-100">
-              <th className="sticky left-0 z-10 bg-brand-50/95 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-brand-400">
+              <th className="sticky left-0 z-20 w-[210px] min-w-[210px] whitespace-nowrap bg-brand-50 px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-500 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.16)]">
                 Módulo
               </th>
 
               {actions.map((action) => (
                 <th
                   key={action}
-                  className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-brand-400"
+                  className="min-w-[94px] whitespace-nowrap px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-brand-500"
                 >
                   {ACTION_LABELS[action] ?? action}
                 </th>
@@ -226,7 +231,10 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
                   key={module}
                   className={cn(!hasView && 'bg-brand-50/30')}
                 >
-                  <th className="sticky left-0 z-10 bg-white px-5 py-2.5 text-left text-[13px] font-medium text-brand-800">
+                  <th className={cn(
+                    'sticky left-0 z-10 w-[210px] min-w-[210px] whitespace-nowrap px-5 py-3 text-left text-[13px] font-medium text-brand-800 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.12)]',
+                    hasView ? 'bg-white' : 'bg-brand-50'
+                  )}>
                     {MODULE_LABELS[module] ?? module}
 
                     {!hasView &&
@@ -245,7 +253,7 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
                     return (
                       <td
                         key={action}
-                        className="px-3 py-2.5 text-center"
+                        className="min-w-[94px] whitespace-nowrap px-3 py-3 text-center align-middle"
                       >
                         {permission ? (
                           <input
