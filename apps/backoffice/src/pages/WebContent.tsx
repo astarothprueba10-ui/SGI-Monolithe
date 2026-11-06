@@ -1061,7 +1061,7 @@ export function WebContent() {
               {!seleccionado && (
                 <button
                   type="button"
-                  className={buttonClass}
+                  className={'rounded-md bg-brand-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50'}
                   disabled={
                     !editable ||
                     ocupado ||
@@ -1078,7 +1078,7 @@ export function WebContent() {
                 <>
                   <button
                     type="button"
-                    className={buttonClass}
+                    className={'rounded-md bg-brand-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50'}
                     disabled={
                       !editable ||
                       ocupado ||
@@ -1257,9 +1257,9 @@ export function WebContent() {
                 5. Haz visibles tus cambios
               </h3>
 
-              <p className="mt-1 text-xs text-brand-600">
-                La publicación actualiza la página pública.
-                Solo está disponible para usuarios con autorización y después de revisar el borrador.
+              <p className="mt-1 text-sm text-brand-600">
+                Después de revisar los cambios, publícalos para que los visitantes puedan verlos.
+                Esta acción necesita autorización.
               </p>
 
               {!PUBLICACION_TEXTOS_HABILITADA &&
@@ -1323,7 +1323,7 @@ export function WebContent() {
                     {imagenesPendientes.length > 0 &&
                       !PUBLICACION_IMAGENES_HABILITADA && (
                         <p className="mt-2 text-amber-800">
-                          No se pueden publicar imágenes hasta activar el publicador correspondiente.
+                          Las fotos nuevas todavía no pueden hacerse públicas desde este entorno.
                         </p>
                       )}
                   </div>
@@ -1339,11 +1339,11 @@ export function WebContent() {
 
                       {seccion.textos.map((texto) => (
                         <div
-                          key={nombreCampo(texto.campo)}
+                          key={texto.campo}
                           className="mt-2 break-words"
                         >
                           <p className="font-medium text-brand-800">
-                            {texto.campo}
+                            {nombreCampo(texto.campo)}
                           </p>
 
                           <p className="text-brand-500">
@@ -1358,11 +1358,10 @@ export function WebContent() {
                     </div>
                   ))}
 
-                  <p className="text-xs text-brand-500">
-                    Borrador #{seleccionado.idBorrador} ·
-                    Versión {seleccionado.revisionEdicion} ·
-                    Revisión pública esperada {seleccionado.revisionBase}.
-                  </p>
+                  <details className="text-xs text-brand-500">
+                     <summary className="cursor-pointer">Detalles para soporte</summary>
+                     Cambio {seleccionado.idBorrador} · Versión {seleccionado.revisionEdicion} · Versión pública {seleccionado.revisionBase}
+                   </details>
 
                   {evaluacionPublicacion.secciones.some(
                     (item) => item.codigo !== 'HERO_PRINCIPAL'
@@ -1379,7 +1378,7 @@ export function WebContent() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className={buttonClass}
+                  className={'rounded-md bg-brand-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50'}
                   disabled={!habilitarConfirmacion}
                   onClick={() => setConfirmandoPublicacion(true)}
                 >
@@ -1458,7 +1457,7 @@ export function WebContent() {
                 const esSeleccionado =
                   seleccionado?.idBorrador === borrador.idBorrador;
                 const etiquetaSlides = slidesAsociados.length > 0
-                  ? slidesAsociados.map((numero) => `Slide ${numero}`).join(' · ')
+                  ? slidesAsociados.map((numero) => nombreZona(numero)).join(' · ')
                   : 'Zona no identificada';
 
                 return (
@@ -1471,7 +1470,7 @@ export function WebContent() {
                   >
                     <div>
                       <p className="text-sm font-medium text-brand-800">
-                        Borrador #{borrador.idBorrador}
+                        Cambio guardado
                       </p>
 
                       <p className="mt-1 text-xs text-brand-500">
