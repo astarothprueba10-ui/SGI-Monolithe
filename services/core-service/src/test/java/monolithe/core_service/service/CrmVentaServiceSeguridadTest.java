@@ -108,6 +108,56 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void crmSinPeriodoRetieneFiltrosYAutorizacionSQL() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+            .thenReturn("{\"items\":[],\"total\":0}");
+        var respuesta=service.buscarCarteraSinPeriodo(
+          5L,null,null,null,null,false,"POTENCIAL",1,15,1L);
+        assertEquals(0,respuesta.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_buscar_v7"));
+        assertTrue(sql.getValue().contains("CAST(NULL AS timestamptz)"));
+    }
+
+    @Test
+    void datosPersonalesCrmUsanFuncionYNoPermitenIdsInvalidos() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+            .thenReturn("{\"idProspecto\":21,\"historial\":[]}");
+        var resultado=service.datosPersonalesCrm(5L,21L);
+        assertEquals(21,resultado.path("idProspecto").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_datos_personales_edicion_v1"));
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.datosPersonalesCrm(5L,0L)).getStatusCode());
+    }
+
+    @Test
+    void correccionPersonalExigeMotivoYObjetoJson() throws Exception {
+        var mapper=new JsonMapper();
+        var datos=mapper.readTree("{\"nombres\":\"Ana\"}");
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.corregirDatosPersonalesCrm(5L,21L,datos,"corto")).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.corregirDatosPersonalesCrm(5L,21L,null,"Corrección validada")).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void cronogramaVentaUsaProcedimientoYRechazaVentaInvalida() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+            .thenReturn("{\"tipoCronograma\":\"REGISTRADO\",\"items\":[]}");
+        var cronograma=service.cronogramaVenta(5L,28L);
+        assertEquals("REGISTRADO",cronograma.path("tipoCronograma").asString());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v1"));
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.cronogramaVenta(5L,-1L)).getStatusCode());
+    }
+
+    @Test
     void historialComercialAceptaArregloJson() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("[{\"tipo\":\"VENTA\",\"id\":22}]");

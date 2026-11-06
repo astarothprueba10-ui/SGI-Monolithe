@@ -63,6 +63,9 @@ export interface CrmAsesoresPeriodo {
 
 export interface CrmBuyer {
   id_cliente: number;
+  id_venta?: number;
+  id_contrato?: number;
+  id_prospecto?: number;
   codigo_cliente: string;
   nombre_completo: string;
   codigo_venta: string;
@@ -101,6 +104,33 @@ export interface CrmDetail {
   totalVisitas: number;
   esComprador: boolean;
 }
+export interface CrmDatosPersonales {
+  idProspecto:number;
+  nombres:string;
+  apellidoPaterno:string;
+  apellidoMaterno:string;
+  telefono:string;
+  correo:string;
+  tipoDocumento:'DNI'|'CE'|'PASAPORTE'|'RUC';
+  numeroDocumento:string;
+  documentoVerificado:boolean;
+  direccion:string;
+  historial: CrmCambioDatoPersonal[];
+}
+export interface CrmCambioDatoPersonal {
+  id:number;
+  fecha:string;
+  motivo:string;
+  actor:string;
+  antes:Omit<CrmDatosPersonales,'historial'>;
+  despues:Omit<CrmDatosPersonales,'historial'>;
+}
+export type CrmDatosPersonalesEdicion = Pick<
+  CrmDatosPersonales,
+  'nombres'|'apellidoPaterno'|'apellidoMaterno'|'telefono'|'correo'|
+  'tipoDocumento'|'numeroDocumento'|'direccion'
+>;
+
 export interface CrmAssignment {
   id_asignacion: number;
   id_asesor: number;
@@ -329,6 +359,27 @@ export interface CrmComprobanteVentaLectura {
   estadoRevision: string;
 }
 
+export interface CrmCuotaCronograma {
+  numero:number;
+  fechaVencimiento:string;
+  capital:number;
+  interes:number;
+  cuota:number;
+  estado:string;
+  fechaPagoCompleto?:string|null;
+}
+export interface CrmCronogramaVenta {
+  idVenta:number;
+  codigoVenta:string;
+  codigoPlan?:string|null;
+  tipoCronograma:'REGISTRADO'|'PROYECTADO'|'SIN_PLAN'|'SIN_CUOTAS';
+  numeroCuotas?:number;
+  capitalFinanciado?:number;
+  fechaPrimeraCuota?:string|null;
+  tasaAnualNominal?:number;
+  advertencia?:string;
+  items:CrmCuotaCronograma[];
+}
 export interface CrmDetalleVenta {
   idVenta: number;
   codigoVenta: string;
@@ -851,6 +902,16 @@ export const crmBackend = {
     categoria: f.categoria ?? 'TODOS', pagina: f.pagina ?? 1, tamano: f.tamano ?? 20
   })}`),
 
+  buscarSinPeriodo: (f: CrmSearch & {idProyecto?: number}) =>
+    coreApi.get<CrmPage<CrmProspect>>(
+      `/crm/prospectos/buscar-sin-periodo${qs({
+        consulta:f.consulta?.trim(),etapa:f.etapa,origen:f.origen,
+        idAsesor:f.idAsesor,sinAsignar:f.sinAsignar,
+        categoria:f.categoria ?? 'TODOS',pagina:f.pagina ?? 1,
+        tamano:f.tamano ?? 15,idProyecto:f.idProyecto
+      })}`
+    ),
+
   buscarPeriodo: (f: CrmSearchPeriodo) =>
     coreApi.get<CrmPage<CrmProspect>>(
       `/crm/prospectos/buscar-periodo${qs({
@@ -869,6 +930,13 @@ export const crmBackend = {
     ),
 
   detalle: (id: number) => coreApi.get<CrmDetail>(`/crm/prospectos/${id}`),
+  datosPersonales: (id:number) =>
+    coreApi.get<CrmDatosPersonales>(`/crm/prospectos/${id}/datos-personales`),
+  corregirDatosPersonales: (id:number, datos:CrmDatosPersonalesEdicion, motivo:string) =>
+    coreApi.patch<{actualizado:boolean;idProspecto:number}>(
+      `/crm/prospectos/${id}/datos-personales`,{datos,motivo}
+    ),
+
   crear: (data: CrmLeadCreate) => coreApi.post<Record<string, unknown>>('/crm/prospectos', data as Record<string, unknown>),
   actualizar: (id: number, body: { origenCodigo?: string; observaciones?: string; idProyectoInteres?: number }) =>
     coreApi.patch<Record<string, unknown>>(`/crm/prospectos/${id}/ficha`, body as Record<string, unknown>),
@@ -1056,6 +1124,12 @@ export const crmBackend = {
         tamano: params?.tamano
       })}`
     ),
+
+  obtenerCronogramaVenta: (idVenta:number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta<=0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmCronogramaVenta>(`/crm/ventas/${idVenta}/cronograma`);
+  },
 
   obtenerDetalleVenta: (idVenta: number) => {
     if (!Number.isSafeInteger(idVenta) || idVenta <= 0)

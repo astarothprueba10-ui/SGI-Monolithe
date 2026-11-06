@@ -121,6 +121,30 @@ const ESTADOS_SEPARACION = {
   }
 } as const;
 
+const ESTADOS_VENTA = {
+  PENDIENTE: {etiqueta:'Pendiente',estilo:'bg-amber-50 text-amber-800 border-amber-200',punto:'bg-amber-500'},
+  CONTRATADA: {etiqueta:'Contratada',estilo:'bg-sky-50 text-sky-800 border-sky-200',punto:'bg-sky-500'},
+  VIGENTE: {etiqueta:'Vigente',estilo:'bg-emerald-50 text-emerald-800 border-emerald-200',punto:'bg-emerald-500'},
+  FORMALIZADA: {etiqueta:'Formalizada',estilo:'bg-emerald-50 text-emerald-800 border-emerald-200',punto:'bg-emerald-500'},
+  APROBADA: {etiqueta:'Aprobada',estilo:'bg-emerald-50 text-emerald-800 border-emerald-200',punto:'bg-emerald-500'},
+  RECHAZADA: {etiqueta:'Rechazada',estilo:'bg-rose-50 text-rose-800 border-rose-200',punto:'bg-rose-500'},
+  CANCELADA: {etiqueta:'Anulada',estilo:'bg-slate-100 text-slate-700 border-slate-200',punto:'bg-slate-500'},
+  ANULADA: {etiqueta:'Anulada',estilo:'bg-slate-100 text-slate-700 border-slate-200',punto:'bg-slate-500'}
+} as const;
+
+function EstadoVentaBadge({estado}: {estado:string}) {
+  const codigo=estado.trim().toUpperCase();
+  const config=ESTADOS_VENTA[codigo as keyof typeof ESTADOS_VENTA] ?? {
+    etiqueta:codigo.replaceAll('_',' '),
+    estilo:'bg-slate-50 text-slate-700 border-slate-200',
+    punto:'bg-slate-400'
+  };
+  return <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.estilo}`}>
+    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.punto}`} aria-hidden="true"/>
+    <span className="whitespace-nowrap">{config.etiqueta}</span>
+  </span>;
+}
+
 function EstadoSeparacionBadge({ estado }: { estado: string }) {
   const codigo = estado.trim().toUpperCase();
 
@@ -1615,7 +1639,7 @@ export function Sales() {
                     </TD>
 
                     <TD>
-                      <StatusBadge status={sale.status} />
+                      <EstadoVentaBadge estado={sale.status} />
                     </TD>
 
                     <TD align="center" className="min-w-[135px]">
@@ -1692,7 +1716,7 @@ export function Sales() {
                 <p className="text-2xl font-bold tabular-nums text-brand-900">{currency(detail.amount)}</p>
                 {detail.type === 'Separación'
                   ? <EstadoSeparacionBadge estado={detail.status} />
-                  : <StatusBadge status={detail.status} />}
+                  : <EstadoVentaBadge estado={detail.status} />}
               </div>
             </div>
 

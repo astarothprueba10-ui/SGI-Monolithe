@@ -471,6 +471,61 @@ public class CrmVentaService {
                 request.motivo().trim());
     }
 
+    /** Ficha personal y cambios auditados; la BD valida crm.view y cartera. */
+    @Transactional(readOnly = true)
+    public JsonNode datosPersonalesCrm(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Prospecto inválido.");
+        return ejecutar("""
+            SELECT public.sp_crm_datos_personales_edicion_v1(
+                CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idProspecto);
+    }
+
+    /** Corrección personal: jamás sustituye los datos sin auditoría de identidad. */
+    @Transactional
+    public JsonNode corregirDatosPersonalesCrm(Long actor, Long idProspecto,
+            JsonNode datos, String motivo) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0 || datos==null || !datos.isObject()
+                || datos.toString().length()>5000 || motivo==null
+                || motivo.trim().length()<8 || motivo.trim().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos personales o motivo de corrección inválidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_corregir_datos_personales_v1(
+                CAST(? AS bigint),CAST(? AS bigint),
+                CAST(? AS jsonb),CAST(? AS text)
+            )::text
+            """,actor,idProspecto,datos.toString(),motivo.trim());
+    }
+
+    /** Buscar CRM sin fecha global; filtros, proyecto y alcance siguen comprobados en PostgreSQL. */
+    @Transactional(readOnly = true)
+    public JsonNode buscarCarteraSinPeriodo(Long actor, String busqueda, String etapa,
+            String origen, Long idAsesor, Boolean sinAsignar,
+            String categoria, Integer pagina, Integer tamano, Long idProyecto) {
+        validarActor(actor);
+        int numero=pagina==null?1:pagina, cantidad=tamano==null?15:tamano;
+        if (numero<1 || numero>100000 || cantidad<1 || cantidad>100
+                || (idProyecto!=null && idProyecto<=0)
+                || (idAsesor!=null && idAsesor<=0)
+                || (busqueda!=null && busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de CRM o paginación inválidos.");
+        return ejecutar("""
+                SELECT public.sp_crm_buscar_v7(
+                  CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS bigint),CAST(? AS boolean),
+                  CAST(? AS varchar),CAST(? AS integer),CAST(? AS integer),
+                  CAST(? AS bigint),CAST(NULL AS timestamptz),CAST(NULL AS timestamptz)
+                )::text
+                """,actor,busqueda,etapa,origen,idAsesor,sinAsignar,
+                categoria==null?"TODOS":categoria,numero,cantidad,idProyecto);
+    }
+
     /** Listado unificado paginado, con alcance comercial por actor. */
     @Transactional(readOnly = true)
     public JsonNode listarOperaciones(
@@ -528,6 +583,19 @@ public class CrmVentaService {
                     CAST(? AS bigint), CAST(? AS bigint)
                 )::text
                 """, actor, idVenta);
+    }
+
+    /** Cronograma financiero: cuotas reales o proyección expresamente identificada. */
+    @Transactional(readOnly = true)
+    public JsonNode cronogramaVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta==null || idVenta<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
+        return ejecutar("""
+            SELECT public.sp_crm_cronograma_venta_v1(
+              CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idVenta);
     }
 
     /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
