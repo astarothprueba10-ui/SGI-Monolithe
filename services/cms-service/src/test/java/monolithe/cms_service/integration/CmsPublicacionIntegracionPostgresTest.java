@@ -2,6 +2,8 @@ package monolithe.cms_service.integration;
 
 import monolithe.cms_service.exception.ConflictException;
 import monolithe.cms_service.service.CmsPublicacionService;
+import monolithe.cms_service.service.StorageBorradoresPrivado;
+import monolithe.cms_service.service.SupabaseStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -50,6 +53,9 @@ class CmsPublicacionIntegracionPostgresTest {
 
     @Autowired private CmsPublicacionService servicio;
     @Autowired private JdbcTemplate jdbc;
+    // @DataJpaTest no registra servicios Storage; simularlos mantiene la IT sin Supabase.
+    @MockitoBean private StorageBorradoresPrivado storagePrivado;
+    @MockitoBean private SupabaseStorageService storagePublico;
 
     private long pagina;
     private long principal;
