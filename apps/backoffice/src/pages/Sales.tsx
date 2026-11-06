@@ -1023,7 +1023,11 @@ export function Sales() {
     <div>
       <PageHeader
         title="Separaciones y ventas"
-        description="Operaciones comerciales con su comprador, lote, modalidad de venta y contrato asociado."
+        description={tab === 'Separación'
+          ? 'Gestiona separaciones de S/ 500, métodos de pago, comprobantes y reservas de lotes.'
+          : tab === 'Venta'
+            ? 'Gestiona las ventas, modalidades de financiamiento y contratos asociados.'
+            : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
         actions={
           <div className="flex items-center gap-2">
             <Gate permission="sales.export">
