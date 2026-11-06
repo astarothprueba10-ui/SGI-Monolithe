@@ -317,9 +317,9 @@ export function Crm() {
     // Si el usuario no define fechas propias, la tabla NO hereda el período global.
     if (!fechaTablaDesde && !fechaTablaHasta) return null;
     if (!fechaTablaDesde || !fechaTablaHasta) return undefined;
-    return calcularRangoCrm('RANGO',fechaReferencia,fechaTablaDesde,fechaTablaHasta)
+    return calcularRangoCrm('RANGO',fechaTablaDesde,fechaTablaDesde,fechaTablaHasta)
       ?? undefined;
-  }, [fechaTablaDesde,fechaTablaHasta,fechaReferencia]);
+  }, [fechaTablaDesde,fechaTablaHasta]);
 
 
   const rangoEvolucion = useMemo(() => {
