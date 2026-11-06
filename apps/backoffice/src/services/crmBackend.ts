@@ -341,6 +341,23 @@ export interface CrmReservasVigentesVenta {
   reservas: CrmReservaVigenteVenta[];
 }
 
+export interface CrmDatosCompradorVenta {
+  idProspecto: number;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono: string;
+  correo: string;
+  idProyectoInteres: number;
+  origenCodigo: string;
+  motivoContacto: string;
+  mensaje: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  direccion: string;
+  idAsesor: number | null;
+}
+
 export interface CrmSaleValidationInput {
   idProspecto: number;
   idLote: number;
@@ -350,6 +367,7 @@ export interface CrmSaleValidationInput {
   numeroCuotas?: number | null;
   tasaInteresMensualPct?: number | null;
   observaciones?: string | null;
+  datosComprador?: CrmDatosCompradorVenta;
 }
 
 export interface CrmSaleValidationResult {
@@ -1022,7 +1040,8 @@ export const crmBackend = {
         montoInicial: body.montoInicial ?? null,
         numeroCuotas: body.numeroCuotas ?? null,
         tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
-        observaciones: body.observaciones ?? null
+        observaciones: body.observaciones ?? null,
+        datosComprador: body.datosComprador ?? null
       }
     ),
   cancelarVentaPendiente: (
@@ -1037,6 +1056,11 @@ export const crmBackend = {
     coreApi.get<CrmBuyerVerification>(
       `/crm/prospectos/${idProspecto}/verificar-compra`
     ),
+  datosCompradorParaVenta: (idProspecto: number) =>
+    coreApi.get<CrmDatosCompradorVenta>(
+      `/crm/prospectos/${idProspecto}/datos-comprador-venta`
+    ),
+
   listarReservasVigentesParaVenta: (idProspecto: number) =>
     coreApi.get<CrmReservasVigentesVenta>(
       `/crm/prospectos/${idProspecto}/reservas-vigentes-venta`
