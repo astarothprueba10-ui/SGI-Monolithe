@@ -3,7 +3,7 @@
  * amortización creciente. Se ajusta la ÚLTIMA cuota por redondeo a céntimos.
  *
  * La política comercial existente fija una TASA NOMINAL ANUAL del 5%;
- * la tasa mensual aplicada es 5% / 12 (no se trata de una TEA del 5%).
+ * la tasa mensual aplicada es 10% / 12 (no se trata de una TEA del 5%).
  */
 export interface CuotaFrancesa {
   numero: number;
@@ -26,7 +26,7 @@ export interface ResumenVentaCalculado {
   saldoContado: number;
 }
 
-export const TASA_ANUAL_FIJA_PCT = 5;
+export const TASA_ANUAL_FIJA_PCT = 10;
 export const TASA_MENSUAL_NOMINAL_PCT = TASA_ANUAL_FIJA_PCT / 12;
 export const MINIMO_INICIAL_ADICIONAL = 5000;
 
