@@ -894,6 +894,15 @@ export const crmBackend = {
       })}`
     ),
 
+  obtenerComprobanteSeparacion: (idReserva: number) => {
+    if (!Number.isSafeInteger(idReserva) || idReserva <= 0) {
+      throw new Error('Identificador de separacion invalido.');
+    }
+    return coreApi.get<CrmVoucherReadUrl>(
+      '/crm/separaciones/' + idReserva + '/comprobante/url-firmada'
+    );
+  },
+
   prepararLecturaVoucherSeparacion: (idVoucher: number) =>
     coreApi.get<CrmVoucherReadUrl>(
       `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
