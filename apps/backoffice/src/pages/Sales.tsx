@@ -967,13 +967,14 @@ export function Sales() {
       .then((etapas) => {
         if (!vigente) return;
 
-        setAvailableStages(
-          (etapas ?? []).filter(
-            (etapa) =>
-              etapa.activo &&
-              etapa.idProyecto === Number(formProjectId)
-          )
+        const activas = (etapas ?? []).filter(
+          (etapa) => etapa.activo && etapa.idProyecto === Number(formProjectId)
         );
+        setAvailableStages(activas);
+        if (autoseleccionPendiente?.idProyecto === Number(formProjectId) &&
+            activas.some((etapa) => etapa.idEtapa === autoseleccionPendiente.idEtapa)) {
+          setFormStageId(String(autoseleccionPendiente.idEtapa));
+        }
       })
       .catch((err: unknown) => {
         if (!vigente) return;
@@ -990,7 +991,7 @@ export function Sales() {
     return () => {
       vigente = false;
     };
-  }, [formProjectId]);
+  }, [formProjectId, autoseleccionPendiente]);
 
 
 
@@ -1057,6 +1058,13 @@ export function Sales() {
         });
 
         setAvailableLots(lotesPermitidos);
+        if (opType === 'Venta' && autoseleccionPendiente &&
+            autoseleccionPendiente.idProyecto === idProyecto &&
+            autoseleccionPendiente.idEtapa === idEtapa &&
+            lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
+          setFormLotId(String(autoseleccionPendiente.idLote));
+          setAutoseleccionPendiente(null);
+        }
       } catch (err: unknown) {
         if (!vigente) return;
 
@@ -1084,7 +1092,8 @@ export function Sales() {
     formProjectId,
     formStageId,
     selectedProspectId,
-    opType
+    opType,
+    autoseleccionPendiente
   ]);
 
 
@@ -1726,6 +1735,12 @@ export function Sales() {
                 ))}
               </Select>
               <ProspectAdvisorInfo prospect={prospectsList.find((p) => p.id_prospecto === selectedProspectId)} />
+              {opType === 'Venta' && reservasVigentes.length > 0 && (
+                <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  Reserva vigente detectada. Se preseleccionó el proyecto, etapa y lote reservado.
+                  Puedes cambiar cualquiera de ellos; el abono se aplicará solo al lote con reserva confirmada.
+                </p>
+              )}
             </div>
 
             <div>
@@ -1737,6 +1752,7 @@ export function Sales() {
                 value={formProjectId}
                 disabled={!selectedProspectId || loadingProjects}
                 onChange={(e) => {
+                  setAutoseleccionPendiente(null);
                   setFormProjectId(e.target.value);
                   setFormStageId('');
                   setAvailableStages([]);
@@ -1775,6 +1791,7 @@ export function Sales() {
                 value={formStageId}
                 disabled={!formProjectId || loadingStages}
                 onChange={(e) => {
+                  setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
                   setFormLotId('');
                   setAvailableLots([]);
@@ -1865,6 +1882,12 @@ export function Sales() {
                       <p className="mt-1 text-xs text-brand-600">
                         Moneda: {precioLote.codigoMoneda}
                       </p>
+                      {opType === 'Venta' && reservaAplicable > 0 && (
+                        <div className="mt-3 flex items-center justify-between border-t border-brand-200 pt-3 text-sm">
+                          <span className="font-medium text-emerald-800">Pago de reserva acreditado</span>
+                          <span className="font-bold tabular-nums text-emerald-800">− {currency(reservaAplicable)}</span>
+                        </div>
+                      )}
                     </>
                   )}
 
