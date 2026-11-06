@@ -289,6 +289,8 @@ export function Crm() {
   const [exportStatus, setExportStatus] = useState('');
 
   const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
+  // Hasta que el usuario cambie el período, el gráfico presenta seis meses históricos.
+  const [periodoGraficoPersonalizado, setPeriodoGraficoPersonalizado] = useState(false);
   const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
   const [fechaDesde, setFechaDesde] = useState(obtenerFechaHoyLima);
   const [fechaHasta, setFechaHasta] = useState(obtenerFechaHoyLima);
@@ -311,48 +313,28 @@ export function Crm() {
 
 
   const rangoTabla = useMemo(() => {
-    if (!fechaTablaDesde && !fechaTablaHasta) {
-      return rangoPeriodo;
-    }
-
-    if (!fechaTablaDesde || !fechaTablaHasta) {
-      return null;
-    }
-
-    return calcularRangoCrm(
-      'RANGO',
-      fechaReferencia,
-      fechaTablaDesde,
-      fechaTablaHasta
-    );
-  }, [
-    fechaTablaDesde,
-    fechaTablaHasta,
-    fechaReferencia,
-    rangoPeriodo
-  ]);
+    // Si el usuario no define fechas propias, la tabla NO hereda el período global.
+    if (!fechaTablaDesde && !fechaTablaHasta) return null;
+    if (!fechaTablaDesde || !fechaTablaHasta) return undefined;
+    return calcularRangoCrm('RANGO',fechaReferencia,fechaTablaDesde,fechaTablaHasta)
+      ?? undefined;
+  }, [fechaTablaDesde,fechaTablaHasta,fechaReferencia]);
 
 
   const rangoEvolucion = useMemo(() => {
     if (!rangoPeriodo) return null;
-
-    const fechaBase =
-      periodoModo === 'RANGO' ? fechaHasta : fechaReferencia;
-
-    const anio = Number(fechaBase.slice(0, 4));
-    const mes = Number(fechaBase.slice(5, 7));
-
+    if (periodoGraficoPersonalizado) return rangoPeriodo;
+    const fechaBase = fechaReferencia;
+    const anio = Number(fechaBase.slice(0,4));
+    const mes = Number(fechaBase.slice(5,7));
     if (!anio || mes < 1 || mes > 12) return null;
-
-    const inicio = new Date(Date.UTC(anio, mes - 6, 1));
-    const fin = new Date(Date.UTC(anio, mes, 1));
-
+    const inicio = new Date(Date.UTC(anio,mes-6,1));
+    const fin = new Date(Date.UTC(anio,mes,1));
     return {
-      desde: `${inicio.toISOString().slice(0, 10)}T00:00:00-05:00`,
-      hastaExclusivo:
-        `${fin.toISOString().slice(0, 10)}T00:00:00-05:00`
+      desde: `${inicio.toISOString().slice(0,10)}T00:00:00-05:00`,
+      hastaExclusivo:`${fin.toISOString().slice(0,10)}T00:00:00-05:00`
     };
-  }, [rangoPeriodo, periodoModo, fechaReferencia, fechaHasta]);
+  },[rangoPeriodo,periodoGraficoPersonalizado,fechaReferencia]);
 
   const [evolucionItems, setEvolucionItems] = useState<CrmEvolucionMes[]>([]);
   const [evolucionLoading, setEvolucionLoading] = useState(false);
@@ -528,11 +510,8 @@ export function Crm() {
     setErrorMsg(null);
 
     try {
-      const rangoConsulta = tab === 'visitas'
-        ? rangoPeriodo
-        : rangoTabla;
-
-      if (!rangoConsulta) {
+      const rangoConsulta = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+      if (rangoConsulta === undefined || (tab === 'visitas' && !rangoConsulta)) {
         setLeadsList([]);
         setTotalLeads(0);
         setErrorMsg(
@@ -557,22 +536,18 @@ export function Crm() {
         tamano: pageSize
       };
 
+      const categoria = tab === 'potenciales' ? 'POTENCIAL' : 'LEAD';
+      // Sin fecha de tabla consulta todo el historial, conservando cartera y paginación.
       const res = tab === 'visitas'
-        ? await crmBackend.buscar({
-          ...filtros,
-          categoria: 'TODOS'
-        })
-        : await crmBackend.buscarPeriodo({
-          ...filtros,
-          categoria: tab === 'potenciales'
-            ? 'POTENCIAL'
-            : 'LEAD',
-          idProyecto: projectFilter === ''
-            ? undefined
-            : projectFilter,
-          desde: rangoConsulta.desde,
-          hastaExclusivo: rangoConsulta.hastaExclusivo
-        });
+        ? await crmBackend.buscar({...filtros,categoria:'TODOS'})
+        : rangoConsulta
+          ? await crmBackend.buscarPeriodo({
+              ...filtros,categoria,
+              idProyecto:projectFilter === '' ? undefined : projectFilter,
+              desde:rangoConsulta.desde,hastaExclusivo:rangoConsulta.hastaExclusivo
+            })
+          : await crmBackend.buscar({...filtros,categoria,
+              idProyecto:projectFilter === '' ? undefined : projectFilter});
 
       setLeadsList(res.items ?? []);
       setTotalLeads(res.total ?? 0);
@@ -597,18 +572,9 @@ export function Crm() {
     setBuyersLoading(true);
 
     try {
-      if (!rangoPeriodo) {
-        setBuyersList([]);
-        setBuyersTotal(0);
-        return;
-      }
-
-      const res = await crmBackend.compradoresPeriodo(
-        buyersQuery.trim() || undefined,
-        buyersPage,
-        15,
-        rangoPeriodo.desde,
-        rangoPeriodo.hastaExclusivo
+      // La tabla de compradores tampoco hereda el período global.
+      const res = await crmBackend.compradores(
+        buyersQuery.trim(),buyersPage,15
       );
 
       setBuyersList(res.items ?? []);
@@ -629,7 +595,7 @@ export function Crm() {
     } finally {
       setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage, rangoPeriodo]
+  }, [buyersQuery, buyersPage]
   );
 
 
@@ -1287,7 +1253,7 @@ export function Crm() {
 
   const handleExportExcel = async () => {
     if (isExporting) return;
-    const rango = rangoTabla ?? rangoPeriodo;
+    const rango = rangoPeriodo;
     if (!rango) {
       toast.error('Sin rango de fechas', { description: 'Complete un rango de fechas valido.' });
       return;
@@ -1330,26 +1296,22 @@ export function Crm() {
         modo={periodoModo}
         onModoChange={(modo) => {
           setPeriodoModo(modo);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaReferencia={fechaReferencia}
         onFechaReferenciaChange={(fecha) => {
           setFechaReferencia(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaDesde={fechaDesde}
         onFechaDesdeChange={(fecha) => {
           setFechaDesde(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaHasta={fechaHasta}
         onFechaHastaChange={(fecha) => {
           setFechaHasta(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
       />
 
