@@ -124,7 +124,7 @@ public class CrmVentaService {
                     "Prospecto invalido.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_datos_comprador_para_venta_v1(
+                SELECT public.sp_crm_datos_comprador_para_venta_v2(
                     CAST(? AS bigint), CAST(? AS bigint)
                 )::text
                 """, actor, idProspecto);
@@ -195,7 +195,7 @@ public class CrmVentaService {
                     "Revise la ficha contractual del comprador antes de registrar.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v10(
+                SELECT public.sp_crm_registrar_venta_pendiente_v11(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
