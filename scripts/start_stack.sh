@@ -6,7 +6,7 @@ VERDE='\033[0;32m'
 AMARILLO='\033[1;33m'
 RESET='\033[0m'
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo -e "${CYAN}SGI Monolithe - Iniciando Stack Global${RESET}"
