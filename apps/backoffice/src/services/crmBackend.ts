@@ -901,6 +901,20 @@ export const crmBackend = {
     );
   },
 
+  /** Usa sales.export en backend, nunca eleva el alcance del asesor. */
+  listarOperacionesParaExportacion: (params: {
+    tipo: 'SEPARACION';
+    pagina: number;
+    tamano: number;
+  }) =>
+    coreApi.get<CrmOperacionesResponse>(
+      `/crm/operaciones/exportacion${qs({
+        tipo: params.tipo,
+        pagina: params.pagina,
+        tamano: params.tamano
+      })}`
+    ),
+
   prepararLecturaVoucherSeparacion: (idVoucher: number) =>
     coreApi.get<CrmVoucherReadUrl>(
       `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
