@@ -58,3 +58,12 @@ Primero conciliar cambios locales con esta rama, ejecutar builds Vite, Maven y P
 - Existe el objeto JPEG de **30.837 bytes** en el bucket público `cms-public`, bajo la ruta `contenido-web/inicio/2/`; registro multimedia nuevo activo, asignado al slide 2 con uso `FONDO` y visibilidad activa.
 - Smoke HTTP enviado por el usuario: `PASS: INICIO (2 secciones), proyectos (2)`; comprobación de no exposición de borradores y lectura GET. La prueba smoke no verifica visualización ni la descarga de medios.
 - Pendiente: verificar visualmente que React muestra **la nueva fotografía** del slide 2 (no solo su subtítulo), confirmar que el navegador carga la URL del bucket sin errores y retirar los flags de publicación de QA (manteniendo habilitada lectura pública).
+
+## Cierre E2E comprobado: imagen pública del slide 2
+
+- El usuario confirmó con captura del navegador local que el slide 2 de la página pública muestra efectivamente la **fotografía nueva de la casa moderna** publicada desde el borrador #14.
+- Conserva el subtítulo **«Descubre nuestros proyectos inmobiliarios»**, el título comercial **«Conoce nuestra propuesta inmobiliaria en Picsi»** y la descripción comercial original.
+- Flujos E2E comprobados por el usuario: **textos (borrador #13; revisión 1) e imagen (borrador #14; revisión 2)**. Persistencia, asignación y auditoría verificadas previamente en Supabase, sin acceder a credenciales privadas.
+- **QA funcional de estos dos flujos: aprobado**. Esto no implica que todas las historias de la issue, permisos negativos, pruebas de regresión ni la unión a main estén cerrados.
+- **Siguiente gate:** retirar los flags temporales de publicación del overlay `docker-compose.cms-qa.yml` (Backoffice imágenes y textos = false; backend imágenes = false), mantener la lectura CMS del frontend en true, y recrear ambos contenedores sin tocar la base de datos.
+- **Consolidación pendiente:** la rama `feature/cms-gestion-contenido-integracion` diverge de `main` (comparación del 2026-11-06: 20 commits por delante, 23 por detrás; 133 archivos diferentes). La copia local del Backoffice validada debe reconciliarse con GitHub antes de cualquier merge o despliegue. No ejecutar un merge automático hasta comprobar diferencias y preservar trabajo de otros módulos.
