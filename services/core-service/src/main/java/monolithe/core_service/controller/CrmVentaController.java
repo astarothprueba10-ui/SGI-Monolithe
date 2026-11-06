@@ -250,6 +250,31 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** Expediente del comprador, domicilio, pago y plan financiero: solo lectura. */
+        @GetMapping("/ventas/{idVenta}/detalle")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> detalleVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVenta) {
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(service.detalleVenta(obtenerActor(jwt), idVenta));
+        }
+
+        /** Firma temporal cada archivo, sin exponer el bucket ni permitir descargas públicas. */
+        @GetMapping("/ventas/{idVenta}/comprobantes/{idComprobante}/url-firmada")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> visualizarComprobanteVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVenta,
+                        @PathVariable Long idComprobante) {
+                var enlace = separacionStorageService.prepararLecturaComprobanteVenta(
+                                obtenerActor(jwt), idVenta, idComprobante);
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
         /** Exportacion paginada y exclusiva de separaciones. Permisos tambien verificados en BD. */
         @GetMapping("/separaciones/exportacion")
         @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
