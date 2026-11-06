@@ -170,6 +170,42 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void detalleVentaConsultaProcedimientoProtegido() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idVenta\":27,\"modalidad\":\"CONTADO\",\"pago\":{\"comprobantes\":[]}}");
+        var respuesta = service.detalleVenta(5L, 27L);
+        assertEquals(27, respuesta.path("idVenta").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_detalle_venta_v1"));
+    }
+
+    @Test
+    void obtenerRutaVoucherVentaSoloPorProcedimientoAutorizado() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"bucket\":\"vouchers-ventas-private\",\"nombre_archivo\":\"pago.pdf\"}");
+        var respuesta = service.rutaComprobanteVenta(5L, 27L, 1L);
+        assertEquals("vouchers-ventas-private", respuesta.path("bucket").asString());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_autorizar_lectura_comprobante_venta_v1"));
+    }
+
+    @Test
+    void detalleYVouchersRechazanIdsInvalidosSinConsultarBase() {
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(
+                ResponseStatusException.class, () -> service.detalleVenta(5L, 0L)
+        ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(
+                ResponseStatusException.class, () -> service.rutaComprobanteVenta(5L, 27L, -1L)
+        ).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(
+                ResponseStatusException.class, () -> service.detalleVenta(null, 27L)
+        ).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void historialRechazaLoteInvalido() {
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.historialComercialLote(5L, 0L));
