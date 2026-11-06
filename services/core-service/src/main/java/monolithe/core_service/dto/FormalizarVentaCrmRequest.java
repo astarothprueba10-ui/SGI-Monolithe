@@ -38,7 +38,10 @@ public record FormalizarVentaCrmRequest(
     String observaciones,
 
     // Se exige para registrar una venta; la validación comercial admite null.
-    JsonNode datosComprador
+    JsonNode datosComprador,
+
+    // Solo se usa durante el registro pendiente de venta; contiene método y vouchers.
+    JsonNode datosPago
 
 ) {
 
