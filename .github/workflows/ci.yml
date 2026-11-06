@@ -5,6 +5,8 @@ on:
     branches: [main, master, develop, "feature/**", "fix/**"]
   pull_request:
     branches: [main, master]
+  # El despliegue a Oracle requiere lanzamiento manual desde Actions.
+  workflow_dispatch:
 
 jobs:
   frontend-validation:
@@ -106,7 +108,7 @@ jobs:
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: [frontend-validation, backend-validation, database-validation]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger remote deployment via SSH
