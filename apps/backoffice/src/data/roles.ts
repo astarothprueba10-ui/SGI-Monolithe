@@ -129,7 +129,7 @@ export const ROLES: Record<RoleName, Role> = {
       ...perms('marketing', ['view', 'create', 'edit', 'export']),
       ...perms('web_content', ['view', 'edit', 'projects_visibility', 'publish'])]
 
-  }
+  },
   RRHH: {
     name: 'RRHH',
     description: 'Trabajadores, asesores, comisiones, horarios y descuentos.',
