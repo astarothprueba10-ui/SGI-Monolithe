@@ -1286,7 +1286,7 @@ export function Sales() {
 
             <Table
               className={tab === 'Separación'
-                ? '[&_table]:min-w-[1280px]'
+                ? '[&_table]:min-w-[1180px] [&_thead]:bg-slate-100/90 [&_th]:py-3.5 [&_th]:text-slate-600 [&_th]:font-bold [&_tbody_tr]:hover:bg-brand-50/50'
                 : '[&_table]:min-w-[1560px]'
               }
               head={tab === 'Separación' ? (
@@ -1320,51 +1320,55 @@ export function Sales() {
             >
               {rows.map((sale) => (
                 tab === 'Separación' ? (
-                  <TR key={sale.id}>
-                    <TD className="whitespace-nowrap text-xs text-brand-600">
+                  <TR key={sale.id} className="group hover:bg-brand-50/60">
+                    <TD className="whitespace-nowrap py-4 text-xs font-medium tabular-nums text-brand-600">
                       {sale.date || '—'}
                     </TD>
-
-                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-900">
-                      {sale.code}
+                    <TD className="whitespace-nowrap">
+                      <span className="inline-flex rounded-md border border-brand-200 bg-brand-50/70 px-2.5 py-1 font-mono text-xs font-semibold text-brand-900">
+                        {sale.code}
+                      </span>
                     </TD>
-
-                    <TD className="min-w-[150px] font-medium text-brand-900">
-                      {sale.buyer || '—'}
+                    <TD className="min-w-[170px]">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold leading-snug text-brand-900">{sale.buyer || '—'}</span>
+                        {sale.document && (
+                          <span className="font-mono text-[11px] text-brand-500">
+                            {/^\d{8}$/.test(sale.document) ? 'DNI' : 'Documento'}: {sale.document}
+                          </span>
+                        )}
+                      </div>
                     </TD>
-
-                    <TD className="min-w-[170px] text-brand-700">
+                    <TD className="min-w-[190px] text-[12px] leading-relaxed text-brand-700">
                       {sale.project || '—'}
                     </TD>
-
-                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-800">
-                      {sale.lot || '—'}
+                    <TD className="whitespace-nowrap">
+                      <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">
+                        {sale.lot || '—'}
+                      </span>
                     </TD>
-
-                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
+                    <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
                       {currency(sale.amount)}
                     </TD>
-
-
-                    <TD className="min-w-[155px] text-brand-700">
-                      {sale.paymentMethod ?? 'No registrado'}
+                    <TD className="min-w-[155px]">
+                      <span className="inline-flex items-center gap-1.5 text-xs text-brand-700">
+                        <CreditCardIcon className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                        {sale.paymentMethod || 'No registrado'}
+                      </span>
                     </TD>
-
-
-                    <TD className="min-w-[130px] text-brand-700">
+                    <TD className="min-w-[140px] text-xs text-brand-700">
                       {sale.advisor?.trim() || '—'}
                     </TD>
-
                     <TD>
                       <EstadoSeparacionBadge estado={sale.status} />
                     </TD>
-
                     <TD align="right">
                       <Button
                         size="sm"
                         variant="ghost"
-                        icon={FileTextIcon}
+                        icon={EyeIcon}
                         onClick={() => setDetail(sale)}
+                        className="font-semibold text-brand-700 hover:text-brand-900"
                       >
                         Ver
                       </Button>
