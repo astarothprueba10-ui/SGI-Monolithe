@@ -63,6 +63,9 @@ export interface CrmAsesoresPeriodo {
 
 export interface CrmBuyer {
   id_cliente: number;
+  id_venta?: number;
+  id_contrato?: number;
+  id_prospecto?: number;
   codigo_cliente: string;
   nombre_completo: string;
   codigo_venta: string;
@@ -356,6 +359,27 @@ export interface CrmComprobanteVentaLectura {
   estadoRevision: string;
 }
 
+export interface CrmCuotaCronograma {
+  numero:number;
+  fechaVencimiento:string;
+  capital:number;
+  interes:number;
+  cuota:number;
+  estado:string;
+  fechaPagoCompleto?:string|null;
+}
+export interface CrmCronogramaVenta {
+  idVenta:number;
+  codigoVenta:string;
+  codigoPlan?:string|null;
+  tipoCronograma:'REGISTRADO'|'PROYECTADO'|'SIN_PLAN'|'SIN_CUOTAS';
+  numeroCuotas?:number;
+  capitalFinanciado?:number;
+  fechaPrimeraCuota?:string|null;
+  tasaAnualNominal?:number;
+  advertencia?:string;
+  items:CrmCuotaCronograma[];
+}
 export interface CrmDetalleVenta {
   idVenta: number;
   codigoVenta: string;
@@ -1100,6 +1124,12 @@ export const crmBackend = {
         tamano: params?.tamano
       })}`
     ),
+
+  obtenerCronogramaVenta: (idVenta:number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta<=0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmCronogramaVenta>(`/crm/ventas/${idVenta}/cronograma`);
+  },
 
   obtenerDetalleVenta: (idVenta: number) => {
     if (!Number.isSafeInteger(idVenta) || idVenta <= 0)
