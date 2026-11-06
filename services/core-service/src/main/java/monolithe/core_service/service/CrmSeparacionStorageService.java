@@ -153,6 +153,29 @@ public class CrmSeparacionStorageService {
         return firmarReferencia(ventaService.obtenerRutaVoucher(actor, idVoucher));
     }
 
+    /** Enlaces de lectura privados por venta y comprobante; alcance validado en PostgreSQL. */
+    public EnlaceLecturaVoucherResponse prepararLecturaComprobanteVenta(
+            Long actor, Long idVenta, Long idComprobante) {
+        if (actor == null || actor <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
+        }
+        JsonNode info = ventaService.rutaComprobanteVenta(actor, idVenta, idComprobante);
+        String bucket = info.path("bucket").asString("");
+        String clave = info.path("clave_archivo").asString("");
+        String nombre = info.path("nombre_archivo").asString("");
+        String mime = info.path("tipo_mime").asString("");
+        if (!BUCKET_VENTAS.equals(bucket)
+                || !clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F\\-]{36}\\.(pdf|jpg|png|webp)$")
+                || !MIMES_PERMITIDOS.contains(mime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Referencia de comprobante de venta invalida.");
+        }
+        String base = validarYResolverBase();
+        String ruta = "/object/sign/" + BUCKET_VENTAS + "/" + clave;
+        String respuesta = solicitarUrlLecturaStorage(base + ruta);
+        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime, BUCKET_VENTAS);
+    }
+
     /** Comprobante del detalle comercial; no requiere permisos de Finanzas. */
     public EnlaceLecturaVoucherResponse prepararLecturaPorReserva(Long actor, Long idReserva) {
         if (actor == null || actor <= 0) {
@@ -170,7 +193,7 @@ public class CrmSeparacionStorageService {
         String base = validarYResolverBase();
         String ruta = "/object/sign/" + BUCKET + "/" + clave;
         String respuesta = solicitarUrlLecturaStorage(base + ruta);
-        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime);
+        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime, BUCKET);
     }
 
     private void validarReferenciaLectura(String bucket, String clave) {
@@ -198,7 +221,7 @@ public class CrmSeparacionStorageService {
     }
 
     private EnlaceLecturaVoucherResponse extraerEnlaceLectura(
-            String raw, String clave, String base, String nombre, String mime) {
+            String raw, String clave, String base, String nombre, String mime, String bucket) {
         try {
             JsonNode json = jsonMapper.readTree(raw);
             String signedUrl = json.path("signedURL").asString("");
@@ -207,7 +230,7 @@ public class CrmSeparacionStorageService {
             }
             String urlCompleta = base + signedUrl;
             return new EnlaceLecturaVoucherResponse(
-                    BUCKET, clave, urlCompleta, nombre, mime, EXPIRY_SECONDS);
+                    bucket, clave, urlCompleta, nombre, mime, EXPIRY_SECONDS);
         } catch (JacksonException | IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Error al interpretar enlace firmado de lectura.", ex);
