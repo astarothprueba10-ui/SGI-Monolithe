@@ -58,9 +58,10 @@ public class ProyectoService {
         return toResponse(proyecto);
     }
 
-    /** Crea un proyecto después de validar su ubicación y cronología. */
+    /** Crea un proyecto después de validar descripción, ubicación y cronología del alta. */
     @Transactional
     public ProyectoResponse crear(ProyectoRequest request) {
+        validacionProyectoService.validarAlta(request);
         String codigo = normalizarCodigo(request.codigo());
         if (proyectoRepository.existsByCodigo(codigo)) {
             throw new ConflictoNegocioException("Ya existe un proyecto con el código: " + codigo);

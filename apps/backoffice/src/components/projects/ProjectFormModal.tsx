@@ -33,7 +33,8 @@ export function ProjectFormModal(props: ProjectFormProps) {
     <form id="project-form" onSubmit={model.submit} className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
       <CatalogNotice model={model} />
       {model.errors.general && <p role="alert" className="col-span-full rounded-md bg-red-50 p-3 text-sm text-red-700">{model.errors.general}</p>}
-      <fieldset disabled={model.submitting || model.catalogs.loading || Boolean(model.catalogs.error)} className="contents">
+      <fieldset key={String(model.submitting || model.catalogs.loading || Boolean(model.catalogs.error))}
+        disabled={model.submitting || model.catalogs.loading || Boolean(model.catalogs.error)} className="col-span-full grid min-w-0 grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
         <ProjectFormFields model={model} />
       </fieldset>
     </form>

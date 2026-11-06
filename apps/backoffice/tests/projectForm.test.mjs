@@ -19,6 +19,7 @@ program.emit();
 const require = createRequire(import.meta.url);
 const { initialProjectForm, projectRequest, changeProjectField } = require(join(output, 'lib/projectForm.js'));
 const { validateProjectForm } = require(join(output, 'lib/projectFormValidation.js'));
+const { countProjectDescriptionLetters, validateProjectDescription } = require(join(output, 'lib/projectDescriptionValidation.js'));
 const { validateProjectDates, isValidProjectDate, projectDateLimits } = require(join(output, 'lib/projectDateValidation.js'));
 const { locationOptions, locationValue } = require(join(output, 'lib/ubigeo.js'));
 const { canChangeProjectNumber, normalizeProjectNumber, validateProjectNumbers } = require(join(output, 'lib/projectNumberValidation.js'));
@@ -195,4 +196,49 @@ test('permite borrar y corregir valores anteriores excesivos sin truncarlos al a
   assert.ok(changed.errors.areaTotalM2);
   assert.equal(changeProjectField(changed.form, changed.errors, 'areaTotalM2', '1234567890', rows).errors.areaTotalM2, undefined);
   assert.equal(changeProjectField(form, {}, 'areaTotalM2', '', rows).form.areaTotalM2, '');
+});
+
+
+test('el alta exige al menos quince letras reales en la descripción', () => {
+  const creation = { registrationDate: '2026-11-06' };
+  for (const descripcion of ['', '   ', '123456789012345', 'abcdefghijklmn', 'a 1 b 2 c'])
+    assert.ok(validateProjectForm({ ...validForm(), descripcion }, rows, creation).descripcion, descripcion);
+  assert.equal(validateProjectDescription('abcdefghijklmno'), undefined);
+  assert.equal(validateProjectDescription('Proyecto 123 de los Cocos.'), undefined);
+  assert.equal(countProjectDescriptionLetters('Mari\u0301a123 Ñandú'), 10);
+});
+
+test('el alta bloquea fechas anteriores al día de registro de Perú', () => {
+  const creation = { registrationDate: '2026-11-06' };
+  const form = { ...validForm(), descripcion: 'Proyecto inmobiliario nuevo' };
+  assert.ok(validateProjectForm({ ...form, fechaInicio: '2026-11-05' }, rows, creation).fechaInicio);
+  assert.ok(validateProjectForm({ ...form, fechaFinEstimada: '2026-11-05' }, rows, creation).fechaFinEstimada);
+  for (const fecha of ['2026-11-06', '2026-12-01'])
+    assert.deepEqual(validateProjectForm({ ...form, fechaInicio: fecha, fechaFinEstimada: fecha }, rows, creation), {});
+  assert.deepEqual(validateProjectForm(form, rows, creation), {});
+  assert.ok(validateProjectForm({ ...form, fechaInicio: '2026-11-08', fechaFinEstimada: '2026-11-07' }, rows, creation).fechaFinEstimada);
+});
+
+test('los calendarios del alta respetan hoy y permiten corregir valores inválidos', () => {
+  const form = { ...validForm(), fechaInicio: '2026-11-08', fechaFinEstimada: '2026-11-12' };
+  const hoy = '2026-11-06';
+  assert.deepEqual(projectDateLimits(form, 'fechaInicio', hoy), { min: hoy, max: form.fechaFinEstimada });
+  assert.equal(projectDateLimits(form, 'fechaFinEstimada', hoy).min, form.fechaInicio);
+  assert.equal(projectDateLimits({ ...form, fechaInicio: '2026-11-05' }, 'fechaFinEstimada', hoy).min, hoy);
+  assert.equal(projectDateLimits({ ...form, fechaFinEstimada: '2026-11-05' }, 'fechaInicio', hoy).max, '9999-12-31');
+});
+
+test('editar conserva fechas históricas y descripciones anteriores opcionales', () => {
+  const form = { ...validForm(), fechaInicio: '2020-01-01', fechaFinEstimada: '2020-12-31' };
+  assert.deepEqual(validateProjectForm(form, rows), {});
+  assert.equal(projectDateLimits(form, 'fechaInicio').min, '0001-01-01');
+});
+
+test('cambiar un campo valida la descripción y las fechas dentro del contexto del alta', () => {
+  const creation = { registrationDate: '2026-11-06' };
+  const form = { ...validForm(), descripcion: 'Proyecto inmobiliario nuevo' };
+  const past = changeProjectField(form, {}, 'fechaInicio', '2026-11-05', rows, creation);
+  assert.ok(past.errors.fechaInicio);
+  assert.equal(changeProjectField(past.form, past.errors, 'fechaInicio', creation.registrationDate, rows, creation).errors.fechaInicio, undefined);
+  assert.ok(changeProjectField(form, {}, 'descripcion', 'Muy breve', rows, creation).errors.descripcion);
 });

@@ -10,10 +10,15 @@ export function isValidProjectDate(value: string): boolean {
 }
 
 /** Conserva las fechas opcionales y permite que inicio y fin coincidan. */
-export function validateProjectDates(form: ProjectFormValues): ProjectFormErrors {
+export function validateProjectDates(form: ProjectFormValues, minimumStartDate?: string): ProjectFormErrors {
   const errors: ProjectFormErrors = {};
   for (const field of ['fechaInicio', 'fechaFinEstimada'] as const) {
     if (form[field] && !isValidProjectDate(form[field])) errors[field] = 'Ingresa una fecha válida (año 0001 a 9999).';
+  }
+  for (const field of ['fechaInicio', 'fechaFinEstimada'] as const) {
+    if (minimumStartDate && form[field] && !errors[field] && form[field] < minimumStartDate)
+      errors[field] = field === 'fechaInicio' ? 'La fecha de inicio debe ser hoy o una fecha posterior.'
+        : 'La fecha de fin estimada no puede ser anterior al día de registro.';
   }
   if (!errors.fechaInicio && !errors.fechaFinEstimada && form.fechaInicio && form.fechaFinEstimada &&
       form.fechaInicio > form.fechaFinEstimada) {
@@ -23,9 +28,10 @@ export function validateProjectDates(form: ProjectFormValues): ProjectFormErrors
   return errors;
 }
 
-/** Limita el calendario con la otra fecha únicamente cuando esta es válida. */
-export function projectDateLimits(form: ProjectFormValues, field: 'fechaInicio' | 'fechaFinEstimada') {
-  const start = isValidProjectDate(form.fechaInicio) ? form.fechaInicio : '0001-01-01';
-  const end = isValidProjectDate(form.fechaFinEstimada) ? form.fechaFinEstimada : '9999-12-31';
-  return field === 'fechaInicio' ? { min: '0001-01-01', max: end } : { min: start, max: '9999-12-31' };
+/** Limita ambos calendarios con fechas válidas y aplica el día de registro únicamente al alta. */
+export function projectDateLimits(form: ProjectFormValues, field: 'fechaInicio' | 'fechaFinEstimada', minimumStartDate?: string) {
+  const floor = minimumStartDate ?? '0001-01-01';
+  const start = isValidProjectDate(form.fechaInicio) && form.fechaInicio >= floor ? form.fechaInicio : floor;
+  const end = isValidProjectDate(form.fechaFinEstimada) && form.fechaFinEstimada >= floor ? form.fechaFinEstimada : '9999-12-31';
+  return field === 'fechaInicio' ? { min: floor, max: end } : { min: start, max: '9999-12-31' };
 }

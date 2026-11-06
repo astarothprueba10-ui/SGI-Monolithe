@@ -6,9 +6,11 @@ import monolithe.core_service.entity.Proyecto;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -38,8 +40,8 @@ class ProyectoServiceValidationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void altaYEdicionPersistenLosNombresOficialesYPaisFijo(boolean editar) {
-        var resultado = guardar(editar, request("lambayeque", "chiclayo", "eten", "peru",
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1)));
+        var fecha = editar ? LocalDate.of(2026, 1, 1) : ValidacionAltaProyecto.fechaRegistro(Instant.now());
+        var resultado = guardar(editar, request("lambayeque", "chiclayo", "eten", "peru", fecha, fecha));
         assertEquals("Lambayeque", resultado.departamento());
         assertEquals("Chiclayo", resultado.provincia());
         assertEquals("Eten", resultado.distrito());
@@ -50,7 +52,8 @@ class ProyectoServiceValidationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void altaYEdicionRechazanFechasInvertidasSinGuardar(boolean editar) {
-        var invalido = request(null, null, null, "Perú", LocalDate.of(2026, 5, 2), LocalDate.of(2026, 5, 1));
+        var hoy = ValidacionAltaProyecto.fechaRegistro(Instant.now());
+        var invalido = request(null, null, null, "Perú", hoy.plusDays(2), hoy.plusDays(1));
         assertThrows(ReglaNegocioException.class, () -> guardar(editar, invalido));
         verify(repository, never()).save(any(Proyecto.class));
     }
@@ -60,6 +63,29 @@ class ProyectoServiceValidationTest {
     void altaYEdicionRechazanUbicacionManipuladaSinGuardar(boolean editar) {
         var invalido = request("Lambayeque", "Lima", "Miraflores", "Perú", null, null);
         assertThrows(ReglaNegocioException.class, () -> guardar(editar, invalido));
+        verify(repository, never()).save(any(Proyecto.class));
+    }
+
+    @Test
+    void laEdicionConservaDescripcionesAusentesYFechasHistoricas() {
+        var request = new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto", null, null, null,
+                null, null, null, "Perú", null, null, null, LocalDate.of(2020, 1, 1), null, true);
+        assertNull(guardar(true, request).descripcion());
+        verify(repository).save(any(Proyecto.class));
+    }
+
+    @Test
+    void elAltaRechazaUnaFechaPasadaAntesDeGuardar() {
+        var ayer = ValidacionAltaProyecto.fechaRegistro(Instant.now()).minusDays(1);
+        assertThrows(ReglaNegocioException.class, () -> guardar(false, request(null, null, null, "Perú", ayer, null)));
+        verify(repository, never()).save(any(Proyecto.class));
+    }
+
+    @Test
+    void elAltaRechazaUnaDescripcionAusenteAntesDeGuardar() {
+        var request = new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto", null, null, null,
+                null, null, null, "Perú", null, null, null, null, null, true);
+        assertThrows(ReglaNegocioException.class, () -> guardar(false, request));
         verify(repository, never()).save(any(Proyecto.class));
     }
 

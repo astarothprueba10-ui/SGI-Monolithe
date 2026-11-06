@@ -1,7 +1,8 @@
-import type { ProjectFormErrors, ProjectFormValues, Ubigeo } from '../types/projectForm';
+import type { ProjectCreationContext, ProjectFormErrors, ProjectFormValues, Ubigeo } from '../types/projectForm';
 import { locationOptions, normalizeLocation } from './ubigeo';
 import { validateProjectDates } from './projectDateValidation';
 import { validateProjectNumbers } from './projectNumberValidation';
+import { validateProjectDescription } from './projectDescriptionValidation';
 
 function validateIdentity(form: ProjectFormValues): ProjectFormErrors {
   const errors: ProjectFormErrors = {};
@@ -26,7 +27,10 @@ function validateLocation(form: ProjectFormValues, rows: Ubigeo[]): ProjectFormE
   return errors;
 }
 
-/** Valida el formulario completo para crear o editar, incluyendo ubicación y fechas. */
-export function validateProjectForm(form: ProjectFormValues, rows: Ubigeo[]): ProjectFormErrors {
-  return { ...validateIdentity(form), ...validateProjectNumbers(form), ...validateLocation(form, rows), ...validateProjectDates(form) };
+/** Valida los datos comunes y aplica las restricciones del alta cuando hay contexto de registro. */
+export function validateProjectForm(form: ProjectFormValues, rows: Ubigeo[], creation?: ProjectCreationContext): ProjectFormErrors {
+  const errors = { ...validateIdentity(form), ...validateProjectNumbers(form), ...validateLocation(form, rows),
+    ...validateProjectDates(form, creation?.registrationDate) };
+  const descriptionError = creation ? validateProjectDescription(form.descripcion) : undefined;
+  return descriptionError ? { ...errors, descripcion: descriptionError } : errors;
 }

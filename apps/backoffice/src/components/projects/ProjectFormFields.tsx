@@ -1,6 +1,7 @@
 import type { InputHTMLAttributes } from 'react';
 import type { ProjectFormModel } from '../../hooks/useProjectForm';
 import { projectDateLimits } from '../../lib/projectDateValidation';
+import { countProjectDescriptionLetters } from '../../lib/projectDescriptionValidation';
 import type { ProjectFormValues } from '../../types/projectForm';
 import { Input, Select } from '../ui/Field';
 import { ProjectField } from './ProjectField';
@@ -55,16 +56,23 @@ function StatusFields({ model }: { model: ProjectFormModel }) {
 }
 
 function DescriptionField({ model }: { model: ProjectFormModel }) {
-  return <ProjectField model={model} name="descripcion" label="Descripción" full>
-    <textarea {...projectControl(model, 'descripcion')} rows={3} placeholder="Descripción del proyecto (opcional)"
+  return <ProjectField model={model} name="descripcion" label="Descripción" required={Boolean(model.creation)} full>
+    <textarea {...projectControl(model, 'descripcion')} rows={3} required={Boolean(model.creation)}
+      minLength={model.creation ? 15 : undefined} placeholder="Describe el proyecto"
+      aria-describedby={model.errors.descripcion ? 'descripcion-error' : model.creation ? 'descripcion-ayuda' : undefined}
       className="w-full resize-none rounded-md border border-brand-200 bg-white px-3 py-2 text-[13px] text-brand-800 focus:border-brand-500" />
+    {model.creation && <p id="descripcion-ayuda" className="text-[11px] text-brand-400">
+      Mínimo 15 letras; espacios y números no cuentan. Llevas {countProjectDescriptionLetters(model.form.descripcion)}.
+    </p>}
   </ProjectField>;
 }
 
 function DateFields({ model }: { model: ProjectFormModel }) {
   return <>{(['fechaInicio', 'fechaFinEstimada'] as const).map((name) =>
     <ProjectField key={name} model={model} name={name} label={name === 'fechaInicio' ? 'Fecha de inicio' : 'Fecha de fin estimada'}>
-      <Input {...projectControl(model, name)} type="date" {...projectDateLimits(model.form, name)} />
+      <Input {...projectControl(model, name)} type="date" {...projectDateLimits(model.form, name, model.creation?.registrationDate)} />
+      {model.creation && <p className="text-[11px] text-brand-400">{name === 'fechaInicio'
+        ? 'Desde hoy, según la fecha de Perú.' : 'La fecha de fin debe ser igual o posterior al inicio.'}</p>}
     </ProjectField>
   )}</>;
 }

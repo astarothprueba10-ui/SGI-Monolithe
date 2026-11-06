@@ -26,3 +26,8 @@ export interface ProjectFormProps {
   onSuccess: () => Promise<void>;
   project?: ProyectoResponse | null;
 }
+
+/** Contexto del alta; se omite para conservar las fechas históricas al editar. */
+export interface ProjectCreationContext {
+  registrationDate: string;
+}
