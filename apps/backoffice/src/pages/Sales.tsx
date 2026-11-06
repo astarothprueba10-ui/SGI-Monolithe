@@ -2218,7 +2218,7 @@ export function Sales() {
               disabled={submitting}
               onClick={() => setConfirmacionVenta(null)}
             >
-              Volver
+              Cancelar registro
             </Button>
 
             <Button
