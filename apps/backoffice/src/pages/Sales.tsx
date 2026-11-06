@@ -19,6 +19,7 @@ import {
   crmBackend,
   type CrmProspect,
   type CrmSaleValidationInput,
+  type CrmReservaVigenteVenta,
   type CrmContratoDocumentacion
 } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
@@ -35,6 +36,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
+import { calcularVenta } from '../utils/financiamientoAleman';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -180,6 +182,12 @@ export function Sales() {
   >('CONTADO');
   const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
+  const [formSaleRate, setFormSaleRate] = useState('');
+  const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
+  const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
+    idProyecto: number; idEtapa: number; idLote: number;
+  } | null>(null);
+  const seleccionProspectoPeticionRef = React.useRef(0);
   const [voucherFile, setVoucherFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
@@ -364,40 +372,50 @@ export function Sales() {
 
 
   const handleSelectProspect = async (id: number | '') => {
+    const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
     setFormProjectId('');
+    setFormStageId('');
+    setAvailableStages([]);
     setAvailableProjects([]);
     setAvailableLots([]);
     setFormLotId('');
-
+    setReservasVigentes([]);
+    setAutoseleccionPendiente(null);
     if (id === '') return;
 
     setLoadingProjects(true);
-
     try {
-      const [detail, projects] = await Promise.all([
+      const [detalle, proyectos, consultaReservas] = await Promise.all([
         crmBackend.detalle(id),
-        coreService.getActiveProjects()
+        coreService.getActiveProjects(),
+        opType === 'Venta'
+          ? crmBackend.listarReservasVigentesParaVenta(id)
+          : Promise.resolve({ reservas: [] as CrmReservaVigenteVenta[], idLotes: [] as number[] })
       ]);
+      if (solicitud !== seleccionProspectoPeticionRef.current) return;
+      const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
+      const elegibles = proyectos.filter((p) => p.activo && intereses.has(p.idProyecto));
+      setAvailableProjects(elegibles);
+      setReservasVigentes(consultaReservas.reservas ?? []);
 
-      const intereses = new Set(
-        (detail.intereses ?? []).map((i) => i.idProyecto)
-      );
-
-      setAvailableProjects(
-        projects.filter(
-          (p) => p.activo && intereses.has(p.idProyecto)
-        )
-      );
+      const reserva = (consultaReservas.reservas ?? [])
+        .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
+      if (reserva) {
+        setAutoseleccionPendiente({
+          idProyecto: reserva.idProyecto,
+          idEtapa: reserva.idEtapa,
+          idLote: reserva.idLote
+        });
+        setFormProjectId(String(reserva.idProyecto));
+      }
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Error al consultar proyectos.';
-
-      toast.error('No se pudieron cargar los proyectos de interés', {
-        description: msg
+      if (solicitud !== seleccionProspectoPeticionRef.current) return;
+      toast.error('No se pudieron cargar los datos del prospecto', {
+        description: err instanceof Error ? err.message : 'Error al consultar proyectos y reservas.'
       });
     } finally {
-      setLoadingProjects(false);
+      if (solicitud === seleccionProspectoPeticionRef.current) setLoadingProjects(false);
     }
   };
 
@@ -412,6 +430,7 @@ export function Sales() {
     setFormSaleModality('CONTADO');
     setFormSaleDownPayment('');
     setFormSaleInstallments('12');
+    setFormSaleRate('');
     setFormOperationNumber('');
     setVoucherFile(null);
     setFormObservations('');
@@ -906,6 +925,28 @@ export function Sales() {
     (paginaSeparacionesActual - 1) * tamanoPaginaSeparaciones,
     paginaSeparacionesActual * tamanoPaginaSeparaciones
   );
+  const reservaAplicable = opType === 'Venta' && formLotId
+    ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReserva ?? 0
+    : 0;
+
+  const resumenVenta = useMemo(() => {
+    if (opType !== 'Venta' || !precioLote || estadoPrecio !== 'disponible'
+        || precioLote.idLote !== Number(formLotId)) return null;
+    try {
+      if (formSaleModality === 'CONTADO')
+        return calcularVenta(Number(precioLote.precio), reservaAplicable);
+      if (!formSaleDownPayment.trim() || !formSaleRate.trim()
+          || !formSaleInstallments.trim()) return null;
+      return calcularVenta(
+        Number(precioLote.precio), reservaAplicable,
+        Number(formSaleDownPayment), Number(formSaleInstallments),
+        Number(formSaleRate));
+    } catch {
+      return null;
+    }
+  }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
+      formSaleDownPayment, formSaleRate, formSaleInstallments, reservaAplicable]);
+
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
@@ -1968,6 +2009,7 @@ export function Sales() {
                       if (modalidad === 'CONTADO') {
                         setFormSaleDownPayment('');
                         setFormSaleInstallments('12');
+    setFormSaleRate('');
                       }
                     }}
                   >
