@@ -5,9 +5,9 @@ const {
   TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT
 } = require('../src/utils/financiamientoFrances.ts');
 
-test('tasa nominal anual fija del 5% y mensual derivada de 5/12', () => {
-  assert.equal(TASA_ANUAL_FIJA_PCT, 5);
-  assert.equal(TASA_MENSUAL_NOMINAL_PCT, 5 / 12);
+test('tasa nominal anual fija del 10% y mensual derivada de 10/12', () => {
+  assert.equal(TASA_ANUAL_FIJA_PCT, 10);
+  assert.equal(TASA_MENSUAL_NOMINAL_PCT, 10 / 12);
 });
 
 test('muestra error de inicial mínima inmediatamente', () => {
@@ -27,27 +27,27 @@ test('venta al contado descuenta solo la reserva del lote', () => {
 test('francés: cuota constante, interés decreciente y capital creciente', () => {
   const plan = calcularVenta(30000, 500, 7000, 12);
   assert.equal(plan.capitalFinanciado, 22500);
-  assert.equal(plan.cuotaMensual, 1926.17);
-  assert.equal(plan.interesTotal, 614.02);
-  assert.equal(plan.totalCuotas, 23114.02);
-  assert.equal(plan.totalOperacionConIntereses, 30614.02);
-  assert.equal(plan.cuotas[0].interes, 93.75);
-  assert.equal(plan.cuotas[0].capital, 1832.42);
+  assert.equal(plan.cuotaMensual, 1978.11);
+  assert.equal(plan.interesTotal, 1237.29);
+  assert.equal(plan.totalCuotas, 23737.29);
+  assert.equal(plan.totalOperacionConIntereses, 31237.29);
+  assert.equal(plan.cuotas[0].interes, 187.50);
+  assert.equal(plan.cuotas[0].capital, 1790.61);
   for (let k = 0; k < plan.cuotas.length - 1; k++) {
-    assert.equal(plan.cuotas[k].cuota, 1926.17);
+    assert.equal(plan.cuotas[k].cuota, 1978.11);
     if (k > 0) {
       assert.ok(plan.cuotas[k].interes < plan.cuotas[k - 1].interes);
       assert.ok(plan.cuotas[k].capital > plan.cuotas[k - 1].capital);
     }
   }
-  assert.equal(plan.cuotas[11].cuota, 1926.15);
+  assert.equal(plan.cuotas[11].cuota, 1978.08);
   assert.equal(plan.cuotas[11].saldo, 0);
 });
 
 test('sin reserva: financia precio menos inicial', () => {
   const plan = calcularVenta(30000, 0, 5000, 12);
   assert.equal(plan.capitalFinanciado, 25000);
-  assert.equal(plan.cuotaMensual, 2140.19);
+  assert.equal(plan.cuotaMensual, 2197.90);
 });
 
 test('última cuota ajusta centavos y liquida el capital en 36 meses', () => {
@@ -60,7 +60,7 @@ test('última cuota ajusta centavos y liquida el capital en 36 meses', () => {
 test('un solo mes: todos los intereses del periodo y saldo cero', () => {
   const plan = calcularVenta(30000, 500, 6000, 1);
   assert.equal(plan.cuotas.length, 1);
-  assert.equal(plan.cuotas[0].interes, 97.92);
+  assert.equal(plan.cuotas[0].interes, 195.83);
   assert.equal(plan.cuotas[0].saldo, 0);
 });
 
