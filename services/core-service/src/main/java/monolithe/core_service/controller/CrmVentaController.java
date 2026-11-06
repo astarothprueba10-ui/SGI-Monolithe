@@ -288,6 +288,14 @@ public class CrmVentaController {
         }
 
         /** Expediente del comprador, domicilio, pago y plan financiero: solo lectura. */
+        @GetMapping("/ventas/{idVenta}/cronograma")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> cronogramaVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
+        }
+
         @GetMapping("/ventas/{idVenta}/detalle")
         @PreAuthorize("hasAuthority('sales.view')")
         public ResponseEntity<JsonNode> detalleVenta(
