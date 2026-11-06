@@ -1092,8 +1092,7 @@ export function Sales() {
     formProjectId,
     formStageId,
     selectedProspectId,
-    opType,
-    autoseleccionPendiente
+    opType
   ]);
 
 
