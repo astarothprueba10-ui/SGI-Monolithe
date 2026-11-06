@@ -321,6 +321,69 @@ export interface CrmOperacionItem {
   asesor: string | null;
 }
 
+export interface CrmComprobanteVentaLectura {
+  idComprobante: number;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanioBytes: number;
+  estadoRevision: string;
+}
+
+export interface CrmDetalleVenta {
+  idVenta: number;
+  codigoVenta: string;
+  modalidad: 'CONTADO' | 'FINANCIADA';
+  precioVenta: number;
+  tieneExpediente: boolean;
+  comprador: {
+    nombreCompleto: string | null;
+    tipoDocumento: string | null;
+    numeroDocumento: string | null;
+    telefono: string | null;
+    correo: string | null;
+    estadoCivil: string | null;
+  };
+  conyuge: {
+    nombres: string;
+    apellidoPaterno: string;
+    apellidoMaterno?: string | null;
+    telefono?: string | null;
+    correo?: string | null;
+    tipoDocumento: string;
+    numeroDocumento: string;
+  } | null;
+  domicilio: {
+    direccion: string | null;
+    referencia: string | null;
+    pais: string | null;
+    departamento: string | null;
+    provincia: string | null;
+    distrito: string | null;
+  };
+  pago: {
+    metodo: string | null;
+    numeroOperacion: string | null;
+    tipoAbono: 'CONTADO' | 'INICIAL' | null;
+    montoPorRevisar: number | null;
+    estadoRevision: string | null;
+    comprobantes: CrmComprobanteVentaLectura[];
+  };
+  financiamiento: {
+    sistema: string;
+    montoInicial: number;
+    abonoReserva: number;
+    capitalFinanciado: number;
+    numeroCuotas: number;
+    interesesTotales: number;
+    totalPendienteEnCuotas: number;
+    saldoCuotasPendiente: number;
+    tasaAnualNominal: number | null;
+    cuotaMensual: number | null;
+    cuotaFija: boolean;
+    descripcionCondiciones: string | null;
+  } | null;
+}
+
 export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
   paginas: number;
 }
@@ -993,6 +1056,21 @@ export const crmBackend = {
         tamano: params?.tamano
       })}`
     ),
+
+  obtenerDetalleVenta: (idVenta: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmDetalleVenta>(`/crm/ventas/${idVenta}/detalle`);
+  },
+
+  obtenerComprobanteVenta: (idVenta: number, idComprobante: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0
+      || !Number.isSafeInteger(idComprobante) || idComprobante <= 0)
+      throw new Error('Identificador de comprobante inválido.');
+    return coreApi.get<CrmVoucherReadUrl>(
+      `/crm/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
+    );
+  },
 
   obtenerComprobanteSeparacion: (idReserva: number) => {
     if (!Number.isSafeInteger(idReserva) || idReserva <= 0) {
