@@ -124,10 +124,12 @@ export interface Sale {
   amount: number;
   advisor: string;
   date: string;
+  dateIso?: string | null;
   contract?: string;
   status: string;
   paymentMethod?: string | null;
   expiresAt?: string | null;
+  expiresAtIso?: string | null;
 }
 
 export interface Installment {
