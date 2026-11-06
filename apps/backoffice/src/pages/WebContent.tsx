@@ -887,7 +887,7 @@ export function WebContent() {
                   Volver a intentar
                 </button>
               </div>
-            )
+            )}
 
             {!cargandoSeccion && !errorSeccion && (
               <div className="grid gap-4">
