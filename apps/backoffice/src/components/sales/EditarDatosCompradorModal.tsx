@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { InfoIcon, UserRoundIcon, Building2Icon, MapPinIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -14,6 +14,7 @@ interface Props {
   proyecto: string;
   modalidad: 'CONTADO' | 'FINANCIADA';
   puedeReasignar: boolean;
+  asesorNombre: string;
   onClose: () => void;
   onGuardar: (datos: CrmDatosCompradorVenta) => void;
 }
@@ -25,7 +26,7 @@ const VACIO: LeadFormValues = {
 };
 
 export function EditarDatosCompradorModal({
-  open, idProspecto, lote, proyecto, modalidad, puedeReasignar, onClose, onGuardar
+  open, idProspecto, lote, proyecto, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
 }: Props) {
   const [form, setForm] = useState<LeadFormValues>(VACIO);
   const [catalogos, setCatalogos] = useState<CrmCatalogs | null>(null);
@@ -116,7 +117,7 @@ export function EditarDatosCompradorModal({
     });
   };
 
-  const campo = (key: LeadField, label: string, input: React.ReactNode, full = false) => (
+  const campo = (key: LeadField, label: string, input: ReactNode, full = false) => (
     <div className={full ? 'min-w-0 sm:col-span-2' : 'min-w-0'} key={key}>
       <label className="mb-1.5 block text-xs font-semibold text-brand-700">{label}</label>
       {input}
@@ -205,7 +206,7 @@ export function EditarDatosCompradorModal({
                 className={!puedeReasignar ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''}>
                 <option value="">Sin asesor asignado</option>
                 {!puedeReasignar && original?.idAsesor ? (
-                  <option value={original.idAsesor}>Asesor actual #{original.idAsesor}</option>
+                  <option value={original.idAsesor}>{asesorNombre || `Asesor #${original.idAsesor}`}</option>
                 ) : asesores.filter(a=>a.activo).map(a => (
                   <option value={a.id_asesor} key={a.id_asesor}>{a.nombre_completo}</option>
                 ))}
