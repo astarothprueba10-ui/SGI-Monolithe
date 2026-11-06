@@ -1,12 +1,15 @@
 package monolithe.cms_service.integration;
 
 import monolithe.cms_service.service.CmsPublicacionService;
+import monolithe.cms_service.service.StorageBorradoresPrivado;
+import monolithe.cms_service.service.SupabaseStorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -42,6 +45,9 @@ class CmsPublicacionJPARolRestringidoTest {
 
     @Autowired private CmsPublicacionService publicacion;
     @Autowired private JdbcTemplate jdbc;
+    // En @DataJpaTest se simula Storage: nunca conecta con Supabase.
+    @MockitoBean private StorageBorradoresPrivado storagePrivado;
+    @MockitoBean private SupabaseStorageService storagePublico;
 
     @Test
     @WithMockUser(authorities = "web_content.publish")
@@ -55,6 +61,8 @@ class CmsPublicacionJPARolRestringidoTest {
                 SELECT rolsuper FROM pg_roles WHERE rolname = current_user
                 """, Boolean.class));
 
+        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+                "SELECT visible FROM cms_secciones WHERE id_seccion=21", Boolean.class));
         var resultado = publicacion.publicarTextos(30L, 1L, 0L, 9001L);
         assertNotNull(resultado.getIdHistorial());
         assertEquals("Titulo renovado", jdbc.queryForObject(
@@ -65,7 +73,7 @@ class CmsPublicacionJPARolRestringidoTest {
                 "SELECT titulo FROM cms_secciones WHERE id_seccion=21", String.class));
         assertEquals("Descripcion comercial protegida", jdbc.queryForObject(
                 "SELECT contenido FROM cms_secciones WHERE id_seccion=21", String.class));
-        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+        assertEquals(Boolean.TRUE, jdbc.queryForObject(
                 "SELECT visible FROM cms_secciones WHERE id_seccion=21", Boolean.class));
         assertEquals("PUBLICADO", jdbc.queryForObject(
                 "SELECT estado FROM cms_borradores WHERE id_borrador=30", String.class));

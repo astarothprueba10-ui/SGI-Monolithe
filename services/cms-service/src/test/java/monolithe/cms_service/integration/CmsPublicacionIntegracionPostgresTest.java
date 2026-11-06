@@ -2,6 +2,8 @@ package monolithe.cms_service.integration;
 
 import monolithe.cms_service.exception.ConflictException;
 import monolithe.cms_service.service.CmsPublicacionService;
+import monolithe.cms_service.service.StorageBorradoresPrivado;
+import monolithe.cms_service.service.SupabaseStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -50,6 +53,9 @@ class CmsPublicacionIntegracionPostgresTest {
 
     @Autowired private CmsPublicacionService servicio;
     @Autowired private JdbcTemplate jdbc;
+    // @DataJpaTest no registra servicios Storage; simularlos mantiene la IT sin Supabase.
+    @MockitoBean private StorageBorradoresPrivado storagePrivado;
+    @MockitoBean private SupabaseStorageService storagePublico;
 
     private long pagina;
     private long principal;
@@ -100,6 +106,9 @@ class CmsPublicacionIntegracionPostgresTest {
     @Test
     @WithMockUser(authorities = "web_content.publish")
     void publicacionExitosaPersisteCambiosYHistorial() {
+        // El slide promocional comienza oculto y se hace público en la primera publicación.
+        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+                "SELECT visible FROM cms_secciones WHERE id_seccion = ?", Boolean.class, promo));
         var resultado = servicio.publicarTextos(borrador, 1L, 0L, PUBLICADOR);
         assertNotNull(resultado.getIdHistorial());
         assertEquals("Titulo renovado", titulo(principal));
@@ -110,7 +119,7 @@ class CmsPublicacionIntegracionPostgresTest {
         assertEquals("Precio protegido", titulo(promo));
         assertEquals("Descripcion comercial protegida", valorTexto(
                 "SELECT contenido FROM cms_secciones WHERE id_seccion = ?", promo));
-        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+        assertEquals(Boolean.TRUE, jdbc.queryForObject(
                 "SELECT visible FROM cms_secciones WHERE id_seccion = ?", Boolean.class, promo));
         assertEquals("Pagina oficial QA", valorTexto(
                 "SELECT titulo FROM cms_paginas WHERE id_pagina = ?", pagina));
