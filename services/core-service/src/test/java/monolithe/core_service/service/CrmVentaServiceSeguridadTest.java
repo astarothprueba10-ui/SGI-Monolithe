@@ -72,8 +72,7 @@ class CrmVentaServiceSeguridadTest {
         var req = new RegistrarSeparacionCrmRequest(
                 1L, 74L, "TRANSFERENCIA", "OP-01",
                 new BigDecimal("499.99"), null, "comprobante.png",
-                "comprobante.png", "image/png", 1024L, null,
-                "CONTADO");
+                "comprobante.png", "image/png", 1024L, null);
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.registrarSeparacion(5L, req));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
