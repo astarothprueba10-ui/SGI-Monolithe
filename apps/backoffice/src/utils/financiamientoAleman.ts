@@ -26,6 +26,26 @@ const soles = (cents: number) => cents / 100;
 export const TASA_ANUAL_FIJA_PCT = 5;
 export const TASA_MENSUAL_NOMINAL_PCT = TASA_ANUAL_FIJA_PCT / 12;
 
+export const MINIMO_INICIAL_ADICIONAL = 5000;
+
+/** Validación reactiva: permite mostrar el aviso rojo mientras se escribe. */
+export function validarInicialAdicional(
+  valor: string,
+  precioOficial: number | null,
+  abonoReserva = 0
+): string | null {
+  if (!valor.trim()) return null;
+  const monto = Number(valor);
+  if (!Number.isFinite(monto) || monto < 0) return 'Ingrese un monto inicial válido.';
+  if (monto < MINIMO_INICIAL_ADICIONAL) return 'El monto inicial mínimo es de S/ 5,000.';
+  if (precioOficial !== null && Number.isFinite(precioOficial)
+      && monto + abonoReserva >= precioOficial) {
+    return 'La inicial debe dejar un saldo positivo después de descontar la reserva.';
+  }
+  return null;
+}
+
+
 export function calcularVenta(
   precioOficial: number,
   abonoReserva = 0,
