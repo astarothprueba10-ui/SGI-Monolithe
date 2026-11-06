@@ -5,6 +5,7 @@ import { Field, Input, Select } from '../ui/Form';
 import { Alert } from '../ui/Feedback';
 import { projects } from '../../data/projects';
 import { enviarConsulta } from '../../services/api';
+import { esCelularPublicoValido, esNombrePublicoValido, insertarTextoPublico, normalizarCampoPublico } from '../../lib/publicContactPolicy';
 
 type State = 'idle' | 'loading' | 'success' | 'error';
 
@@ -15,15 +16,25 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
   const [codigoSeguimiento, setCodigoSeguimiento] = useState<string | null>(null);
 
   function update(key: keyof typeof values, value: string) {
-    setValues((v) => ({ ...v, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: '' }));
+    setValues((v) => ({ ...v, [key]: normalizarCampoPublico(key, value, v[key]) }));
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function paste(key: keyof typeof values, event: React.ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const input = event.currentTarget;
+    update(key, insertarTextoPublico(input.value, event.clipboardData.getData('text'), input.selectionStart, input.selectionEnd));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    if (!values.name.trim()) next.name = 'Ingresa tu nombre completo';
-    if (!/^[0-9+\s]{9,15}$/.test(values.phone.trim())) next.phone = 'Ingresa un teléfono válido';
+    if (!esNombrePublicoValido(values.name)) next.name = 'Ingresa tu nombre utilizando solo letras y espacios.';
+    if (!esCelularPublicoValido(values.phone)) next.phone = 'El celular debe tener 9 dígitos y comenzar por 9.';
     if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) next.email = 'Ingresa un correo válido';
     setErrors(next);
     if (Object.keys(next).length > 0) {
@@ -92,25 +103,32 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Nombre" htmlFor="lead-name" required error={errors.name}>
+        <Field label="Nombre" htmlFor="lead-name" required hint="Solo letras y espacios." error={errors.name}>
           <Input
             id="lead-name"
             value={values.name}
             error={errors.name}
+            aria-invalid={Boolean(errors.name)}
             onChange={(e) => update('name', e.target.value)}
             placeholder="María Fernández"
             autoComplete="name"
           />
         </Field>
-        <Field label="Teléfono" htmlFor="lead-phone" required error={errors.phone}>
+        <Field label="Teléfono" htmlFor="lead-phone" required hint="9 dígitos; debe comenzar por 9." error={errors.phone}>
           <Input
             id="lead-phone"
             value={values.phone}
             error={errors.phone}
             onChange={(e) => update('phone', e.target.value)}
-            placeholder="999 999 999"
-            inputMode="tel"
-            autoComplete="tel"
+            onPaste={(event) => paste('phone', event)}
+            type="tel"
+            inputMode="numeric"
+            minLength={9}
+            maxLength={9}
+            pattern="9[0-9]{8}"
+            aria-invalid={Boolean(errors.phone)}
+            placeholder="987654321"
+            autoComplete="tel-national"
           />
         </Field>
         <Field label="Correo" htmlFor="lead-email" required error={errors.email}>
