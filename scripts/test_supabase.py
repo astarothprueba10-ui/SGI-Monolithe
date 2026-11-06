@@ -43,7 +43,8 @@ def main():
     except Exception:
         pooler_host = os.environ.get('SUPABASE_POOLER_HOST', 'aws-0-us-west-2.pooler.supabase.com')
         project_ref = os.environ.get('SUPABASE_PROJECT_REF', '')
-        pooler_user = f"postgres.{project_ref}" if project_ref and not user.startswith('postgres.') else user
+        effective_user = os.environ.get('SUPABASE_DB_USERNAME', user)
+        pooler_user = effective_user if '.' in effective_user or not project_ref else f"{effective_user}.{project_ref}"
         conn = pg8000.native.Connection(
             user=pooler_user,
             host=pooler_host,
