@@ -127,6 +127,7 @@ export interface Sale {
   contract?: string;
   status: string;
   paymentMethod?: string | null;
+  expiresAt?: string | null;
 }
 
 export interface Installment {
