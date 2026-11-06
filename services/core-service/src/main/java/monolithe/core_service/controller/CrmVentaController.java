@@ -275,6 +275,19 @@ public class CrmVentaController {
                                 .body(enlace);
         }
 
+        /** Exportación de cartera de ventas: validación JWT y SQL, nunca datos globales sin rol. */
+        @GetMapping("/ventas/exportacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
+        public ResponseEntity<JsonNode> exportarVentas(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "100") Integer tamano) {
+                return ResponseEntity.ok()
+                        .cacheControl(CacheControl.noStore())
+                        .body(service.listarVentasParaExportacion(
+                                obtenerActor(jwt), pagina, tamano));
+        }
+
         /** Exportacion paginada y exclusiva de separaciones. Permisos tambien verificados en BD. */
         @GetMapping("/separaciones/exportacion")
         @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
