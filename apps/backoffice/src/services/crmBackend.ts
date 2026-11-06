@@ -101,6 +101,33 @@ export interface CrmDetail {
   totalVisitas: number;
   esComprador: boolean;
 }
+export interface CrmDatosPersonales {
+  idProspecto:number;
+  nombres:string;
+  apellidoPaterno:string;
+  apellidoMaterno:string;
+  telefono:string;
+  correo:string;
+  tipoDocumento:'DNI'|'CE'|'PASAPORTE'|'RUC';
+  numeroDocumento:string;
+  documentoVerificado:boolean;
+  direccion:string;
+  historial: CrmCambioDatoPersonal[];
+}
+export interface CrmCambioDatoPersonal {
+  id:number;
+  fecha:string;
+  motivo:string;
+  actor:string;
+  antes:Omit<CrmDatosPersonales,'historial'>;
+  despues:Omit<CrmDatosPersonales,'historial'>;
+}
+export type CrmDatosPersonalesEdicion = Pick<
+  CrmDatosPersonales,
+  'nombres'|'apellidoPaterno'|'apellidoMaterno'|'telefono'|'correo'|
+  'tipoDocumento'|'numeroDocumento'|'direccion'
+>;
+
 export interface CrmAssignment {
   id_asignacion: number;
   id_asesor: number;
@@ -879,6 +906,13 @@ export const crmBackend = {
     ),
 
   detalle: (id: number) => coreApi.get<CrmDetail>(`/crm/prospectos/${id}`),
+  datosPersonales: (id:number) =>
+    coreApi.get<CrmDatosPersonales>(`/crm/prospectos/${id}/datos-personales`),
+  corregirDatosPersonales: (id:number, datos:CrmDatosPersonalesEdicion, motivo:string) =>
+    coreApi.patch<{actualizado:boolean;idProspecto:number}>(
+      `/crm/prospectos/${id}/datos-personales`,{datos,motivo}
+    ),
+
   crear: (data: CrmLeadCreate) => coreApi.post<Record<string, unknown>>('/crm/prospectos', data as Record<string, unknown>),
   actualizar: (id: number, body: { origenCodigo?: string; observaciones?: string; idProyectoInteres?: number }) =>
     coreApi.patch<Record<string, unknown>>(`/crm/prospectos/${id}/ficha`, body as Record<string, unknown>),
