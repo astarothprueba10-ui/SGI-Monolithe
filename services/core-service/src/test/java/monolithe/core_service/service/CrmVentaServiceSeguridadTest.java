@@ -118,7 +118,7 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
-    void registroVentaUsaProcedimiento() {
+    void registroVentaUsaProcedimiento() throws Exception {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"success\":true}");
         var comprobador = tools.jackson.databind.json.JsonMapper.builder().build()
