@@ -1580,7 +1580,7 @@ export function Sales() {
 
             <section className="rounded-xl border border-brand-100 bg-white px-4 py-2 sm:px-5">
               <h3 className="border-b border-brand-100 py-3 text-sm font-semibold text-brand-900">
-                {detail.type === 'Separación' ? 'Información de la separación' : 'Información de la venta'}
+                {detail.type === 'Separación' ? 'Información de la separación' : 'Resumen comercial'}
               </h3>
               <dl className="grid grid-cols-1 gap-x-7 sm:grid-cols-2">
                 {[
