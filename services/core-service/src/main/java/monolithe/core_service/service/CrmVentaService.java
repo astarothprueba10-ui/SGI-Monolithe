@@ -72,7 +72,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v7(
+                SELECT public.sp_crm_validar_formalizacion_v8(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -174,7 +174,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v7(
+                SELECT public.sp_crm_registrar_venta_pendiente_v8(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
