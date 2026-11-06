@@ -2158,7 +2158,7 @@ export function Sales() {
                         <div className="rounded-md bg-brand-50 p-2 text-[11px] text-brand-600">
                           Sistema alemán: amortización de capital constante. Las cuotas decrecen conforme baja el interés.
                           Primera cuota {currency(resumenVenta.cuotas[0]?.cuota ?? 0)};
-                          última cuota {currency(resumenVenta.cuotas.at(-1)?.cuota ?? 0)}.
+                          última cuota {currency(resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0)}.
                         </div>
                       </>
                     )}
