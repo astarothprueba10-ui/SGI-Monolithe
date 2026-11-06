@@ -2182,6 +2182,7 @@ export function Sales() {
         proyecto={availableProjects.find((p) => p.idProyecto === Number(formProjectId))?.nombre ?? ''}
         modalidad={datosVentaValidados?.datos.modalidad ?? 'CONTADO'}
         puedeReasignar={puedeReasignarComprador}
+        asesorNombre={prospectsList.find((p) => p.id_prospecto === selectedProspectId)?.asesor_nombre ?? ''}
         onClose={() => {
           if (!submitting) {
             setEditandoComprador(false);
