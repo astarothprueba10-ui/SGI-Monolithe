@@ -108,7 +108,7 @@ class CrmVentaServiceSeguridadTest {
                 .thenReturn("{\"elegible\":true,\"planFrances\":{\"sistema\":\"FRANCES\"}}");
         var req = new FormalizarVentaCrmRequest(
                 5L, 92L, "FINANCIADA", new BigDecimal("30000.00"),
-                new BigDecimal("7000.00"), 12, null, null, null);
+                new BigDecimal("7000.00"), 12, null, null, null, null);
         var respuesta = service.validar(5L, req);
         assertEquals("FRANCES",
                 respuesta.path("planFrances").path("sistema").asString());
@@ -125,12 +125,13 @@ class CrmVentaServiceSeguridadTest {
                 .readTree("{\"idProspecto\":1,\"nombres\":\"Prueba\"}");
         var req = new FormalizarVentaCrmRequest(
                 1L, 74L, "CONTADO", new BigDecimal("29900.00"),
-                null, null, null, null, comprobador);
+                null, null, null, null, comprobador,
+                tools.jackson.databind.json.JsonMapper.builder().build().readTree("{\"metodoPago\":\"EFECTIVO\",\"comprobantes\":[]}"));
         var resultado = service.registrarVentaPendiente(5L, req);
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v11"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v13"));
     }
 
     @Test
@@ -141,14 +142,14 @@ class CrmVentaServiceSeguridadTest {
         assertEquals(1, resultado.path("idPais").asInt());
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_datos_comprador_para_venta_v2"));
+        assertTrue(sql.getValue().contains("sp_crm_datos_comprador_para_venta_v3"));
     }
 
     @Test
     void registroSinRevisionDeCompradorRechazado() {
         var req = new FormalizarVentaCrmRequest(
                 1L, 74L, "CONTADO", new BigDecimal("29900.00"),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.registrarVentaPendiente(5L, req));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
