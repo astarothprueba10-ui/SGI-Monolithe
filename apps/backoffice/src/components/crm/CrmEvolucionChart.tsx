@@ -11,10 +11,13 @@ import {
 } from 'recharts';
 
 import type { CrmEvolucionMes } from '../../services/crmBackend';
+import type { PeriodoCrmModo } from './CrmPeriodoGlobal';
 
 interface Props {
   items: CrmEvolucionMes[];
   loading?: boolean;
+  modo: PeriodoCrmModo;
+  fechaReferencia: string;
 }
 
 function formatearMes(mes: string): string {
@@ -26,15 +29,30 @@ function formatearMes(mes: string): string {
 
   return new Intl.DateTimeFormat('es-PE', {
     month: 'short',
-    year: '2-digit',
+    year: 'numeric',
     timeZone: 'UTC'
   }).format(fecha);
 }
 
+function formatearFecha(fecha: string): string {
+  const valor = new Date(`${fecha}T12:00:00Z`);
+  if (Number.isNaN(valor.getTime())) return fecha;
+  return new Intl.DateTimeFormat('es-PE', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+  }).format(valor);
+}
+
 export function CrmEvolucionChart({
   items,
-  loading = false
+  loading = false,
+  modo,
+  fechaReferencia
 }: Props) {
+  const esDia = modo === 'HOY';
+  const tituloGrafico = esDia ? 'Actividad comercial del día' : 'Evolución comercial por mes';
+  const etiquetaGrafico = (mes: string) => esDia
+    ? formatearFecha(fechaReferencia)
+    : formatearMes(mes);
   const sinActividad = items.length > 0 &&
     items.every(
       (item) =>
@@ -48,17 +66,18 @@ export function CrmEvolucionChart({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brand-100 px-5 py-4">
         <div>
           <h3 className="text-sm font-semibold text-brand-900">
-            Evolución comercial por mes
+            {tituloGrafico}
           </h3>
 
           <p className="mt-1 text-xs text-brand-400">
-            Comparativo de leads, clientes potenciales y
-            compradores.
+            {esDia
+              ? `Leads, clientes potenciales y compradores del ${formatearFecha(fechaReferencia)}.`
+              : 'Leads, clientes potenciales y compradores agrupados por mes dentro del período seleccionado.'}
           </p>
         </div>
 
         <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-          Evolución mensual
+          {esDia ? 'Vista diaria' : 'Evolución mensual'}
         </span>
       </div>
 
@@ -76,7 +95,9 @@ export function CrmEvolucionChart({
             <div
               className="h-[260px] w-full"
               role="img"
-              aria-label="Gráfico comparativo mensual de leads, potenciales y compradores"
+              aria-label={esDia
+                ? 'Gráfico de leads, potenciales y compradores del día seleccionado'
+                : 'Gráfico comparativo mensual de leads, potenciales y compradores'}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -97,7 +118,7 @@ export function CrmEvolucionChart({
 
                   <XAxis
                     dataKey="mes"
-                    tickFormatter={formatearMes}
+                    tickFormatter={etiquetaGrafico}
                     tickLine={false}
                     axisLine={false}
                     tick={{
@@ -118,7 +139,7 @@ export function CrmEvolucionChart({
 
                   <Tooltip
                     labelFormatter={(value) =>
-                      formatearMes(String(value))
+                      etiquetaGrafico(String(value))
                     }
                     contentStyle={{
                       borderRadius: 10,
