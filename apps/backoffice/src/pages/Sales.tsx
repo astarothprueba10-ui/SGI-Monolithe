@@ -20,6 +20,7 @@ import {
   type CrmProspect,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
+  type CrmVoucherVenta,
   type CrmReservaVigenteVenta,
   type CrmContratoDocumentacion
 } from '../services/crmBackend';
@@ -192,6 +193,7 @@ export function Sales() {
   } | null>(null);
   const seleccionProspectoPeticionRef = React.useRef(0);
   const [voucherFile, setVoucherFile] = useState<File | null>(null);
+  const [comprobantesVenta, setComprobantesVenta] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
   const registroVentaEnCursoRef = React.useRef(false);
@@ -445,6 +447,7 @@ export function Sales() {
     setFormSaleInstallments('12');
     setFormOperationNumber('');
     setVoucherFile(null);
+    setComprobantesVenta([]);
     setFormObservations('');
     setDatosVentaValidados(null);
     setEditandoComprador(false);
@@ -466,6 +469,7 @@ export function Sales() {
 
   const handleSelectLot = (lotIdStr: string) => {
     setFormLotId(lotIdStr);
+    setComprobantesVenta([]);
   };
 
   useEffect(() => {
@@ -521,6 +525,27 @@ export function Sales() {
       return;
     }
     setVoucherFile(file);
+  };
+
+  const archivosVentaObligatorios = formPaymentMethod !== 'EFECTIVO';
+  const requiereNumeroOperacionVenta = ['TRANSFERENCIA','DEPOSITO','YAPE_PLIN']
+    .includes(formPaymentMethod);
+  const agregarComprobantesVenta = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const candidatos = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (!candidatos.length) return;
+    if (comprobantesVenta.length + candidatos.length > 8) {
+      toast.error('Se permiten como máximo 8 comprobantes por venta.');
+      return;
+    }
+    const invalidos = candidatos.filter(f =>
+      !['application/pdf','image/jpeg','image/png','image/webp'].includes(f.type)
+      || f.size < 1 || f.size > 5242880 || f.name.length > 255);
+    if (invalidos.length) {
+      toast.error('Solo se admiten PDF, JPG, PNG o WebP, máximo 5 MB por archivo.');
+      return;
+    }
+    setComprobantesVenta(prev => [...prev, ...candidatos]);
   };
 
   const validarFormularioSeparacion = (): boolean => {
@@ -692,6 +717,16 @@ export function Sales() {
       return;
     }
 
+    if (archivosVentaObligatorios && !comprobantesVenta.length) {
+      toast.error('Adjunte el comprobante de ' +
+        (esFinanciada ? 'la inicial' : 'pago') + ' antes de validar.');
+      return;
+    }
+    if (requiereNumeroOperacionVenta && !formOperationNumber.trim()) {
+      toast.error('Ingrese el número de operación del pago.');
+      return;
+    }
+
     const datos = {
       idProspecto,
       idLote,
@@ -790,9 +825,23 @@ export function Sales() {
       if (!solicitud.datos.datosComprador) {
         throw new Error('Revise primero los datos del comprador.');
       }
-      const resultado = await crmBackend.registrarVentaPendiente(
-        solicitud.datos
-      );
+      const cargados: CrmVoucherVenta[] = [];
+      for (const archivo of comprobantesVenta) {
+        const cargado = await crmBackend.subirComprobanteVenta(solicitud.datos, archivo);
+        cargados.push(cargado);
+      }
+      if (solicitud.datos.datosComprador?.estadoCivil === 'CASADO'
+          && !solicitud.datos.datosComprador.conyuge) {
+        throw new Error('Debe completar los datos del cónyuge.');
+      }
+      const resultado = await crmBackend.registrarVentaPendiente({
+        ...solicitud.datos,
+        datosPago: {
+          metodoPago: formPaymentMethod,
+          numeroOperacion: formOperationNumber.trim() || null,
+          comprobantes: cargados
+        }
+      });
 
       if (
         !resultado.success ||
@@ -804,6 +853,7 @@ export function Sales() {
 
       setConfirmacionVenta(null);
       setIsModalOpen(false);
+      setComprobantesVenta([]);
 
       toast.success('Venta pendiente registrada', {
         description:
@@ -2159,6 +2209,81 @@ export function Sales() {
               </div>
             )}
 
+            {opType === 'Venta' && (
+              <section className="space-y-3 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm sm:p-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-brand-900">Pago y comprobantes</h3>
+                  <p className="mt-1 text-xs text-brand-600">
+                    {formSaleModality === 'FINANCIADA'
+                      ? 'Adjunta los comprobantes de la inicial adicional. La reserva se acredita por separado.'
+                      : 'Adjunta los comprobantes del saldo al contado.'}
+                    {' '}Serán revisados por Finanzas.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <label className="mb-1.5 block text-xs font-semibold text-brand-700" htmlFor="metodo-pago-venta">
+                      Método de pago *
+                    </label>
+                    <Select id="metodo-pago-venta" value={formPaymentMethod} onChange={e => {
+                      setFormPaymentMethod(e.target.value as typeof formPaymentMethod);
+                      setFormOperationNumber('');
+                    }}>
+                      <option value="TRANSFERENCIA">Transferencia bancaria</option>
+                      <option value="DEPOSITO">Depósito bancario</option>
+                      <option value="YAPE_PLIN">Yape / Plin</option>
+                      <option value="EFECTIVO">Efectivo</option>
+                      <option value="OTRO">Otro medio</option>
+                    </Select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1.5 block text-xs font-semibold text-brand-700" htmlFor="operacion-venta">
+                      N.º de operación {requiereNumeroOperacionVenta ? '*' : '(opcional)'}
+                    </label>
+                    <Input id="operacion-venta" maxLength={80} value={formOperationNumber}
+                      disabled={formPaymentMethod === 'EFECTIVO'}
+                      placeholder={formPaymentMethod === 'EFECTIVO' ? 'No aplica' : 'Número de transacción'}
+                      onChange={e => setFormOperationNumber(e.target.value)} />
+                    {formTouched && requiereNumeroOperacionVenta && !formOperationNumber.trim() && (
+                      <p className="mt-1 text-xs text-red-600">Número de operación obligatorio.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-3">
+                  <label htmlFor="comprobantes-venta" className="block text-xs font-semibold text-brand-800">
+                    Comprobantes de {formSaleModality === 'FINANCIADA' ? 'inicial' : 'pago'}
+                    {archivosVentaObligatorios ? ' *' : ' (opcional en efectivo)'}
+                  </label>
+                  <input id="comprobantes-venta" type="file" multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                    onChange={agregarComprobantesVenta}
+                    className="block w-full min-w-0 text-xs text-brand-700 file:mr-3 file:rounded-md file:border file:border-brand-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-800 hover:file:bg-brand-50" />
+                  <p className="text-[11px] text-brand-500">
+                    Hasta 8 archivos. PDF, JPG, PNG o WebP; 5 MB por archivo. Al confirmar se cargarán al almacenamiento privado.
+                  </p>
+                  {comprobantesVenta.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {comprobantesVenta.map((archivo, indice) => (
+                        <li key={indice} className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-white px-2 py-2 text-xs">
+                          <span className="min-w-0 truncate" title={archivo.name}>
+                            <FileTextIcon className="mr-1 inline h-3.5 w-3.5 text-brand-500"/>
+                            {archivo.name} ({(archivo.size/1024).toFixed(0)} KB)
+                          </span>
+                          <button type="button" className="shrink-0 font-semibold text-red-600 hover:underline"
+                            onClick={() => setComprobantesVenta(p => p.filter((_,i)=>i!==indice))}
+                          >Quitar</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {formTouched && archivosVentaObligatorios && !comprobantesVenta.length &&
+                    <p role="alert" className="text-xs font-medium text-red-600">
+                      Adjunte al menos un comprobante de pago.
+                    </p>}
+                </div>
+              </section>
+            )}
+
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Observaciones (Opcional)
@@ -2351,6 +2476,14 @@ export function Sales() {
                 </>
               )}
             </dl>
+
+            <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-xs text-brand-800">
+              <strong>Método de pago:</strong> {formPaymentMethod.replace('_',' / ')}.
+              {' '}{comprobantesVenta.length} archivo(s) pendiente(s) de carga.
+              {formPaymentMethod === 'EFECTIVO'
+                ? ' La evidencia de efectivo es opcional.'
+                : ' Los comprobantes se verificarán antes de reconocer el pago.'}
+            </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
               Al confirmar, se registrará una venta en estado
