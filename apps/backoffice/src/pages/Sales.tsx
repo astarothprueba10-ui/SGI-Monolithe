@@ -1504,9 +1504,9 @@ export function Sales() {
                     value: (
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{detail.buyer || '—'}</span>
-                        {detail.type === 'Separación' && detail.document && (
+                        {detail.type === 'Separación' && (
                           <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-700">
-                            {/^[0-9]{8}$/.test(detail.document) ? 'DNI' : 'Documento'}: {detail.document}
+                            {detail.document && !/^[0-9]{8}$/.test(detail.document) ? 'Documento' : 'DNI'}: {detail.document || 'No registrado'}
                           </span>
                         )}
                       </div>
