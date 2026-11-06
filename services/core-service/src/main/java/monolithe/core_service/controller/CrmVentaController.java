@@ -224,6 +224,21 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** Exportacion paginada: requiere permiso de exportacion y mantiene alcance del listado. */
+        @GetMapping("/operaciones/exportacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
+        public ResponseEntity<JsonNode> listarOperacionesParaExportacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(defaultValue = "SEPARACION") String tipo,
+                        @RequestParam(required = false) String busqueda,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "100") Integer tamano) {
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(service.listarOperaciones(
+                                                obtenerActor(jwt), tipo, busqueda, pagina, tamano));
+        }
+
         @PostMapping("/ventas/{idVenta}/cancelar")
         @PreAuthorize("hasAuthority('sales.reject')")
         public JsonNode cancelarVentaPendiente(
