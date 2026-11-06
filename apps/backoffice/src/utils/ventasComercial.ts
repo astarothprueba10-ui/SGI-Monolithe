@@ -106,7 +106,9 @@ export function resumenMensualComercial(
   for (let i = 0; cur <= end && i < 240; i++) {
     const key = iso(cur.getUTCFullYear(),cur.getUTCMonth()+1,1).slice(0,7);
     porMes.set(key,{
-      mes: MESES[cur.getUTCMonth()]+' '+String(cur.getUTCFullYear()).slice(-2),
+      mes: periodo.desde === periodo.hasta
+        ? `${start.getUTCDate()} ${MESES[start.getUTCMonth()]} ${start.getUTCFullYear()}`
+        : `${MESES[cur.getUTCMonth()]} ${cur.getUTCFullYear()}`,
       separaciones:0,ventas:0
     });
     cur = new Date(Date.UTC(cur.getUTCFullYear(),cur.getUTCMonth()+1,1));

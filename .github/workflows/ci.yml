@@ -38,6 +38,11 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd25ucm9xamx0b2FxenB4bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NTU0ODUsImV4cCI6MjEwNDEzMTQ4NX0.p8EnRBwYdrJgvuTnfljwj1JRLCinG9qPoKXCbMNb5h0' }}
         run: npm run build
 
+      - name: Validate sales period labels
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs
+
   crm-frontend-tests:
     name: CRM frontend tests
     runs-on: ubuntu-latest
