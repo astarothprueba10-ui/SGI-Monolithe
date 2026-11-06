@@ -566,6 +566,24 @@ public class CrmVentaService {
                 actor, numero, cantidad);
     }
 
+    /** Exportación de ventas: sales.view + sales.export y alcance de cartera en la BD. */
+    @Transactional(readOnly = true)
+    public JsonNode listarVentasParaExportacion(
+            Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int numero = pagina == null ? 1 : pagina;
+        int cantidad = tamano == null ? 100 : tamano;
+        if (numero < 1 || numero > 100000 || cantidad < 1 || cantidad > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de exportación inválida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_exportar_ventas_v1(
+                    CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """, actor, numero, cantidad);
+    }
+
     @Transactional
     public JsonNode registrarEvidenciaContrato(
             Long actor,
