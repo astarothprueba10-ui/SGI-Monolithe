@@ -212,7 +212,7 @@ public class CrmVentaService {
         validarActor(actor);
         validarDatosSeparacion(request);
         return ejecutar("""
-                SELECT public.sp_crm_registrar_separacion_v2(
+                SELECT public.sp_crm_registrar_separacion_v3(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -224,6 +224,7 @@ public class CrmVentaService {
                     CAST(? AS varchar),
                     CAST(? AS varchar),
                     CAST(? AS bigint),
+                    CAST(? AS varchar),
                     CAST(? AS varchar)
                 )::text
                 """,
@@ -238,7 +239,8 @@ public class CrmVentaService {
                 request.nombreArchivo(),
                 request.tipoMime(),
                 request.tamanioBytes(),
-                request.hashSha256());
+                request.hashSha256(),
+                request.modalidadPrevista());
     }
 
     private void validarDatosSeparacion(RegistrarSeparacionCrmRequest req) {
@@ -246,6 +248,8 @@ public class CrmVentaService {
                 || req.idLote() == null || req.idLote() <= 0
                 || req.monto() == null || req.monto().compareTo(new java.math.BigDecimal("500.00")) != 0
                 || req.metodoPago() == null || req.metodoPago().isBlank()
+                || (!"CONTADO".equals(req.modalidadPrevista())
+                    && !"FINANCIADA".equals(req.modalidadPrevista()))
                 || req.claveArchivo() == null || req.claveArchivo().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de separacion invalidos.");
         }
