@@ -409,7 +409,7 @@ export function Anulaciones() {
         </Card>
 
         {seleccion.tipoOperacion === 'VENTA' && seleccion.requiereRevisionLegal &&
-          (legal || gerencia) &&
+          (legal || (gerencia && can('annulments.approve'))) &&
           <ExpedienteLegalPanel key={seleccion.idSolicitud}
             idSolicitud={seleccion.idSolicitud}
             puedeCargar={gerencia && can('annulments.approve') && seleccion.estado === 'PENDIENTE_LEGAL'}
