@@ -69,6 +69,21 @@ function validarCampoIndividual(
   return null;
 }
 
+function nombreZona(numero: 1 | 2 | 3): string {
+  return numero === 1 ? 'Portada principal' : numero === 2 ? 'Presentación del proyecto' : 'Opciones de pago';
+}
+
+function nombreCampo(campo: string): string {
+  return campo === 'titulo' ? 'Título principal' : campo === 'subtitulo' ? 'Frase de presentación'
+    : campo === 'contenido' ? 'Descripción breve' : campo;
+}
+
+function nombreSeccion(codigo: string): string {
+  return codigo === 'HERO_PRINCIPAL' ? 'Portada principal'
+    : codigo === 'HERO_SLIDE_2_PROMO' ? 'Presentación del proyecto'
+    : codigo === 'HERO_SLIDE_3_PROMO' ? 'Opciones de pago' : 'Otro contenido de Inicio';
+}
+
 export function WebContent() {
   const { can } = useAuth();
 
@@ -84,6 +99,7 @@ export function WebContent() {
 
   const [cargandoSeccion, setCargandoSeccion] = useState(true);
   const [errorSeccion, setErrorSeccion] = useState('');
+  const [intentoCarga, setIntentoCarga] = useState(0);
 
   const [slideActivo, setSlideActivo] = useState<1 | 2 | 3>(1);
   const [camposPromo, setCamposPromo] = useState<CamposPromoCms>(CAMPOS_VACIOS);
@@ -122,6 +138,8 @@ export function WebContent() {
 
   useEffect(() => {
     let vigente = true;
+    setCargandoSeccion(true);
+    setErrorSeccion('');
 
     webContentDraftService.listarSecciones(PAGINA_INICIO)
       .then((secciones) => {
@@ -148,7 +166,7 @@ export function WebContent() {
     return () => {
       vigente = false;
     };
-  }, []);
+  }, [intentoCarga]);
 
   // =========================================================
   // RECARGA Y OPERACIONES
@@ -704,70 +722,45 @@ export function WebContent() {
   return (
     <div>
       <PageHeader
-        title="Gestión de contenido web"
-        description="Administra los textos y las imágenes promocionales de la página pública."
+        title="Edita tu página web"
+        description="Actualiza las fotografías y mensajes que ven los visitantes de tu sitio."
       />
 
-      {/* ESTADO DE LOS SLIDES */}
-
-      <section
-        aria-label="Estado de las tres diapositivas de Inicio"
-        className="mb-5 rounded-lg border border-brand-200 bg-white p-4"
-      >
-        <h2 className="text-sm font-semibold text-brand-900">
-          Diapositivas de Inicio
-        </h2>
-
-        <p className="mt-1 text-xs text-brand-500">
-          Puedes modificar el contenido promocional sin alterar los datos comerciales oficiales de los proyectos.
-        </p>
-
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          {inventarioSlides.map((item) => (
-            <div
-              key={item.clave}
-              className="rounded-md border border-brand-100 bg-brand-50/30 p-3"
-            >
-              <p className="text-xs font-semibold text-brand-500">
-                Slide {item.numero}
-              </p>
-
-              <h3 className="mt-1 text-sm font-semibold text-brand-900">
-                {item.nombre}
-              </h3>
-
-              <p className={`mt-2 text-xs font-medium ${item.estado === 'EDITOR_CMS'
-                ? 'text-emerald-700'
-                : 'text-amber-800'
-                }`}>
-                {item.estado === 'EDITOR_CMS'
-                  ? 'Disponible para editar'
-                  : 'Solo lectura · integración pendiente'}
-              </p>
-
-              <p className="mt-2 text-xs leading-relaxed text-brand-600">
-                {item.descripcion}
-              </p>
-            </div>
-          ))}
+      <section aria-label="Guía para actualizar la página" className="mb-6 overflow-hidden rounded-xl border border-brand-200 bg-white shadow-sm">
+        <div className="bg-brand-900 px-5 py-5 text-white sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand-200">Página pública · Inicio</p>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">Cambia tu página con tranquilidad</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-brand-100">
+            Elige qué parte quieres cambiar, guarda tu trabajo y mira cómo quedará antes de publicarlo.
+            Tus visitantes seguirán viendo la versión actual hasta que confirmes la publicación.
+          </p>
         </div>
-
-        <p className="mt-3 text-xs text-brand-500">
-          Los slides 2 y 3 conservan los títulos y las descripciones comerciales originales de React. El CMS solo cambia el subtítulo y el fondo tras una publicación autorizada y la activación de lectura pública en el despliegue.
-        </p>
+        <ol className="grid divide-y divide-brand-100 md:grid-cols-3 md:divide-x md:divide-y-0">
+          {[
+            ['1', 'Elige y modifica', 'Selecciona una parte de Inicio y edita su mensaje o su imagen.'],
+            ['2', 'Guarda y revisa', 'Comprueba cómo se verá en computadora y celular.'],
+            ['3', 'Publica cuando esté listo', 'Los cambios solo serán visibles después de tu confirmación.']
+          ].map(([paso, titulo, detalle]) => (
+            <li key={paso} className="flex gap-3 p-4">
+              <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-900">{paso}</span>
+              <div><p className="text-sm font-semibold text-brand-900">{titulo}</p>
+                <p className="mt-1 text-xs leading-relaxed text-brand-600">{detalle}</p></div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <Card>
         <CardHeader
-          title="Editor de contenido promocional"
-          description="Modifica el contenido, guarda tus cambios y revisa cómo quedará antes de publicarlo."
+          title="Cambia los textos y las imágenes de Inicio"
+          description="Sigue los pasos en orden. Puedes guardar tu trabajo y continuar después."
         />
 
         <CardBody>
 
-          <p className="mb-4 text-[13px] leading-relaxed text-brand-500">
-            Los cambios se guardan primero como borradores privados.
-            La página pública no cambia hasta que un usuario autorizado confirme la publicación.
+          <p className="mb-5 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900">
+            <strong>Guardar no significa publicar.</strong> Puedes hacer cambios y revisarlos sin que nadie
+            fuera del equipo los vea. Solamente al pulsar «Publicar» cambiará la página pública.
           </p>
 
           {error && (
@@ -790,41 +783,54 @@ export function WebContent() {
 
           {/* SELECCIÓN DEL SLIDE */}
 
-          <fieldset className="mb-5">
-            <legend className="mb-2 text-sm font-semibold text-brand-800">
-              1. Selecciona la diapositiva que deseas modificar
+          <fieldset className="mb-6">
+            <legend className="mb-3 text-base font-semibold text-brand-900">
+              1. ¿Qué parte de Inicio quieres cambiar?
             </legend>
-
-            <div className="flex flex-wrap gap-2">
-              {inventarioSlides.map((item) => (
-                <button
-                  key={item.numero}
-                  type="button"
-                  className={`rounded-md border px-3 py-2 text-sm ${slideActivo === item.numero
-                    ? 'border-brand-800 bg-brand-900 text-white'
-                    : buttonClass
-                    }`}
-                  disabled={
-                    item.estado !== 'EDITOR_CMS' ||
-                    ocupado ||
-                    (Boolean(seleccionado) && !slidesDelBorrador.includes(item.numero))
-                  }
-                  aria-pressed={slideActivo === item.numero}
-                  title={
-                    seleccionado && !slidesDelBorrador.includes(item.numero)
-                      ? 'Esta diapositiva no pertenece al borrador. Libera la selección para editarla.'
-                      : seleccionado && hayCambiosFormulario && item.numero !== slideActivo
-                        ? 'Guarda los cambios actuales antes de cambiar de diapositiva.'
-                        : undefined
-                  }
-                  onClick={() => cambiarSlide(item.numero)}
-                >
-                  {seleccionado && slideActivo === item.numero ? 'En edición: ' : ''}
-                  Slide {item.numero} · {item.nombre}
-                </button>
-              ))}
+            <div className="grid gap-3 md:grid-cols-3">
+              {inventarioSlides.map((item) => {
+                const activa = slideActivo === item.numero;
+                const disponible = item.estado === 'EDITOR_CMS';
+                const pertenece = !seleccionado || slidesDelBorrador.includes(item.numero);
+                return (
+                  <button
+                    key={item.numero}
+                    type="button"
+                    className={activa
+                      ? 'min-h-36 rounded-xl border-2 border-brand-900 bg-brand-50 p-4 text-left shadow-sm'
+                      : 'min-h-36 rounded-xl border border-brand-200 bg-white p-4 text-left transition hover:border-brand-500 disabled:cursor-not-allowed disabled:bg-brand-50 disabled:opacity-75'}
+                    disabled={!disponible || !pertenece || ocupado}
+                    aria-pressed={activa}
+                    title={!disponible ? 'El administrador debe habilitar esta parte de la página.'
+                      : !pertenece ? 'Termina la edición actual para cambiar de zona.'
+                        : hayCambiosFormulario && !activa ? 'Guarda lo que escribiste antes de cambiar de zona.' : undefined}
+                    onClick={() => cambiarSlide(item.numero)}
+                  >
+                    <span className="block text-xs font-semibold uppercase text-brand-500">Zona {item.numero}</span>
+                    <span className="mt-2 block text-base font-bold text-brand-900">{nombreZona(item.numero)}</span>
+                    <span className="mt-2 block text-xs leading-relaxed text-brand-600">
+                      {item.numero === 1 ? 'Primera imagen, título y texto de la página.'
+                        : item.numero === 2 ? 'Fotografía y frase de presentación del proyecto.'
+                          : 'Fotografía y frase sobre las opciones de pago.'}
+                    </span>
+                    <span className={disponible
+                      ? 'mt-3 block text-xs font-semibold text-emerald-800'
+                      : 'mt-3 block text-xs font-semibold text-amber-800'}>
+                      {!disponible ? 'No disponible por ahora'
+                        : !pertenece ? 'Finaliza la edición anterior'
+                          : activa ? '✓ Seleccionada' : 'Elegir esta zona'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </fieldset>
+            {!cargandoSeccion && inventarioSlides.some((item) => item.estado !== 'EDITOR_CMS') && (
+              <p className="mt-3 text-sm text-brand-600">
+                Algunas zonas aún no están habilitadas. Solicita ayuda al administrador;
+                puedes seguir trabajando con las zonas disponibles.
+              </p>
+            )}
+          </fieldset>          </fieldset>
 
           {!seleccionado && hayCambiosFormulario && (
             <p role="status" className="mb-4 text-xs text-amber-800">
