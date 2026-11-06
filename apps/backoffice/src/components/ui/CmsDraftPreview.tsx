@@ -285,12 +285,11 @@ export function CmsDraftPreview({
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-brand-900">
-            Previsualización privada · Borrador #{borrador.idBorrador}
+            Así quedará tu página · Aún no publicado
           </h3>
 
           <p className="mt-1 text-xs text-brand-500">
-            Revisión guardada {borrador.revisionEdicion} · {cambios} campo(s)
-            diferente(s) del CMS actual
+            Revisa el resultado antes de publicarlo. Has modificado {cambios} campo(s).
           </p>
         </div>
 
@@ -335,7 +334,7 @@ export function CmsDraftPreview({
           htmlFor="imagen-local-cms"
           className="block text-sm font-medium text-brand-800"
         >
-          Imagen promocional del borrador (sin publicar)
+          ¿Quieres cambiar también la fotografía?
         </label>
 
         <input
@@ -349,15 +348,14 @@ export function CmsDraftPreview({
         />
 
         <p className="mt-2 text-xs text-brand-500">
-          JPG, PNG o WebP, máximo 5 MB. Seleccionar solo previsualiza;
-          utiliza «Guardar imagen en borrador» para persistirla de forma
-          privada.
+          Elige una foto JPG, PNG o WebP de hasta 5 MB.
+          Después pulsa «Guardar esta foto» para conservarla junto a tus cambios.
         </p>
 
         {archivoLocal && (
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-brand-700">
             <span className="break-all">
-              Seleccionada (sin guardar): {archivoLocal.name}
+              Foto elegida (todavía sin guardar): {archivoLocal.name}
             </span>
 
             <button
@@ -366,7 +364,7 @@ export function CmsDraftPreview({
               disabled={ocupado}
               className={buttonClass}
             >
-              Quitar imagen local
+              Cancelar selección de foto
             </button>
           </div>
         )}
@@ -380,7 +378,7 @@ export function CmsDraftPreview({
             }
             onClick={() => void guardarImagen()}
           >
-            Guardar imagen en borrador
+            Guardar esta foto
           </button>
 
           <button
@@ -389,7 +387,7 @@ export function CmsDraftPreview({
             disabled={ocupado || cargandoImagen}
             onClick={() => void recuperarGuardada()}
           >
-            Recuperar imagen guardada
+            Ver foto guardada
           </button>
 
           <button
@@ -400,19 +398,19 @@ export function CmsDraftPreview({
             }
             onClick={() => void retirarGuardada()}
           >
-            Retirar imagen del borrador
+            Quitar foto guardada
           </button>
         </div>
 
         {cargandoImagen && (
           <p role="status" className="mt-2 text-xs text-brand-600">
-            Comprobando imagen privada guardada...
+            Buscando la foto que guardaste...
           </p>
         )}
 
         {!cargandoImagen && !hayGuardada && !errorImagen && (
           <p className="mt-2 text-xs text-brand-500">
-            No hay imagen guardada para esta sección del borrador.
+            Todavía no has guardado una foto nueva para esta zona.
           </p>
         )}
 
@@ -435,7 +433,7 @@ export function CmsDraftPreview({
       >
         <div className="min-w-0">
           <p className="mb-2 text-sm font-semibold text-brand-700">
-            Contenido actual del CMS
+            Así se ve ahora
           </p>
 
           <CmsHeroVisualPreview
@@ -448,7 +446,7 @@ export function CmsDraftPreview({
 
         <div className="min-w-0">
           <p className="mb-2 text-sm font-semibold text-brand-700">
-            Contenido con borrador (no publicado)
+            Así se verá con tus cambios
           </p>
 
           <CmsHeroVisualPreview
@@ -465,17 +463,13 @@ export function CmsDraftPreview({
 
       {!seccion.visible && (
         <p className="mt-3 text-xs text-amber-800">
-          La sección CMS está marcada como no visible actualmente.
+          Esta parte de la página no está visible para los visitantes.
         </p>
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-brand-500">
-        Representación editorial del slide seleccionado. Se conserva la
-        fotografía y el contenido original de referencia. En los slides 2
-        y 3, el título y la descripción permanecen protegidos; Marketing
-        únicamente modifica el subtítulo y la imagen promocional. Las
-        imágenes nuevas se muestran de forma privada y no alteran el
-        carrusel público desde esta pantalla.
+        Esta comparación es privada. Elegir y guardar una fotografía aquí no la publica.
+        Los precios, los títulos comerciales protegidos y la información oficial del proyecto no se modifican.
       </p>
     </section>
   );
