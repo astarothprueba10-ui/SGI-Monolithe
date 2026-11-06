@@ -109,6 +109,7 @@ export function WebContent() {
 
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
+  const [panelActivo, setPanelActivo] = useState<'inicio' | 'proyectos'>('inicio');
 
   const puedeEditar = can('web_content.edit');
   const puedePublicar = can('web_content.publish');
@@ -726,6 +727,36 @@ export function WebContent() {
         description="Actualiza las fotografías y mensajes que ven los visitantes de tu sitio."
       />
 
+      <nav aria-label="¿Qué deseas cambiar?" className="mb-6 grid gap-3 sm:grid-cols-2">
+        <button type="button"
+          className={panelActivo === 'inicio'
+            ? 'rounded-xl border-2 border-brand-900 bg-brand-50 p-4 text-left shadow-sm'
+            : 'rounded-xl border border-brand-200 bg-white p-4 text-left transition hover:border-brand-500'}
+          aria-current={panelActivo === 'inicio' ? 'page' : undefined}
+          onClick={() => { if (!ocupado) setPanelActivo('inicio'); }} disabled={ocupado}>
+          <span className="block text-base font-bold text-brand-900">Cambiar portada y fotografías</span>
+          <span className="mt-1 block text-sm text-brand-600">Editar lo que aparece al entrar a la página web.</span>
+        </button>
+        <button type="button"
+          className={panelActivo === 'proyectos'
+            ? 'rounded-xl border-2 border-brand-900 bg-brand-50 p-4 text-left shadow-sm'
+            : 'rounded-xl border border-brand-200 bg-white p-4 text-left transition hover:border-brand-500'}
+          aria-current={panelActivo === 'proyectos' ? 'page' : undefined}
+          onClick={() => {
+            if (ocupado) return;
+            if (hayCambiosFormulario) {
+              setError('Guarda primero lo que escribiste para no perderlo al cambiar de tarea.');
+              return;
+            }
+            setError('');
+            setPanelActivo('proyectos');
+          }} disabled={ocupado}>
+          <span className="block text-base font-bold text-brand-900">Mostrar u ocultar proyectos</span>
+          <span className="mt-1 block text-sm text-brand-600">Decidir qué proyectos aparecen en el sitio.</span>
+        </button>
+      </nav>
+
+      <div id="editor-inicio" className={panelActivo === 'inicio' ? '' : 'hidden'}>
       <section aria-label="Guía para actualizar la página" className="mb-6 overflow-hidden rounded-xl border border-brand-200 bg-white shadow-sm">
         <div className="bg-brand-900 px-5 py-5 text-white sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand-200">Página pública · Inicio</p>
@@ -801,7 +832,7 @@ export function WebContent() {
                       : 'min-h-36 rounded-xl border border-brand-200 bg-white p-4 text-left transition hover:border-brand-500 disabled:cursor-not-allowed disabled:bg-brand-50 disabled:opacity-75'}
                     disabled={!disponible || !pertenece || ocupado}
                     aria-pressed={activa}
-                    title={!disponible ? 'El administrador debe habilitar esta parte de la página.'
+                    title={cargandoSeccion ? 'Comprobando disponibilidad...' : !disponible ? 'El administrador debe habilitar esta parte de la página.'
                       : !pertenece ? 'Termina la edición actual para cambiar de zona.'
                         : hayCambiosFormulario && !activa ? 'Guarda lo que escribiste antes de cambiar de zona.' : undefined}
                     onClick={() => cambiarSlide(item.numero)}
@@ -816,8 +847,9 @@ export function WebContent() {
                     <span className={disponible
                       ? 'mt-3 block text-xs font-semibold text-emerald-800'
                       : 'mt-3 block text-xs font-semibold text-amber-800'}>
-                      {!disponible ? 'No disponible por ahora'
-                        : !pertenece ? 'Finaliza la edición anterior'
+                      {cargandoSeccion ? 'Cargando esta parte...'
+                        : !disponible ? 'No disponible por ahora'
+                          : !pertenece ? 'Finaliza la edición anterior'
                           : activa ? '✓ Seleccionada' : 'Elegir esta zona'}
                     </span>
                   </button>
@@ -1510,8 +1542,11 @@ export function WebContent() {
 
         </CardBody>
       </Card>
+      </div>
 
-      <WebContentVisibilidad />
+      <div id="editor-proyectos" className={panelActivo === 'proyectos' ? '' : 'hidden'}>
+        <WebContentVisibilidad />
+      </div>
     </div>
   );
 }
