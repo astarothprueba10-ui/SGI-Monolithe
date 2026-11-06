@@ -1161,58 +1161,120 @@ export function Sales() {
       {(tab === 'Separación' || tab === 'Venta') && (
 
         <Card>
-          <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
-            <SearchInput
-              value={query}
-              onValueChange={setQuery}
-              placeholder={tab === 'Separación'
-                ? "Buscar por prospecto, código o lote…"
-                : "Buscar por comprador, código o lote…"}
-              className="w-full sm:w-72"
-            />
-            {tab === 'Separación' ? (
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-medium text-brand-600">Método de pago:</span>
-                <Select
-                  value={paymentMethodFilter}
-                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                  className="w-48"
-                >
-                  <option value="all">Todos</option>
-                  <option value="Transferencia bancaria">Transferencia bancaria</option>
-                  <option value="Depósito bancario">Depósito bancario</option>
-                  <option value="Yape / Plin">Yape / Plin</option>
-                  <option value="Efectivo">Efectivo</option>
-                  <option value="Otro">Otro</option>
-                </Select>
+          {tab === 'Separación' ? (
+            <div className="space-y-4 border-b border-brand-100 bg-gradient-to-b from-slate-50/80 to-white px-4 py-5 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-brand-900">Filtros de separaciones</h3>
+                  <p className="mt-1 text-xs text-brand-500">
+                    Combina filtros; el Excel respeta la selección y tu alcance autorizado.
+                  </p>
+                </div>
+                <span className="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700">
+                  {rows.length} de {separationsCount} separaciones
+                </span>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
-                <Select
-                  value={modality}
-                  onChange={(e) => setModality(e.target.value as typeof modality)}
-                  className="w-36"
-                >
+              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Buscar prospecto</span>
+                  <SearchInput value={filtrosSeparacion.busqueda}
+  onValueChange={(value) => cambiarFiltroSeparacion('busqueda', value)}
+  placeholder="Nombre, DNI, código o lote…" className="w-full" />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Método de pago</span>
+                  <Select value={filtrosSeparacion.metodoPago}
+  onChange={(e) => cambiarFiltroSeparacion('metodoPago', e.target.value)}
+  className="w-full">
+  <option value="all">Todos los métodos</option>
+  {metodosFiltro.map((metodo) => <option key={metodo} value={metodo}>{metodo}</option>)}
+</Select>
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Asesor</span>
+                  <Select value={filtrosSeparacion.asesor}
+  onChange={(e) => cambiarFiltroSeparacion('asesor', e.target.value)}
+  className="w-full">
+  <option value="all">Todos los asesores</option>
+  {asesoresFiltro.map((asesor) => <option key={asesor} value={asesor}>{asesor}</option>)}
+  {salesList.some((item) => item.type === 'Separación' && !item.advisor?.trim()) && (
+    <option value="__sin_asesor__">Sin asesor</option>
+  )}
+</Select>
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Proyecto</span>
+                  <Select value={filtrosSeparacion.proyecto}
+  onChange={(e) => cambiarFiltroSeparacion('proyecto', e.target.value)}
+  className="w-full">
+  <option value="all">Todos los proyectos</option>
+  {proyectosFiltro.map((proyecto) => <option key={proyecto} value={proyecto}>{proyecto}</option>)}
+</Select>
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Fecha desde</span>
+                  <Input type="date" value={filtrosSeparacion.desde}
+  max={filtrosSeparacion.hasta || undefined}
+  onChange={(e) => cambiarFiltroSeparacion('desde', e.target.value)}
+  className="w-full" />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Fecha hasta</span>
+                  <Input type="date" value={filtrosSeparacion.hasta}
+  min={filtrosSeparacion.desde || undefined}
+  onChange={(e) => cambiarFiltroSeparacion('hasta', e.target.value)}
+  className="w-full" />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-xs font-semibold text-brand-700">Estado</span>
+                  <Select value={filtrosSeparacion.estado}
+  onChange={(e) => cambiarFiltroSeparacion('estado', e.target.value)}
+  className="w-full">
+  <option value="all">Todos los estados</option>
+  {Object.entries(ESTADOS_SEPARACION).map(([codigo, config]) => (
+    <option key={codigo} value={codigo}>{config.etiqueta}</option>
+  ))}
+</Select>
+                </label>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <span className="select-none text-xs font-semibold text-transparent" aria-hidden="true">Acciones</span>
+                  <Button
+                    variant="secondary"
+                    icon={RotateCcwIcon}
+                    className="w-full"
+                    onClick={() => setFiltrosSeparacion(FILTROS_SEPARACIONES_INICIALES)}
+                  >Limpiar filtros</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-3 border-b border-brand-100 px-5 py-3.5">
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-semibold text-brand-700">Buscar comprador</span>
+                <SearchInput value={query} onValueChange={setQuery}
+                  placeholder="Comprador, código o lote…" className="w-full sm:w-72" />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-semibold text-brand-700">Modalidad de venta</span>
+                <Select value={modality} onChange={(e) => setModality(e.target.value as typeof modality)}
+                  className="w-full sm:w-40">
                   <option value="all">Todas</option>
                   <option value="Contado">Contado</option>
                   <option value="Financiado">Financiado</option>
                 </Select>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-medium text-brand-600">Asesor:</span>
-              <Select
-                value={advisorFilter}
-                onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
-                className="w-40"
-              >
-                <option value="all">Todos los asesores</option>
-                <option value="with_advisor">Con asesor</option>
-                <option value="without_advisor">Sin asesor</option>
-              </Select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-semibold text-brand-700">Asesor</span>
+                <Select value={advisorFilter}
+                  onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
+                  className="w-full sm:w-44">
+                  <option value="all">Todos los asesores</option>
+                  <option value="with_advisor">Con asesor</option>
+                  <option value="without_advisor">Sin asesor</option>
+                </Select>
+              </label>
             </div>
-          </div>
+          )}
 
           {rows.length === 0 ? (
             <EmptyState
