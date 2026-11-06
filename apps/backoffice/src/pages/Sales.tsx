@@ -1282,8 +1282,10 @@ export function Sales() {
 
           {rows.length === 0 ? (
             <EmptyState
-              title="No hay operaciones registradas"
-              description="Las separaciones y ventas se registrarán aquí con su documentación asociada."
+              title={tab === 'Separación' ? 'No hay separaciones para estos filtros' : 'No hay operaciones registradas'}
+              description={tab === 'Separación'
+                ? 'Prueba otros criterios o utiliza Limpiar filtros para ver tu cartera disponible.'
+                : 'Las ventas se registrarán aquí con su documentación asociada.'}
             />
           ) : (
 
