@@ -36,7 +36,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
-import { calcularVenta, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
+import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -949,14 +949,11 @@ export function Sales() {
       formSaleDownPayment, formSaleInstallments, reservaAplicable]);
 
   const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
-    && formSaleDownPayment.trim() !== ''
-    ? (Number(formSaleDownPayment) < 5000
-      ? 'El monto inicial mínimo es de S/ 5,000.'
-      : (!Number.isFinite(Number(formSaleDownPayment))
-        ? 'Ingrese un monto inicial válido.'
-        : (precioLote && Number(formSaleDownPayment) + reservaAplicable >= Number(precioLote.precio)
-          ? 'La inicial debe dejar un saldo positivo después de descontar la reserva.'
-          : null)))
+    ? validarInicialAdicional(
+        formSaleDownPayment,
+        precioLote ? Number(precioLote.precio) : null,
+        reservaAplicable
+      )
     : null;
   const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
     && (!formSaleDownPayment.trim() || Boolean(errorMontoInicial)
