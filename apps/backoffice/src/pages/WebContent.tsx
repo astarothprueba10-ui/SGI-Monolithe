@@ -812,6 +812,10 @@ export function WebContent() {
             </p>
           )}
 
+          <a href="#cambios-guardados" className="mb-5 inline-flex items-center rounded-md border border-brand-200 bg-white px-3 py-2 text-sm font-medium text-brand-800 hover:bg-brand-50">
+            ¿Ya guardaste cambios? Retómalos aquí
+          </a>
+
           {/* SELECCIÓN DEL SLIDE */}
 
           <fieldset className="mb-6">
@@ -1070,7 +1074,7 @@ export function WebContent() {
 
             {editable && !hayCambiosFormulario && !errorCampos && (
               <p className="mt-3 text-xs text-brand-500">
-                No hay cambios nuevos en este slide. Modifica algún campo para habilitar el guardado.
+                Aún no has cambiado este contenido. Escribe algo diferente para activar el botón Guardar.
               </p>
             )}
           </section>
@@ -1338,7 +1342,7 @@ export function WebContent() {
                       Fotos pendientes de publicación: {imagenesPendientes.length}
                     </p>
                     <p className="mt-1 text-brand-600">
-                      Textos que cambiarán: {evaluacionPublicacion.secciones.reduce(
+                      Campos de texto incluidos en tu propuesta: {evaluacionPublicacion.secciones.reduce(
                         (total, item) => total + item.textos.length, 0
                       )}
                     </p>
@@ -1399,9 +1403,8 @@ export function WebContent() {
                     (item) => item.codigo !== 'HERO_PRINCIPAL'
                   ) && (
                       <p className="text-xs text-amber-800">
-                        El carrusel público aplica los subtítulos y fondos solo tras publicarlos
-                        y habilitar los indicadores de lectura CMS en la página web.
-                        Los títulos y las descripciones comerciales permanecen protegidos.
+                        Las nuevas frases y fotografías aparecerán después de publicarlas y activar su visualización.
+                        Los precios y las condiciones oficiales no se modifican.
                       </p>
                     )}
                 </div>
@@ -1460,16 +1463,18 @@ export function WebContent() {
             </section>
           )}
 
-          {/* LISTA DE BORRADORES */}
-
-          <section className="mt-6 border-t border-brand-100 pt-4">
-            <h3 className="mb-3 text-sm font-semibold text-brand-900">
-              Tus cambios guardados y pendientes de publicación
-            </h3>
+          {/* CAMBIOS GUARDADOS: sección desplegable para evitar saturación */}
+          <details id="cambios-guardados" className="mt-6 rounded-lg border border-brand-200 bg-brand-50/30 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-900">
+              Cambios guardados sin publicar ({pruebasInicio.length}) · Mostrar u ocultar
+            </summary>
+            <p className="mb-3 mt-2 text-xs leading-relaxed text-brand-600">
+              Puedes volver a ellos cuando quieras. Solo se mostrarán a los visitantes cuando se publiquen.
+            </p>
 
             {cargando && (
               <p className="text-sm text-brand-400">
-                Cargando borradores...
+                Buscando tus cambios guardados...
               </p>
             )}
 
@@ -1502,7 +1507,7 @@ export function WebContent() {
                   >
                     <div>
                       <p className="text-sm font-medium text-brand-800">
-                        Cambio guardado
+                        Cambio guardado #{borrador.idBorrador}
                       </p>
 
                       <p className="mt-1 text-xs text-brand-500">
@@ -1538,7 +1543,7 @@ export function WebContent() {
                 );
               })}
             </div>
-          </section>
+          </details>
 
         </CardBody>
       </Card>
