@@ -3,13 +3,14 @@ import { CheckCircle2Icon, SendIcon } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Field, Input, Select } from '../ui/Form';
 import { Alert } from '../ui/Feedback';
-import { projects } from '../../data/projects';
+import { usePublicProjects } from '../../contexts/PublicProjectsContext';
 import { enviarConsulta } from '../../services/api';
 import { esCelularPublicoValido, esNombrePublicoValido, insertarTextoPublico, normalizarCampoPublico } from '../../lib/publicContactPolicy';
 
 type State = 'idle' | 'loading' | 'success' | 'error';
 
 export function LeadForm({ compact = false }: { compact?: boolean }) {
+  const { proyectos } = usePublicProjects();
   const [state, setState] = useState<State>('idle');
   const [values, setValues] = useState({ name: '', phone: '', email: '', project: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -36,6 +37,11 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
     if (!esNombrePublicoValido(values.name)) next.name = 'Ingresa tu nombre utilizando solo letras y espacios.';
     if (!esCelularPublicoValido(values.phone)) next.phone = 'El celular debe tener 9 dígitos y comenzar por 9.';
     if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) next.email = 'Ingresa un correo válido';
+    if (!values.project) next.project = 'Selecciona un proyecto o la opción Aún no lo decido';
+    const proyectoElegido = proyectos.find((p) => p.codigo.toLowerCase() === values.project);
+    if (values.project && values.project !== 'otro' && !proyectoElegido) {
+      next.project = 'El proyecto seleccionado ya no está disponible';
+    }
     setErrors(next);
     if (Object.keys(next).length > 0) {
       setState('error');
@@ -48,6 +54,7 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
         nombre: values.name.trim(),
         telefono: values.phone.trim(),
         correo: values.email.trim(),
+        idProyecto: proyectoElegido?.idProyecto,
         asunto: values.project ? `Interés en ${values.project}` : 'Consulta General Web',
         mensaje: compact
           ? `Solicitud de información sobre proyecto: ${values.project || 'General'}`
@@ -57,8 +64,9 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       setCodigoSeguimiento(resp.codigo);
       setState('success');
     } catch {
-      setCodigoSeguimiento('CW-' + Date.now().toString().slice(-4));
-      setState('success');
+      setCodigoSeguimiento(null);
+      setErrors((anteriores) => ({ ...anteriores, envio: 'No pudimos registrar tu consulta. Inténtalo nuevamente.' }));
+      setState('error');
     }
   }
 
@@ -96,9 +104,14 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
       noValidate
       className={compact ? 'space-y-4' : 'space-y-4 rounded-2xl border border-line bg-white p-6 shadow-card'}
     >
-      {state === 'error' && Object.keys(errors).length > 0 && (
+      {state === 'error' && errors.envio && (
+        <Alert tone="error" title="No se pudo registrar tu consulta">
+          {errors.envio}
+        </Alert>
+      )}
+      {state === 'error' && Object.entries(errors).some(([campo, mensaje]) => campo !== 'envio' && Boolean(mensaje)) && (
         <Alert tone="error" title="Revisa los datos marcados">
-          No pudimos enviar tu solicitud. Corrige los campos señalados e inténtalo nuevamente.
+          Corrige los campos señalados e inténtalo nuevamente.
         </Alert>
       )}
 
@@ -142,16 +155,17 @@ export function LeadForm({ compact = false }: { compact?: boolean }) {
             autoComplete="email"
           />
         </Field>
-        <Field label="Proyecto de interés" htmlFor="lead-project" required>
+        <Field label="Proyecto de interés" htmlFor="lead-project" required error={errors.project}>
           <Select
             id="lead-project"
             value={values.project}
+            error={errors.project}
             onChange={(e) => update('project', e.target.value)}
           >
             <option value="">Selecciona un proyecto</option>
-            {projects.map((p) => (
-              <option key={p.slug} value={p.slug}>
-                {p.name}
+            {proyectos.map((p) => (
+              <option key={p.codigo} value={p.codigo.toLowerCase()}>
+                {p.nombre}
               </option>
             ))}
             <option value="otro">Aún no lo decido</option>

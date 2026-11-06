@@ -5,6 +5,7 @@ import {
   LayoutDashboardIcon,
   MapIcon,
   MegaphoneIcon,
+  PanelsTopLeftIcon,
   ScrollTextIcon,
   ShieldCheckIcon,
   UsersIcon,
@@ -86,6 +87,13 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: MegaphoneIcon,
     module: 'marketing',
     permission: 'marketing.view'
+  },
+  {
+    label: 'Editar página web',
+    to: '/contenido-web',
+    icon: PanelsTopLeftIcon,
+    module: 'web_content',
+    permission: 'web_content.view'
   }]
 
 },

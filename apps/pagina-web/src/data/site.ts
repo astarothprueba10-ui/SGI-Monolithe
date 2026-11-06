@@ -33,7 +33,7 @@ export const pillars = [
     icon: 'Wallet',
     title: 'Financiamiento flexible',
     text:
-      'Los Cocos cuenta con alternativas de pago que permiten adquirir un lote con una inicial desde S/ 8,000 y financiamiento de hasta 36 meses.'
+      'Consulta con un asesor las modalidades de pago y condiciones comerciales vigentes del proyecto.'
   },
   {
     icon: 'MapPin',
@@ -199,9 +199,9 @@ export const benefitCategories: BenefitCategory[] = [
         icon: 'FileCheck2'
       },
       {
-        name: 'Lotes independizados',
+        name: 'Documentación registral',
         description:
-          'Cada lote se encuentra independizado e inscrito en el Registro de Predios de la SUNARP, con su propia partida registral electrónica.',
+          'Solicita la documentación registral vigente y confirma con un asesor la situación de cada lote antes de adquirirlo.',
         icon: 'FileText'
       },
       {
@@ -253,7 +253,7 @@ export const milestones = [
     year: 'Proyecto actual',
     title: 'Condominio Campestre Los Cocos',
     text:
-      'La empresa desarrolla actualmente Los Cocos en Picsi, con lotes campestres desde 450 m² y alternativas de financiamiento.'
+      'La empresa desarrolla Los Cocos en Picsi. La disponibilidad, las áreas de los lotes y las condiciones comerciales deben confirmarse con un asesor.'
   },
   {
     year: 'Actualidad',

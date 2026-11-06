@@ -75,15 +75,15 @@ assert.ok(
 assert.ok(page.includes('<ProspectSearchAutocomplete'), 'La pagina Crm no utiliza el buscador dinamico');
 
 // 7. Verificacion de Contadores y Estados de Carga/Error
-assert.ok(page.includes('visitsError'), 'Falta estado de error en agenda');
-assert.ok(page.includes('isLoadingVisits'), 'Falta estado de carga en agenda');
+assert.ok(page.includes('agendaError'), 'Falta estado de error en agenda');
+assert.ok(page.includes('agendaLoading'), 'Falta estado de carga en agenda');
 assert.ok(page.includes('Reintentar'), 'Falta boton de reintentar tras error');
 
 // 8. Verificacion de Permisos y Exportacion
 assert.ok(page.includes('permission="crm.edit"'), 'Falta validacion de permiso crm.edit');
 assert.ok(page.includes('permission="crm.export"'), 'Falta validacion de permiso crm.export');
-assert.ok(page.includes('permission="crm.delete"'), 'Falta validacion de permiso crm.delete');
+assert.ok(page.includes("permission: 'crm.delete'"), 'Falta validacion de permiso crm.delete');
 assert.ok(page.includes('permission="crm.create"'), 'Falta validacion de permiso crm.create');
-assert.ok(page.includes('crmBackend.exportarCsv'), 'Falta exportacion CSV');
+assert.ok(page.includes('ejecutarExportacionExcelCompleta') && page.includes('handleExportExcel'), 'Falta exportacion Excel desde CRM');
 
 console.log('Validacion automatizada de contratos CRUD CRM: 100% aprobada.');

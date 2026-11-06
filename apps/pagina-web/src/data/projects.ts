@@ -27,62 +27,55 @@ export const projects: Project[] = [
     slug: 'condominio-campestre-los-cocos',
     name: 'Condominio Campestre Los Cocos',
     location: 'Picsi, Chiclayo · Lambayeque',
-    status: 'Preventa',
+    status: 'Estado por confirmar',
     type: 'Lotes campestres',
-    priceFrom: 'S/ 25,900',
-    areaFrom: '450 m²',
+    priceFrom: 'Consultar precio',
+    areaFrom: 'Consultar área',
 
     shortDescription:
-      'Lotes campestres desde 450 m² en Picsi, a aproximadamente 30 minutos de Chiclayo, con financiamiento disponible y espacios pensados para disfrutar de un entorno campestre.',
+      'Proyecto inmobiliario ubicado en Picsi. Consulta con un asesor las áreas de los lotes, disponibilidad y condiciones comerciales vigentes.',
 
     description:
-      'Condominio Campestre Los Cocos es un proyecto de lotes campestres ubicado en Picsi, a aproximadamente 30 minutos de Chiclayo. Cuenta con lotes desde 450 m² y contempla servicios y espacios comunes como pozo de agua, biodigestor, alumbrado solar, parques, zonas de parrillas, canchas deportivas, pórtico de ingreso, estacionamientos, juegos recreativos y cerco vivo.',
+      'Condominio Campestre Los Cocos es un proyecto inmobiliario ubicado en Picsi. Consulta con un asesor la información oficial de lotes, servicios, espacios comunes y condiciones de adquisición.',
 
     cover: IMAGES.masterplan,
 
     gallery: [
       {
         src: IMAGES.masterplan,
-        caption: 'Plano general del proyecto'
+        caption: 'Imagen referencial del proyecto'
       },
       {
         src: IMAGES.heroAerial,
-        caption: 'Vista del proyecto'
+        caption: 'Imagen referencial del proyecto'
       },
       {
         src: IMAGES.parque,
-        caption: 'Parques y áreas verdes'
+        caption: 'Imagen referencial de áreas verdes'
       },
       {
         src: IMAGES.parrillas,
-        caption: 'Zona de parrillas'
+        caption: 'Imagen referencial de área recreativa'
       },
       {
         src: IMAGES.cancha,
-        caption: 'Cancha deportiva'
+        caption: 'Imagen referencial de área deportiva'
       },
       {
         src: IMAGES.portico,
-        caption: 'Pórtico de ingreso'
+        caption: 'Imagen referencial de ingreso'
       }
     ],
 
     financing: {
-      cash: 'S/ 25,900',
-      downPayment: 'S/ 8,000',
-      months: 'Hasta 36 meses',
+      cash: 'Consultar precio',
+      downPayment: 'Consultar con un asesor',
+      months: 'Consultar con un asesor',
       note:
-        'Financiamiento disponible. Las condiciones finales se determinan según el plan de pago seleccionado.'
+        'Consulta con un asesor las condiciones comerciales y alternativas de pago vigentes.'
     },
 
-    highlights: [
-      'Lotes desde 450 m²',
-      'Lotes independizados con partida registral propia',
-      'Inscritos en el Registro de Predios de SUNARP',
-      'A aproximadamente 35 minutos de Chiclayo',
-      'Escritura pública',
-      'Financiamiento directo'
-    ],
+    highlights: [],
 
     published: true,
     updatedAt: '2026-09-13'
