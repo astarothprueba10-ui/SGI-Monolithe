@@ -233,6 +233,24 @@ public class CrmVentaController {
                                 request);
         }
 
+        @GetMapping("/prospectos/buscar-sin-periodo")
+        @PreAuthorize("hasAuthority('crm.view')")
+        public ResponseEntity<JsonNode> buscarCarteraSinPeriodo(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required=false) String consulta,
+                @RequestParam(required=false) String etapa,
+                @RequestParam(required=false) String origen,
+                @RequestParam(required=false) Long idAsesor,
+                @RequestParam(required=false) Boolean sinAsignar,
+                @RequestParam(defaultValue="TODOS") String categoria,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="15") Integer tamano,
+                @RequestParam(required=false) Long idProyecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.buscarCarteraSinPeriodo(obtenerActor(jwt),
+                    consulta,etapa,origen,idAsesor,sinAsignar,categoria,pagina,tamano,idProyecto));
+        }
+
         @GetMapping("/operaciones")
         @PreAuthorize("hasAuthority('sales.view')")
         public JsonNode listarOperaciones(
