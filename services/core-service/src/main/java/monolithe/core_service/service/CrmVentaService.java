@@ -471,6 +471,37 @@ public class CrmVentaService {
                 request.motivo().trim());
     }
 
+    /** Ficha personal y cambios auditados; la BD valida crm.view y cartera. */
+    @Transactional(readOnly = true)
+    public JsonNode datosPersonalesCrm(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Prospecto inválido.");
+        return ejecutar("""
+            SELECT public.sp_crm_datos_personales_edicion_v1(
+                CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idProspecto);
+    }
+
+    /** Corrección personal: jamás sustituye los datos sin auditoría de identidad. */
+    @Transactional
+    public JsonNode corregirDatosPersonalesCrm(Long actor, Long idProspecto,
+            JsonNode datos, String motivo) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0 || datos==null || !datos.isObject()
+                || datos.toString().length()>5000 || motivo==null
+                || motivo.trim().length()<8 || motivo.trim().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos personales o motivo de corrección inválidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_corregir_datos_personales_v1(
+                CAST(? AS bigint),CAST(? AS bigint),
+                CAST(? AS jsonb),CAST(? AS text)
+            )::text
+            """,actor,idProspecto,datos.toString(),motivo.trim());
+    }
+
     /** Buscar CRM sin fecha global; filtros, proyecto y alcance siguen comprobados en PostgreSQL. */
     @Transactional(readOnly = true)
     public JsonNode buscarCarteraSinPeriodo(Long actor, String busqueda, String etapa,
