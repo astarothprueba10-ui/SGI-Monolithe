@@ -108,12 +108,12 @@ class CrmVentaServiceSeguridadTest {
                 .thenReturn("{\"success\":true}");
         var req = new FormalizarVentaCrmRequest(
                 1L, 74L, "CONTADO", new BigDecimal("29900.00"),
-                null, null, null);
+                null, null, null, null);
         var resultado = service.registrarVentaPendiente(5L, req);
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v6"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v7"));
     }
 
     @Test
