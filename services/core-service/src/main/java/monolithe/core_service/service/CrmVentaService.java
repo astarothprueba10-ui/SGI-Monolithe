@@ -72,14 +72,15 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v6(
+                SELECT public.sp_crm_validar_formalizacion_v7(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS varchar),
                     CAST(? AS numeric),
                     CAST(? AS numeric),
-                    CAST(? AS integer)
+                    CAST(? AS integer),
+                    CAST(? AS numeric)
                 )::text
                 """,
                 actor,
@@ -88,7 +89,8 @@ public class CrmVentaService {
                 req.modalidad(),
                 req.montoTotal(),
                 req.montoInicial(),
-                req.numeroCuotas());
+                req.numeroCuotas(),
+                req.tasaInteresMensualPct());
     }
 
     @Transactional(readOnly = true)
@@ -172,7 +174,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v6(
+                SELECT public.sp_crm_registrar_venta_pendiente_v7(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -180,6 +182,7 @@ public class CrmVentaService {
                     CAST(? AS numeric),
                     CAST(? AS numeric),
                     CAST(? AS integer),
+                    CAST(? AS numeric),
                     CAST(? AS text)
                 )::text
                 """,
@@ -190,6 +193,7 @@ public class CrmVentaService {
                 req.montoTotal(),
                 req.montoInicial(),
                 req.numeroCuotas(),
+                req.tasaInteresMensualPct(),
                 req.observaciones());
     }
 
