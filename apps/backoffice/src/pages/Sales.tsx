@@ -2044,7 +2044,7 @@ export function Sales() {
                       if (modalidad === 'CONTADO') {
                         setFormSaleDownPayment('');
                         setFormSaleInstallments('12');
-    setFormSaleRate('');
+                        setFormSaleRate('');
                       }
                     }}
                   >
@@ -2057,14 +2057,15 @@ export function Sales() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-brand-700">
-                        Monto inicial (S/) *
+                        Inicial adicional (mínimo S/ 5,000) *
                       </label>
 
                       <Input
                         type="number"
-                        min="0.01"
+                        min="5000"
+                        max={precioLote ? Math.max(5000, Number(precioLote.precio) - reservaAplicable - 0.01) : undefined}
                         step="0.01"
-                        placeholder="Ej. 10000.00"
+                        placeholder="Ej. 5000.00"
                         value={formSaleDownPayment}
                         onChange={(e) => setFormSaleDownPayment(e.target.value)}
                       />
@@ -2076,28 +2077,95 @@ export function Sales() {
                       </label>
 
                       <Input
-                        type="number"
-                        min="1"
-                        max="36"
-                        step="1"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="(?:[1-9]|[12][0-9]|3[0-6])"
+                        maxLength={2}
+                        placeholder="1 a 36"
                         value={formSaleInstallments}
-                        onChange={(e) => setFormSaleInstallments(e.target.value)}
+                        onChange={(e) => {
+                          const limpio = e.target.value.replace(/[^0-9]/g, '');
+                          if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= 36)) {
+                            setFormSaleInstallments(limpio);
+                          }
+                        }}
                       />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-brand-700">
+                        Tasa de interés mensual pactada (%) *
+                      </label>
+                      <Input
+                        type="number"
+                        min="0.0001"
+                        max="100"
+                        step="0.0001"
+                        placeholder="Indique la tasa pactada, sin valor predeterminado"
+                        value={formSaleRate}
+                        onChange={(e) => setFormSaleRate(e.target.value)}
+                      />
+                      <p className="mt-1 text-[11px] text-brand-600">
+                        Es necesaria para calcular el sistema alemán; no hay tasa empresarial configurada.
+                      </p>
                     </div>
                   </div>
                 )}
 
-                <div className="rounded-md border border-brand-200 bg-white p-3">
-                  <p className="text-xs text-brand-600">
-                    Precio oficial de venta
+                {resumenVenta ? (
+                  <div className="space-y-2 rounded-lg border border-brand-200 bg-white p-3 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-brand-600">Precio oficial</span>
+                      <strong>{currency(resumenVenta.precioOficial)}</strong>
+                    </div>
+                    {resumenVenta.abonoReserva > 0 && (
+                      <div className="flex justify-between gap-3 text-emerald-800">
+                        <span>Pago de reserva</span>
+                        <strong>− {currency(resumenVenta.abonoReserva)}</strong>
+                      </div>
+                    )}
+                    {formSaleModality === 'CONTADO' ? (
+                      <div className="flex justify-between gap-3 border-t border-brand-200 pt-2">
+                        <span className="font-semibold text-brand-900">Saldo a pagar al contado</span>
+                        <strong className="text-lg text-brand-900">
+                          {currency(resumenVenta.saldoContado)}
+                        </strong>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between gap-3 text-brand-700">
+                          <span>Inicial adicional</span>
+                          <strong>− {currency(resumenVenta.inicialAdicional)}</strong>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span>Capital financiado</span>
+                          <strong>{currency(resumenVenta.capitalFinanciado)}</strong>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span>Intereses totales</span>
+                          <strong>{currency(resumenVenta.interesTotal)}</strong>
+                        </div>
+                        <div className="flex justify-between gap-3 border-t border-brand-200 pt-2">
+                          <span className="font-semibold">Total de cuotas</span>
+                          <strong>{currency(resumenVenta.totalCuotas)}</strong>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span className="font-semibold">Precio final incluyendo intereses</span>
+                          <strong>{currency(resumenVenta.totalOperacionConIntereses)}</strong>
+                        </div>
+                        <div className="rounded-md bg-brand-50 p-2 text-[11px] text-brand-600">
+                          Sistema alemán: amortización de capital constante. Las cuotas decrecen conforme baja el interés.
+                          Primera cuota {currency(resumenVenta.cuotas[0]?.cuota ?? 0)};
+                          última cuota {currency(resumenVenta.cuotas.at(-1)?.cuota ?? 0)}.
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    Complete la inicial, el plazo de 1 a 36 meses y la tasa mensual pactada
+                    para consultar el cálculo alemán.
                   </p>
-
-                  <p className="mt-1 text-lg font-bold text-brand-900">
-                    {precioLote
-                      ? currency(Number(precioLote.precio))
-                      : 'Seleccione un lote con precio vigente'}
-                  </p>
-                </div>
+                )}
 
                 <p className="text-xs text-brand-700">
                   La venta se registrará inicialmente como PENDIENTE.
