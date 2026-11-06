@@ -106,6 +106,9 @@ class CmsPublicacionIntegracionPostgresTest {
     @Test
     @WithMockUser(authorities = "web_content.publish")
     void publicacionExitosaPersisteCambiosYHistorial() {
+        // El slide promocional comienza oculto y se hace público en la primera publicación.
+        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+                "SELECT visible FROM cms_secciones WHERE id_seccion = ?", Boolean.class, promo));
         var resultado = servicio.publicarTextos(borrador, 1L, 0L, PUBLICADOR);
         assertNotNull(resultado.getIdHistorial());
         assertEquals("Titulo renovado", titulo(principal));
@@ -116,7 +119,7 @@ class CmsPublicacionIntegracionPostgresTest {
         assertEquals("Precio protegido", titulo(promo));
         assertEquals("Descripcion comercial protegida", valorTexto(
                 "SELECT contenido FROM cms_secciones WHERE id_seccion = ?", promo));
-        assertEquals(Boolean.FALSE, jdbc.queryForObject(
+        assertEquals(Boolean.TRUE, jdbc.queryForObject(
                 "SELECT visible FROM cms_secciones WHERE id_seccion = ?", Boolean.class, promo));
         assertEquals("Pagina oficial QA", valorTexto(
                 "SELECT titulo FROM cms_paginas WHERE id_pagina = ?", pagina));
