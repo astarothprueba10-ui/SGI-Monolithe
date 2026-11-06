@@ -72,7 +72,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v8(
+                SELECT public.sp_crm_validar_formalizacion_v9(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -113,6 +113,21 @@ public class CrmVentaService {
                 """,
                 actor,
                 idProspecto);
+    }
+
+    /** Expediente contractual editable, delimitado por cartera y permiso sales.create en BD. */
+    @Transactional(readOnly = true)
+    public JsonNode datosCompradorParaVenta(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto == null || idProspecto <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Prospecto invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_datos_comprador_para_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idProspecto);
     }
 
     /** Obtiene las reservas vigentes del prospecto con proyecto, etapa y abono acreditado. */
@@ -173,8 +188,14 @@ public class CrmVentaService {
                     "Datos obligatorios de venta incompletos.");
         }
 
+        if (req.datosComprador() == null || !req.datosComprador().isObject()
+                || req.datosComprador().toString().length() > 15000
+                || req.datosComprador().path("idProspecto").asLong() != req.idProspecto()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Revise la ficha contractual del comprador antes de registrar.");
+        }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v8(
+                SELECT public.sp_crm_registrar_venta_pendiente_v10(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -183,7 +204,8 @@ public class CrmVentaService {
                     CAST(? AS numeric),
                     CAST(? AS integer),
                     CAST(? AS numeric),
-                    CAST(? AS text)
+                    CAST(? AS text),
+                    CAST(? AS jsonb)
                 )::text
                 """,
                 actor,
@@ -194,7 +216,8 @@ public class CrmVentaService {
                 req.montoInicial(),
                 req.numeroCuotas(),
                 req.tasaInteresMensualPct(),
-                req.observaciones());
+                req.observaciones(),
+                req.datosComprador().toString());
     }
 
     @Transactional(readOnly = true)
