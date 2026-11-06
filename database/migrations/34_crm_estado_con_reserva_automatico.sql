@@ -1,7 +1,6 @@
 -- SGI MONOLITHE | Bloque 1: integracion comercial de reservas.
 -- CON_RESERVA es automatico; las separaciones PENDIENTES no convierten prospectos.
 -- Ejecutar con rol administrador de BD. No modifica ventas ni reservas existentes.
-BEGIN;
 
 INSERT INTO public.cfg_estados_prospecto
     (codigo, nombre, descripcion, es_estado_final, activo, orden)
@@ -330,4 +329,3 @@ BEGIN
 END
 $patch$;
 
-COMMIT;
