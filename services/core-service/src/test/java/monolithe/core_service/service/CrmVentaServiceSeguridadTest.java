@@ -130,7 +130,18 @@ class CrmVentaServiceSeguridadTest {
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v10"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v11"));
+    }
+
+    @Test
+    void consultaDatosCompradorUsaVersionConUbigeo() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idProspecto\":5,\"idPais\":1,\"referencia\":\"Cerca del parque\"}");
+        var resultado = service.datosCompradorParaVenta(5L, 5L);
+        assertEquals(1, resultado.path("idPais").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_datos_comprador_para_venta_v2"));
     }
 
     @Test
