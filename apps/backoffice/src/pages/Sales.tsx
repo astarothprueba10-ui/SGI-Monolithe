@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { SearchInput, Select, Input } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
+import { Pagination } from '../components/ui/Pagination';
 import { StatusBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
@@ -138,6 +139,8 @@ export function Sales() {
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
   const [filtrosSeparacion, setFiltrosSeparacion] = useState<FiltrosSeparaciones>(FILTROS_SEPARACIONES_INICIALES);
+  const [paginaSeparaciones, setPaginaSeparaciones] = useState(1);
+  const tamanoPaginaSeparaciones = 15;
   const [exportandoSeparaciones, setExportandoSeparaciones] = useState(false);
   const [instanteActual, setInstanteActual] = useState(() => Date.now());
   const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
@@ -206,8 +209,15 @@ export function Sales() {
     };
   }, [detail]);
 
-  const cambiarFiltroSeparacion = (campo: keyof FiltrosSeparaciones, valor: string) =>
+  const cambiarFiltroSeparacion = (campo: keyof FiltrosSeparaciones, valor: string) => {
     setFiltrosSeparacion((previo) => ({ ...previo, [campo]: valor }));
+    setPaginaSeparaciones(1);
+  };
+
+  const limpiarFiltrosSeparacion = () => {
+    setFiltrosSeparacion(FILTROS_SEPARACIONES_INICIALES);
+    setPaginaSeparaciones(1);
+  };
 
   const proyectosFiltro = useMemo(
     () => opcionesUnicasSeparaciones(salesList, 'project'),
@@ -890,6 +900,12 @@ export function Sales() {
     ? leyendaVencimiento(detail.expiresAtIso, detail.status, instanteActual)
     : null;
 
+  const totalPaginasSeparaciones = Math.max(1, Math.ceil(rows.length / tamanoPaginaSeparaciones));
+  const paginaSeparacionesActual = Math.min(paginaSeparaciones, totalPaginasSeparaciones);
+  const filasSeparacionesPagina = rows.slice(
+    (paginaSeparacionesActual - 1) * tamanoPaginaSeparaciones,
+    paginaSeparacionesActual * tamanoPaginaSeparaciones
+  );
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
@@ -1132,7 +1148,7 @@ export function Sales() {
           setTab(id as typeof tab);
           setQuery('');
           setModality('all');
-          setFiltrosSeparacion(FILTROS_SEPARACIONES_INICIALES);
+          limpiarFiltrosSeparacion();
           setAdvisorFilter('all');
         }}
         items={[
@@ -1187,14 +1203,15 @@ export function Sales() {
                   {rows.length} de {separationsCount} separaciones
                 </span>
               </div>
-              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <label className="flex min-w-0 flex-col gap-1.5">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[300px]">
                   <span className="text-xs font-semibold text-brand-700">Buscar prospecto</span>
                   <SearchInput value={filtrosSeparacion.busqueda}
   onValueChange={(value) => cambiarFiltroSeparacion('busqueda', value)}
   placeholder="Nombre, DNI, código o lote…" className="w-full" />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[160px]">
                   <span className="text-xs font-semibold text-brand-700">Método de pago</span>
                   <Select value={filtrosSeparacion.metodoPago}
   onChange={(e) => cambiarFiltroSeparacion('metodoPago', e.target.value)}
@@ -1203,7 +1220,7 @@ export function Sales() {
   {metodosFiltro.map((metodo) => <option key={metodo} value={metodo}>{metodo}</option>)}
 </Select>
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[205px]">
                   <span className="text-xs font-semibold text-brand-700">Asesor</span>
                   <Select value={filtrosSeparacion.asesor}
   onChange={(e) => cambiarFiltroSeparacion('asesor', e.target.value)}
@@ -1215,7 +1232,7 @@ export function Sales() {
   )}
 </Select>
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[205px]">
                   <span className="text-xs font-semibold text-brand-700">Proyecto</span>
                   <Select value={filtrosSeparacion.proyecto}
   onChange={(e) => cambiarFiltroSeparacion('proyecto', e.target.value)}
@@ -1224,21 +1241,23 @@ export function Sales() {
   {proyectosFiltro.map((proyecto) => <option key={proyecto} value={proyecto}>{proyecto}</option>)}
 </Select>
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[190px]">
                   <span className="text-xs font-semibold text-brand-700">Fecha desde</span>
                   <Input type="date" value={filtrosSeparacion.desde}
   max={filtrosSeparacion.hasta || undefined}
   onChange={(e) => cambiarFiltroSeparacion('desde', e.target.value)}
   className="w-full" />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[190px]">
                   <span className="text-xs font-semibold text-brand-700">Fecha hasta</span>
                   <Input type="date" value={filtrosSeparacion.hasta}
   min={filtrosSeparacion.desde || undefined}
   onChange={(e) => cambiarFiltroSeparacion('hasta', e.target.value)}
   className="w-full" />
                 </label>
-                <label className="flex min-w-0 flex-col gap-1.5">
+<label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[185px]">
                   <span className="text-xs font-semibold text-brand-700">Estado</span>
                   <Select value={filtrosSeparacion.estado}
   onChange={(e) => cambiarFiltroSeparacion('estado', e.target.value)}
@@ -1249,14 +1268,15 @@ export function Sales() {
   ))}
 </Select>
                 </label>
-                <div className="flex min-w-0 flex-col gap-1.5">
+<div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
                   <span className="select-none text-xs font-semibold text-transparent" aria-hidden="true">Acciones</span>
                   <Button
                     variant="secondary"
                     icon={RotateCcwIcon}
-                    className="w-full"
-                    onClick={() => setFiltrosSeparacion(FILTROS_SEPARACIONES_INICIALES)}
+                    className="w-full sm:w-auto"
+                    onClick={limpiarFiltrosSeparacion}
                   >Limpiar filtros</Button>
+                </div>
                 </div>
               </div>
             </div>
@@ -1333,7 +1353,7 @@ export function Sales() {
                 </>
               )}
             >
-              {rows.map((sale) => (
+              {(tab === 'Separación' ? filasSeparacionesPagina : rows).map((sale) => (
                 tab === 'Separación' ? (
                   <TR key={sale.id} className="group hover:bg-brand-50/60">
                     <TD className="whitespace-nowrap py-4 text-xs font-medium tabular-nums text-brand-600">
@@ -1467,6 +1487,14 @@ export function Sales() {
               ))}
             </Table>
 
+          )}
+          {tab === 'Separación' && (
+            <Pagination
+              page={paginaSeparacionesActual}
+              pageSize={tamanoPaginaSeparaciones}
+              total={rows.length}
+              onPageChange={setPaginaSeparaciones}
+            />
           )}
         </Card>
       )}
