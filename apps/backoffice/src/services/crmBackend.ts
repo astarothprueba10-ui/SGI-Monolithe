@@ -365,7 +365,7 @@ export interface CrmSaleValidationResult {
   precioVigente: number;
   montoReservaAplicable: number;
   saldoContado: number;
-  planAleman: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number } | null;
+  planFrances: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number; cuotaMensual: number } | null;
   idMoneda: number;
   mensaje: string;
 }
