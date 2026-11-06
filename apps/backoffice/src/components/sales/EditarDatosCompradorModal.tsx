@@ -3,9 +3,10 @@ import { InfoIcon, UserRoundIcon, Building2Icon, MapPinIcon } from 'lucide-react
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Field';
-import { crmBackend, type CrmCatalogs, type CrmAdvisor, type CrmDatosCompradorVenta } from '../../services/crmBackend';
+import { crmBackend, type CrmCatalogs, type CrmAdvisor, type CrmDatosCompradorVenta, type CrmDatosConyugeVenta, type EstadoCivilReniec } from '../../services/crmBackend';
 import { sanitizarLead, validarNuevoLead, type LeadField, type LeadFormValues } from '../../utils/crmLeadValidation';
 import { toast } from 'sonner';
+import { CONYUGE_VACIO, validarConyugeVenta } from '../../utils/crmConyugeVenta';
 import { coreService, type UbicacionGeograficaResponse } from '../../services/coreService';
 
 interface Props {
@@ -30,6 +31,23 @@ export function EditarDatosCompradorModal({
   open, idProspecto, lote, proyecto, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
 }: Props) {
   const [form, setForm] = useState<LeadFormValues>(VACIO);
+  const [estadoCivil, setEstadoCivil] = useState<EstadoCivilReniec | ''>('');
+  const [conyuge, setConyuge] = useState<CrmDatosConyugeVenta>(CONYUGE_VACIO);
+  const [conyugeErroresVisibles, setConyugeErroresVisibles] = useState(false);
+  const erroresConyuge = useMemo(() => validarConyugeVenta(conyuge), [conyuge]);
+  const actualizarConyuge = (campo: keyof CrmDatosConyugeVenta, valor: string) => {
+    setConyuge(prev => ({
+      ...prev,
+      [campo]: campo === 'telefono' ? valor.replace(/[^0-9+]/g, '')
+        : campo === 'numeroDocumento' ? (prev.tipoDocumento === 'PASAPORTE'
+          ? valor.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+          : valor.replace(/\D/g, ''))
+        : campo === 'nombres' || campo === 'apellidoPaterno' || campo === 'apellidoMaterno'
+          ? valor.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ -]/g, '')
+          : valor
+    }));
+  };
+
   const [catalogos, setCatalogos] = useState<CrmCatalogs | null>(null);
   const [asesores, setAsesores] = useState<CrmAdvisor[]>([]);
   const [original, setOriginal] = useState<CrmDatosCompradorVenta | null>(null);
@@ -74,6 +92,9 @@ export function EditarDatosCompradorModal({
     setEnviado(false);
     setTocados({});
     setOriginal(null);
+    setEstadoCivil('');
+    setConyuge(CONYUGE_VACIO);
+    setConyugeErroresVisibles(false);
     setReferencia('');
     setGeo({idPais: null,idDepartamento: null,idProvincia: null,idDistrito: null});
     setPaises([]);setDepartamentos([]);setProvincias([]);setDistritos([]);
@@ -86,6 +107,8 @@ export function EditarDatosCompradorModal({
     ]).then(([datos, lista, asesoresDisponibles, paisesDisponibles]) => {
       if (!activo) return;
       setOriginal(datos);
+      setEstadoCivil(datos.estadoCivil ?? '');
+      setConyuge(datos.conyuge ?? CONYUGE_VACIO);
       setCatalogos(lista);
       setAsesores(asesoresDisponibles);
       const peru = paisesDisponibles.find(p => p.codigo === 'PE' && p.tipo === 'PAIS');
@@ -155,6 +178,22 @@ export function EditarDatosCompradorModal({
       toast.error('Corrige los campos marcados en rojo antes de continuar.');
       return;
     }
+    if (!estadoCivil) {
+      toast.error('Seleccione el estado civil del comprador.');
+      return;
+    }
+    if (estadoCivil === 'CASADO') {
+      setConyugeErroresVisibles(true);
+      if (Object.keys(erroresConyuge).length > 0) {
+        toast.error('Revise los datos del cónyuge marcados en rojo.');
+        return;
+      }
+      if (conyuge.tipoDocumento === form.tipoDocumento &&
+          conyuge.numeroDocumento.trim().toUpperCase() === form.numeroDocumento.trim().toUpperCase()) {
+        toast.error('El cónyuge no puede tener el mismo documento que el comprador.');
+        return;
+      }
+    }
     if (!form.direccion.trim() || !geo.idPais || !geo.idDepartamento ||
         !geo.idProvincia || !geo.idDistrito) {
       toast.error('Complete la dirección, país, departamento, provincia y distrito.');
@@ -187,7 +226,18 @@ export function EditarDatosCompradorModal({
       idDepartamento: geo.idDepartamento,
       idProvincia: geo.idProvincia,
       idDistrito: geo.idDistrito,
-      idAsesor: form.idAsesor === '' ? null : Number(form.idAsesor)
+      idAsesor: form.idAsesor === '' ? null : Number(form.idAsesor),
+      estadoCivil,
+      conyuge: estadoCivil === 'CASADO'
+        ? {
+            ...conyuge, nombres: conyuge.nombres.trim(),
+            apellidoPaterno: conyuge.apellidoPaterno.trim(),
+            apellidoMaterno: conyuge.apellidoMaterno.trim(),
+            telefono: conyuge.telefono.trim(),
+            correo: conyuge.correo.trim().toLowerCase(),
+            numeroDocumento: conyuge.numeroDocumento.trim().toUpperCase()
+          }
+        : null
     });
   };
 
@@ -266,6 +316,79 @@ export function EditarDatosCompradorModal({
               maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
               value={form.numeroDocumento} onChange={e => actualizar('numeroDocumento',e.target.value)}
               {...propsError('numeroDocumento')} />)}
+            <div className="min-w-0 sm:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">
+                Estado civil (según DNI) *
+              </label>
+              <Select required value={estadoCivil} aria-invalid={enviado && !estadoCivil}
+                onChange={e => {
+                  setEstadoCivil(e.target.value as EstadoCivilReniec);
+                  setConyugeErroresVisibles(false);
+                }}>
+                <option value="">Selecciona el estado civil</option>
+                <option value="SOLTERO">Soltero(a)</option>
+                <option value="CASADO">Casado(a)</option>
+                <option value="DIVORCIADO">Divorciado(a)</option>
+                <option value="VIUDO">Viudo(a)</option>
+              </Select>
+              {enviado && !estadoCivil &&
+                <p role="alert" className="mt-1 text-xs text-red-600">El estado civil es obligatorio.</p>}
+            </div>
+            {estadoCivil === 'CASADO' && (
+              <section className="min-w-0 space-y-3 rounded-xl border border-sky-200 bg-sky-50/60 p-3 sm:col-span-2 sm:p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-brand-900">Datos del cónyuge</h3>
+                  <p className="mt-1 text-xs text-brand-600">
+                    Información para preparar el contrato. No crea automáticamente otro comprador ni usuario.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {([
+                    ['nombres','Nombres *',120],
+                    ['apellidoPaterno','Apellido paterno *',80],
+                    ['apellidoMaterno','Apellido materno',80],
+                    ['telefono','Teléfono *',18],
+                    ['correo','Correo electrónico *',180]
+                  ] as const).map(([key,label,maxLength]) => (
+                    <div key={key} className="min-w-0">
+                      <label className="mb-1 block text-xs font-semibold text-brand-700">{label}</label>
+                      <Input value={conyuge[key]} maxLength={maxLength}
+                        type={key === 'correo' ? 'email' : 'text'}
+                        onChange={e => actualizarConyuge(key,e.target.value)}
+                        aria-invalid={conyugeErroresVisibles && !!erroresConyuge[key]}
+                        className={conyugeErroresVisibles && erroresConyuge[key] ? 'border-red-500' : ''} />
+                      {conyugeErroresVisibles && erroresConyuge[key] &&
+                        <p role="alert" className="mt-1 text-xs text-red-600">{erroresConyuge[key]}</p>}
+                    </div>
+                  ))}
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-semibold text-brand-700">Tipo de documento *</label>
+                    <Select value={conyuge.tipoDocumento} onChange={e => setConyuge(c => ({
+                      ...c, tipoDocumento:e.target.value as CrmDatosConyugeVenta['tipoDocumento'],
+                      numeroDocumento: ''
+                    }))}>
+                      <option value="DNI">DNI</option>
+                      <option value="CE">Carné de extranjería</option>
+                      <option value="PASAPORTE">Pasaporte</option>
+                      <option value="RUC">RUC</option>
+                    </Select>
+                  </div>
+                  <div className="min-w-0 sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold text-brand-700">Número de documento *</label>
+                    <Input value={conyuge.numeroDocumento}
+                      maxLength={conyuge.tipoDocumento === 'DNI' ? 8
+                        : conyuge.tipoDocumento === 'RUC' ? 11
+                        : conyuge.tipoDocumento === 'CE' ? 12 : 20}
+                      inputMode={conyuge.tipoDocumento === 'PASAPORTE' ? 'text' : 'numeric'}
+                      onChange={e => actualizarConyuge('numeroDocumento',e.target.value)}
+                      aria-invalid={conyugeErroresVisibles && !!erroresConyuge.numeroDocumento}
+                      className={conyugeErroresVisibles && erroresConyuge.numeroDocumento ? 'border-red-500' : ''}/>
+                    {conyugeErroresVisibles && erroresConyuge.numeroDocumento &&
+                      <p role="alert" className="mt-1 text-xs text-red-600">{erroresConyuge.numeroDocumento}</p>}
+                  </div>
+                </div>
+              </section>
+            )}
             {campo('direccion', 'Dirección *', <Input required maxLength={255}
               placeholder="Dirección de domicilio" value={form.direccion}
               onChange={e => actualizar('direccion', e.target.value)}
