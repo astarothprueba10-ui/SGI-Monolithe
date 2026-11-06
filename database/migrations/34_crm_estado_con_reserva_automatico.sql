@@ -243,8 +243,181 @@ BEGIN
         IF strpos(v_def, $old$'NEGOCIACION'$old$)=0 THEN
             RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro NEGOCIACION en %.',v_fn;
         END IF;
+        IF strpos(v_def,$new
+            $new$'NEGOCIACION','CON_RESERVA'$new$);
+        EXECUTE v_def;
+    END LOOP;
+END
+$patch$;
+
+-- El catalogo sigue listando CON_RESERVA para filtros,
+-- pero las operaciones manuales no pueden asignarlo ni retirarlo.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_crm_cambiar_etapa_v3';
+
+    IF strpos(v_def,'-- Conservar respuesta cuando no existen cambios.')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro punto de validacion de etapa.';
+    END IF;
+    v_def:=replace(v_def,
+        '-- Conservar respuesta cuando no existen cambios.',
+        $new$IF v_actual = 'CON_RESERVA' OR v_destino = 'CON_RESERVA' THEN
+        RAISE EXCEPTION 'ETAPA_AUTOMATICA|Con Reserva se asigna o retira exclusivamente por operaciones comerciales.';
+    END IF;
+
+    -- Conservar respuesta cuando no existen cambios.$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+-- Ruta heredada de cambios de etapa: bloquear asignacion y salida manual.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_cambiar_etapa_prospecto';
+    IF strpos(v_def,'-- Ruta heredada: impedir que salte la aprobacion obligatoria.')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro validacion en ruta heredada.';
+    END IF;
+    v_def:=replace(v_def,
+        '-- Ruta heredada: impedir que salte la aprobacion obligatoria.',
+        $new$IF EXISTS (
+        SELECT 1 FROM public.cfg_estados_prospecto e
+        WHERE e.id_estado_prospecto=p_id_estado
+          AND e.codigo='CON_RESERVA'
+    ) OR EXISTS (
+        SELECT 1 FROM public.crm_prospectos p
+        JOIN public.cfg_estados_prospecto e ON e.id_estado_prospecto=p.id_estado_prospecto
+        WHERE p.id_prospecto=p_id_prospecto
+          AND e.codigo='CON_RESERVA'
+    ) THEN
+        RAISE EXCEPTION 'ETAPA_AUTOMATICA|Con Reserva no admite cambios de etapa manuales.';
+    END IF;
+
+    -- Ruta heredada: impedir que salte la aprobacion obligatoria.$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+-- No permitir separacion nueva a prospectos cerrados por perdida.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_crm_validar_preparacion_comprobante_v1';
+    IF strpos(v_def,'SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro punto de validacion comercial.';
+    END IF;
+    v_def:=replace(v_def,
+        'SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado',
+        $new$IF EXISTS (
+        SELECT 1 FROM public.crm_prospectos p
+        JOIN public.cfg_estados_prospecto e ON e.id_estado_prospecto=p.id_estado_prospecto
+        WHERE p.id_prospecto=p_prospecto AND e.codigo IN ('NO_INTERESADO','DESCARTADO')
+    ) THEN
+        RAISE EXCEPTION 'PROSPECTO_NO_ELEGIBLE|El prospecto tiene una etapa comercial final.';
+    END IF;
+
+    SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+NEGOCIACION','CON_RESERVA'$new$)>0 THEN
+            CONTINUE;
+        END IF;
         v_def:=replace(v_def,
-            $old$'NEGOCIACION'$old$,
+            $old
+            $new$'NEGOCIACION','CON_RESERVA'$new$);
+        EXECUTE v_def;
+    END LOOP;
+END
+$patch$;
+
+-- El catalogo sigue listando CON_RESERVA para filtros,
+-- pero las operaciones manuales no pueden asignarlo ni retirarlo.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_crm_cambiar_etapa_v3';
+
+    IF strpos(v_def,'-- Conservar respuesta cuando no existen cambios.')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro punto de validacion de etapa.';
+    END IF;
+    v_def:=replace(v_def,
+        '-- Conservar respuesta cuando no existen cambios.',
+        $new$IF v_actual = 'CON_RESERVA' OR v_destino = 'CON_RESERVA' THEN
+        RAISE EXCEPTION 'ETAPA_AUTOMATICA|Con Reserva se asigna o retira exclusivamente por operaciones comerciales.';
+    END IF;
+
+    -- Conservar respuesta cuando no existen cambios.$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+-- Ruta heredada de cambios de etapa: bloquear asignacion y salida manual.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_cambiar_etapa_prospecto';
+    IF strpos(v_def,'-- Ruta heredada: impedir que salte la aprobacion obligatoria.')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro validacion en ruta heredada.';
+    END IF;
+    v_def:=replace(v_def,
+        '-- Ruta heredada: impedir que salte la aprobacion obligatoria.',
+        $new$IF EXISTS (
+        SELECT 1 FROM public.cfg_estados_prospecto e
+        WHERE e.id_estado_prospecto=p_id_estado
+          AND e.codigo='CON_RESERVA'
+    ) OR EXISTS (
+        SELECT 1 FROM public.crm_prospectos p
+        JOIN public.cfg_estados_prospecto e ON e.id_estado_prospecto=p.id_estado_prospecto
+        WHERE p.id_prospecto=p_id_prospecto
+          AND e.codigo='CON_RESERVA'
+    ) THEN
+        RAISE EXCEPTION 'ETAPA_AUTOMATICA|Con Reserva no admite cambios de etapa manuales.';
+    END IF;
+
+    -- Ruta heredada: impedir que salte la aprobacion obligatoria.$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+-- No permitir separacion nueva a prospectos cerrados por perdida.
+DO $patch$
+DECLARE v_def text;
+BEGIN
+    SELECT pg_get_functiondef(oid) INTO STRICT v_def
+    FROM pg_proc WHERE pronamespace='public'::regnamespace
+      AND proname='sp_crm_validar_preparacion_comprobante_v1';
+    IF strpos(v_def,'SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado')=0 THEN
+        RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No se encontro punto de validacion comercial.';
+    END IF;
+    v_def:=replace(v_def,
+        'SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado',
+        $new$IF EXISTS (
+        SELECT 1 FROM public.crm_prospectos p
+        JOIN public.cfg_estados_prospecto e ON e.id_estado_prospecto=p.id_estado_prospecto
+        WHERE p.id_prospecto=p_prospecto AND e.codigo IN ('NO_INTERESADO','DESCARTADO')
+    ) THEN
+        RAISE EXCEPTION 'PROSPECTO_NO_ELEGIBLE|El prospecto tiene una etapa comercial final.';
+    END IF;
+
+    SELECT l.id_proyecto, el.codigo INTO v_proyecto, v_lote_estado$new$);
+    EXECUTE v_def;
+END
+$patch$;
+
+NEGOCIACION'$old$,
             $new$'NEGOCIACION','CON_RESERVA'$new$);
         EXECUTE v_def;
     END LOOP;
