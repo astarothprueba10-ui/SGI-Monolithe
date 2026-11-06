@@ -10,6 +10,7 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { LotMap } from './pages/LotMap';
 import { Crm } from './pages/Crm';
 import { Marketing } from './pages/Marketing';
+import { WebContent } from './pages/WebContent';
 import { Sales } from './pages/Sales';
 import { Anulaciones } from './pages/Anulaciones';
 import { Financing } from './pages/Financing';
@@ -168,6 +169,15 @@ export function App({
               element={
                 <PermissionRoute permission="marketing.view">
                   <Marketing />
+                </PermissionRoute>
+              }
+            />
+
+            <Route
+              path="/contenido-web"
+              element={
+                <PermissionRoute permission="web_content.view">
+                  <WebContent />
                 </PermissionRoute>
               }
             />

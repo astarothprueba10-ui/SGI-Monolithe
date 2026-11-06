@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -13,6 +14,7 @@ import java.util.Map;
 
 @Entity
 @Table(name = "cms_secciones")
+@DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor

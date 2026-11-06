@@ -23,7 +23,7 @@ const { validateProjectDates, isValidProjectDate, projectDateLimits } = require(
 const { locationOptions, locationValue } = require(join(output, 'lib/ubigeo.js'));
 const { canChangeProjectNumber, normalizeProjectNumber, validateProjectNumbers } = require(join(output, 'lib/projectNumberValidation.js'));
 const catalogPath = resolve(root, '../../services/core-service/src/main/resources/catalogos/ubigeo-peru.tsv');
-const rows = readFileSync(catalogPath, 'utf8').trim().split('\n').slice(1).map((line) => {
+const rows = readFileSync(catalogPath, 'utf8').trim().split(/\r?\n/).slice(1).map((line) => {
   const [codigo, departamento, provincia, distrito] = line.split('\t');
   return { codigo, departamento, provincia, distrito };
 });
