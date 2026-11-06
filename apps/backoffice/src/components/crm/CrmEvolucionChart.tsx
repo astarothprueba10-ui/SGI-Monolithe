@@ -186,8 +186,8 @@ export function CrmEvolucionChart({
 
             {sinActividad && (
               <p className="mt-2 text-center text-xs text-brand-400">
-                No se registró actividad comercial en los meses
-                seleccionados.
+                No se registró actividad comercial en el período
+                seleccionado.
               </p>
             )}
           </>
