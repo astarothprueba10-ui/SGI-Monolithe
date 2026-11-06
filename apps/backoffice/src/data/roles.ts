@@ -8,7 +8,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   lots: 'Plano interactivo',
   crm: 'CRM y clientes',
   marketing: 'Marketing y campañas',
-  web_content: 'Gestión de contenido web',
+  web_content: 'Contenido de la página web',
   sales: 'Separaciones y ventas',
   financing: 'Financiamiento y pagos',
   finance: 'Finanzas',
