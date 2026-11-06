@@ -43,3 +43,10 @@ Primero conciliar cambios locales con esta rama, ejecutar builds Vite, Maven y P
 - Prueba HTTP ejecutada desde Windows/Docker por el usuario: `node scripts/cms-public-smoke.mjs http://localhost:8082` → `PASS: INICIO (2 secciones), proyectos (2)` y `PASS: solo endpoints GET públicos; sin token, sin borradores ni escritura`.
 - El fallo previo `permission denied for table cms_paginas` se corrigió con la migración `cms_permiso_bloqueo_publicacion_20261106`, versionada en `database/migrations/44_cms_permiso_bloqueo_publicacion.sql`. El rol `sigi_cms_user` solo recibió permiso UPDATE sobre `fecha_actualizacion` con política limitada a página INICIO.
 - Pendiente comprobar la presentación visual del carrusel React con ambos flags de lectura CMS habilitados en Docker QA; aún **no** está validada la publicación de imágenes.
+
+## Confirmación visual de carrusel React
+
+- Evidencia visual proporcionada por el responsable: con las dos banderas de lectura CMS habilitadas en Docker QA, el slide 2 del carrusel presenta el subtítulo **«Descubre nuestros proyectos inmobiliarios»**.
+- El título «Conoce nuestra propuesta inmobiliaria en Picsi», la descripción comercial y el fondo original permanecen sin cambios.
+- Prueba completada de extremo a extremo para texto: Backoffice → borrador #13 → historial/revisión pública 1 → API pública → React.
+- **Próximo gate:** crear borrador exclusivo para imagen del slide 2, guardar imagen en Storage privado, recargar/recuperar/verificar hash, y solo después activar publicación de fondos con la bandera de servidor y Backoffice. No se ha publicado aún imagen nueva.
