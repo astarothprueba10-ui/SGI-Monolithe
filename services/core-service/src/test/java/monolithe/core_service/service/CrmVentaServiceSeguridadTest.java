@@ -59,6 +59,29 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void exportacionSeparacionesUtilizaProcedimientoAutorizado() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":100,\"paginas\":0}");
+        var resultado = service.listarSeparacionesParaExportacion(5L, 1, 100);
+        assertEquals(0, resultado.path("total").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_exportar_separaciones_v1"));
+        assertFalse(sql.getValue().contains("FROM public.ven_reservas"));
+    }
+
+    @Test
+    void exportacionSeparacionesRechazaPaginacionInvalidaAntesDeSQL() {
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.listarSeparacionesParaExportacion(5L, 0, 100));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        error = assertThrows(ResponseStatusException.class,
+                () -> service.listarSeparacionesParaExportacion(5L, 1, 101));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void historialComercialAceptaArregloJson() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("[{\"tipo\":\"VENTA\",\"id\":22}]");
