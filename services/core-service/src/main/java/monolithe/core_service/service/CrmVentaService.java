@@ -124,7 +124,7 @@ public class CrmVentaService {
                     "Prospecto invalido.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_datos_comprador_para_venta_v2(
+                SELECT public.sp_crm_datos_comprador_para_venta_v3(
                     CAST(? AS bigint), CAST(? AS bigint)
                 )::text
                 """, actor, idProspecto);
@@ -194,8 +194,13 @@ public class CrmVentaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Revise la ficha contractual del comprador antes de registrar.");
         }
+        if (req.datosPago() == null || !req.datosPago().isObject()
+                || req.datosPago().toString().length() > 16000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indique metodo de pago y comprobantes de la venta.");
+        }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v11(
+                SELECT public.sp_crm_registrar_venta_pendiente_v13(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -205,6 +210,7 @@ public class CrmVentaService {
                     CAST(? AS integer),
                     CAST(? AS numeric),
                     CAST(? AS text),
+                    CAST(? AS jsonb),
                     CAST(? AS jsonb)
                 )::text
                 """,
@@ -217,7 +223,8 @@ public class CrmVentaService {
                 req.numeroCuotas(),
                 req.tasaInteresMensualPct(),
                 req.observaciones(),
-                req.datosComprador().toString());
+                req.datosComprador().toString(),
+                req.datosPago().toString());
     }
 
     @Transactional(readOnly = true)
