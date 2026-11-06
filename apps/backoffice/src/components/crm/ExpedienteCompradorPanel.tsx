@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Building2,FileSignature,Home,UserCheck} from 'lucide-react';
+import {Building2,FileSignature,Home,UserCheck,RefreshCw,AlertCircle} from 'lucide-react';
 import {crmBackend,type CrmBuyer,type CrmDetalleVenta,type CrmOperacionItem} from '../../services/crmBackend';
 import {DetalleVentaAmpliadoPanel} from '../sales/DetalleVentaAmpliadoPanel';
 import {CronogramaVentaPanel} from '../sales/CronogramaVentaPanel';
@@ -15,10 +15,14 @@ function Campo({etiqueta,valor}:{etiqueta:string;valor:string}) {
 export function ExpedienteCompradorPanel({buyer}:{buyer:CrmBuyer}) {
  const [operacion,setOperacion]=useState<CrmOperacionItem|null>(null);
  const [detalle,setDetalle]=useState<CrmDetalleVenta|null>(null);
+ const [cargando,setCargando]=useState(true);
+ const [error,setError]=useState(false);
+ const [revision,setRevision]=useState(0);
  const idVenta=buyer.id_venta??0;
  useEffect(()=>{
    if(idVenta<=0) return;
    let activo=true;
+   setCargando(true);setError(false);setOperacion(null);setDetalle(null);
    void Promise.all([
      crmBackend.listarOperaciones({tipo:'VENTA',busqueda:buyer.codigo_venta,pagina:1,tamano:20}),
      crmBackend.obtenerDetalleVenta(idVenta)
@@ -26,13 +30,22 @@ export function ExpedienteCompradorPanel({buyer}:{buyer:CrmBuyer}) {
      if(!activo)return;
      setOperacion(res.items.find(x=>x.tipo==='VENTA' && x.id===idVenta)??null);
      setDetalle(datos);
-   }).catch(()=>{if(activo){setOperacion(null);setDetalle(null)}});
+   }).catch(()=>{if(activo){setOperacion(null);setDetalle(null);setError(true)}})
+     .finally(()=>{if(activo)setCargando(false)});
    return ()=>{activo=false};
- },[buyer.codigo_venta,idVenta]);
+ },[buyer.codigo_venta,idVenta,revision]);
  if(idVenta<=0) return <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
    El registro no tiene un identificador de venta válido para abrir su expediente.
  </p>;
  return <div className="space-y-5">
+   {cargando&&<p className="flex items-center gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-600">
+     <RefreshCw className="h-4 w-4 animate-spin"/>Consultando contrato y datos comerciales…
+   </p>}
+   {error&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+     <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4"/>
+       No se pudieron cargar todos los datos de esta venta; intenta consultar nuevamente.</span>
+     <button type="button" className="font-semibold underline" onClick={()=>setRevision(v=>v+1)}>Reintentar</button>
+   </div>}
    <section className="rounded-xl border border-brand-100 bg-white p-4 sm:p-5">
      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
        <div>
