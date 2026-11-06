@@ -90,7 +90,7 @@ export const NAV_GROUPS: NavGroup[] = [
     permission: 'marketing.view'
   },
   {
-    label: 'Gestión de contenido web',
+    label: 'Editar página web',
     to: '/contenido-web',
     icon: PanelsTopLeftIcon,
     module: 'web_content',
