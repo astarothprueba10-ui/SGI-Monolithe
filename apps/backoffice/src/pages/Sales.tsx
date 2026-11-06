@@ -1702,19 +1702,17 @@ export function Sales() {
               </h3>
               <dl className="grid grid-cols-1 gap-x-7 sm:grid-cols-2">
                 {[
-                  {
-                    label: detail.type === 'Separación' ? 'Prospecto' : 'Comprador',
+                  ...(detail.type === 'Separación' ? [{
+                    label: 'Prospecto',
                     value: (
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{detail.buyer || '—'}</span>
-                        {detail.type === 'Separación' && (
-                          <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-700">
-                            {detail.document && !/^[0-9]{8}$/.test(detail.document) ? 'Documento' : 'DNI'}: {detail.document || 'No registrado'}
-                          </span>
-                        )}
+                        <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-700">
+                          {detail.document && !/^[0-9]{8}$/.test(detail.document) ? 'Documento' : 'DNI'}: {detail.document || 'No registrado'}
+                        </span>
                       </div>
                     )
-                  },
+                  }] : []),
                   { label: 'Proyecto inmobiliario', value: detail.project || '—' },
                   { label: 'Lote', value: detail.lot || '—' },
                   { label: 'Asesor comercial', value: (
