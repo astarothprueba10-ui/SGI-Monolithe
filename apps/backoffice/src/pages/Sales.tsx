@@ -262,7 +262,7 @@ export function Sales() {
       const prospects = await crmBackend.prospectos();
 
       const elegibles = (prospects ?? []).filter((p) =>
-        ['INTERESADO', 'NEGOCIACION'].includes(
+        ['INTERESADO', 'NEGOCIACION', 'CON_RESERVA'].includes(
           p.estado_codigo?.toUpperCase() ?? ''
         )
       );
