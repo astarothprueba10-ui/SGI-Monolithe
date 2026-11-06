@@ -552,7 +552,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales/preparar-carga")
-        @PreAuthorize("hasAnyAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.approve')")
         public ResponseEntity<CrmContratoStorageService.EnlaceCargaPdf> prepararCargaEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud) {
@@ -567,7 +567,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales")
-        @PreAuthorize("hasAnyAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.approve')")
         public ResponseEntity<JsonNode> registrarEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -595,7 +595,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/{idSolicitud}/evidencias-legales")
-        @PreAuthorize("hasAnyAuthority('sales.annul','sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.review_legal')")
         public ResponseEntity<JsonNode> listarEvidenciasLegales(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud) {
@@ -609,7 +609,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales/{idEvidencia}/preparar-lectura")
-        @PreAuthorize("hasAnyAuthority('sales.annul','sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.review_legal')")
         public ResponseEntity<CrmAnulacionStorageService.EnlaceLecturaEvidenciaLegal> prepararLecturaEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -624,7 +624,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/revision-legal/pendientes")
-        @PreAuthorize("hasAuthority('sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_legal')")
         public JsonNode listarCasosRevisionLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(defaultValue = "1") Integer pagina,
@@ -635,7 +635,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/revision-legal")
-        @PreAuthorize("hasAuthority('sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_legal')")
         public JsonNode registrarRevisionLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -663,7 +663,7 @@ public class CrmVentaController {
         // ===== CRM: solicitudes de anulación y revisiones independientes =====
         @PostMapping("/anulaciones/solicitudes")
         @ResponseStatus(HttpStatus.CREATED)
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.create')")
         public JsonNode solicitarAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @Valid @RequestBody SolicitarAnulacionRequest request) {
@@ -675,7 +675,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/solicitudes")
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view')")
         public ResponseEntity<JsonNode> listarSolicitudesAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(required = false) String tipo,
@@ -691,7 +691,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/historial")
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view')")
         public ResponseEntity<JsonNode> listarHistorialAnulaciones(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(required = false) String tipo,
@@ -706,7 +706,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/solicitudes/{idSolicitud}/decision")
-        @PreAuthorize("hasAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.reject')")
         public ResponseEntity<JsonNode> decidirSolicitudAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -720,7 +720,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/solicitudes/{idSolicitud}/revision-financiera")
-        @PreAuthorize("hasAuthority('finance.edit')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_finance')")
         public ResponseEntity<JsonNode> registrarRevisionFinancieraAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
