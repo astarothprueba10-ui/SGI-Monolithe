@@ -39,6 +39,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
+import { validarPagoVenta } from '../utils/crmPagoVenta';
 import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
@@ -474,6 +475,7 @@ export function Sales() {
 
   useEffect(() => {
     setVoucherFile(null);
+    setComprobantesVenta([]);
   }, [
     selectedProspectId,
     formProjectId,
@@ -717,13 +719,9 @@ export function Sales() {
       return;
     }
 
-    if (archivosVentaObligatorios && !comprobantesVenta.length) {
-      toast.error('Adjunte el comprobante de ' +
-        (esFinanciada ? 'la inicial' : 'pago') + ' antes de validar.');
-      return;
-    }
-    if (requiereNumeroOperacionVenta && !formOperationNumber.trim()) {
-      toast.error('Ingrese el número de operación del pago.');
+    const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
+    if (errorPago) {
+      toast.error(errorPago);
       return;
     }
 
@@ -825,6 +823,8 @@ export function Sales() {
       if (!solicitud.datos.datosComprador) {
         throw new Error('Revise primero los datos del comprador.');
       }
+      const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
+      if (errorPago) throw new Error(errorPago);
       const cargados: CrmVoucherVenta[] = [];
       for (const archivo of comprobantesVenta) {
         const cargado = await crmBackend.subirComprobanteVenta(solicitud.datos, archivo);
@@ -2026,6 +2026,7 @@ export function Sales() {
                     onChange={(e) => {
                       const modalidad = e.target.value as 'CONTADO' | 'FINANCIADA';
                       setFormSaleModality(modalidad);
+                      setComprobantesVenta([]);
                       if (modalidad === 'CONTADO') {
                         setFormSaleDownPayment('');
                         setFormSaleInstallments('12');
@@ -2228,6 +2229,7 @@ export function Sales() {
                     <Select id="metodo-pago-venta" value={formPaymentMethod} onChange={e => {
                       setFormPaymentMethod(e.target.value as typeof formPaymentMethod);
                       setFormOperationNumber('');
+                      setComprobantesVenta([]);
                     }}>
                       <option value="TRANSFERENCIA">Transferencia bancaria</option>
                       <option value="DEPOSITO">Depósito bancario</option>
