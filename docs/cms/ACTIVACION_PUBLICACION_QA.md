@@ -1,6 +1,6 @@
 # CMS — habilitación controlada de la publicación (QA y despliegue manual)
 
-Este documento corresponde a la issue de gestión administrable de contenido visual de la página pública. **Las funciones se entregan con los publicadores apagados** para evitar modificar contenido real antes de la aceptación.
+Este documento corresponde a la issue de gestión administrable de contenido visual de la página pública. **Desde el ajuste para pruebas de publicación, el botón de textos está habilitado por defecto en `main`; imágenes y visibilidad de proyectos permanecen desactivadas.** El backend conserva la verificación de permisos, revisiones y contenido. No pulsar «Confirmar publicación» contra una base compartida sin autorización específica.
 
 ## Condiciones previas verificadas el 06-11-2026
 - Migrations `cms_lectura_publica_rls_20261105` (43) y `cms_permiso_bloqueo_publicacion_20261106` (44) registradas en la base de datos compartida. No repetirlas.
@@ -15,13 +15,13 @@ Configurar en el `.env` **privado** del servidor, nunca en Git.
 
 | Función | Variables que deben ser `true` |
 |---|---|
-| Publicar textos desde Backoffice | `VITE_CMS_PUBLICACION_TEXTOS_HABILITADA` |
+| Publicar textos desde Backoffice | `VITE_CMS_PUBLICACION_TEXTOS_HABILITADA` (por defecto `true` en `main`; usar `false` para deshabilitar) |
 | Publicar textos e imágenes | `VITE_CMS_PUBLICACION_IMAGENES_HABILITADA` y `CMS_PUBLICACION_IMAGENES_HABILITADA` |
 | Mostrar contenido CMS en portada pública | `VITE_CMS_HERO_PUBLICADO_ENABLED` |
 | Mostrar subtítulos/fondos CMS en slides 2–3 | `VITE_CMS_HERO_PROMO_SLIDES_ENABLED` |
 | Publicar visibilidad de proyectos | `VITE_CMS_PUBLICACION_VISIBILIDAD_HABILITADA` y `CMS_PUBLICACION_VISIBILIDAD_ENABLED` |
 
-Los valores por defecto son **`false`**. Los flags del navegador **no sustituyen** permisos del backend.
+**Únicamente la publicación de textos está habilitada por defecto** en el Backoffice de `main`. Las imágenes y la visibilidad de proyectos siguen en **`false`**. `VITE_CMS_PUBLICACION_TEXTOS_HABILITADA=false` permite desactivar textos en el despliegue. Los flags del navegador **no sustituyen** los permisos ni las validaciones del backend.
 
 ### Aislamiento y claves
 - En el backend CMS se deben configurar `CMS_DB_URL`, `CMS_DB_USERNAME` y `CMS_DB_PASSWORD` con la cuenta restringida `sigi_cms_user`; revisar antes de aceptar el fallback al usuario general Supabase.
@@ -34,11 +34,11 @@ Los valores por defecto son **`false`**. Los flags del navegador **no sustituyen
 1. En un ambiente **QA aislado**, arrancar Auth, Core, CMS, Backoffice y página pública con las credenciales apropiadas.
 2. Iniciar sesión con Marketing. Guardar una modificación de prueba; verificar que la web pública **no cambia**.
 3. Abrir la vista previa, comprobar imágenes JPG/PNG/WebP válidas (máx. 5 MB), errores de archivo y validación.
-4. Activar **solo** `VITE_CMS_PUBLICACION_TEXTOS_HABILITADA=true`, reiniciar Backoffice y publicar un borrador de QA autorizado; revisar que la revisión aumente una vez y que otro usuario sin permiso obtenga 403.
+4. Verificar que el despliegue Backoffice tenga textos habilitados (valor predeterminado `true`; una variable de entorno `false` los desactiva) y publicar un borrador de QA expresamente autorizado; revisar que la revisión aumente una vez y que otro usuario sin permiso obtenga 403.
 5. Activar lectura pública controlada, reiniciar página pública, comprobar que visitantes ven únicamente la revisión publicada (no borradores).
 6. Tras verificar Storage y pruebas PostgreSQL opt-in, habilitar los dos flags de publicación de imágenes, publicar una foto de QA y comprobar que el bucket privado nunca se exponga.
 7. Finalmente habilitar ambos flags de visibilidad, revisar mostrar/ocultar proyecto de QA y su historial.
-8. Volver a poner los flags en **false** si se encuentra un fallo; reiniciar servicios afectados. No revertir datos publicados mediante SQL manual.
+8. Si se encuentra un fallo, establecer `VITE_CMS_PUBLICACION_TEXTOS_HABILITADA=false` y mantener los demás flags en `false`; reconstruir o reiniciar los servicios afectados según el tipo de despliegue. No revertir datos publicados mediante SQL manual.
 
 ## Desarrollo local — habilitar exclusivamente publicación de textos
 Si se utiliza una base **QA aislada** y el backend CMS está conectado a ella, en PowerShell y dentro de `apps/backoffice`:

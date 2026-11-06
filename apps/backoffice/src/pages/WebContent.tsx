@@ -40,8 +40,12 @@ const MAXIMOS_CAMPOS = {
 
 type CampoPromo = keyof CamposPromoCms;
 
+// En main, textos disponibles por defecto para la fase de pruebas.
+// El entorno puede suspenderlos con VITE_CMS_PUBLICACION_TEXTOS_HABILITADA=false.
+// El backend sigue validando permisos y revisiones antes de publicar.
+const flagPublicacionTextos = import.meta.env.VITE_CMS_PUBLICACION_TEXTOS_HABILITADA;
 const PUBLICACION_TEXTOS_HABILITADA =
-  import.meta.env.VITE_CMS_PUBLICACION_TEXTOS_HABILITADA === 'true';
+  flagPublicacionTextos === undefined || flagPublicacionTextos === 'true';
 
 const PUBLICACION_IMAGENES_HABILITADA =
   import.meta.env.VITE_CMS_PUBLICACION_IMAGENES_HABILITADA === 'true';

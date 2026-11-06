@@ -79,8 +79,9 @@ services:
       VITE_AUTH_API_URL: /api/auth
       VITE_CMS_API_URL: /cms-api
       VITE_CORE_API_URL: /api/core
-      # Ningún botón de publicación se activa sin opt-in explícito del entorno.
-      VITE_CMS_PUBLICACION_TEXTOS_HABILITADA: ${VITE_CMS_PUBLICACION_TEXTOS_HABILITADA:-false}
+      # Textos habilitados por defecto para pruebas posteriores al despliegue;
+      # el operador puede deshabilitarlos explícitamente con false.
+      VITE_CMS_PUBLICACION_TEXTOS_HABILITADA: ${VITE_CMS_PUBLICACION_TEXTOS_HABILITADA:-true}
       VITE_CMS_PUBLICACION_IMAGENES_HABILITADA: ${VITE_CMS_PUBLICACION_IMAGENES_HABILITADA:-false}
       VITE_CMS_PUBLICACION_VISIBILIDAD_HABILITADA: ${VITE_CMS_PUBLICACION_VISIBILIDAD_HABILITADA:-false}
 
