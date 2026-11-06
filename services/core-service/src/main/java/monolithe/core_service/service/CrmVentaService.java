@@ -471,6 +471,30 @@ public class CrmVentaService {
                 request.motivo().trim());
     }
 
+    /** Buscar CRM sin fecha global; filtros, proyecto y alcance siguen comprobados en PostgreSQL. */
+    @Transactional(readOnly = true)
+    public JsonNode buscarCarteraSinPeriodo(Long actor, String busqueda, String etapa,
+            String origen, Long idAsesor, Boolean sinAsignar,
+            String categoria, Integer pagina, Integer tamano, Long idProyecto) {
+        validarActor(actor);
+        int numero=pagina==null?1:pagina, cantidad=tamano==null?15:tamano;
+        if (numero<1 || numero>100000 || cantidad<1 || cantidad>100
+                || (idProyecto!=null && idProyecto<=0)
+                || (idAsesor!=null && idAsesor<=0)
+                || (busqueda!=null && busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de CRM o paginación inválidos.");
+        return ejecutar("""
+                SELECT public.sp_crm_buscar_v7(
+                  CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS bigint),CAST(? AS boolean),
+                  CAST(? AS varchar),CAST(? AS integer),CAST(? AS integer),
+                  CAST(? AS bigint),CAST(NULL AS timestamptz),CAST(NULL AS timestamptz)
+                )::text
+                """,actor,busqueda,etapa,origen,idAsesor,sinAsignar,
+                categoria==null?"TODOS":categoria,numero,cantidad,idProyecto);
+    }
+
     /** Listado unificado paginado, con alcance comercial por actor. */
     @Transactional(readOnly = true)
     public JsonNode listarOperaciones(
