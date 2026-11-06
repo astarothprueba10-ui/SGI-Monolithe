@@ -36,7 +36,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
-import { calcularVenta, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
+import { calcularVenta, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -182,7 +182,6 @@ export function Sales() {
   >('CONTADO');
   const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
-  const [formSaleRate, setFormSaleRate] = useState('');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
     idProyecto: number; idEtapa: number; idLote: number;
@@ -431,7 +430,6 @@ export function Sales() {
     setFormSaleModality('CONTADO');
     setFormSaleDownPayment('');
     setFormSaleInstallments('12');
-    setFormSaleRate('');
     setFormOperationNumber('');
     setVoucherFile(null);
     setFormObservations('');
@@ -669,15 +667,10 @@ export function Sales() {
         !Number.isFinite(montoInicial) ||
         montoInicial < 5000 ||
         montoInicial + reservaAplicable >= montoTotal ||
-        !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments) ||
-        !formSaleRate.trim() ||
-        !Number.isFinite(Number(formSaleRate)) ||
-        Number(formSaleRate) <= 0 ||
-        Number(formSaleRate) > 100 ||
-        Number(Number(formSaleRate).toFixed(4)) !== Number(formSaleRate)
+        !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
       )
     ) {
-      toast.error('La inicial adicional debe ser mínimo S/ 5,000, el plazo de 1 a 36 meses y la tasa mensual válida.');
+      toast.error('La inicial adicional mínima es S/ 5,000 y el plazo debe ser de 1 a 36 meses.');
       return;
     }
 
@@ -688,7 +681,7 @@ export function Sales() {
       montoTotal,
       montoInicial: esFinanciada ? montoInicial : null,
       numeroCuotas: esFinanciada ? numeroCuotas : null,
-      tasaInteresMensualPct: esFinanciada ? Number(formSaleRate) : null,
+      tasaInteresMensualPct: null,
       observaciones: formObservations.trim() || null
     };
 
@@ -794,13 +787,6 @@ export function Sales() {
           toast.error('El plazo de financiamiento debe ser un número entero entre 1 y 36 meses.');
           return;
         }
-        if (!formSaleRate.trim() ||
-            !Number.isFinite(Number(formSaleRate)) ||
-            Number(formSaleRate) <= 0 || Number(formSaleRate) > 100 ||
-            Number(Number(formSaleRate).toFixed(4)) !== Number(formSaleRate)) {
-          toast.error('Indique la tasa de interés mensual pactada para calcular las cuotas.');
-          return;
-        }
       }
 
       setSubmitting(true);
@@ -813,7 +799,7 @@ export function Sales() {
           montoTotal,
           montoInicial: financiada ? montoInicial : null,
           numeroCuotas: financiada ? numeroCuotas : null,
-          tasaInteresMensualPct: financiada ? Number(formSaleRate) : null,
+          tasaInteresMensualPct: null,
           observaciones: formObservations.trim() || null
         });
 
@@ -951,17 +937,30 @@ export function Sales() {
     try {
       if (formSaleModality === 'CONTADO')
         return calcularVenta(Number(precioLote.precio), reservaAplicable);
-      if (!formSaleDownPayment.trim() || !formSaleRate.trim()
-          || !formSaleInstallments.trim()) return null;
+      if (!formSaleDownPayment.trim() || !formSaleInstallments.trim()
+          || Number(formSaleDownPayment) < 5000) return null;
       return calcularVenta(
         Number(precioLote.precio), reservaAplicable,
-        Number(formSaleDownPayment), Number(formSaleInstallments),
-        Number(formSaleRate));
+        Number(formSaleDownPayment), Number(formSaleInstallments));
     } catch {
       return null;
     }
   }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
-      formSaleDownPayment, formSaleRate, formSaleInstallments, reservaAplicable]);
+      formSaleDownPayment, formSaleInstallments, reservaAplicable]);
+
+  const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
+    && formSaleDownPayment.trim() !== ''
+    ? (Number(formSaleDownPayment) < 5000
+      ? 'El monto inicial mínimo es de S/ 5,000.'
+      : (!Number.isFinite(Number(formSaleDownPayment))
+        ? 'Ingrese un monto inicial válido.'
+        : (precioLote && Number(formSaleDownPayment) + reservaAplicable >= Number(precioLote.precio)
+          ? 'La inicial debe dejar un saldo positivo después de descontar la reserva.'
+          : null)))
+    : null;
+  const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
+    && (!formSaleDownPayment.trim() || Boolean(errorMontoInicial)
+      || !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments));
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
@@ -1701,6 +1700,7 @@ export function Sales() {
 
               disabled={
                 submitting ||
+                ventaFinanciadaInvalida ||
                 (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
               }
               onClick={handleProcessOperation}
@@ -1715,7 +1715,7 @@ export function Sales() {
             {opType === 'Venta' && (
               <Button
                 variant="primary"
-                disabled={submitting || loadingLots}
+                disabled={submitting || loadingLots || ventaFinanciadaInvalida}
                 onClick={() => void ejecutarRegistroVentaPendiente()}
               >
                 Registrar Venta Pendiente
@@ -2047,8 +2047,7 @@ export function Sales() {
                       if (modalidad === 'CONTADO') {
                         setFormSaleDownPayment('');
                         setFormSaleInstallments('12');
-                        setFormSaleRate('');
-                      }
+                                          }
                     }}
                   >
                     <option value="CONTADO">Venta al contado</option>
