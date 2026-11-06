@@ -69,6 +69,15 @@ public class CrmVentaController {
                                 idProspecto);
         }
 
+        @GetMapping("/prospectos/{idProspecto}/reservas-vigentes-venta")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode listarReservasVigentesParaVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idProspecto) {
+                return service.listarReservasVigentesParaVenta(
+                                obtenerActor(jwt), idProspecto);
+        }
+
         @GetMapping("/prospectos/{idProspecto}/verificar-compra")
         @PreAuthorize("hasAuthority('crm.view')")
         public JsonNode verificarComprador(
