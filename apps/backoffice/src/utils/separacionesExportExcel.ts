@@ -9,6 +9,7 @@ import {
   type FiltrosSeparaciones
 } from './separacionesFiltros';
 import { descargarBlobExcel } from './crmExportExcel';
+import { limitarPorPeriodo, periodoValido, type PeriodoComercial } from './ventasComercial';
 
 const TAMANO = 100;
 const MAX_PAGINAS = 1000;
@@ -88,12 +89,19 @@ const columnas: { titulo: string; ancho: number }[] = [
 ];
 
 export async function exportarSeparacionesExcel(
-  filtros: FiltrosSeparaciones
+  filtros: FiltrosSeparaciones,
+  periodo?: PeriodoComercial
 ): Promise<{ total: number; nombre: string }> {
+  if (periodo && !periodoValido(periodo)) {
+    throw new Error('Seleccione un período comercial global válido.');
+  }
   if (filtros.desde && filtros.hasta && filtros.desde > filtros.hasta) {
     throw new Error('La fecha desde no puede ser posterior a la fecha hasta.');
   }
-  const registros = filtrarSeparaciones(await obtenerSeparacionesAutorizadas(), filtros);
+  const autorizados = await obtenerSeparacionesAutorizadas();
+  const registros = filtrarSeparaciones(
+    periodo ? limitarPorPeriodo(autorizados, periodo) : autorizados, filtros
+  );
   const wb = new ExcelJS.Workbook();
   wb.creator = 'SGI MONOLITHE';
   wb.created = new Date();
@@ -125,7 +133,8 @@ export async function exportarSeparacionesExcel(
 
   ws.mergeCells('A4:L4');
   ws.getCell('A4').value = textoSeguro(
-    'Filtros · Búsqueda: ' + (filtros.busqueda || 'Todas') +
+    'Período global: ' + (periodo ? periodo.desde+' a '+periodo.hasta : 'Sin restricción') +
+    '  |  Filtros · Búsqueda: ' + (filtros.busqueda || 'Todas') +
     '  |  Método: ' + (filtros.metodoPago === 'all' ? 'Todos' : filtros.metodoPago) +
     '  |  Asesor: ' + (filtros.asesor === 'all' ? 'Todos' : filtros.asesor) +
     '  |  Proyecto: ' + (filtros.proyecto === 'all' ? 'Todos' : filtros.proyecto) +
