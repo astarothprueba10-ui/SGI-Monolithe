@@ -408,6 +408,10 @@ export function Sales() {
 
   const validarFormularioSeparacion = (): boolean => {
     setFormTouched(true);
+    if (!['CONTADO', 'FINANCIADA'].includes(formSaleModality)) {
+      toast.error('Seleccione una modalidad de venta prevista.');
+      return false;
+    }
     if (!selectedProspectId) {
       toast.error('Debe seleccionar un prospecto del CRM.');
       return false;
@@ -476,6 +480,7 @@ export function Sales() {
       const res = await crmBackend.registrarSeparacion({
         idProspecto: prospectId,
         idLote: lotIdNum,
+        modalidadPrevista: formSaleModality,
         metodoPago: formPaymentMethod,
         numeroOperacion: formOperationNumber.trim() || null,
         monto: 500.00,
@@ -497,6 +502,7 @@ export function Sales() {
         description:
           `Código: ${res.codigo_reserva || res.id_reserva}. ` +
           `Monto: S/ 500.00 PEN. ` +
+          `Modalidad prevista: ${res.modalidad_prevista === 'FINANCIADA' ? 'Financiada' : 'Contado'}. ` +
           `Vence: ${vencimiento}. ` +
           'Comprobante pendiente de revisión por Finanzas.'
       });
@@ -1628,6 +1634,22 @@ export function Sales() {
 
             {opType === 'Separacion' ? (
               <>
+                <div>
+                  <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                    Modalidad de venta prevista *
+                  </label>
+                  <Select
+                    value={formSaleModality}
+                    onChange={(e) => setFormSaleModality(e.target.value as 'CONTADO' | 'FINANCIADA')}
+                  >
+                    <option value="CONTADO">Al contado</option>
+                    <option value="FINANCIADA">Financiada</option>
+                  </Select>
+                  <p className="mt-1 text-[11px] text-brand-500">
+                    Es una previsión comercial. No genera cuotas ni formaliza una venta;
+                    las condiciones definitivas se confirmarán al contratar.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
