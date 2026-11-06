@@ -74,6 +74,7 @@ const STAGE_TONES: Record<string, string> = {
   EN_SEGUIMIENTO: 'bg-sky-50 text-sky-700 border-sky-200',
   INTERESADO: 'bg-brand-50 text-brand-700 border-brand-200',
   NEGOCIACION: 'bg-amber-50 text-amber-800 border-amber-200',
+  CON_RESERVA: 'bg-teal-50 text-teal-800 border-teal-200',
   CONVERTIDO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   NO_INTERESADO: 'bg-rose-50 text-rose-700 border-rose-200',
   DESCARTADO: 'bg-rose-50 text-rose-700 border-rose-200'
@@ -1032,6 +1033,12 @@ export function Crm() {
       });
       return;
     }
+    if (stageLead.estado_codigo === 'CON_RESERVA' || newStageCode === 'CON_RESERVA') {
+      toast.error('Etapa automatica', {
+        description: 'Con Reserva solo se asigna o retira automaticamente desde Separaciones y Ventas.'
+      });
+      return;
+    }
     const estadoActual = catalogs?.estados.find((e) => e.codigo === stageLead.estado_codigo);
     if (estadoActual?.final || stageLead.categoria === 'COMPRADOR' || stageLead.categoria === 'CERRADO') {
       toast.error('Etapa definitiva', {
@@ -1752,7 +1759,7 @@ export function Crm() {
                     }] : []),
                     {
                       label: 'Cambiar etapa', icon: RefreshCw, permission: 'crm.edit',
-                      disabled: isLeadFinal,
+                      disabled: isLeadFinal || lead.estado_codigo === 'CON_RESERVA',
                       onClick: () => { setStageLead(lead); setNewStageCode(lead.estado_codigo); }
                     },
                     {
@@ -2894,8 +2901,10 @@ export function Crm() {
                 isSubmitting ||
                 !newStageCode ||
                 newStageCode === stageLead?.estado_codigo ||
+                stageLead?.estado_codigo === 'CON_RESERVA' ||
                 Boolean(
                   catalogs?.estados.find((e) => e.codigo === stageLead?.estado_codigo)?.final ||
+                  stageLead?.estado_codigo === 'CON_RESERVA' ||
                   stageLead?.categoria === 'COMPRADOR' ||
                   stageLead?.categoria === 'CERRADO'
                 )
@@ -2930,6 +2939,7 @@ export function Crm() {
               disabled={
                 Boolean(
                   catalogs?.estados.find((e) => e.codigo === stageLead?.estado_codigo)?.final ||
+                  stageLead?.estado_codigo === 'CON_RESERVA' ||
                   stageLead?.categoria === 'COMPRADOR' ||
                   stageLead?.categoria === 'CERRADO'
                 )
@@ -2937,7 +2947,7 @@ export function Crm() {
             >
               {catalogs?.estados ? (
                 catalogs.estados
-                  .filter((est) => est.codigo !== 'CONVERTIDO')
+                  .filter((est) => est.codigo !== 'CONVERTIDO' && est.codigo !== 'CON_RESERVA')
                   .map((est) => (
                     <option key={est.codigo} value={est.codigo}>
                       {est.nombre} {est.final ? '(Definitiva)' : ''}
