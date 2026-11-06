@@ -2030,25 +2030,35 @@ export function Sales() {
               </>
 
             ) : (
-              <div className="space-y-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
+              <div className="space-y-4 rounded-2xl border border-brand-200 bg-gradient-to-b from-brand-50/90 to-white p-3 shadow-sm sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-brand-900">Condiciones de venta</p>
+                    <p className="mt-1 text-xs text-brand-500">
+                      Consulta el importe final antes de validar la operación.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-brand-200 bg-white px-3 py-1 text-[11px] font-semibold text-brand-700">
+                    {formSaleModality === 'FINANCIADA' ? 'Financiamiento alemán' : 'Pago al contado'}
+                  </span>
+                </div>
+
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-brand-700">
+                  <label className="mb-1.5 block text-xs font-semibold text-brand-700" htmlFor="venta-modalidad">
                     Modalidad de venta *
                   </label>
-
                   <Select
+                    id="venta-modalidad"
                     value={formSaleModality}
                     onChange={(e) => {
-                      const modalidad = e.target.value as
-                        'CONTADO' | 'FINANCIADA';
-
+                      const modalidad = e.target.value as 'CONTADO' | 'FINANCIADA';
                       setFormSaleModality(modalidad);
-
                       if (modalidad === 'CONTADO') {
                         setFormSaleDownPayment('');
                         setFormSaleInstallments('12');
-                                          }
+                      }
                     }}
+                    className="bg-white"
                   >
                     <option value="CONTADO">Venta al contado</option>
                     <option value="FINANCIADA">Venta financiada</option>
@@ -2056,123 +2066,172 @@ export function Sales() {
                 </div>
 
                 {formSaleModality === 'FINANCIADA' && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-brand-700">
-                        Inicial adicional (mínimo S/ 5,000) *
-                      </label>
-
-                      <Input
-                        type="number"
-                        min="5000"
-                        max={precioLote ? Math.max(5000, Number(precioLote.precio) - reservaAplicable - 0.01) : undefined}
-                        step="0.01"
-                        placeholder="Ej. 5000.00"
-                        value={formSaleDownPayment}
-                        onChange={(e) => setFormSaleDownPayment(e.target.value)}
-                      />
+                  <div className="space-y-3 rounded-xl border border-brand-100 bg-white p-3 sm:p-4">
+                    <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <label htmlFor="venta-inicial" className="mb-1.5 block text-xs font-semibold text-brand-700">
+                          Inicial adicional (S/) *
+                        </label>
+                        <Input
+                          id="venta-inicial"
+                          type="number"
+                          min="5000"
+                          max={precioLote
+                            ? Math.max(5000, Number(precioLote.precio) - reservaAplicable - 0.01)
+                            : undefined}
+                          step="0.01"
+                          placeholder="Mínimo S/ 5,000"
+                          value={formSaleDownPayment}
+                          aria-invalid={Boolean(errorMontoInicial)}
+                          aria-describedby={errorMontoInicial ? 'venta-inicial-error' : 'venta-inicial-ayuda'}
+                          className={errorMontoInicial
+                            ? 'border-red-500 bg-red-50/40 focus:border-red-600 focus:ring-1 focus:ring-red-200'
+                            : 'bg-white'}
+                          onChange={(e) => setFormSaleDownPayment(e.target.value)}
+                        />
+                        {errorMontoInicial ? (
+                          <p id="venta-inicial-error" role="alert" className="mt-1.5 text-xs font-semibold text-red-600">
+                            {errorMontoInicial}
+                          </p>
+                        ) : (
+                          <p id="venta-inicial-ayuda" className="mt-1.5 text-[11px] text-brand-500">
+                            Mínimo S/ 5,000, sin incluir la reserva.
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <label htmlFor="venta-plazo" className="mb-1.5 block text-xs font-semibold text-brand-700">
+                          Número de cuotas (1 a 36) *
+                        </label>
+                        <Input
+                          id="venta-plazo"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="(?:[1-9]|[12][0-9]|3[0-6])"
+                          maxLength={2}
+                          placeholder="1 a 36 meses"
+                          value={formSaleInstallments}
+                          onChange={(e) => {
+                            const limpio = e.target.value.replace(/[^0-9]/g, '');
+                            if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= 36)) {
+                              setFormSaleInstallments(limpio);
+                            }
+                          }}
+                          className="bg-white"
+                        />
+                        <p className="mt-1.5 text-[11px] text-brand-500">
+                          Ingresa un plazo entero de 1 a 36 meses.
+                        </p>
+                      </div>
                     </div>
-
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-brand-700">
-                        Número de cuotas (1 a 36) *
-                      </label>
-
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="(?:[1-9]|[12][0-9]|3[0-6])"
-                        maxLength={2}
-                        placeholder="1 a 36"
-                        value={formSaleInstallments}
-                        onChange={(e) => {
-                          const limpio = e.target.value.replace(/[^0-9]/g, '');
-                          if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= 36)) {
-                            setFormSaleInstallments(limpio);
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-medium text-brand-700">
-                        Tasa de interés mensual pactada (%) *
-                      </label>
-                      <Input
-                        type="number"
-                        min="0.0001"
-                        max="100"
-                        step="0.0001"
-                        placeholder="Indique la tasa pactada, sin valor predeterminado"
-                        value={formSaleRate}
-                        onChange={(e) => setFormSaleRate(e.target.value)}
-                      />
-                      <p className="mt-1 text-[11px] text-brand-600">
-                        Es necesaria para calcular el sistema alemán; no hay tasa empresarial configurada.
-                      </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3">
+                      <div>
+                        <p className="text-xs font-semibold text-sky-900">Interés nominal anual fijo</p>
+                        <p className="mt-0.5 text-[11px] text-sky-700">
+                          Equivalente mensual: {TASA_MENSUAL_NOMINAL_PCT.toFixed(4)} %. No modificable.
+                        </p>
+                      </div>
+                      <strong className="text-xl font-bold tabular-nums text-sky-900">
+                        {TASA_ANUAL_FIJA_PCT} % anual
+                      </strong>
                     </div>
                   </div>
                 )}
 
                 {resumenVenta ? (
-                  <div className="space-y-2 rounded-lg border border-brand-200 bg-white p-3 text-sm">
-                    <div className="flex justify-between gap-3">
-                      <span className="text-brand-600">Precio oficial</span>
-                      <strong>{currency(resumenVenta.precioOficial)}</strong>
-                    </div>
-                    {resumenVenta.abonoReserva > 0 && (
-                      <div className="flex justify-between gap-3 text-emerald-800">
-                        <span>Pago de reserva</span>
-                        <strong>− {currency(resumenVenta.abonoReserva)}</strong>
+                  <section className="space-y-3 rounded-xl border border-brand-200 bg-white p-3 sm:p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-brand-600">
+                      Resumen de la operación
+                    </h3>
+                    <dl className="space-y-2 text-[13px]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <dt className="text-brand-600">Precio oficial</dt>
+                        <dd className="font-semibold tabular-nums text-brand-900">
+                          {currency(resumenVenta.precioOficial)}
+                        </dd>
+                      </div>
+                      {resumenVenta.abonoReserva > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <dt className="text-emerald-700">Pago de reserva acreditado</dt>
+                          <dd className="font-semibold tabular-nums text-emerald-800">
+                            − {currency(resumenVenta.abonoReserva)}
+                          </dd>
+                        </div>
+                      )}
+                      {formSaleModality === 'CONTADO' ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
+                          <dt className="font-semibold text-brand-900">Saldo por pagar al contado</dt>
+                          <dd className="text-lg font-bold tabular-nums text-brand-900">
+                            {currency(resumenVenta.saldoContado)}
+                          </dd>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <dt className="text-brand-600">Inicial adicional</dt>
+                            <dd className="font-semibold tabular-nums text-brand-800">
+                              − {currency(resumenVenta.inicialAdicional)}
+                            </dd>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <dt className="text-brand-600">Capital financiado</dt>
+                            <dd className="font-semibold tabular-nums text-brand-900">
+                              {currency(resumenVenta.capitalFinanciado)}
+                            </dd>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <dt className="text-brand-600">Intereses totales ({TASA_ANUAL_FIJA_PCT} % anual)</dt>
+                            <dd className="font-semibold tabular-nums text-brand-900">
+                              {currency(resumenVenta.interesTotal)}
+                            </dd>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
+                            <dt className="font-semibold text-brand-800">Total de cuotas</dt>
+                            <dd className="font-bold tabular-nums text-brand-900">
+                              {currency(resumenVenta.totalCuotas)}
+                            </dd>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <dt className="font-semibold text-brand-900">
+                              Precio final incluyendo intereses
+                            </dt>
+                            <dd className="text-lg font-bold tabular-nums text-brand-900">
+                              {currency(resumenVenta.totalOperacionConIntereses)}
+                            </dd>
+                          </div>
+                        </>
+                      )}
+                    </dl>
+                    {formSaleModality === 'FINANCIADA' && (
+                      <div className="rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white p-3 sm:p-4">
+                        <p className="text-xs font-semibold text-sky-900">Cuota mensual inicial</p>
+                        <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-900 sm:text-3xl">
+                          {currency(resumenVenta.cuotas[0]?.cuota ?? 0)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-brand-600">
+                          <span>Última cuota: <strong>{currency(
+                            resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0
+                          )}</strong></span>
+                          <span>{resumenVenta.cuotas.length} cuotas mensuales</span>
+                        </div>
+                        <p className="mt-2 border-t border-sky-100 pt-2 text-[11px] leading-relaxed text-brand-600">
+                          Sistema alemán: las cuotas son decrecientes; la cifra destacada
+                          corresponde a la primera, no a un pago mensual fijo.
+                        </p>
                       </div>
                     )}
-                    {formSaleModality === 'CONTADO' ? (
-                      <div className="flex justify-between gap-3 border-t border-brand-200 pt-2">
-                        <span className="font-semibold text-brand-900">Saldo a pagar al contado</span>
-                        <strong className="text-lg text-brand-900">
-                          {currency(resumenVenta.saldoContado)}
-                        </strong>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between gap-3 text-brand-700">
-                          <span>Inicial adicional</span>
-                          <strong>− {currency(resumenVenta.inicialAdicional)}</strong>
-                        </div>
-                        <div className="flex justify-between gap-3">
-                          <span>Capital financiado</span>
-                          <strong>{currency(resumenVenta.capitalFinanciado)}</strong>
-                        </div>
-                        <div className="flex justify-between gap-3">
-                          <span>Intereses totales</span>
-                          <strong>{currency(resumenVenta.interesTotal)}</strong>
-                        </div>
-                        <div className="flex justify-between gap-3 border-t border-brand-200 pt-2">
-                          <span className="font-semibold">Total de cuotas</span>
-                          <strong>{currency(resumenVenta.totalCuotas)}</strong>
-                        </div>
-                        <div className="flex justify-between gap-3">
-                          <span className="font-semibold">Precio final incluyendo intereses</span>
-                          <strong>{currency(resumenVenta.totalOperacionConIntereses)}</strong>
-                        </div>
-                        <div className="rounded-md bg-brand-50 p-2 text-[11px] text-brand-600">
-                          Sistema alemán: amortización de capital constante. Las cuotas decrecen conforme baja el interés.
-                          Primera cuota {currency(resumenVenta.cuotas[0]?.cuota ?? 0)};
-                          última cuota {currency(resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0)}.
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  </section>
                 ) : (
-                  <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    Complete la inicial, el plazo de 1 a 36 meses y la tasa mensual pactada
-                    para consultar el cálculo alemán.
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                    {formSaleModality === 'FINANCIADA'
+                      ? 'Complete una inicial válida de al menos S/ 5,000 y un plazo entre 1 y 36 meses para calcular las cuotas.'
+                      : 'Seleccione un lote con precio oficial vigente para consultar el saldo.'}
                   </p>
                 )}
-
-                <p className="text-xs text-brand-700">
-                  La venta se registrará inicialmente como PENDIENTE.
-                  El contrato deberá firmarse y aprobarse antes de
-                  confirmar la venta y cambiar el lote a VENDIDO.
+                <p className="text-xs leading-relaxed text-brand-600">
+                  La operación se registra inicialmente como PENDIENTE.
+                  El contrato debe firmarse y aprobarse antes de confirmar la venta
+                  y cambiar el lote a VENDIDO.
                 </p>
               </div>
             )}
@@ -2304,9 +2363,9 @@ export function Sales() {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-brand-500">Tasa mensual pactada</dt>
+                    <dt className="text-brand-500">Tasa nominal anual fija</dt>
                     <dd className="font-semibold text-brand-900">
-                      {confirmacionVenta.datos.tasaInteresMensualPct} %
+                      {TASA_ANUAL_FIJA_PCT} % anual
                     </dd>
                   </div>
                   <div>
