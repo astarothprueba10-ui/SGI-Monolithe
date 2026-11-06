@@ -1157,7 +1157,7 @@ export function Sales() {
                 <>
                   <TH>Fecha</TH>
                   <TH>Código</TH>
-                  <TH>Cliente</TH>
+                  <TH>Prospecto</TH>
                   <TH>Proyecto</TH>
                   <TH>Lote</TH>
                   <TH align="right">Monto</TH>
@@ -1326,42 +1326,63 @@ export function Sales() {
       >
         {detail ? (
           <div className="space-y-5">
-            <dl className="divide-y divide-brand-100 text-sm">            {[
-              { label: 'Código', value: detail.code },
-              { label: 'Tipo de operación', value: detail.type },
-              { label: 'Comprador', value: detail.buyer },
-              { label: 'Lote', value: detail.lot },
-              { label: 'Proyecto', value: detail.project },
-              { label: 'Modalidad de venta', value: detail.modality ?? '—' },
-              { label: 'Monto de la operación', value: currency(detail.amount) },
-              {
-                label: 'Asesor comercial',
-                value: (
-                  detail.advisor && detail.advisor.trim() ? (
-                    <span className="inline-flex items-center gap-1.5 font-medium text-emerald-800">
-                      <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" />
-                      {detail.advisor}
-                    </span>
-                  ) : detail.type === 'Venta' ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                      <AlertTriangleIcon className="h-3 w-3 text-amber-600" />
-                      Sin asesor vinculado
-                    </span>
-                  ) : (
-                    <span className="text-brand-400 italic">No aplica (Separación)</span>
-                  )
-                )
-              },
-              { label: 'Fecha de registro', value: detail.date || '—' },
-              { label: 'Contrato', value: detail.contract || '—' },
-              { label: 'Estado', value: <StatusBadge status={detail.status} /> }
-            ].map((row) => (
-              <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
-                <dt className="text-[12px] text-brand-400">{row.label}</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">{row.value}</dd>
+            <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50/70 p-4 sm:p-5">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-500">
+                  {detail.type === 'Separación' ? 'Reserva inmobiliaria' : 'Venta inmobiliaria'}
+                </p>
+                <p className="mt-1 font-mono text-lg font-bold text-brand-900">{detail.code}</p>
+                <p className="mt-1 text-xs text-brand-600">
+                  {detail.type === 'Separación'
+                    ? 'Separación de lote con comprobante de pago asociado'
+                    : 'Operación comercial y documentación de venta'}
+                </p>
               </div>
-            ))}
-            </dl>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <p className="text-xs text-brand-500">
+                  {detail.type === 'Separación' ? 'Monto de separación' : 'Monto de venta'}
+                </p>
+                <p className="text-2xl font-bold tabular-nums text-brand-900">{currency(detail.amount)}</p>
+                {detail.type === 'Separación'
+                  ? <EstadoSeparacionBadge estado={detail.status} />
+                  : <StatusBadge status={detail.status} />}
+              </div>
+            </div>
+
+            <section className="rounded-xl border border-brand-100 bg-white px-4 py-2 sm:px-5">
+              <h3 className="border-b border-brand-100 py-3 text-sm font-semibold text-brand-900">
+                {detail.type === 'Separación' ? 'Información de la separación' : 'Información de la venta'}
+              </h3>
+              <dl className="grid grid-cols-1 gap-x-7 sm:grid-cols-2">
+                {[
+                  { label: detail.type === 'Separación' ? 'Prospecto' : 'Comprador', value: detail.buyer || '—' },
+                  { label: 'Proyecto inmobiliario', value: detail.project || '—' },
+                  { label: 'Lote', value: detail.lot || '—' },
+                  { label: 'Asesor comercial', value: (
+                    detail.advisor?.trim() ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-800">
+                        <UserCheckIcon className="h-3.5 w-3.5" />{detail.advisor}
+                      </span>
+                    ) : (
+                      <span className="text-brand-500">Sin asesor vinculado</span>
+                    )
+                  ) },
+                  { label: 'Fecha de registro', value: detail.date || '—' },
+                  ...(detail.type === 'Separación' ? [
+                    { label: 'Método de pago', value: detail.paymentMethod || 'No registrado' },
+                    { label: 'Vencimiento de la reserva', value: detail.expiresAt || '—' }
+                  ] : [
+                    { label: 'Modalidad de venta', value: detail.modality || '—' },
+                    { label: 'Contrato', value: detail.contract || '—' }
+                  ])
+                ].map((row) => (
+                  <div key={row.label} className="flex flex-col gap-1 border-b border-brand-100 py-3">
+                    <dt className="text-[11px] font-medium text-brand-500">{row.label}</dt>
+                    <dd className="break-words text-[13px] font-semibold text-brand-900">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
 
             {detail.type === 'Separación' && (
               <ComprobanteSeparacionPreview
@@ -1374,7 +1395,6 @@ export function Sales() {
                 <h3 className="mb-3 text-sm font-semibold text-brand-900">
                   Documentación asociada a la venta
                 </h3>
-
                 <AnexosContratoPanel
                   idContrato={documentosPorVenta[detail.id].idContrato}
                   codigoContrato={documentosPorVenta[detail.id].codigoContrato}
