@@ -103,6 +103,21 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void validacionVentaUsaSimuladorFrancesV8() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"elegible\":true,\"planFrances\":{\"sistema\":\"FRANCES\"}}");
+        var req = new FormalizarVentaCrmRequest(
+                5L, 92L, "FINANCIADA", new BigDecimal("30000.00"),
+                new BigDecimal("7000.00"), 12, null, null);
+        var respuesta = service.validar(5L, req);
+        assertEquals("FRANCES",
+                respuesta.path("planFrances").path("sistema").asString());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v8"));
+    }
+
+    @Test
     void registroVentaUsaProcedimiento() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"success\":true}");
