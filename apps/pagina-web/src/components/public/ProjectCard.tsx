@@ -8,11 +8,17 @@ export function ProjectCard({ project }: {project: Project;}) {
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-card transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-1 hover:shadow-lift">
       <div className="relative aspect-[4/3] overflow-hidden bg-bone">
-        <img
-          src={project.cover}
-          alt={`Vista del proyecto ${project.name}`}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105" />
+        {project.cover ? (
+          <img
+            src={project.cover}
+            alt={`Vista del proyecto ${project.name}`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted">
+            Imagen del proyecto pendiente de publicación
+          </div>
+        )}
         
         <div className="absolute left-4 top-4 flex gap-2">
           <Badge tone={statusTone(project.status)}>{project.status}</Badge>
@@ -38,7 +44,7 @@ export function ProjectCard({ project }: {project: Project;}) {
             <dd className="mt-0.5 text-[17px] font-semibold text-brand">{project.priceFrom}</dd>
           </div>
           <div>
-            <dt className="text-[11px] uppercase tracking-wide text-muted">Área desde</dt>
+            <dt className="text-[11px] uppercase tracking-wide text-muted">{project.areaLabel ?? 'Área desde'}</dt>
             <dd className="mt-0.5 flex items-center gap-1.5 text-[17px] font-semibold text-night">
               <MaximizeIcon className="h-4 w-4 text-gold" />
               {project.areaFrom}

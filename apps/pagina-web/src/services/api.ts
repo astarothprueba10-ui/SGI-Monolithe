@@ -126,48 +126,30 @@ function generarCodigoSeguimiento(): string {
 }
 
 /**
- * Obtiene el catálogo de proyectos activos desde el backend o Supabase.
+ * La publicación de proyectos solo la determina el backend CMS.
+ * Un catálogo vacío es una respuesta válida: no se consulta inm_proyectos
+ * directamente para evitar mostrar proyectos ocultos.
  */
 export async function obtenerProyectosPublicos(): Promise<ProyectoDto[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/public/proyectos`, {
-      headers: { Accept: 'application/json' }
-    });
+  const response = await fetch(`${API_BASE_URL}/api/public/proyectos`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error('No se pudo consultar el catálogo público');
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error('Respuesta inválida del catálogo público');
+  return data as ProyectoDto[];
+}
 
-    if (response.ok) {
-      const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
-      }
-    }
-  } catch {
-  }
-
-  const { data, error } = await supabase
-    .from('inm_proyectos')
-    .select('id_proyecto, codigo, nombre, descripcion, direccion, ubicacion_referencia, distrito, provincia, departamento, area_total_m2, latitud, longitud, activo')
-    .eq('activo', true)
-    .order('nombre', { ascending: true });
-
-  if (error || !data) {
-    return [];
-  }
-
-  return data.map((p) => ({
-    idProyecto: Number(p.id_proyecto),
-    codigo: p.codigo,
-    nombre: p.nombre,
-    descripcion: p.descripcion || undefined,
-    direccion: p.direccion || undefined,
-    ubicacionReferencia: p.ubicacion_referencia || undefined,
-    distrito: p.distrito || undefined,
-    provincia: p.provincia || undefined,
-    departamento: p.departamento || undefined,
-    areaTotal: p.area_total_m2 ? Number(p.area_total_m2) : undefined,
-    latitud: p.latitud ? Number(p.latitud) : undefined,
-    longitud: p.longitud ? Number(p.longitud) : undefined,
-    activo: Boolean(p.activo)
-  }));
+/** Valida una ficha contra el mismo control de visibilidad del CMS. */
+export async function obtenerProyectoPublicoPorCodigo(codigo: string): Promise<ProyectoDto | null> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/public/proyectos/codigo/${encodeURIComponent(codigo)}`,
+    { headers: { Accept: 'application/json' }, cache: 'no-store' }
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('No se pudo consultar el proyecto público');
+  return await response.json() as ProyectoDto;
 }
 
 export async function obtenerPaginasPublicadas(): Promise<PaginaDto[]> {

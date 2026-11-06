@@ -1,4 +1,4 @@
-export type ProjectStatus = 'Preventa' | 'En venta' | 'Próximamente';
+export type ProjectStatus = 'Preventa' | 'En venta' | 'Próximamente' | 'Estado por confirmar';
 
 export interface Project {
   slug: string;
@@ -8,6 +8,7 @@ export interface Project {
   type: string;
   priceFrom: string;
   areaFrom: string;
+  areaLabel?: string;
   shortDescription: string;
   description: string;
   cover: string;

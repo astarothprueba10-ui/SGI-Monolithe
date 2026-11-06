@@ -4,27 +4,18 @@ import { LinkButton } from '../components/ui/Button';
 import { SectionHeading } from '../components/ui/Primitives';
 import { IMAGES } from '../data/projects';
 import { milestones, values } from '../data/site';
+import { usePublicProjects } from '../contexts/PublicProjectsContext';
 
 const stats = [
-  {
-    value: 'SUNARP',
-    label: 'Lotes independizados e inscritos'
-  },
-  {
-    value: '450 m²',
-    label: 'Área de lote desde'
-  },
-  {
-    value: '30 min',
-    label: 'Aprox. desde Chiclayo'
-  },
-  {
-    value: '36 meses',
-    label: 'Financiamiento hasta'
-  }
+  { value: 'Consultar', label: 'Situación registral de cada lote' },
+  { value: 'Consultar', label: 'Área de los lotes disponibles' },
+  { value: 'Consultar', label: 'Ruta y tiempo de traslado' },
+  { value: 'Consultar', label: 'Condiciones comerciales vigentes' }
 ];
 
 export function About() {
+  const { proyectos } = usePublicProjects();
+  const losCocosVisible = proyectos.some((p) => p.codigo === 'PROY-001');
   return (
     <>
       <PageHero
@@ -35,7 +26,7 @@ export function About() {
         eyebrow="Nosotros"
         title="Construimos relaciones basadas en confianza"
         description="MONOLITHE es una empresa inmobiliaria orientada al desarrollo y comercialización de proyectos que buscan ofrecer alternativas de vivienda e inversión."
-        image={IMAGES.heroAvenue}
+        image={losCocosVisible ? IMAGES.heroAvenue : IMAGES.team}
       />
 
       {/* Quiénes somos */}
@@ -55,17 +46,12 @@ export function About() {
             />
 
             <p className="mt-5 text-[15px] leading-relaxed text-muted">
-              Actualmente desarrollamos el Condominio Campestre Los Cocos,
-              ubicado en Picsi, Chiclayo. Todos los lotes del proyecto se
-              encuentran debidamente independizados e inscritos en el Registro
-              de Predios de la SUNARP, contando cada uno con su propia partida
-              registral electrónica. Nuestro proceso comercial comprende la
-              orientación al cliente, coordinación de visitas al terreno,
-              elección del lote, formalización de la compra y seguimiento
-              durante el proceso de pago.
+              {losCocosVisible
+                ? 'Actualmente desarrollamos el Condominio Campestre Los Cocos, ubicado en Picsi, Chiclayo. Nuestro proceso comercial comprende la orientación al cliente, coordinación de visitas, elección del lote y seguimiento durante la compra.'
+                : 'Nuestro proceso comercial comprende orientación al cliente, coordinación de visitas, selección de alternativas inmobiliarias y seguimiento durante la compra.'}
             </p>
 
-            <dl className="mt-10 grid grid-cols-2 gap-6">
+            {losCocosVisible && <dl className="mt-10 grid grid-cols-2 gap-6">
               {stats.map((stat) => (
                 <div
                   key={stat.label}
@@ -80,7 +66,7 @@ export function About() {
                   </dd>
                 </div>
               ))}
-            </dl>
+            </dl>}
           </div>
         </div>
       </section>
@@ -95,7 +81,7 @@ export function About() {
           />
 
           <ol className="mt-12 grid gap-6 md:grid-cols-4">
-            {milestones.map((milestone) => (
+            {milestones.filter((item) => losCocosVisible || item.year !== 'Proyecto actual').map((milestone) => (
               <li
                 key={milestone.year}
                 className="relative rounded-xl border border-line bg-white p-6"
@@ -194,7 +180,7 @@ export function About() {
       <section className="bg-bone py-16">
         <div className="shell flex flex-col items-center gap-6 rounded-2xl bg-night px-8 py-12 text-center">
           <h2 className="max-w-2xl font-display text-3xl leading-tight text-white sm:text-4xl">
-            ¿Quieres conocer Los Cocos?
+            {losCocosVisible ? '¿Quieres conocer Los Cocos?' : '¿Quieres conocer nuestros proyectos?'}
           </h2>
 
           <p className="max-w-xl text-[15px] text-white/70">

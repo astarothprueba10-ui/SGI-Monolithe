@@ -38,7 +38,8 @@ function createApiClient(
   async function request<T>(
     path: string,
     options: ApiClientOptions = {},
-    allowRefresh = true
+    allowRefresh = true,
+    responseBlob = false
   ): Promise<T> {
     if (authenticated && expireSessionIfInactive(revokeSession)) {
       throw new ApiError(401, 'Tu sesión se cerró por inactividad.');
@@ -86,7 +87,8 @@ function createApiClient(
         return request<T>(
           path,
           options,
-          false
+          false,
+          responseBlob
         );
       }
 
@@ -103,6 +105,10 @@ function createApiClient(
 
     const contentType =
       response.headers.get('content-type') ?? '';
+
+    if (response.ok && responseBlob) {
+      return (await response.blob()) as T;
+    }
 
     const data = contentType.includes('application/json')
       ? await response.json()
@@ -136,6 +142,12 @@ function createApiClient(
         ...options,
         method: 'GET'
       }),
+
+    getBlob: (path: string) =>
+      request<Blob>(path, {
+        method: 'GET',
+        cache: 'no-store'
+      }, true, true),
 
     post: <T>(
       path: string,
