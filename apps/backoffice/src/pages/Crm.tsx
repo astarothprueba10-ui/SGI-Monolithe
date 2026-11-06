@@ -37,7 +37,6 @@ import {
   type CrmAdvisor,
   type CrmBuyer,
   type CrmCatalogs,
-  type CrmCategory,
   type CrmDetail,
   type CrmFollowUpCreate,
   type CrmFollowUpItem,
@@ -57,6 +56,9 @@ import {
   type PeriodoCrmModo
 } from '../components/crm/CrmPeriodoGlobal';
 import { CrmEvolucionChart } from '../components/crm/CrmEvolucionChart';
+import { EditarDatosPersonalesModal } from '../components/crm/EditarDatosPersonalesModal';
+import { CrmHistorialDatosPersonalesPanel } from '../components/crm/CrmHistorialDatosPersonalesPanel';
+import { ExpedienteCompradorPanel } from '../components/crm/ExpedienteCompradorPanel';
 import type { CrmEvolucionMes } from '../services/crmBackend';
 import {
   sanitizarLead, validarNuevoLead,
@@ -227,10 +229,10 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
 
   const puedeVerGestionGlobal = user.roles.some(
-    (rol) => rol === 'Administrador' || rol === 'Gerencia'
+    (rol) => rol === 'Administrador' || rol === 'Gerencia' || rol === 'Supervisor comercial'
   );
 
   const puedeElegirAsesor = user.roles.some(
@@ -251,7 +253,6 @@ export function Crm() {
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
   const [origin, setOrigin] = useState('all');
-  const [, setCategory] = useState<CrmCategory>('LEAD');
   const [advisorFilter, setAdvisorFilter] = useState<number | ''>('');
   const [projectFilter, setProjectFilter] = useState<number | ''>('');
   const [fechaTablaDesde, setFechaTablaDesde] = useState('');
@@ -412,6 +413,9 @@ export function Crm() {
   // Expediente / Detalle
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [leadDetail, setLeadDetail] = useState<CrmDetail | null>(null);
+  const [personalLead, setPersonalLead] = useState<CrmProspect | null>(null);
+  const [revisionHistorialPersonal, setRevisionHistorialPersonal] = useState(0);
+  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyer | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
@@ -952,45 +956,6 @@ export function Crm() {
   };
 
 
-  const handleVerifySale = async (lead: CrmProspect) => {
-    try {
-      const resultado = await crmBackend.verificarCompra(
-        lead.id_prospecto
-      );
-
-      if (!resultado.esComprador) {
-        toast.info('Compra pendiente de formalización', {
-          description: resultado.mensaje
-        });
-        return;
-      }
-
-      await Promise.all([
-        loadLeads(),
-        loadCatalogsAndAdvisors(),
-        loadBuyers()
-      ]);
-
-      setCategory('COMPRADOR');
-      setPage(1);
-
-      toast.success('Comprador verificado', {
-        description:
-          `${lead.nombre_completo} tiene una compra formalizada. ` +
-          `Venta: ${resultado.compra?.codigoVenta ?? 'Registrada'}. ` +
-          `Contrato: ${resultado.compra?.codigoContrato ?? 'Válido'}.`
-      });
-
-    } catch (err: unknown) {
-      toast.error('No se pudo verificar la compra', {
-        description:
-          err instanceof Error
-            ? err.message
-            : 'Error al consultar al servidor.'
-      });
-    }
-  };
-
   const handleStageSubmit = async () => {
     if (!stageLead || !newStageCode) return;
     if (newStageCode === stageLead.estado_codigo) {
@@ -1405,11 +1370,7 @@ export function Crm() {
         onChange={(newTab) => {
           setTab(newTab);
 
-          if (newTab === 'leads') {
-            setCategory('LEAD');
-          } else if (newTab === 'potenciales') {
-            setCategory('POTENCIAL');
-          }
+
 
           setPage(1);
         }}
@@ -1715,14 +1676,15 @@ export function Crm() {
                   );
 
                   const acciones: CrmMenuAction[] = [
-                    ...(lead.categoria === 'POTENCIAL' ? [{
-                      label: 'Verificar compra', icon: CheckCircleIcon, permission: 'crm.view' as const,
-                      onClick: () => void handleVerifySale(lead)
-                    }] : []),
+
                     {
                       label: 'Cambiar etapa', icon: RefreshCw, permission: 'crm.edit',
                       disabled: isLeadFinal || lead.estado_codigo === 'CON_RESERVA',
                       onClick: () => { setStageLead(lead); setNewStageCode(lead.estado_codigo); }
+                    },
+                    {
+                      label: 'Editar datos personales', icon: PencilIcon, permission: 'crm.edit',
+                      onClick: () => setPersonalLead(lead)
                     },
                     {
                       label: 'Editar ficha comercial', icon: PencilIcon, permission: 'crm.edit',
@@ -2174,6 +2136,7 @@ export function Crm() {
                     <TH>Contrato / Estado</TH>
                     <TH align="right">Monto venta</TH>
                     <TH>Fecha formalizacion</TH>
+                    <TH align="right">Expediente</TH>
                   </>
                 }
               >
@@ -2192,6 +2155,15 @@ export function Crm() {
                       {currency(buyer.precio_venta)}
                     </TD>
                     <TD className="text-brand-500 tabular text-[12px]">{formatDateLima(buyer.fecha_venta)}</TD>
+                    <TD align="right">
+                      <Gate permission="sales.view">
+                        <Button size="sm" variant="ghost" icon={EyeIcon}
+                          onClick={()=>setCompradorExpediente(buyer)}
+                          className="font-semibold text-brand-700 hover:text-brand-900">
+                          Expediente
+                        </Button>
+                      </Gate>
+                    </TD>
                   </TR>
                 ))}
               </Table>
@@ -2289,12 +2261,37 @@ export function Crm() {
         />
       )}
 
+      <Modal open={Boolean(compradorExpediente)}
+        onClose={()=>setCompradorExpediente(null)}
+        title={compradorExpediente ? `Expediente del cliente ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
+        description={compradorExpediente?.nombre_completo??''}
+        width="max-w-5xl"
+        footer={<Button onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
+        {compradorExpediente&&
+          <ExpedienteCompradorPanel key={compradorExpediente.id_venta??compradorExpediente.id_cliente}
+            buyer={compradorExpediente}/>}
+      </Modal>
+
+      <EditarDatosPersonalesModal
+        idProspecto={personalLead?.id_prospecto??null}
+        codigo={personalLead?.codigo}
+        onClose={()=>setPersonalLead(null)}
+        onSaved={async()=>{
+          const id=personalLead?.id_prospecto;
+          setRevisionHistorialPersonal(n=>n+1);
+          await loadLeads();
+          if(id && detailModalOpen && leadDetail?.prospecto.id_prospecto===id)
+            await handleOpenDetail(id);
+        }}
+      />
+
       {/* MODAL: Expediente comercial (Detalle) */}
       <Modal
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         title="Expediente comercial del prospecto"
-        description="Ficha completa de identidad, medios de contacto e historial de interaccion comercial."
+        description="Identidad, contactos, asignaciones, correcciones auditadas y actividad comercial."
+        width="max-w-3xl"
         footer={
           <Button onClick={() => setDetailModalOpen(false)}>Cerrar expediente</Button>
         }
@@ -2324,6 +2321,15 @@ export function Crm() {
                 </div>
               </div>
             </div>
+
+            {can('crm.edit') && (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button size="sm" icon={PencilIcon} variant="secondary"
+                  onClick={()=>setPersonalLead(leadDetail.prospecto)}>
+                  Editar datos personales
+                </Button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 text-[13px]">
               <div>
@@ -2395,6 +2401,11 @@ export function Crm() {
                 </p>
               </div>
             )}
+
+            <CrmHistorialDatosPersonalesPanel
+              idProspecto={leadDetail.prospecto.id_prospecto}
+              revision={revisionHistorialPersonal}
+            />
 
             {/* Historial de asignaciones comerciales */}
             <div className="pt-2 border-t border-brand-100">
