@@ -2303,17 +2303,17 @@ export function Crm() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg bg-brand-50 p-4 border border-brand-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-mono text-xs font-semibold text-brand-600">
+            <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-blue-50/60 p-4 shadow-sm sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="inline-flex rounded-md border border-brand-200 bg-white px-2 py-1 font-mono text-xs font-semibold text-brand-600">
                     {leadDetail.prospecto.codigo}
                   </span>
-                  <h3 className="text-base font-bold text-brand-900">
+                  <h3 className="mt-2 break-words text-lg font-bold text-brand-900">
                     {leadDetail.prospecto.nombre_completo}
                   </h3>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="brand">{leadDetail.prospecto.categoria}</Badge>
                   <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-white text-brand-800">
                     {leadDetail.prospecto.estado_nombre}
@@ -2331,7 +2331,9 @@ export function Crm() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 text-[13px]">
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-800">Identificación y gestión</h4>
+              <div className="grid grid-cols-1 gap-4 text-[13px] sm:grid-cols-2">
               <div>
                 <p className="text-brand-400">Documento principal</p>
                 <p className="font-medium text-brand-900">
@@ -2356,16 +2358,19 @@ export function Crm() {
               </div>
             </div>
 
-            <div>
-              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-500 mb-1">
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700 mb-2">
                 Contactos registrados
               </h4>
-              <div className="rounded border border-brand-100 divide-y divide-brand-50">
+              <div className="divide-y divide-brand-100 overflow-hidden rounded-lg border border-brand-100">
                 {leadDetail.contactos && leadDetail.contactos.length > 0 ? (
                   leadDetail.contactos.map((c, i) => (
-                    <div key={i} className="flex justify-between p-2 text-[12px]">
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/40 p-3 text-[12px]">
                       <span className="font-mono text-brand-600">{c.tipoCodigo}</span>
-                      <span className="font-medium text-brand-900">{c.valor}</span>
+                      <span className="min-w-0 break-all font-semibold text-brand-900">{c.valor}</span>
                     </div>
                   ))
                 ) : (
@@ -2376,16 +2381,16 @@ export function Crm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded border border-brand-100 p-2">
+            <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Seguimientos</p>
                 <p className="text-lg font-bold text-brand-900">{leadDetail.totalSeguimientos}</p>
               </div>
-              <div className="rounded border border-brand-100 p-2">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Visitas guiadas</p>
                 <p className="text-lg font-bold text-brand-900">{leadDetail.totalVisitas}</p>
               </div>
-              <div className="rounded border border-brand-100 p-2">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Comprador</p>
                 <p className="text-lg font-bold text-brand-900">
                   {leadDetail.esComprador ? 'Si' : 'No'}
@@ -2408,8 +2413,8 @@ export function Crm() {
             />
 
             {/* Historial de asignaciones comerciales */}
-            <div className="pt-2 border-t border-brand-100">
-              <h4 className="text-[12px] font-semibold uppercase text-brand-700 mb-2">
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="text-[12px] font-bold uppercase tracking-wide text-brand-700 mb-3">
                 Historial de asignaciones ({assignmentsList.length})
               </h4>
 
@@ -2422,7 +2427,7 @@ export function Crm() {
                   {assignmentsList.map((a) => (
                     <div
                       key={a.id_asignacion}
-                      className="rounded border border-brand-100 p-3 text-xs"
+                      className="rounded-lg border border-brand-100 bg-slate-50/40 p-3 text-xs"
                     >
                       <div className="flex justify-between">
                         <strong>{a.asesor_nombre}</strong>
@@ -2451,8 +2456,8 @@ export function Crm() {
             </div>
 
             {/* Historial de Seguimientos Comerciales */}
-            <div className="pt-2 border-t border-brand-100">
-              <div className="flex items-center justify-between mb-2">
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Historial de seguimientos ({followUpsList.length})
                 </h4>
@@ -2491,7 +2496,7 @@ export function Crm() {
                   {followUpsList.map((f, idx) => (
                     <div
                       key={f.id_seguimiento || idx}
-                      className="rounded border border-brand-100 bg-white p-2.5 text-xs shadow-xs"
+                      className="rounded-xl border border-brand-100 bg-slate-50/50 p-3 text-xs shadow-sm"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
@@ -2524,8 +2529,8 @@ export function Crm() {
             </div>
 
             {/* Visitas guiadas en el Expediente */}
-            <div className="pt-2 border-t border-brand-100">
-              <div className="flex items-center justify-between mb-2">
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Visitas guiadas ({detailVisitsList.length})
                 </h4>
@@ -2561,7 +2566,7 @@ export function Crm() {
                   {detailVisitsList.map((v) => (
                     <div
                       key={v.id_visita}
-                      className="rounded border border-brand-100 bg-white p-2 text-xs flex justify-between items-center"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-100 bg-slate-50/50 p-3 text-xs"
                     >
                       <div>
                         <p className="font-semibold text-brand-900">
