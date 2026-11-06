@@ -113,6 +113,23 @@ public class CrmVentaService {
                 idProspecto);
     }
 
+    /** Obtiene las reservas vigentes del prospecto con proyecto, etapa y abono acreditado. */
+    @Transactional(readOnly = true)
+    public JsonNode listarReservasVigentesParaVenta(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto == null || idProspecto <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador del prospecto invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_reservas_vigentes_para_venta_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor, idProspecto);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode verificarComprador(
             Long actor,
