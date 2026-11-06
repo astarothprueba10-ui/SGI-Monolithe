@@ -22,13 +22,17 @@ export interface ResumenVentaCalculado {
 const centavos = (monto: number) => Math.round((monto + Number.EPSILON) * 100);
 const soles = (cents: number) => cents / 100;
 
+/** 5 % nominal anual fijo. Para el sistema alemán usamos la tasa mensual 5 / 12. */
+export const TASA_ANUAL_FIJA_PCT = 5;
+export const TASA_MENSUAL_NOMINAL_PCT = TASA_ANUAL_FIJA_PCT / 12;
+
 export function calcularVenta(
   precioOficial: number,
   abonoReserva = 0,
   inicialAdicional = 0,
-  numeroCuotas = 0,
-  tasaMensualPct = 0
+  numeroCuotas = 0
 ): ResumenVentaCalculado {
+  const tasaMensualPct = TASA_MENSUAL_NOMINAL_PCT;
   if (![precioOficial, abonoReserva, inicialAdicional, tasaMensualPct].every(Number.isFinite)
       || precioOficial <= 0 || abonoReserva < 0 || inicialAdicional < 0
       || abonoReserva + inicialAdicional > precioOficial
