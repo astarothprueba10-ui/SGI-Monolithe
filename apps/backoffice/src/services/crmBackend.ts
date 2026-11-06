@@ -903,13 +903,11 @@ export const crmBackend = {
 
   /** Usa sales.export en backend, nunca eleva el alcance del asesor. */
   listarOperacionesParaExportacion: (params: {
-    tipo: 'SEPARACION';
     pagina: number;
     tamano: number;
   }) =>
     coreApi.get<CrmOperacionesResponse>(
-      `/crm/operaciones/exportacion${qs({
-        tipo: params.tipo,
+      `/crm/separaciones/exportacion${qs({
         pagina: params.pagina,
         tamano: params.tamano
       })}`
