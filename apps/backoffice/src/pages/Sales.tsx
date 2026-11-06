@@ -26,6 +26,7 @@ import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
+import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -1343,6 +1344,12 @@ export function Sales() {
               </div>
             ))}
             </dl>
+
+            {detail.type === 'Separación' && (
+              <ComprobanteSeparacionPreview
+                idReserva={Number(detail.id.slice('SEPARACION-'.length))}
+              />
+            )}
 
             {detail.type === 'Venta' && documentosPorVenta[detail.id] && (
               <section className="border-t border-brand-100 pt-4">
