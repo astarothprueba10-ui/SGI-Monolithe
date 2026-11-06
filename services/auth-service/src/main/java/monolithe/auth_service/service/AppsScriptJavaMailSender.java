@@ -192,6 +192,9 @@ public final class AppsScriptJavaMailSender implements JavaMailSender {
         }
         sender.validate();
         recipient.validate();
+        // MimeMessageHelper configura un multipart en memoria. Serializarlo
+        // antes de leer su contenido evita recibir un MIME sin cuerpo.
+        message.saveChanges();
         String subject = message.getSubject();
         Body body = new Body();
         collectBody(message, body);
