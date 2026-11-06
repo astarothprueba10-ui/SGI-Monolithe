@@ -700,8 +700,14 @@ export function Sales() {
         validacion.modalidad !== formSaleModality ||
         Number(validacion.precioVigente) !== montoTotal ||
         Number(validacion.montoReservaAplicable) !== reservaAplicable ||
-        (esFinanciada && Number(validacion.planFrances?.capitalFinanciado) !==
-          resumenVenta.capitalFinanciado)
+        (esFinanciada && (
+          !validacion.planFrances ||
+          Number(validacion.planFrances.capitalFinanciado) !== resumenVenta.capitalFinanciado ||
+          Number(validacion.planFrances.cuotaMensual) !== resumenVenta.cuotaMensual ||
+          Number(validacion.planFrances.interesTotal) !== resumenVenta.interesTotal ||
+          Number(validacion.planFrances.totalCuotas) !== resumenVenta.totalCuotas ||
+          Number(validacion.planFrances.totalOperacion) !== resumenVenta.totalOperacionConIntereses
+        ))
       ) {
         throw new Error('La validación comercial no coincide con la operación.');
       }
@@ -2369,6 +2375,12 @@ export function Sales() {
                     <dt className="text-brand-500">Capital financiado</dt>
                     <dd className="font-semibold text-brand-900">
                       {currency(confirmacionVenta.resumen.capitalFinanciado)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-brand-500">Cuota mensual fija (sistema francés)</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {currency(confirmacionVenta.resumen.cuotaMensual)}
                     </dd>
                   </div>
                   <div>
