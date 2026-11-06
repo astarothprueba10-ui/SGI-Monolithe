@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../utils/cn';
 import type { Permission } from '../../types';
 
+import type { DashboardPendingCounts } from '../../services/dashboardService';
+
 interface Op {
   id: string;
   label: string;
@@ -86,7 +88,19 @@ const TONES = {
   info: 'bg-sky-50 text-sky-700 border-sky-200'
 };
 
-export function PendingOperations() {
+function resolveOpCount(opId: string, baseCount: number, counts?: Partial<DashboardPendingCounts>): number {
+  if (!counts) return baseCount;
+  switch (opId) {
+    case 'OP-1': return counts.vouchers_por_validar ?? baseCount;
+    case 'OP-2': return counts.cuotas_vencidas ?? baseCount;
+    case 'OP-3': return counts.separaciones_por_vencer ?? baseCount;
+    case 'OP-4': return counts.leads_sin_asignar ?? baseCount;
+    case 'OP-5': return counts.comisiones_por_aprobar ?? baseCount;
+    default: return baseCount;
+  }
+}
+
+export function PendingOperations({ counts }: { counts?: Partial<DashboardPendingCounts>; }) {
   const { can } = useAuth();
   const visible = OPS.filter((op) => can(op.permission));
 
@@ -94,25 +108,25 @@ export function PendingOperations() {
     return (
       <p className="px-5 py-8 text-center text-[13px] text-brand-400">
         No tienes operaciones pendientes asignadas a tu rol.
-      </p>);
-
+      </p>
+    );
   }
 
   return (
     <ul className="divide-y divide-brand-50">
-      {visible.slice(0, 5).map((op) =>
-      <li key={op.id}>
+      {visible.slice(0, 5).map((op) => (
+        <li key={op.id}>
           <Link
-          to={op.to}
-          className="group flex items-center gap-3 px-5 py-3 transition-colors duration-150 ease-smooth hover:bg-brand-50/70">
-          
+            to={op.to}
+            className="group flex items-center gap-3 px-5 py-3 transition-colors duration-150 ease-smooth hover:bg-brand-50/70"
+          >
             <span
-            className={cn(
-              'flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-[13px] font-semibold tabular',
-              TONES[op.tone]
-            )}>
-            
-              {op.count}
+              className={cn(
+                'flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-[13px] font-semibold tabular',
+                TONES[op.tone]
+              )}
+            >
+              {resolveOpCount(op.id, op.count, counts)}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium text-brand-800">
@@ -123,7 +137,7 @@ export function PendingOperations() {
             <ArrowRightIcon className="h-4 w-4 shrink-0 text-brand-200 transition-colors duration-150 ease-smooth group-hover:text-brand-500" />
           </Link>
         </li>
-      )}
-    </ul>);
-
+      ))}
+    </ul>
+  );
 }

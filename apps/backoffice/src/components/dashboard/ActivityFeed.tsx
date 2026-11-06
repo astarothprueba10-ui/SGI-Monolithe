@@ -1,10 +1,19 @@
 import { RECENT_ACTIVITY } from '../../data/dashboard';
+import type { DashboardActivityItem } from '../../services/dashboardService';
 
-export function ActivityFeed({ limit = 5 }: {limit?: number;}) {
+export function ActivityFeed({
+  items,
+  limit = 5
+}: {
+  items?: DashboardActivityItem[];
+  limit?: number;
+}) {
+  const feed = items && items.length > 0 ? items : RECENT_ACTIVITY;
+
   return (
     <ul className="divide-y divide-brand-50">
-      {RECENT_ACTIVITY.slice(0, limit).map((item) =>
-      <li key={item.id} className="flex gap-3 px-5 py-3">
+      {feed.slice(0, limit).map((item) => (
+        <li key={item.id} className="flex gap-3 px-5 py-3">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-600">
             {item.initials}
           </span>
@@ -18,7 +27,7 @@ export function ActivityFeed({ limit = 5 }: {limit?: number;}) {
             </p>
           </div>
         </li>
-      )}
-    </ul>);
-
+      ))}
+    </ul>
+  );
 }

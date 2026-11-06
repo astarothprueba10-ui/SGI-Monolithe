@@ -21,6 +21,8 @@ import { LEAD_SOURCES } from '../data/crm';
 import { ADVISORS } from '../data/people';
 import { commissionsService } from '../services/commissionsService';
 import type { ManagerialKpis } from '../services/commissionsService';
+import { dashboardService } from '../services/dashboardService';
+import type { DashboardSummary } from '../services/dashboardService';
 import type { RoleName } from '../types';
 import type { Kpi } from '../components/ui/KpiCard';
 
@@ -104,13 +106,30 @@ const CHART_BY_ROLE: Record<Exclude<RoleName, 'Asesoría Legal'>, ChartConfig> =
   }
 };
 
-function buildDynamicKpis(baseKpis: Kpi[], data: ManagerialKpis | null): Kpi[] {
+function buildDynamicKpis(
+  baseKpis: Kpi[],
+  data: (ManagerialKpis & {
+    clientesActivos?: number;
+    cuotasVencidasMonto?: number;
+    cuotasVencidasCantidad?: number;
+  }) | null
+): Kpi[] {
   if (!data) return baseKpis;
   return baseKpis.map((kpi) => {
-    if (kpi.label.includes('Ventas')) return { ...kpi, value: `S/ ${(data.totalVentas / 1000).toFixed(1)}k`, hint: `S/ ${data.totalVentas.toLocaleString('es-PE')} total` };
-    if (kpi.label.includes('disponibles')) return { ...kpi, value: String(data.lotesDisponibles), hint: `de ${data.totalLotes} totales` };
+    if (kpi.label.includes('Ventas')) {
+      return { ...kpi, value: `S/ ${(data.totalVentas / 1000).toFixed(1)}k`, hint: `S/ ${data.totalVentas.toLocaleString('es-PE')} total` };
+    }
+    if (kpi.label.includes('disponibles')) {
+      return { ...kpi, value: String(data.lotesDisponibles), hint: `de ${data.totalLotes} totales` };
+    }
     if (kpi.label.includes('separados')) return { ...kpi, value: String(data.lotesReservados) };
     if (kpi.label.includes('vendidos')) return { ...kpi, value: String(data.lotesVendidos) };
+    if (kpi.label.includes('Clientes activos') && data.clientesActivos !== undefined) {
+      return { ...kpi, value: String(data.clientesActivos), hint: 'con registro vigente' };
+    }
+    if (kpi.label.includes('Cuotas vencidas') && data.cuotasVencidasMonto !== undefined) {
+      return { ...kpi, value: `S/ ${data.cuotasVencidasMonto.toLocaleString('es-PE')}`, hint: `${data.cuotasVencidasCantidad ?? 0} cuotas` };
+    }
     if (kpi.label.includes('Recaudación') || kpi.label.includes('Cobranza') || kpi.label.includes('cobrados')) {
       return { ...kpi, value: `S/ ${(data.totalRecaudado / 1000).toFixed(1)}k`, hint: `S/ ${data.totalRecaudado.toLocaleString('es-PE')} cobrado` };
     }
@@ -123,16 +142,16 @@ function buildDynamicKpis(baseKpis: Kpi[], data: ManagerialKpis | null): Kpi[] {
 
 export function Dashboard() {
   const { role, user, hasModule } = useAuth();
-  const [managerialKpis, setManagerialKpis] = React.useState<ManagerialKpis | null>(null);
+  const [dashboardSummary, setDashboardSummary] = React.useState<DashboardSummary | null>(null);
 
   React.useEffect(() => {
     if (role === 'Asesoría Legal') return;
-    commissionsService.getManagerialKpis().then((res) => {
-      if (res) setManagerialKpis(res);
+    dashboardService.getDashboardSummary().then((res) => {
+      if (res) setDashboardSummary(res);
     });
   }, [role]);
 
-  const kpis = buildDynamicKpis(ROLE_KPIS[role], managerialKpis);
+  const kpis = buildDynamicKpis(ROLE_KPIS[role], dashboardSummary?.kpis ?? null);
   const intro = DASHBOARD_INTRO[role];
 
   if (role === 'Asesoría Legal') {
@@ -152,6 +171,9 @@ export function Dashboard() {
     );
   }
   const chart = CHART_BY_ROLE[role];
+  const trendData = dashboardSummary?.tendenciaMensual && dashboardSummary.tendenciaMensual.length > 0
+    ? dashboardSummary.tendenciaMensual
+    : chart.data;
 
   return (
     <div>
@@ -168,10 +190,10 @@ export function Dashboard() {
         }
         actions={
           <>
-            <Select defaultValue="ago" aria-label="Periodo" className="w-[168px]">
-              <option value="ago">Agosto 2026</option>
-              <option value="jul">Julio 2026</option>
-              <option value="q3">Trimestre III 2026</option>
+            <Select defaultValue="nov" aria-label="Periodo" className="w-[168px]">
+              <option value="nov">Noviembre 2026</option>
+              <option value="oct">Octubre 2026</option>
+              <option value="q4">Trimestre IV 2026</option>
             </Select>
             <Button icon={CalendarIcon}>Comparar periodo</Button>
             <Gate permission="dashboard.export">
@@ -183,10 +205,10 @@ export function Dashboard() {
         } />
 
 
-      {role === 'Finanzas' ?
+      {role === 'Finanzas' && (dashboardSummary?.kpis.cuotasVencidasCantidad ?? 0) > 0 ?
         <Alert
           tone="danger"
-          title="14 cuotas vencidas superan los 15 días de mora"
+          title={`${dashboardSummary?.kpis.cuotasVencidasCantidad} cuotas vencidas superan los 15 días de mora`}
           className="mb-5"
           actions={
             <Link to="/financiamiento">
@@ -194,7 +216,7 @@ export function Dashboard() {
             </Link>
           }>
 
-          Representan S/ 84,120 de la cartera de Las Palmeras y Vista Alegre.
+          Representan S/ {dashboardSummary?.kpis.cuotasVencidasMonto.toLocaleString('es-PE')} de la cartera de cobranzas.
         </Alert> :
         null}
 
@@ -216,7 +238,7 @@ export function Dashboard() {
 
           <div className="px-3 py-4">
             <TrendChart
-              data={chart.data}
+              data={trendData}
               series={chart.series}
               valuePrefix={chart.valuePrefix}
               height={280} />
@@ -229,7 +251,7 @@ export function Dashboard() {
             title="Operaciones pendientes"
             description="Solo lo que puedes resolver con tus permisos" />
 
-          <PendingOperations />
+          <PendingOperations counts={dashboardSummary?.operacionesPendientes} />
         </Card>
       </div>
 
@@ -249,7 +271,7 @@ export function Dashboard() {
                 </Gate>
               } />
 
-            <LotMixSummary />
+            <LotMixSummary projects={dashboardSummary?.proyectos} />
           </Card> :
           null}
 
@@ -262,7 +284,7 @@ export function Dashboard() {
             title="Actividad reciente"
             description={`Trazabilidad visible para ${user.primaryRole}`} />
 
-          <ActivityFeed />
+          <ActivityFeed items={dashboardSummary?.actividadReciente} />
         </Card>
       </div>
     </div>);
