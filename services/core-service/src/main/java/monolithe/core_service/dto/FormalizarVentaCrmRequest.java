@@ -28,9 +28,9 @@ public record FormalizarVentaCrmRequest(
     @Max(36)
     Integer numeroCuotas,
 
-    @DecimalMin("0.00")
-    @DecimalMax("100.00")
-    @Digits(integer = 3, fraction = 4)
+    // La tasa del nuevo financiamiento es fija: 5% nominal anual en BD.
+    // No admitir tasas configurables desde el cliente, ni siquiera positivas.
+    @Null
     BigDecimal tasaInteresMensualPct,
 
     @Size(max = 1000)
