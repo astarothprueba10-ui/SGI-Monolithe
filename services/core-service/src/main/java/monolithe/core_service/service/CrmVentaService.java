@@ -515,6 +515,36 @@ public class CrmVentaService {
                 paginaActual, tamanoActual);
     }
 
+    /** Expediente de venta de solo lectura, con autorización por venta en PostgreSQL. */
+    @Transactional(readOnly = true)
+    public JsonNode detalleVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de venta invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_detalle_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta);
+    }
+
+    /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
+    @Transactional(readOnly = true)
+    public JsonNode rutaComprobanteVenta(Long actor, Long idVenta, Long idComprobante) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0 || idComprobante == null || idComprobante <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de comprobante invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_lectura_comprobante_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta, idComprobante);
+    }
+
     /** La BD vuelve a validar sales.export y limita los registros al actor. */
     @Transactional(readOnly = true)
     public JsonNode listarSeparacionesParaExportacion(
