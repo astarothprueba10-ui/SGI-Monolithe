@@ -40,6 +40,13 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
+import { exportarVentasExcel } from '../utils/ventasExportExcel';
+import { ResumenComercialOperaciones } from '../components/sales/ResumenComercialOperaciones';
+import {
+  FILTROS_VENTAS_INICIALES, crearPeriodoComercial, filtrarVentas,
+  opcionesUnicasVentas, periodoValido,
+  type FiltrosVentas
+} from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
 import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
 
@@ -145,14 +152,16 @@ export function Sales() {
   const [tab, setTab] = useState<
     'Separación' | 'Venta' | 'Contratos' | 'Anexos'
   >('Separación');
-  const [query, setQuery] = useState('');
-  const [modality, setModality] = useState<'all' | Sale['modality']>('all');
+  const [filtrosVenta, setFiltrosVenta] = useState<FiltrosVentas>(FILTROS_VENTAS_INICIALES);
+  const [paginaVentas, setPaginaVentas] = useState(1);
+  const tamanoPaginaVentas = 15;
+  const [periodoComercial, setPeriodoComercial] = useState(() => crearPeriodoComercial('tres_meses'));
+  const [exportandoVentas, setExportandoVentas] = useState(false);
   const [filtrosSeparacion, setFiltrosSeparacion] = useState<FiltrosSeparaciones>(FILTROS_SEPARACIONES_INICIALES);
   const [paginaSeparaciones, setPaginaSeparaciones] = useState(1);
   const tamanoPaginaSeparaciones = 15;
   const [exportandoSeparaciones, setExportandoSeparaciones] = useState(false);
   const [instanteActual, setInstanteActual] = useState(() => Date.now());
-  const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
   const [salesList, setSalesList] = useState<Sale[]>([]);
   const [documentosPorVenta, setDocumentosPorVenta] = useState<
@@ -234,6 +243,15 @@ export function Sales() {
     };
   }, [detail]);
 
+  const cambiarFiltroVenta = (campo: keyof FiltrosVentas, valor: string) => {
+    setFiltrosVenta(prev => ({...prev,[campo]:valor}));
+    setPaginaVentas(1);
+  };
+  const limpiarFiltrosVenta = () => {
+    setFiltrosVenta(FILTROS_VENTAS_INICIALES);
+    setPaginaVentas(1);
+  };
+
   const cambiarFiltroSeparacion = (campo: keyof FiltrosSeparaciones, valor: string) => {
     setFiltrosSeparacion((previo) => ({ ...previo, [campo]: valor }));
     setPaginaSeparaciones(1);
@@ -256,11 +274,24 @@ export function Sales() {
     () => opcionesUnicasSeparaciones(salesList, 'paymentMethod'),
     [salesList]
   );
+  const asesoresVentasFiltro = useMemo(
+    () => opcionesUnicasVentas(salesList, 'advisor'),[salesList]
+  );
+  const proyectosVentasFiltro = useMemo(
+    () => opcionesUnicasVentas(salesList, 'project'),[salesList]
+  );
+  const estadosVentasFiltro = useMemo(
+    () => opcionesUnicasVentas(salesList, 'status'),[salesList]
+  );
 
   const ejecutarExportacionSeparaciones = async () => {
     if (tab !== 'Separación' || exportandoSeparaciones) return;
     if (!can('sales.view') || !can('sales.export')) {
       toast.error('No tienes permiso para exportar separaciones.');
+      return;
+    }
+    if (!periodoValido(periodoComercial)) {
+      toast.error('Selecciona un período comercial válido para exportar.');
       return;
     }
     if (filtrosSeparacion.desde && filtrosSeparacion.hasta &&
@@ -270,7 +301,7 @@ export function Sales() {
     }
     setExportandoSeparaciones(true);
     try {
-      const resultado = await exportarSeparacionesExcel(filtrosSeparacion);
+      const resultado = await exportarSeparacionesExcel(filtrosSeparacion, periodoComercial);
       toast.success('Reporte Excel generado', {
         description: `${resultado.total} separaciones exportadas con el alcance de tu cartera autorizada.`
       });
@@ -280,6 +311,31 @@ export function Sales() {
       });
     } finally {
       setExportandoSeparaciones(false);
+    }
+  };
+
+  const ejecutarExportacionVentas = async () => {
+    if (tab !== 'Venta' || exportandoVentas) return;
+    if (!can('sales.view') || !can('sales.export')) {
+      toast.error('No tienes permisos para exportar ventas.');
+      return;
+    }
+    if (!periodoValido(periodoComercial)) {
+      toast.error('Selecciona un período comercial global válido.');
+      return;
+    }
+    setExportandoVentas(true);
+    try {
+      const resultado = await exportarVentasExcel(filtrosVenta, periodoComercial);
+      toast.success('Reporte de ventas generado',{
+        description:`${resultado.total} ventas exportadas de tu cartera autorizada.`
+      });
+    } catch(error:unknown) {
+      toast.error('No se pudo exportar Ventas',{
+        description:error instanceof Error ? error.message : 'Revisa tu conexión y permisos.'
+      });
+    } finally {
+      setExportandoVentas(false);
     }
   };
 
@@ -886,21 +942,8 @@ export function Sales() {
     if (tab === 'Separación') {
       return filtrarSeparaciones(salesList, filtrosSeparacion);
     }
-    const q = query.trim().toLowerCase();
-    return salesList.filter((sale) => {
-      const byTab = sale.type === tab;
-      const byModality = modality === 'all' || sale.modality === modality;
-      const byAdvisor = advisorFilter === 'all' ||
-        (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
-        (advisorFilter === 'without_advisor' && !sale.advisor?.trim());
-      const byQuery = q.length === 0 ||
-        sale.buyer.toLowerCase().includes(q) ||
-        sale.code.toLowerCase().includes(q) ||
-        sale.lot.toLowerCase().includes(q) ||
-        sale.advisor.toLowerCase().includes(q);
-      return byTab && byModality && byAdvisor && byQuery;
-    });
-  }, [salesList, tab, query, modality, advisorFilter, filtrosSeparacion]);
+    return filtrarVentas(salesList,filtrosVenta);
+  }, [salesList, tab, filtrosSeparacion, filtrosVenta]);
 
   const textoVencimientoDetalle = detail?.type === 'Separación'
     ? leyendaVencimiento(detail.expiresAtIso, detail.status, instanteActual)
@@ -911,6 +954,12 @@ export function Sales() {
   const filasSeparacionesPagina = rows.slice(
     (paginaSeparacionesActual - 1) * tamanoPaginaSeparaciones,
     paginaSeparacionesActual * tamanoPaginaSeparaciones
+  );
+  const totalPaginasVentas = Math.max(1,Math.ceil(rows.length / tamanoPaginaVentas));
+  const paginaVentasActual = Math.min(paginaVentas,totalPaginasVentas);
+  const filasVentasPagina = rows.slice(
+    (paginaVentasActual-1)*tamanoPaginaVentas,
+    paginaVentasActual*tamanoPaginaVentas
   );
   const reservaAplicable = opType === 'Venta' && formLotId
     ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReserva ?? 0
@@ -1165,6 +1214,14 @@ export function Sales() {
             : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
         actions={
           <div className="flex items-center gap-2">
+            {tab === 'Venta' && (
+              <Gate permission="sales.export">
+                <Button icon={DownloadIcon} disabled={exportandoVentas}
+                  onClick={()=>void ejecutarExportacionVentas()}>
+                  {exportandoVentas ? 'Exportando…' : 'Exportar Excel'}
+                </Button>
+              </Gate>
+            )}
             {tab === 'Separación' && (
               <Gate permission="sales.export">
                 <Button
@@ -1187,15 +1244,21 @@ export function Sales() {
         }
       />
 
+      {(tab === 'Separación' || tab === 'Venta') && (
+        <ResumenComercialOperaciones
+          operaciones={salesList}
+          periodo={periodoComercial}
+          onChange={setPeriodoComercial}
+        />
+      )}
+
       <Tabs
         className="mb-5"
         active={tab}
         onChange={(id) => {
           setTab(id as typeof tab);
-          setQuery('');
-          setModality('all');
+          limpiarFiltrosVenta();
           limpiarFiltrosSeparacion();
-          setAdvisorFilter('all');
         }}
         items={[
           {
