@@ -118,6 +118,36 @@ export function EditarDatosCompradorModal({
     return () => { activo = false; };
   }, [open, idProspecto, puedeReasignar]);
 
+  useEffect(() => {
+    if (!open || !geo.idPais) return;
+    let activo = true;
+    setErrorGeo(null);
+    coreService.getUbicaciones(geo.idPais).then(datos => {
+      if (activo) setDepartamentos(datos.filter(u => u.tipo === 'DEPARTAMENTO'));
+    }).catch(() => {if (activo) setErrorGeo('No se pudo consultar el catálogo de departamentos.');});
+    return () => { activo = false; };
+  }, [open, geo.idPais]);
+
+  useEffect(() => {
+    if (!open || !geo.idDepartamento) return;
+    let activo = true;
+    setErrorGeo(null);
+    coreService.getUbicaciones(geo.idDepartamento).then(datos => {
+      if (activo) setProvincias(datos.filter(u => u.tipo === 'PROVINCIA'));
+    }).catch(() => {if (activo) setErrorGeo('No se pudo consultar el catálogo de provincias.');});
+    return () => { activo = false; };
+  }, [open, geo.idDepartamento]);
+
+  useEffect(() => {
+    if (!open || !geo.idProvincia) return;
+    let activo = true;
+    setErrorGeo(null);
+    coreService.getUbicaciones(geo.idProvincia).then(datos => {
+      if (activo) setDistritos(datos.filter(u => u.tipo === 'DISTRITO'));
+    }).catch(() => {if (activo) setErrorGeo('No se pudo consultar el catálogo de distritos.');});
+    return () => { activo = false; };
+  }, [open, geo.idProvincia]);
+
   const guardar = () => {
     setEnviado(true);
     if (!original || cargando || errorCarga) return;
@@ -236,11 +266,72 @@ export function EditarDatosCompradorModal({
               maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
               value={form.numeroDocumento} onChange={e => actualizar('numeroDocumento',e.target.value)}
               {...propsError('numeroDocumento')} />)}
-            {campo('direccion', 'Dirección', <Input maxLength={255} value={form.direccion}
-              onChange={e => actualizar('direccion', e.target.value)} {...propsError('direccion')} />)}
-            {campo('motivoContacto', 'Motivo de contacto *', <Input required maxLength={150}
-              value={form.motivoContacto} onChange={e => actualizar('motivoContacto', e.target.value)}
-              {...propsError('motivoContacto')} />, true)}
+            {campo('direccion', 'Dirección *', <Input required maxLength={255}
+              placeholder="Dirección de domicilio" value={form.direccion}
+              onChange={e => actualizar('direccion', e.target.value)}
+              aria-invalid={enviado && !form.direccion.trim()}
+              className={enviado && !form.direccion.trim() ? 'border-red-500' : ''}
+            />, true)}
+            <div className="min-w-0 sm:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">
+                Referencia del domicilio
+              </label>
+              <Input maxLength={255} placeholder="Referencia para ubicar el domicilio"
+                value={referencia} onChange={e => setReferencia(e.target.value)} />
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">País *</label>
+              <Select value={geo.idPais ?? ''} required disabled={paises.length <= 1}
+                onChange={e => {
+                  const idPais = Number(e.target.value) || null;
+                  setGeo({idPais,idDepartamento:null,idProvincia:null,idDistrito:null});
+                  setDepartamentos([]);setProvincias([]);setDistritos([]);
+                }}>
+                <option value="">Selecciona un país</option>
+                {paises.map(p => <option value={p.idUbicacion} key={p.idUbicacion}>{p.nombre}</option>)}
+              </Select>
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">Departamento *</label>
+              <Select required value={geo.idDepartamento ?? ''} disabled={!geo.idPais}
+                aria-invalid={enviado && !geo.idDepartamento}
+                onChange={e => {
+                  setGeo(p => ({...p,idDepartamento:Number(e.target.value)||null,
+                    idProvincia:null,idDistrito:null}));
+                  setProvincias([]);setDistritos([]);
+                }}>
+                <option value="">Seleccionar departamento</option>
+                {departamentos.map(d => <option value={d.idUbicacion} key={d.idUbicacion}>{d.nombre}</option>)}
+              </Select>
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">Provincia *</label>
+              <Select required value={geo.idProvincia ?? ''} disabled={!geo.idDepartamento}
+                aria-invalid={enviado && !geo.idProvincia}
+                onChange={e => {
+                  setGeo(p => ({...p,idProvincia:Number(e.target.value)||null,idDistrito:null}));
+                  setDistritos([]);
+                }}>
+                <option value="">{geo.idDepartamento ? 'Seleccionar provincia' : 'Primero selecciona departamento'}</option>
+                {provincias.map(p => <option value={p.idUbicacion} key={p.idUbicacion}>{p.nombre}</option>)}
+              </Select>
+            </div>
+            <div className="min-w-0">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-700">Distrito *</label>
+              <Select required value={geo.idDistrito ?? ''} disabled={!geo.idProvincia}
+                aria-invalid={enviado && !geo.idDistrito}
+                onChange={e => setGeo(p => ({...p,idDistrito:Number(e.target.value)||null}))}>
+                <option value="">{geo.idProvincia ? 'Seleccionar distrito' : 'Primero selecciona provincia'}</option>
+                {distritos.map(d => <option value={d.idUbicacion} key={d.idUbicacion}>{d.nombre}</option>)}
+              </Select>
+            </div>
+            {errorGeo && <p role="alert" className="text-xs text-red-600 sm:col-span-2">{errorGeo}</p>}
+            {enviado && (!geo.idPais || !geo.idDepartamento || !geo.idProvincia ||
+                !geo.idDistrito || !form.direccion.trim()) && (
+              <p role="alert" className="text-xs font-semibold text-red-600 sm:col-span-2">
+                Completa la dirección y su ubicación geográfica.
+              </p>
+            )}
             {campo('mensaje', 'Nota adicional', <Input maxLength={4000} value={form.mensaje}
               onChange={e => actualizar('mensaje', e.target.value)} {...propsError('mensaje')} />, true)}
             <div className="sm:col-span-2">
