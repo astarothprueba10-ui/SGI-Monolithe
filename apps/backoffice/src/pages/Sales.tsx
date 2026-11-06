@@ -36,7 +36,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
-import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
+import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -700,7 +700,7 @@ export function Sales() {
         validacion.modalidad !== formSaleModality ||
         Number(validacion.precioVigente) !== montoTotal ||
         Number(validacion.montoReservaAplicable) !== reservaAplicable ||
-        (esFinanciada && Number(validacion.planAleman?.capitalFinanciado) !==
+        (esFinanciada && Number(validacion.planFrances?.capitalFinanciado) !==
           resumenVenta.capitalFinanciado)
       ) {
         throw new Error('La validación comercial no coincide con la operación.');
@@ -2036,7 +2036,7 @@ export function Sales() {
                     </p>
                   </div>
                   <span className="rounded-full border border-brand-200 bg-white px-3 py-1 text-[11px] font-semibold text-brand-700">
-                    {formSaleModality === 'FINANCIADA' ? 'Financiamiento alemán' : 'Pago al contado'}
+                    {formSaleModality === 'FINANCIADA' ? 'Financiamiento francés' : 'Pago al contado'}
                   </span>
                 </div>
 
@@ -2201,19 +2201,19 @@ export function Sales() {
                     </dl>
                     {formSaleModality === 'FINANCIADA' && (
                       <div className="rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white p-3 sm:p-4">
-                        <p className="text-xs font-semibold text-sky-900">Cuota mensual inicial</p>
+                        <p className="text-xs font-semibold text-sky-900">Cuota mensual fija</p>
                         <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-900 sm:text-3xl">
-                          {currency(resumenVenta.cuotas[0]?.cuota ?? 0)}
+                          {currency(resumenVenta.cuotaMensual)}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-brand-600">
-                          <span>Última cuota: <strong>{currency(
+                          <span>Ajuste última cuota: <strong>{currency(
                             resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0
                           )}</strong></span>
                           <span>{resumenVenta.cuotas.length} cuotas mensuales</span>
                         </div>
                         <p className="mt-2 border-t border-sky-100 pt-2 text-[11px] leading-relaxed text-brand-600">
-                          Sistema alemán: las cuotas son decrecientes; la cifra destacada
-                          corresponde a la primera, no a un pago mensual fijo.
+                          Sistema francés: cuotas mensuales iguales, con amortización de capital creciente
+                          e intereses decrecientes. La última puede variar unos céntimos por redondeo.
                         </p>
                       </div>
                     )}
