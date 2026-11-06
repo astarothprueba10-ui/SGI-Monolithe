@@ -129,6 +129,7 @@ export function Sales() {
   >('Separación');
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
   const [salesList, setSalesList] = useState<Sale[]>([]);
@@ -142,7 +143,8 @@ export function Sales() {
   const [, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [opType, setOpType] = useState<'Separacion' | 'Venta'>('Separacion');
+  // El formulario pertenece a la pestaña; no se cambia el tipo dentro del modal.
+  const opType: 'Separacion' | 'Venta' = tab === 'Venta' ? 'Venta' : 'Separacion';
   const [availableLots, setAvailableLots] = useState<LoteResponse[]>([]);
   const [loadingLots, setLoadingLots] = useState(false); const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
   const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
@@ -409,10 +411,6 @@ export function Sales() {
 
   const validarFormularioSeparacion = (): boolean => {
     setFormTouched(true);
-    if (!['CONTADO', 'FINANCIADA'].includes(formSaleModality)) {
-      toast.error('Seleccione una modalidad de venta prevista.');
-      return false;
-    }
     if (!selectedProspectId) {
       toast.error('Debe seleccionar un prospecto del CRM.');
       return false;
@@ -481,7 +479,6 @@ export function Sales() {
       const res = await crmBackend.registrarSeparacion({
         idProspecto: prospectId,
         idLote: lotIdNum,
-        modalidadPrevista: formSaleModality,
         metodoPago: formPaymentMethod,
         numeroOperacion: formOperationNumber.trim() || null,
         monto: 500.00,
@@ -503,7 +500,6 @@ export function Sales() {
         description:
           `Código: ${res.codigo_reserva || res.id_reserva}. ` +
           `Monto: S/ 500.00 PEN. ` +
-          `Modalidad prevista: ${res.modalidad_prevista === 'FINANCIADA' ? 'Financiada' : 'Contado'}. ` +
           `Vence: ${vencimiento}. ` +
           'Comprobante pendiente de revisión por Finanzas.'
       });
@@ -806,7 +802,9 @@ export function Sales() {
     const q = query.trim().toLowerCase();
     return salesList.filter((sale) => {
       const byTab = sale.type === tab;
-      const byModality = modality === 'all' || sale.modality === modality;
+      const byModality = tab !== 'Venta' || modality === 'all' || sale.modality === modality;
+      const byPaymentMethod = tab !== 'Separación' ||
+        paymentMethodFilter === 'all' || sale.paymentMethod === paymentMethodFilter;
       const byAdvisor = advisorFilter === 'all' ||
         (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
         (advisorFilter === 'without_advisor' && sale.type === 'Venta' && !sale.advisor?.trim());
@@ -815,9 +813,9 @@ export function Sales() {
         sale.code.toLowerCase().includes(q) ||
         sale.lot.toLowerCase().includes(q) ||
         sale.advisor.toLowerCase().includes(q);
-      return byTab && byModality && byAdvisor && byQuery;
+      return byTab && byModality && byPaymentMethod && byAdvisor && byQuery;
     });
-  }, [salesList, tab, query, modality, advisorFilter]);
+  }, [salesList, tab, query, modality, paymentMethodFilter, advisorFilter]);
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
@@ -1031,11 +1029,13 @@ export function Sales() {
             <Gate permission="sales.export">
               <Button icon={DownloadIcon}>Exportar</Button>
             </Gate>
-            <Gate permission="sales.create">
-              <Button icon={PlusIcon} variant="primary" onClick={handleOpenModal}>
-                Nueva operación
-              </Button>
-            </Gate>
+            {(tab === 'Separación' || tab === 'Venta') && (
+              <Gate permission="sales.create">
+                <Button icon={PlusIcon} variant="primary" onClick={handleOpenModal}>
+                  {tab === 'Separación' ? 'Nueva Separación' : 'Nueva Venta'}
+                </Button>
+              </Gate>
+            )}
           </div>
         }
       />
@@ -1047,6 +1047,7 @@ export function Sales() {
           setTab(id as typeof tab);
           setQuery('');
           setModality('all');
+          setPaymentMethodFilter('all');
           setAdvisorFilter('all');
         }}
         items={[
@@ -1095,19 +1096,36 @@ export function Sales() {
               placeholder="Buscar por comprador, código o lote…"
               className="w-full sm:w-72"
             />
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
-              <Select
-                value={modality}
-                onChange={(e) => setModality(e.target.value as typeof modality)}
-                className="w-36"
-              >
-                <option value="all">Todas</option>
-                <option value="Contado">Contado</option>
-                <option value="Financiado">Financiado</option>
-                <option value="Reserva">Reserva</option>
-              </Select>
-            </div>
+            {tab === 'Separación' ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-medium text-brand-600">Método de pago:</span>
+                <Select
+                  value={paymentMethodFilter}
+                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                  className="w-48"
+                >
+                  <option value="all">Todos</option>
+                  <option value="Transferencia bancaria">Transferencia bancaria</option>
+                  <option value="Depósito bancario">Depósito bancario</option>
+                  <option value="Yape / Plin">Yape / Plin</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Otro">Otro</option>
+                </Select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-medium text-brand-600">Modalidad:</span>
+                <Select
+                  value={modality}
+                  onChange={(e) => setModality(e.target.value as typeof modality)}
+                  className="w-36"
+                >
+                  <option value="all">Todas</option>
+                  <option value="Contado">Contado</option>
+                  <option value="Financiado">Financiado</option>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-medium text-brand-600">Asesor:</span>
               <Select
@@ -1143,7 +1161,7 @@ export function Sales() {
                   <TH>Proyecto</TH>
                   <TH>Lote</TH>
                   <TH align="right">Monto</TH>
-                  <TH>Modalidad de pago</TH>
+                  <TH>Método de pago</TH>
                   <TH>Asesor</TH>
                   <TH>Estado</TH>
                   <TH align="right">Acciones</TH>
@@ -1192,8 +1210,8 @@ export function Sales() {
                     </TD>
 
 
-                    <TD className="min-w-[125px] text-brand-700">
-                      {sale.modality ?? 'Por definir'}
+                    <TD className="min-w-[155px] text-brand-700">
+                      {sale.paymentMethod ?? 'No registrado'}
                     </TD>
 
 
@@ -1373,7 +1391,9 @@ export function Sales() {
         open={isModalOpen}
         onClose={cerrarModalOperacion}
         title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
-        description="Selecciona prospecto, lote y condiciones comerciales para registrar en Supabase."
+        description={opType === 'Separacion'
+          ? 'Registra la separación de S/ 500 y adjunta su comprobante para revisión por Finanzas.'
+          : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -1417,34 +1437,6 @@ export function Sales() {
           </div>
         ) : (
           <form onSubmit={handleProcessOperation} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Tipo de Operación
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpType('Separacion')}
-                  className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Separacion'
-                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                    }`}
-                >
-                  Separación (S/ 500)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpType('Venta')}
-                  className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all ${opType === 'Venta'
-                    ? 'bg-brand-900 text-white border-brand-900 shadow-sm'
-                    : 'bg-white text-brand-700 border-brand-200 hover:bg-brand-50'
-                    }`}
-                >
-                  Venta (Inactiva)
-                </button>
-              </div>
-            </div>
-
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Prospecto (CRM) *
@@ -1641,22 +1633,6 @@ export function Sales() {
 
             {opType === 'Separacion' ? (
               <>
-                <div>
-                  <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                    Modalidad de venta prevista *
-                  </label>
-                  <Select
-                    value={formSaleModality}
-                    onChange={(e) => setFormSaleModality(e.target.value as 'CONTADO' | 'FINANCIADA')}
-                  >
-                    <option value="CONTADO">Al contado</option>
-                    <option value="FINANCIADA">Financiada</option>
-                  </Select>
-                  <p className="mt-1 text-[11px] text-brand-500">
-                    Es una previsión comercial. No genera cuotas ni formaliza una venta;
-                    las condiciones definitivas se confirmarán al contratar.
-                  </p>
-                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
