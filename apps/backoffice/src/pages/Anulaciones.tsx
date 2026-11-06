@@ -74,12 +74,18 @@ const resumenLegal = (s: CasoLegal): Expediente => ({
 
 export function Anulaciones() {
   const { can, user } = useAuth();
-  const comercial = can('sales.view');
-  const gerencia = can('sales.annul') && user.roles.includes('Gerencia');
-  const finanzas = can('finance.edit') && user.roles.includes('Finanzas') && !user.roles.includes('Gerencia');
-  const legal = can('sales.legal.review') && user.roles.includes('Asesoría Legal') && !user.roles.includes('Gerencia');
-  const puedeSolicitar = comercial && user.roles.some((r) =>
-    ['Gerencia','Administrador','Asesor','Supervisor comercial'].includes(r));
+  const puedeVer = can('annulments.view');
+  const comercial = puedeVer && can('sales.view') && user.roles.some((r) =>
+    ['Gerencia', 'Administrador', 'Asesor', 'Supervisor comercial'].includes(r));
+  const gerencia = puedeVer && user.roles.includes('Gerencia') &&
+    (can('annulments.approve') || can('annulments.reject'));
+  const finanzas = puedeVer && can('annulments.review_finance') &&
+    user.roles.includes('Finanzas') && !user.roles.includes('Gerencia');
+  const legal = puedeVer && can('annulments.review_legal') &&
+    user.roles.includes('Asesoría Legal') && !user.roles.includes('Gerencia');
+  const puedeSolicitar = comercial && can('annulments.create');
+  const accionesGerencia = ACCIONES.filter((accion) =>
+    accion.codigo === 'RECHAZAR' ? can('annulments.reject') : can('annulments.approve'));
 
   const [tab, setTab] = useState<Pestaña>(comercial ? 'solicitudes' : legal ? 'legal' : 'finanzas');
   const [items, setItems] = useState<SolicitudAnulacion[]>([]);
@@ -188,7 +194,10 @@ export function Anulaciones() {
 
   const abrirExpediente = (e: Expediente) => {
     setSeleccion(e);
-    setAccion(e.estado === 'SOLICITADA' ? 'INICIAR_REVISION' : 'DERIVAR_FINANZAS');
+    const preferida: AccionGerencia =
+      e.estado === 'SOLICITADA' ? 'INICIAR_REVISION' : 'DERIVAR_FINANZAS';
+    setAccion(accionesGerencia.some((a) => a.codigo === preferida)
+      ? preferida : accionesGerencia[0]?.codigo ?? 'RECHAZAR');
     setResultado('OBSERVADA');
     setSustento('');
     setIdEvidencia(null);
@@ -221,6 +230,10 @@ export function Anulaciones() {
     e.preventDefault();
     const s = seleccion;
     if (!s) return;
+    if (tab === 'solicitudes' && !accionesGerencia.some((a) => a.codigo === accion)) {
+      toast.error('No tienes permiso para realizar esta decisión.');
+      return;
+    }
     const texto = sustento.trim();
     const minimo = tab === 'solicitudes' ? 20 : 40;
     if (texto.length < minimo || texto.length > 2000) {
@@ -399,7 +412,7 @@ export function Anulaciones() {
           (legal || gerencia) &&
           <ExpedienteLegalPanel key={seleccion.idSolicitud}
             idSolicitud={seleccion.idSolicitud}
-            puedeCargar={gerencia && seleccion.estado === 'PENDIENTE_LEGAL'}
+            puedeCargar={gerencia && can('annulments.approve') && seleccion.estado === 'PENDIENTE_LEGAL'}
             seleccion={idEvidencia}
             onSeleccionar={tab === 'legal' ? setIdEvidencia : undefined} />}
 
@@ -423,7 +436,7 @@ export function Anulaciones() {
             {tab === 'solicitudes' ? <Select value={accion} disabled={guardando}
               aria-label="Acción de Gerencia"
               onChange={(e) => setAccion(e.target.value as AccionGerencia)}>
-              {ACCIONES.map((x) => <option key={x.codigo} value={x.codigo}>{x.nombre}</option>)}
+              {accionesGerencia.map((x) => <option key={x.codigo} value={x.codigo}>{x.nombre}</option>)}
             </Select> : <Select value={resultado} disabled={guardando}
               aria-label="Resultado de revisión"
               onChange={(e) => setResultado(e.target.value as ResultadoRevision)}>
