@@ -204,10 +204,14 @@ export function EditarDatosCompradorModal({
               <Select disabled={!puedeReasignar} value={form.idAsesor}
                 onChange={e => setForm(p => ({ ...p, idAsesor: e.target.value ? Number(e.target.value) : '' }))}
                 className={!puedeReasignar ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''}>
-                <option value="">Sin asesor asignado</option>
-                {!puedeReasignar && original?.idAsesor ? (
-                  <option value={original.idAsesor}>{asesorNombre || `Asesor #${original.idAsesor}`}</option>
-                ) : asesores.filter(a=>a.activo).map(a => (
+                <option value="" disabled={Boolean(original?.idAsesor)}>Sin asesor asignado</option>
+                {original?.idAsesor && (!puedeReasignar ||
+                    !asesores.some(a => a.id_asesor === original.idAsesor)) && (
+                  <option value={original.idAsesor}>
+                    {asesorNombre || `Asesor #${original.idAsesor}`}
+                  </option>
+                )}
+                {puedeReasignar && asesores.filter(a => a.activo).map(a => (
                   <option value={a.id_asesor} key={a.id_asesor}>{a.nombre_completo}</option>
                 ))}
               </Select>
