@@ -585,6 +585,19 @@ public class CrmVentaService {
                 """, actor, idVenta);
     }
 
+    /** Cronograma financiero: cuotas reales o proyección expresamente identificada. */
+    @Transactional(readOnly = true)
+    public JsonNode cronogramaVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta==null || idVenta<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
+        return ejecutar("""
+            SELECT public.sp_crm_cronograma_venta_v1(
+              CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idVenta);
+    }
+
     /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
     @Transactional(readOnly = true)
     public JsonNode rutaComprobanteVenta(Long actor, Long idVenta, Long idComprobante) {
