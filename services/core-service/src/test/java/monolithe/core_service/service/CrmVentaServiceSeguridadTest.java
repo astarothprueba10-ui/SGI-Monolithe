@@ -157,6 +157,19 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void registroVentaSinDatosPagoSeRechaza() throws Exception {
+        var comprador = tools.jackson.databind.json.JsonMapper.builder().build()
+                .readTree("{\"idProspecto\":1}");
+        var req = new FormalizarVentaCrmRequest(
+                1L, 74L, "CONTADO", new BigDecimal("29900.00"),
+                null, null, null, null, comprador, null);
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.registrarVentaPendiente(5L, req));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void historialRechazaLoteInvalido() {
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.historialComercialLote(5L, 0L));
