@@ -1081,6 +1081,14 @@ export const crmBackend = {
     );
   },
 
+  /** Exportación de ventas validada por sales.export y cartera en backend/SQL. */
+  listarVentasParaExportacion: (params: { pagina: number; tamano: number }) =>
+    coreApi.get<CrmOperacionesResponse>(
+      `/crm/ventas/exportacion${qs({
+        pagina: params.pagina, tamano: params.tamano
+      })}`
+    ),
+
   /** Usa sales.export en backend, nunca eleva el alcance del asesor. */
   listarOperacionesParaExportacion: (params: {
     pagina: number;
