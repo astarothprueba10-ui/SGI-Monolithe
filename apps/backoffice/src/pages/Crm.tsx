@@ -546,7 +546,7 @@ export function Crm() {
               idProyecto:projectFilter === '' ? undefined : projectFilter,
               desde:rangoConsulta.desde,hastaExclusivo:rangoConsulta.hastaExclusivo
             })
-          : await crmBackend.buscar({...filtros,categoria,
+          : await crmBackend.buscarSinPeriodo({...filtros,categoria,
               idProyecto:projectFilter === '' ? undefined : projectFilter});
 
       setLeadsList(res.items ?? []);
