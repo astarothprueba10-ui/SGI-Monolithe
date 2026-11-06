@@ -4,6 +4,7 @@ package monolithe.core_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.FormalizarVentaCrmRequest;
+import monolithe.core_service.dto.CorregirDatosPersonalesCrmRequest;
 import monolithe.core_service.service.CrmVentaService;
 import monolithe.core_service.dto.CancelarVentaPendienteRequest;
 import monolithe.core_service.dto.RegistrarEvidenciaContratoRequest;
@@ -231,6 +232,24 @@ public class CrmVentaController {
                                 obtenerActor(jwt),
                                 idVoucher,
                                 request);
+        }
+
+        @GetMapping("/prospectos/{idProspecto}/datos-personales")
+        @PreAuthorize("hasAuthority('crm.view')")
+        public ResponseEntity<JsonNode> datosPersonalesCrm(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.datosPersonalesCrm(obtenerActor(jwt),idProspecto));
+        }
+
+        @PatchMapping("/prospectos/{idProspecto}/datos-personales")
+        @PreAuthorize("hasAuthority('crm.edit')")
+        public ResponseEntity<JsonNode> corregirDatosPersonalesCrm(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto,
+                @Valid @RequestBody CorregirDatosPersonalesCrmRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.corregirDatosPersonalesCrm(
+                            obtenerActor(jwt),idProspecto,request.datos(),request.motivo()));
         }
 
         @GetMapping("/prospectos/buscar-sin-periodo")
