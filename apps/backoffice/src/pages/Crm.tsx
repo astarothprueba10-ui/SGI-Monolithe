@@ -2357,11 +2357,9 @@ export function Crm() {
                 <p className="font-medium text-brand-900">{leadDetail.prospecto.puntuacion || 'Medio'}</p>
               </div>
             </div>
-
-              </div>
             </section>
 
-            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
               <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700 mb-2">
                 Contactos registrados
               </h4>
@@ -2413,7 +2411,7 @@ export function Crm() {
             />
 
             {/* Historial de asignaciones comerciales */}
-            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
               <h4 className="text-[12px] font-bold uppercase tracking-wide text-brand-700 mb-3">
                 Historial de asignaciones ({assignmentsList.length})
               </h4>
@@ -2456,7 +2454,7 @@ export function Crm() {
             </div>
 
             {/* Historial de Seguimientos Comerciales */}
-            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Historial de seguimientos ({followUpsList.length})
@@ -2529,7 +2527,7 @@ export function Crm() {
             </div>
 
             {/* Visitas guiadas en el Expediente */}
-            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Visitas guiadas ({detailVisitsList.length})
