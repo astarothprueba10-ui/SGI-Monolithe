@@ -107,7 +107,18 @@ public class CrmSeparacionStorageService {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
         }
-        JsonNode info = ventaService.obtenerRutaVoucher(actor, idVoucher);
+        return firmarReferencia(ventaService.obtenerRutaVoucher(actor, idVoucher));
+    }
+
+    /** Comprobante del detalle comercial; no requiere permisos de Finanzas. */
+    public EnlaceLecturaVoucherResponse prepararLecturaPorReserva(Long actor, Long idReserva) {
+        if (actor == null || actor <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
+        }
+        return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor, idReserva));
+    }
+
+    private EnlaceLecturaVoucherResponse firmarReferencia(JsonNode info) {
         String clave = info.path("clave_archivo").asString("");
         String bucket = info.path("bucket").asString("");
         String nombre = info.path("nombre_archivo").asString("");
