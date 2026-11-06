@@ -1329,6 +1329,15 @@ public class CrmVentaService {
             return errorAnulacion;
         }
 
+        if (mensaje.contains("VENTA_NO_DISPONIBLE|")
+                || mensaje.contains("COMPROBANTE_NO_DISPONIBLE|")) {
+            // Evita revelar si una venta existe fuera del alcance autorizado.
+            return new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No se encontró la venta o el comprobante en su cartera autorizada.",
+                    ex);
+        }
+
         if (mensaje.contains("DENEGADO|")) {
             return new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
