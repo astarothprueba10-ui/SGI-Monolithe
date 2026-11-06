@@ -108,7 +108,8 @@ export function WebContent() {
   const editable = Boolean(puedeEditar && seccionActiva && slide?.estado === 'EDITOR_CMS');
   const tieneCambioGuardado = Boolean(seleccionado && seccionActiva &&
     seccionGuardada(seleccionado.contenidoPendiente, seccionActiva.idSeccion));
-  const imagenesVerificadas = PUBLICACION_IMAGENES_HABILITADA && previsualizando &&
+  // La validación visual no depende del interruptor de publicación.
+  const imagenesVerificadas = previsualizando &&
     revisionPrevisualizada === seleccionado?.revisionEdicion
       ? new Set(imagenesPendientes.map((imagen) => imagen.idSeccion))
       : new Set<number>();
@@ -433,6 +434,7 @@ export function WebContent() {
                   <h4 className="text-xs font-semibold text-brand-800">Resumen de los textos y fondos de este borrador</h4>
                   <div className="rounded border border-brand-100 p-3 text-xs">
                     <p className="font-semibold text-brand-800">Imágenes privadas pendientes: {imagenesPendientes.length}</p>
+                    <p className="mt-1 text-brand-600">Campos de texto pendientes: {evaluacionPublicacion.secciones.reduce((total, item) => total + item.textos.length, 0)}</p>
                     {imagenesPendientes.map((imagen) => (
                       <p key={imagen.idSeccion} className="mt-1 text-brand-600">
                         Sección #{imagen.idSeccion} · {imagen.mimeType} · {imagen.tamanoBytes ?? 0} bytes
