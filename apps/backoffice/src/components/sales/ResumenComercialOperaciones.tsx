@@ -136,7 +136,7 @@ export function ResumenComercialOperaciones({ operaciones, periodo, onChange }: 
                   <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="#E2E8F0"/>
                   <XAxis dataKey="mes" tick={{fontSize:11,fill:'#64748B'}} tickLine={false} axisLine={false}/>
                   <YAxis allowDecimals={false} tick={{fontSize:11,fill:'#64748B'}} tickLine={false} axisLine={false}/>
-                  <Tooltip formatter={(value:number, name:string)=>[value+' operaciones',name]}/>
+                  <Tooltip cursor={{fill: "#F1F5F9"}} />
                   <Legend wrapperStyle={{fontSize:12}}/>
                   <Bar dataKey="separaciones" name="Separaciones" fill="#38A3D1" radius={[4,4,0,0]} maxBarSize={35}/>
                   <Bar dataKey="ventas" name="Ventas" fill="#16A77A" radius={[4,4,0,0]} maxBarSize={35}/>
