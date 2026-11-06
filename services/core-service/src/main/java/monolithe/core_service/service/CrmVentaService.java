@@ -464,6 +464,27 @@ public class CrmVentaService {
                 paginaActual, tamanoActual);
     }
 
+    /** La BD vuelve a validar sales.export y limita los registros al actor. */
+    @Transactional(readOnly = true)
+    public JsonNode listarSeparacionesParaExportacion(
+            Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int numero = pagina == null ? 1 : pagina;
+        int cantidad = tamano == null ? 100 : tamano;
+        if (numero < 1 || numero > 100000 || cantidad < 1 || cantidad > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginacion de exportacion invalida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_exportar_separaciones_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """,
+                actor, numero, cantidad);
+    }
+
     @Transactional
     public JsonNode registrarEvidenciaContrato(
             Long actor,
