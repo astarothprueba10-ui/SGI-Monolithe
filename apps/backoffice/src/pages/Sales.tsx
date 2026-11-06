@@ -2235,9 +2235,15 @@ export function Sales() {
           <div className="space-y-4 text-sm">
             <dl className="grid grid-cols-2 gap-3">
               <div>
-                <dt className="text-brand-500">Comprador</dt>
+                <dt className="text-brand-500">Cliente comprador revisado</dt>
                 <dd className="font-semibold text-brand-900">
-                  {confirmacionVenta.codigoProspecto}
+                  {[confirmacionVenta.datos.datosComprador?.nombres,
+                    confirmacionVenta.datos.datosComprador?.apellidoPaterno,
+                    confirmacionVenta.datos.datosComprador?.apellidoMaterno]
+                    .filter(Boolean).join(' ')}
+                  <span className="mt-1 block font-mono text-[11px] font-normal text-brand-500">
+                    {confirmacionVenta.datos.datosComprador?.tipoDocumento}: {confirmacionVenta.datos.datosComprador?.numeroDocumento}
+                  </span>
                 </dd>
               </div>
 
