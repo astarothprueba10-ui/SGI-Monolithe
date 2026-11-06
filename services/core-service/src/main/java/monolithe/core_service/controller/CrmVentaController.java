@@ -11,6 +11,7 @@ import monolithe.core_service.service.CrmContratoStorageService;
 import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
 import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
@@ -107,6 +108,14 @@ public class CrmVentaController {
                 return service.registrarVentaPendiente(
                                 obtenerActor(jwt),
                                 request);
+        }
+
+        @PostMapping("/ventas/preparar-comprobante")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public EnlaceCargaVoucherResponse prepararComprobanteVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody PrepararCargaVoucherVentaRequest request) {
+                return separacionStorageService.prepararCargaVenta(obtenerActor(jwt), request);
         }
 
         @PostMapping("/separaciones/preparar-comprobante")
