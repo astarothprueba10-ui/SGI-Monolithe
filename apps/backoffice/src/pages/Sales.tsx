@@ -807,7 +807,7 @@ export function Sales() {
         paymentMethodFilter === 'all' || sale.paymentMethod === paymentMethodFilter;
       const byAdvisor = advisorFilter === 'all' ||
         (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
-        (advisorFilter === 'without_advisor' && sale.type === 'Venta' && !sale.advisor?.trim());
+        (advisorFilter === 'without_advisor' && !sale.advisor?.trim());
       const byQuery = q.length === 0 ||
         sale.buyer.toLowerCase().includes(q) ||
         sale.code.toLowerCase().includes(q) ||
@@ -1097,7 +1097,9 @@ export function Sales() {
             <SearchInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Buscar por comprador, código o lote…"
+              placeholder={tab === 'Separación'
+                ? "Buscar por prospecto, código o lote…"
+                : "Buscar por comprador, código o lote…"}
               className="w-full sm:w-72"
             />
             {tab === 'Separación' ? (
@@ -1707,7 +1709,7 @@ export function Sales() {
 
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                    Comprobante de Pago * (PDF, JPG, PNG - Máx. 5 MB)
+                    Comprobante de pago * (PDF, JPG, PNG o WebP - Máx. 5 MB)
                   </label>
                   <div className="flex items-center gap-2">
                     <input
