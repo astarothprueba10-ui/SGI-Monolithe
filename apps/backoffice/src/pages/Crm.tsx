@@ -509,12 +509,16 @@ export function Crm() {
     }
   }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
 
+  // El período global solo entra en consultas de Visitas; Leads y Potenciales
+  // dependen únicamente de las fechas propias de sus tablas.
+  const rangoBusquedaLeads = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const rangoConsulta = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+      const rangoConsulta = rangoBusquedaLeads;
       if (rangoConsulta === undefined || (tab === 'visitas' && !rangoConsulta)) {
         setLeadsList([]);
         setTotalLeads(0);
@@ -569,7 +573,7 @@ export function Crm() {
       setIsLoading(false);
     }
 
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla, puedeVerGestionGlobal]);
+  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoBusquedaLeads, puedeVerGestionGlobal]);
 
 
   const loadBuyers = useCallback(async () => {
