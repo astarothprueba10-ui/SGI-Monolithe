@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon } from 'lucide-react';
+import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon, CalendarDaysIcon, RotateCcwIcon, CreditCardIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -11,6 +11,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
+import { useAuth } from '../contexts/AuthContext';
 import { currency } from '../utils/format';
 import { salesService } from '../services/salesService';
 import {
@@ -27,6 +28,12 @@ import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
+import {
+  FILTROS_SEPARACIONES_INICIALES,
+  filtrarSeparaciones, leyendaVencimiento, opcionesUnicasSeparaciones,
+  type FiltrosSeparaciones
+} from '../utils/separacionesFiltros';
+import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -124,12 +131,15 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 
 export function Sales() {
+  const { can } = useAuth();
   const [tab, setTab] = useState<
     'Separación' | 'Venta' | 'Contratos' | 'Anexos'
   >('Separación');
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState<'all' | Sale['modality']>('all');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
+  const [filtrosSeparacion, setFiltrosSeparacion] = useState<FiltrosSeparaciones>(FILTROS_SEPARACIONES_INICIALES);
+  const [exportandoSeparaciones, setExportandoSeparaciones] = useState(false);
+  const [instanteActual, setInstanteActual] = useState(() => Date.now());
   const [advisorFilter, setAdvisorFilter] = useState<'all' | 'with_advisor' | 'without_advisor'>('all');
   const [detail, setDetail] = useState<Sale | null>(null);
   const [salesList, setSalesList] = useState<Sale[]>([]);
@@ -179,6 +189,55 @@ export function Sales() {
   } | null>(null);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
+
+  useEffect(() => {
+    if (!detail || detail.type !== 'Separación') return;
+    setInstanteActual(Date.now());
+    const intervalo = window.setInterval(() => setInstanteActual(Date.now()), 60_000);
+    return () => window.clearInterval(intervalo);
+  }, [detail]);
+
+  const cambiarFiltroSeparacion = (campo: keyof FiltrosSeparaciones, valor: string) =>
+    setFiltrosSeparacion((previo) => ({ ...previo, [campo]: valor }));
+
+  const proyectosFiltro = useMemo(
+    () => opcionesUnicasSeparaciones(salesList, 'project'),
+    [salesList]
+  );
+  const asesoresFiltro = useMemo(
+    () => opcionesUnicasSeparaciones(salesList, 'advisor'),
+    [salesList]
+  );
+  const metodosFiltro = useMemo(
+    () => opcionesUnicasSeparaciones(salesList, 'paymentMethod'),
+    [salesList]
+  );
+
+  const ejecutarExportacionSeparaciones = async () => {
+    if (tab !== 'Separación' || exportandoSeparaciones) return;
+    if (!can('sales.view') || !can('sales.export')) {
+      toast.error('No tienes permiso para exportar separaciones.');
+      return;
+    }
+    if (filtrosSeparacion.desde && filtrosSeparacion.hasta &&
+        filtrosSeparacion.desde > filtrosSeparacion.hasta) {
+      toast.error('La fecha desde no puede ser posterior a la fecha hasta.');
+      return;
+    }
+    setExportandoSeparaciones(true);
+    try {
+      const resultado = await exportarSeparacionesExcel(filtrosSeparacion);
+      toast.success('Reporte Excel generado', {
+        description: `${resultado.total} separaciones exportadas con el alcance de tu cartera autorizada.`
+      });
+    } catch (error: unknown) {
+      toast.error('No se pudo exportar Separaciones', {
+        description: error instanceof Error ? error.message : 'Revisa la conexión y los permisos.'
+      });
+    } finally {
+      setExportandoSeparaciones(false);
+    }
+  };
 
   const fetchSalesData = async () => {
     setLoading(true);
@@ -799,12 +858,13 @@ export function Sales() {
   };
 
   const rows = useMemo(() => {
+    if (tab === 'Separación') {
+      return filtrarSeparaciones(salesList, filtrosSeparacion);
+    }
     const q = query.trim().toLowerCase();
     return salesList.filter((sale) => {
       const byTab = sale.type === tab;
-      const byModality = tab !== 'Venta' || modality === 'all' || sale.modality === modality;
-      const byPaymentMethod = tab !== 'Separación' ||
-        paymentMethodFilter === 'all' || sale.paymentMethod === paymentMethodFilter;
+      const byModality = modality === 'all' || sale.modality === modality;
       const byAdvisor = advisorFilter === 'all' ||
         (advisorFilter === 'with_advisor' && Boolean(sale.advisor?.trim())) ||
         (advisorFilter === 'without_advisor' && !sale.advisor?.trim());
@@ -813,9 +873,9 @@ export function Sales() {
         sale.code.toLowerCase().includes(q) ||
         sale.lot.toLowerCase().includes(q) ||
         sale.advisor.toLowerCase().includes(q);
-      return byTab && byModality && byPaymentMethod && byAdvisor && byQuery;
+      return byTab && byModality && byAdvisor && byQuery;
     });
-  }, [salesList, tab, query, modality, paymentMethodFilter, advisorFilter]);
+  }, [salesList, tab, query, modality, advisorFilter, filtrosSeparacion]);
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
@@ -1030,9 +1090,17 @@ export function Sales() {
             : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
         actions={
           <div className="flex items-center gap-2">
-            <Gate permission="sales.export">
-              <Button icon={DownloadIcon}>Exportar</Button>
-            </Gate>
+            {tab === 'Separación' && (
+              <Gate permission="sales.export">
+                <Button
+                  icon={DownloadIcon}
+                  disabled={exportandoSeparaciones}
+                  onClick={() => void ejecutarExportacionSeparaciones()}
+                >
+                  {exportandoSeparaciones ? 'Exportando…' : 'Exportar Excel'}
+                </Button>
+              </Gate>
+            )}
             {(tab === 'Separación' || tab === 'Venta') && (
               <Gate permission="sales.create">
                 <Button icon={PlusIcon} variant="primary" onClick={handleOpenModal}>
@@ -1051,7 +1119,7 @@ export function Sales() {
           setTab(id as typeof tab);
           setQuery('');
           setModality('all');
-          setPaymentMethodFilter('all');
+          setFiltrosSeparacion(FILTROS_SEPARACIONES_INICIALES);
           setAdvisorFilter('all');
         }}
         items={[
