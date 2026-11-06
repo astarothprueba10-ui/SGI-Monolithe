@@ -50,3 +50,11 @@ Primero conciliar cambios locales con esta rama, ejecutar builds Vite, Maven y P
 - El título «Conoce nuestra propuesta inmobiliaria en Picsi», la descripción comercial y el fondo original permanecen sin cambios.
 - Prueba completada de extremo a extremo para texto: Backoffice → borrador #13 → historial/revisión pública 1 → API pública → React.
 - **Próximo gate:** crear borrador exclusivo para imagen del slide 2, guardar imagen en Storage privado, recargar/recuperar/verificar hash, y solo después activar publicación de fondos con la bandera de servidor y Backoffice. No se ha publicado aún imagen nueva.
+
+## Confirmación: primera publicación de imagen (revisión 2)
+
+- 2026-11-06 05:22 UTC: Backoffice notificó **«Contenido publicado correctamente. Revisión pública 2»** para el borrador **#14**, exclusivo de imagen del slide 2.
+- Se verificó en Supabase (solo lectura) el estado `PUBLICADO`, revisión pública `1 → 2`, historial de publicación **#2**, y el subtítulo previo del slide 2 conservado sin modificaciones.
+- Existe el objeto JPEG de **30.837 bytes** en el bucket público `cms-public`, bajo la ruta `contenido-web/inicio/2/`; registro multimedia nuevo activo, asignado al slide 2 con uso `FONDO` y visibilidad activa.
+- Smoke HTTP enviado por el usuario: `PASS: INICIO (2 secciones), proyectos (2)`; comprobación de no exposición de borradores y lectura GET. La prueba smoke no verifica visualización ni la descarga de medios.
+- Pendiente: verificar visualmente que React muestra **la nueva fotografía** del slide 2 (no solo su subtítulo), confirmar que el navegador carga la URL del bucket sin errores y retirar los flags de publicación de QA (manteniendo habilitada lectura pública).
