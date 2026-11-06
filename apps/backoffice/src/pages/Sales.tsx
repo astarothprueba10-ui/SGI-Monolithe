@@ -194,7 +194,16 @@ export function Sales() {
     if (!detail || detail.type !== 'Separación') return;
     setInstanteActual(Date.now());
     const intervalo = window.setInterval(() => setInstanteActual(Date.now()), 60_000);
-    return () => window.clearInterval(intervalo);
+    const vencimiento = detail.expiresAtIso ? Date.parse(detail.expiresAtIso) : NaN;
+    const milisegundos = vencimiento - Date.now();
+    // Además de actualizar por minuto, pasar a «Vencida» al cumplirse la hora exacta.
+    const timeout = Number.isFinite(milisegundos) && milisegundos > 0
+      ? window.setTimeout(() => setInstanteActual(Date.now()), milisegundos + 100)
+      : null;
+    return () => {
+      window.clearInterval(intervalo);
+      if (timeout !== null) window.clearTimeout(timeout);
+    };
   }, [detail]);
 
   const cambiarFiltroSeparacion = (campo: keyof FiltrosSeparaciones, valor: string) =>
