@@ -851,6 +851,16 @@ export const crmBackend = {
     categoria: f.categoria ?? 'TODOS', pagina: f.pagina ?? 1, tamano: f.tamano ?? 20
   })}`),
 
+  buscarSinPeriodo: (f: CrmSearch & {idProyecto?: number}) =>
+    coreApi.get<CrmPage<CrmProspect>>(
+      `/crm/prospectos/buscar-sin-periodo${qs({
+        consulta:f.consulta?.trim(),etapa:f.etapa,origen:f.origen,
+        idAsesor:f.idAsesor,sinAsignar:f.sinAsignar,
+        categoria:f.categoria ?? 'TODOS',pagina:f.pagina ?? 1,
+        tamano:f.tamano ?? 15,idProyecto:f.idProyecto
+      })}`
+    ),
+
   buscarPeriodo: (f: CrmSearchPeriodo) =>
     coreApi.get<CrmPage<CrmProspect>>(
       `/crm/prospectos/buscar-periodo${qs({
