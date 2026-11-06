@@ -19,11 +19,14 @@ import tools.jackson.databind.json.JsonMapper;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
+import monolithe.core_service.dto.FormalizarVentaCrmRequest;
 
 @Service
 public class CrmSeparacionStorageService {
 
     private static final String BUCKET = "vouchers-separacion-private";
+    private static final String BUCKET_VENTAS = "vouchers-ventas-private";
     private static final long MAX_BYTES = 5242880L;
     private static final int EXPIRY_SECONDS = 300;
     private static final Set<String> MIMES_PERMITIDOS = Set.of(
@@ -58,6 +61,42 @@ public class CrmSeparacionStorageService {
         String ruta = "/object/upload/sign/" + BUCKET + "/" + clave;
         String respuesta = solicitarUrlCargaStorage(base + ruta);
         return extraerEnlaceCarga(respuesta, clave, base, ruta, req.tipoMime());
+    }
+
+    /** Ventas: genera URL de carga privada después de verificar lote, precio y cartera. */
+    public EnlaceCargaVoucherResponse prepararCargaVenta(
+            Long actor, PrepararCargaVoucherVentaRequest req) {
+        if (actor == null || actor <= 0 || req == null || req.idProspecto() == null
+                || req.idLote() == null || req.tipoMime() == null
+                || !MIMES_PERMITIDOS.contains(req.tipoMime())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solicitud de comprobante de venta invalida.");
+        }
+        ventaService.validar(actor, new FormalizarVentaCrmRequest(
+                req.idProspecto(), req.idLote(), req.modalidad(), req.montoTotal(),
+                req.montoInicial(), req.numeroCuotas(), null, null, null));
+        String extension = resolverExtension(req.tipoMime());
+        String clave = "ventas/p-" + req.idProspecto() + "/l-" + req.idLote()
+                + "/" + UUID.randomUUID() + "." + extension;
+        String base = validarYResolverBase();
+        String ruta = "/object/upload/sign/" + BUCKET_VENTAS + "/" + clave;
+        String respuesta = solicitarUrlCargaStorage(base + ruta);
+        try {
+            JsonNode json = jsonMapper.readTree(respuesta);
+            String rutaFirmada = json.path("url").asString("");
+            URI enlace = URI.create(rutaFirmada);
+            if (enlace.isAbsolute() || !ruta.equals(enlace.getRawPath())
+                    || enlace.getRawQuery() == null
+                    || !enlace.getRawQuery().startsWith("token=")) {
+                throw new IllegalStateException("Enlace de carga invalido.");
+            }
+            return new EnlaceCargaVoucherResponse(
+                    BUCKET_VENTAS, clave, base + rutaFirmada,
+                    req.tipoMime(), MAX_BYTES, EXPIRY_SECONDS);
+        } catch (JacksonException | IllegalArgumentException | IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Storage devolvio un enlace de carga invalido.", ex);
+        }
     }
 
     private void validarSolicitudCarga(Long actor, PrepararCargaVoucherSeparacionRequest req) {
