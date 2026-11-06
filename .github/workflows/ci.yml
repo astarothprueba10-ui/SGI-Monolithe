@@ -74,7 +74,7 @@ jobs:
 
       - name: Compile and Test Compile
         working-directory: ${{ matrix.service }}
-        run: ./mvnw test-compile -B --no-transfer-progress
+        run: ./mvnw test -B --no-transfer-progress
 
   core-service-validation:
     name: Core Service - Tests
