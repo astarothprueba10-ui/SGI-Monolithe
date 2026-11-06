@@ -19,6 +19,7 @@ import {
   crmBackend,
   type CrmProspect,
   type CrmSaleValidationInput,
+  type CrmDatosCompradorVenta,
   type CrmReservaVigenteVenta,
   type CrmContratoDocumentacion
 } from '../services/crmBackend';
@@ -30,6 +31,7 @@ import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
+import { EditarDatosCompradorModal } from '../components/sales/EditarDatosCompradorModal';
 import {
   FILTROS_SEPARACIONES_INICIALES,
   filtrarSeparaciones, leyendaVencimiento, opcionesUnicasSeparaciones,
@@ -134,7 +136,9 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 
 export function Sales() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const puedeReasignarComprador = can('crm.edit') && user.roles.some((r) =>
+    r === 'Gerencia' || r === 'Supervisor comercial');
   const [tab, setTab] = useState<
     'Separación' | 'Venta' | 'Contratos' | 'Anexos'
   >('Separación');
@@ -198,6 +202,15 @@ export function Sales() {
     idAsesor?: number | null;
     resumen: ResumenVentaCalculado;
   } | null>(null);
+
+  const [datosVentaValidados, setDatosVentaValidados] = useState<{
+    datos: CrmSaleValidationInput;
+    codigoProspecto: string;
+    codigoLote: string;
+    idAsesor?: number | null;
+    resumen: ResumenVentaCalculado;
+  } | null>(null);
+  const [editandoComprador, setEditandoComprador] = useState(false);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
 
@@ -433,6 +446,9 @@ export function Sales() {
     setFormOperationNumber('');
     setVoucherFile(null);
     setFormObservations('');
+    setDatosVentaValidados(null);
+    setEditandoComprador(false);
+    setConfirmacionVenta(null);
     setIsModalOpen(true);
   };
 
@@ -444,6 +460,8 @@ export function Sales() {
     ) return;
 
     setIsModalOpen(false);
+    setDatosVentaValidados(null);
+    setEditandoComprador(false);
   };
 
   const handleSelectLot = (lotIdStr: string) => {
@@ -631,7 +649,7 @@ export function Sales() {
   };
 
 
-  const ejecutarRegistroVentaPendiente = async () => {
+  const validarVentaAntesDeRevisarComprador = async () => {
     if (submitting || registroVentaEnCursoRef.current) return;
 
     const idProspecto = Number(selectedProspectId);
@@ -712,13 +730,14 @@ export function Sales() {
         throw new Error('La validación comercial no coincide con la operación.');
       }
 
-      setConfirmacionVenta({
+      setDatosVentaValidados({
         datos,
         codigoProspecto: validacion.codigoProspecto,
         codigoLote: validacion.codigoLote,
         idAsesor: validacion.idAsesor,
         resumen: resumenVenta!
       });
+      setEditandoComprador(true);
 
     } catch (err: unknown) {
       toast.error('No se pudo confirmar el registro de venta', {
@@ -740,101 +759,7 @@ export function Sales() {
 
     if (opType === 'Venta') {
       setFormTouched(true);
-
-      if (!selectedProspectId || !formLotId) {
-        toast.error('Seleccione un prospecto y un lote.');
-        return;
-      }
-
-      const idLote = Number(formLotId);
-      const loteSeleccionado = availableLots.find(
-        (lote) => lote.idLote === idLote
-      );
-
-      if (!loteSeleccionado) {
-        toast.error('El lote seleccionado ya no está disponible.');
-        return;
-      }
-
-      if (
-        estadoPrecio !== 'disponible' ||
-        !precioLote ||
-        precioLote.idLote !== idLote
-      ) {
-        toast.error('Debe verificarse el precio oficial del lote.');
-        return;
-      }
-
-      const montoTotal = Number(precioLote.precio);
-
-      if (!Number.isFinite(montoTotal) || montoTotal <= 0) {
-        toast.error('El precio oficial no es válido.');
-        return;
-      }
-
-      const financiada = formSaleModality === 'FINANCIADA';
-      const montoInicial = Number(formSaleDownPayment);
-      const numeroCuotas = Number(formSaleInstallments);
-
-      if (financiada) {
-        if (
-          !formSaleDownPayment.trim() ||
-          !Number.isFinite(montoInicial) ||
-          montoInicial < 5000 ||
-          montoInicial + reservaAplicable >= montoTotal
-        ) {
-          toast.error('La inicial adicional debe ser desde S/ 5,000 y dejar saldo financiable después de la reserva.');
-          return;
-        }
-
-        if (
-          !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
-        ) {
-          toast.error('El plazo de financiamiento debe ser un número entero entre 1 y 36 meses.');
-          return;
-        }
-      }
-
-      setSubmitting(true);
-
-      try {
-        const resultado = await crmBackend.validarVenta({
-          idProspecto: Number(selectedProspectId),
-          idLote,
-          modalidad: formSaleModality,
-          montoTotal,
-          montoInicial: financiada ? montoInicial : null,
-          numeroCuotas: financiada ? numeroCuotas : null,
-          tasaInteresMensualPct: null,
-          observaciones: formObservations.trim() || null
-        });
-
-        if (!resultado.elegible) {
-          toast.error(
-            resultado.mensaje || 'La operación no es elegible.'
-          );
-          return;
-        }
-
-        toast.success('Validación comercial satisfactoria', {
-          description:
-            `Lote: ${resultado.codigoLote}. ` +
-            `Modalidad: ${resultado.modalidad}. ` +
-            `Precio oficial: ${currency(resultado.precioVigente)}. ` +
-            'La venta todavía no ha sido registrada.',
-          duration: 8000
-        });
-      } catch (err: unknown) {
-        toast.error('No se pudo validar la venta', {
-          description:
-            err instanceof Error
-              ? err.message
-              : 'Error al consultar Core Service.'
-        });
-      } finally {
-        setSubmitting(false);
-      }
-
+      await validarVentaAntesDeRevisarComprador();
       return;
     }
 
@@ -862,6 +787,9 @@ export function Sales() {
     setSubmitting(true);
 
     try {
+      if (!solicitud.datos.datosComprador) {
+        throw new Error('Revise primero los datos del comprador.');
+      }
       const resultado = await crmBackend.registrarVentaPendiente(
         solicitud.datos
       );
@@ -1715,15 +1643,7 @@ export function Sales() {
                   : 'Validar Venta'}
             </Button>
 
-            {opType === 'Venta' && (
-              <Button
-                variant="primary"
-                disabled={submitting || loadingLots || ventaFinanciadaInvalida}
-                onClick={() => void ejecutarRegistroVentaPendiente()}
-              >
-                Registrar Venta Pendiente
-              </Button>
-            )}
+
           </div>
         }
       >
@@ -2255,6 +2175,32 @@ export function Sales() {
       </Modal>
 
 
+      <EditarDatosCompradorModal
+        open={editandoComprador && datosVentaValidados !== null}
+        idProspecto={datosVentaValidados?.datos.idProspecto ?? 0}
+        lote={datosVentaValidados?.codigoLote ?? ''}
+        proyecto={availableProjects.find((p) => p.idProyecto === Number(formProjectId))?.nombre ?? ''}
+        modalidad={datosVentaValidados?.datos.modalidad ?? 'CONTADO'}
+        puedeReasignar={puedeReasignarComprador}
+        onClose={() => {
+          if (!submitting) {
+            setEditandoComprador(false);
+            setDatosVentaValidados(null);
+          }
+        }}
+        onGuardar={(datosComprador: CrmDatosCompradorVenta) => {
+          if (!datosVentaValidados) return;
+          setConfirmacionVenta({
+            ...datosVentaValidados,
+            datos: { ...datosVentaValidados.datos, datosComprador },
+            idAsesor: datosComprador.idAsesor ?? datosVentaValidados.idAsesor
+          });
+          setEditandoComprador(false);
+          setDatosVentaValidados(null);
+          toast.info('Ficha revisada. Los cambios se guardarán al confirmar el registro de la venta.');
+        }}
+      />
+
       <Modal
         open={confirmacionVenta !== null}
         onClose={() => {
@@ -2263,7 +2209,7 @@ export function Sales() {
           }
         }}
         title="Confirmar registro de venta"
-        description="Verifique los datos antes de registrar la operación."
+        description="Confirma el registro pendiente y la actualización conjunta de los datos contractuales."
         footer={
           <>
             <Button
