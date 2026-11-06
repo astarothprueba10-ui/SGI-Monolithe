@@ -19,11 +19,14 @@ import tools.jackson.databind.json.JsonMapper;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
+import monolithe.core_service.dto.FormalizarVentaCrmRequest;
 
 @Service
 public class CrmSeparacionStorageService {
 
     private static final String BUCKET = "vouchers-separacion-private";
+    private static final String BUCKET_VENTAS = "vouchers-ventas-private";
     private static final long MAX_BYTES = 5242880L;
     private static final int EXPIRY_SECONDS = 300;
     private static final Set<String> MIMES_PERMITIDOS = Set.of(
@@ -58,6 +61,46 @@ public class CrmSeparacionStorageService {
         String ruta = "/object/upload/sign/" + BUCKET + "/" + clave;
         String respuesta = solicitarUrlCargaStorage(base + ruta);
         return extraerEnlaceCarga(respuesta, clave, base, ruta, req.tipoMime());
+    }
+
+    /** Ventas: genera URL de carga privada después de verificar lote, precio y cartera. */
+    public EnlaceCargaVoucherResponse prepararCargaVenta(
+            Long actor, PrepararCargaVoucherVentaRequest req) {
+        if (actor == null || actor <= 0 || req == null || req.idProspecto() == null
+                || req.idLote() == null || req.tipoMime() == null
+                || !MIMES_PERMITIDOS.contains(req.tipoMime())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solicitud de comprobante de venta invalida.");
+        }
+        JsonNode validacion = ventaService.validar(actor, new FormalizarVentaCrmRequest(
+                req.idProspecto(), req.idLote(), req.modalidad(), req.montoTotal(),
+                req.montoInicial(), req.numeroCuotas(), null, null, null, null));
+        if (!validacion.path("elegible").asBoolean(false)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El prospecto o lote no es elegible para la venta.");
+        }
+        String extension = resolverExtension(req.tipoMime());
+        String clave = "ventas/p-" + req.idProspecto() + "/l-" + req.idLote()
+                + "/" + UUID.randomUUID() + "." + extension;
+        String base = validarYResolverBase();
+        String ruta = "/object/upload/sign/" + BUCKET_VENTAS + "/" + clave;
+        String respuesta = solicitarUrlCargaStorage(base + ruta);
+        try {
+            JsonNode json = jsonMapper.readTree(respuesta);
+            String rutaFirmada = json.path("url").asString("");
+            URI enlace = URI.create(rutaFirmada);
+            if (enlace.isAbsolute() || !ruta.equals(enlace.getRawPath())
+                    || enlace.getRawQuery() == null
+                    || !enlace.getRawQuery().startsWith("token=")) {
+                throw new IllegalStateException("Enlace de carga invalido.");
+            }
+            return new EnlaceCargaVoucherResponse(
+                    BUCKET_VENTAS, clave, base + rutaFirmada,
+                    req.tipoMime(), MAX_BYTES, EXPIRY_SECONDS);
+        } catch (JacksonException | IllegalArgumentException | IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Storage devolvio un enlace de carga invalido.", ex);
+        }
     }
 
     private void validarSolicitudCarga(Long actor, PrepararCargaVoucherSeparacionRequest req) {
@@ -107,7 +150,41 @@ public class CrmSeparacionStorageService {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
         }
-        JsonNode info = ventaService.obtenerRutaVoucher(actor, idVoucher);
+        return firmarReferencia(ventaService.obtenerRutaVoucher(actor, idVoucher));
+    }
+
+    /** Enlaces de lectura privados por venta y comprobante; alcance validado en PostgreSQL. */
+    public EnlaceLecturaVoucherResponse prepararLecturaComprobanteVenta(
+            Long actor, Long idVenta, Long idComprobante) {
+        if (actor == null || actor <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
+        }
+        JsonNode info = ventaService.rutaComprobanteVenta(actor, idVenta, idComprobante);
+        String bucket = info.path("bucket").asString("");
+        String clave = info.path("clave_archivo").asString("");
+        String nombre = info.path("nombre_archivo").asString("");
+        String mime = info.path("tipo_mime").asString("");
+        if (!BUCKET_VENTAS.equals(bucket)
+                || !clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F\\-]{36}\\.(pdf|jpg|png|webp)$")
+                || !MIMES_PERMITIDOS.contains(mime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Referencia de comprobante de venta invalida.");
+        }
+        String base = validarYResolverBase();
+        String ruta = "/object/sign/" + BUCKET_VENTAS + "/" + clave;
+        String respuesta = solicitarUrlLecturaStorage(base + ruta);
+        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime, BUCKET_VENTAS);
+    }
+
+    /** Comprobante del detalle comercial; no requiere permisos de Finanzas. */
+    public EnlaceLecturaVoucherResponse prepararLecturaPorReserva(Long actor, Long idReserva) {
+        if (actor == null || actor <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
+        }
+        return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor, idReserva));
+    }
+
+    private EnlaceLecturaVoucherResponse firmarReferencia(JsonNode info) {
         String clave = info.path("clave_archivo").asString("");
         String bucket = info.path("bucket").asString("");
         String nombre = info.path("nombre_archivo").asString("");
@@ -116,7 +193,7 @@ public class CrmSeparacionStorageService {
         String base = validarYResolverBase();
         String ruta = "/object/sign/" + BUCKET + "/" + clave;
         String respuesta = solicitarUrlLecturaStorage(base + ruta);
-        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime);
+        return extraerEnlaceLectura(respuesta, clave, base, nombre, mime, BUCKET);
     }
 
     private void validarReferenciaLectura(String bucket, String clave) {
@@ -144,7 +221,7 @@ public class CrmSeparacionStorageService {
     }
 
     private EnlaceLecturaVoucherResponse extraerEnlaceLectura(
-            String raw, String clave, String base, String nombre, String mime) {
+            String raw, String clave, String base, String nombre, String mime, String bucket) {
         try {
             JsonNode json = jsonMapper.readTree(raw);
             String signedUrl = json.path("signedURL").asString("");
@@ -153,7 +230,7 @@ public class CrmSeparacionStorageService {
             }
             String urlCompleta = base + signedUrl;
             return new EnlaceLecturaVoucherResponse(
-                    BUCKET, clave, urlCompleta, nombre, mime, EXPIRY_SECONDS);
+                    bucket, clave, urlCompleta, nombre, mime, EXPIRY_SECONDS);
         } catch (JacksonException | IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Error al interpretar enlace firmado de lectura.", ex);

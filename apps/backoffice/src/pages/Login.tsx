@@ -10,6 +10,7 @@ import {
 
 import { ApiError, authApi } from '../lib/apiClient';
 import { beginSessionActivity } from '../lib/inactivitySession';
+import { getSessionRoles } from '../lib/authSession';
 import { Alert } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
 import { FieldLabel, Input, Select } from '../components/ui/Field';
@@ -37,14 +38,6 @@ const TIPOS_DOCUMENTO: { value: TipoDocumento; label: string }[] = [
     { value: 'RUC', label: 'RUC' }
 ];
 
-const INTERNAL_ROLES = new Set([
-    'ROLE_ADMINISTRADOR',
-    'ROLE_GERENCIA',
-    'ROLE_MARKETING',
-    'ROLE_ASESOR',
-    'ROLE_FINANZAS',
-    'ROLE_RRHH'
-]);
 
 function resolverMensajeErrorLogin(error: ApiError): string {
     if (error.status === 423) {
@@ -164,9 +157,7 @@ export function Login() {
         try {
             const data = await authApi.post<LoginResponse>('/login', payload);
 
-            const tieneRolInterno = data.autoridades.some((authority) =>
-                INTERNAL_ROLES.has(authority)
-            );
+            const tieneRolInterno = getSessionRoles(data.autoridades).length > 0;
 
             if (!tieneRolInterno) {
                 try {

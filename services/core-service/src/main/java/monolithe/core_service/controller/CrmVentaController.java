@@ -4,6 +4,7 @@ package monolithe.core_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.FormalizarVentaCrmRequest;
+import monolithe.core_service.dto.CorregirDatosPersonalesCrmRequest;
 import monolithe.core_service.service.CrmVentaService;
 import monolithe.core_service.dto.CancelarVentaPendienteRequest;
 import monolithe.core_service.dto.RegistrarEvidenciaContratoRequest;
@@ -11,6 +12,7 @@ import monolithe.core_service.service.CrmContratoStorageService;
 import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
 import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
@@ -69,6 +71,23 @@ public class CrmVentaController {
                                 idProspecto);
         }
 
+        @GetMapping("/prospectos/{idProspecto}/datos-comprador-venta")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view')")
+        public JsonNode datosCompradorParaVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idProspecto) {
+                return service.datosCompradorParaVenta(obtenerActor(jwt), idProspecto);
+        }
+
+        @GetMapping("/prospectos/{idProspecto}/reservas-vigentes-venta")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode listarReservasVigentesParaVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idProspecto) {
+                return service.listarReservasVigentesParaVenta(
+                                obtenerActor(jwt), idProspecto);
+        }
+
         @GetMapping("/prospectos/{idProspecto}/verificar-compra")
         @PreAuthorize("hasAuthority('crm.view')")
         public JsonNode verificarComprador(
@@ -90,6 +109,14 @@ public class CrmVentaController {
                 return service.registrarVentaPendiente(
                                 obtenerActor(jwt),
                                 request);
+        }
+
+        @PostMapping("/ventas/preparar-comprobante")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public EnlaceCargaVoucherResponse prepararComprobanteVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody PrepararCargaVoucherVentaRequest request) {
+                return separacionStorageService.prepararCargaVenta(obtenerActor(jwt), request);
         }
 
         @PostMapping("/separaciones/preparar-comprobante")
@@ -163,6 +190,22 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** URL de solo lectura y corta duracion para el comprobante de una separacion. */
+        @GetMapping("/separaciones/{idReserva}/comprobante/url-firmada")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idReserva) {
+
+                var enlace = separacionStorageService.prepararLecturaPorReserva(
+                                obtenerActor(jwt),
+                                idReserva);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
         @GetMapping("/separaciones/vouchers/{idVoucher}/url-firmada")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<EnlaceLecturaVoucherResponse> prepararLecturaVoucher(
@@ -191,6 +234,42 @@ public class CrmVentaController {
                                 request);
         }
 
+        @GetMapping("/prospectos/{idProspecto}/datos-personales")
+        @PreAuthorize("hasAuthority('crm.view')")
+        public ResponseEntity<JsonNode> datosPersonalesCrm(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.datosPersonalesCrm(obtenerActor(jwt),idProspecto));
+        }
+
+        @PatchMapping("/prospectos/{idProspecto}/datos-personales")
+        @PreAuthorize("hasAuthority('crm.edit')")
+        public ResponseEntity<JsonNode> corregirDatosPersonalesCrm(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto,
+                @Valid @RequestBody CorregirDatosPersonalesCrmRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.corregirDatosPersonalesCrm(
+                            obtenerActor(jwt),idProspecto,request.datos(),request.motivo()));
+        }
+
+        @GetMapping("/prospectos/buscar-sin-periodo")
+        @PreAuthorize("hasAuthority('crm.view')")
+        public ResponseEntity<JsonNode> buscarCarteraSinPeriodo(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required=false) String consulta,
+                @RequestParam(required=false) String etapa,
+                @RequestParam(required=false) String origen,
+                @RequestParam(required=false) Long idAsesor,
+                @RequestParam(required=false) Boolean sinAsignar,
+                @RequestParam(defaultValue="TODOS") String categoria,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="15") Integer tamano,
+                @RequestParam(required=false) Long idProyecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.buscarCarteraSinPeriodo(obtenerActor(jwt),
+                    consulta,etapa,origen,idAsesor,sinAsignar,categoria,pagina,tamano,idProyecto));
+        }
+
         @GetMapping("/operaciones")
         @PreAuthorize("hasAuthority('sales.view')")
         public JsonNode listarOperaciones(
@@ -206,6 +285,65 @@ public class CrmVentaController {
                                 busqueda,
                                 pagina,
                                 tamano);
+        }
+
+        /** Expediente del comprador, domicilio, pago y plan financiero: solo lectura. */
+        @GetMapping("/ventas/{idVenta}/cronograma")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> cronogramaVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
+        }
+
+        @GetMapping("/ventas/{idVenta}/detalle")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> detalleVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVenta) {
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(service.detalleVenta(obtenerActor(jwt), idVenta));
+        }
+
+        /** Firma temporal cada archivo, sin exponer el bucket ni permitir descargas públicas. */
+        @GetMapping("/ventas/{idVenta}/comprobantes/{idComprobante}/url-firmada")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> visualizarComprobanteVenta(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idVenta,
+                        @PathVariable Long idComprobante) {
+                var enlace = separacionStorageService.prepararLecturaComprobanteVenta(
+                                obtenerActor(jwt), idVenta, idComprobante);
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
+        /** Exportación de cartera de ventas: validación JWT y SQL, nunca datos globales sin rol. */
+        @GetMapping("/ventas/exportacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
+        public ResponseEntity<JsonNode> exportarVentas(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "100") Integer tamano) {
+                return ResponseEntity.ok()
+                        .cacheControl(CacheControl.noStore())
+                        .body(service.listarVentasParaExportacion(
+                                obtenerActor(jwt), pagina, tamano));
+        }
+
+        /** Exportacion paginada y exclusiva de separaciones. Permisos tambien verificados en BD. */
+        @GetMapping("/separaciones/exportacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.export')")
+        public ResponseEntity<JsonNode> exportarSeparaciones(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestParam(defaultValue = "1") Integer pagina,
+                        @RequestParam(defaultValue = "100") Integer tamano) {
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(service.listarSeparacionesParaExportacion(
+                                                obtenerActor(jwt), pagina, tamano));
         }
 
         @PostMapping("/ventas/{idVenta}/cancelar")
@@ -523,7 +661,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales/preparar-carga")
-        @PreAuthorize("hasAnyAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.approve')")
         public ResponseEntity<CrmContratoStorageService.EnlaceCargaPdf> prepararCargaEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud) {
@@ -538,7 +676,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales")
-        @PreAuthorize("hasAnyAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.approve')")
         public ResponseEntity<JsonNode> registrarEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -566,7 +704,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/{idSolicitud}/evidencias-legales")
-        @PreAuthorize("hasAnyAuthority('sales.annul','sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.review_legal')")
         public ResponseEntity<JsonNode> listarEvidenciasLegales(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud) {
@@ -580,7 +718,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/evidencias-legales/{idEvidencia}/preparar-lectura")
-        @PreAuthorize("hasAnyAuthority('sales.annul','sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.review_legal')")
         public ResponseEntity<CrmAnulacionStorageService.EnlaceLecturaEvidenciaLegal> prepararLecturaEvidenciaLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -595,7 +733,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/revision-legal/pendientes")
-        @PreAuthorize("hasAuthority('sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_legal')")
         public JsonNode listarCasosRevisionLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(defaultValue = "1") Integer pagina,
@@ -606,7 +744,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/{idSolicitud}/revision-legal")
-        @PreAuthorize("hasAuthority('sales.legal.review')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_legal')")
         public JsonNode registrarRevisionLegal(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -634,7 +772,7 @@ public class CrmVentaController {
         // ===== CRM: solicitudes de anulación y revisiones independientes =====
         @PostMapping("/anulaciones/solicitudes")
         @ResponseStatus(HttpStatus.CREATED)
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.create')")
         public JsonNode solicitarAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @Valid @RequestBody SolicitarAnulacionRequest request) {
@@ -646,7 +784,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/solicitudes")
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view')")
         public ResponseEntity<JsonNode> listarSolicitudesAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(required = false) String tipo,
@@ -662,7 +800,7 @@ public class CrmVentaController {
         }
 
         @GetMapping("/anulaciones/historial")
-        @PreAuthorize("hasAuthority('sales.view')")
+        @PreAuthorize("hasAuthority('annulments.view')")
         public ResponseEntity<JsonNode> listarHistorialAnulaciones(
                         @AuthenticationPrincipal Jwt jwt,
                         @RequestParam(required = false) String tipo,
@@ -677,7 +815,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/solicitudes/{idSolicitud}/decision")
-        @PreAuthorize("hasAuthority('sales.annul')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAnyAuthority('annulments.approve','annulments.reject')")
         public ResponseEntity<JsonNode> decidirSolicitudAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,
@@ -691,7 +829,7 @@ public class CrmVentaController {
         }
 
         @PostMapping("/anulaciones/solicitudes/{idSolicitud}/revision-financiera")
-        @PreAuthorize("hasAuthority('finance.edit')")
+        @PreAuthorize("hasAuthority('annulments.view') and hasAuthority('annulments.review_finance')")
         public ResponseEntity<JsonNode> registrarRevisionFinancieraAnulacion(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable Long idSolicitud,

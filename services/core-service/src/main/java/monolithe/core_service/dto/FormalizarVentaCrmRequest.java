@@ -2,6 +2,7 @@ package monolithe.core_service.dto;
 
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import tools.jackson.databind.JsonNode;
 
 public record FormalizarVentaCrmRequest(
 
@@ -28,8 +29,19 @@ public record FormalizarVentaCrmRequest(
     @Max(36)
     Integer numeroCuotas,
 
+    // La tasa del nuevo financiamiento es fija: 10% nominal anual en BD.
+    // No admitir tasas configurables desde el cliente, ni siquiera positivas.
+    @Null
+    BigDecimal tasaInteresMensualPct,
+
     @Size(max = 1000)
-    String observaciones
+    String observaciones,
+
+    // Se exige para registrar una venta; la validación comercial admite null.
+    JsonNode datosComprador,
+
+    // Solo se usa durante el registro pendiente de venta; contiene método y vouchers.
+    JsonNode datosPago
 
 ) {
 

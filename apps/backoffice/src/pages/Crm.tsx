@@ -37,7 +37,6 @@ import {
   type CrmAdvisor,
   type CrmBuyer,
   type CrmCatalogs,
-  type CrmCategory,
   type CrmDetail,
   type CrmFollowUpCreate,
   type CrmFollowUpItem,
@@ -57,6 +56,9 @@ import {
   type PeriodoCrmModo
 } from '../components/crm/CrmPeriodoGlobal';
 import { CrmEvolucionChart } from '../components/crm/CrmEvolucionChart';
+import { EditarDatosPersonalesModal } from '../components/crm/EditarDatosPersonalesModal';
+import { CrmHistorialDatosPersonalesPanel } from '../components/crm/CrmHistorialDatosPersonalesPanel';
+import { ExpedienteCompradorPanel } from '../components/crm/ExpedienteCompradorPanel';
 import type { CrmEvolucionMes } from '../services/crmBackend';
 import {
   sanitizarLead, validarNuevoLead,
@@ -74,6 +76,7 @@ const STAGE_TONES: Record<string, string> = {
   EN_SEGUIMIENTO: 'bg-sky-50 text-sky-700 border-sky-200',
   INTERESADO: 'bg-brand-50 text-brand-700 border-brand-200',
   NEGOCIACION: 'bg-amber-50 text-amber-800 border-amber-200',
+  CON_RESERVA: 'bg-teal-50 text-teal-800 border-teal-200',
   CONVERTIDO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   NO_INTERESADO: 'bg-rose-50 text-rose-700 border-rose-200',
   DESCARTADO: 'bg-rose-50 text-rose-700 border-rose-200'
@@ -226,10 +229,10 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
 
   const puedeVerGestionGlobal = user.roles.some(
-    (rol) => rol === 'Administrador' || rol === 'Gerencia'
+    (rol) => rol === 'Administrador' || rol === 'Gerencia' || rol === 'Supervisor comercial'
   );
 
   const puedeElegirAsesor = user.roles.some(
@@ -250,7 +253,6 @@ export function Crm() {
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('all');
   const [origin, setOrigin] = useState('all');
-  const [, setCategory] = useState<CrmCategory>('LEAD');
   const [advisorFilter, setAdvisorFilter] = useState<number | ''>('');
   const [projectFilter, setProjectFilter] = useState<number | ''>('');
   const [fechaTablaDesde, setFechaTablaDesde] = useState('');
@@ -288,6 +290,8 @@ export function Crm() {
   const [exportStatus, setExportStatus] = useState('');
 
   const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
+  // Hasta que el usuario cambie el período, el gráfico presenta seis meses históricos.
+  const [periodoGraficoPersonalizado, setPeriodoGraficoPersonalizado] = useState(false);
   const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
   const [fechaDesde, setFechaDesde] = useState(obtenerFechaHoyLima);
   const [fechaHasta, setFechaHasta] = useState(obtenerFechaHoyLima);
@@ -310,48 +314,28 @@ export function Crm() {
 
 
   const rangoTabla = useMemo(() => {
-    if (!fechaTablaDesde && !fechaTablaHasta) {
-      return rangoPeriodo;
-    }
-
-    if (!fechaTablaDesde || !fechaTablaHasta) {
-      return null;
-    }
-
-    return calcularRangoCrm(
-      'RANGO',
-      fechaReferencia,
-      fechaTablaDesde,
-      fechaTablaHasta
-    );
-  }, [
-    fechaTablaDesde,
-    fechaTablaHasta,
-    fechaReferencia,
-    rangoPeriodo
-  ]);
+    // Si el usuario no define fechas propias, la tabla NO hereda el período global.
+    if (!fechaTablaDesde && !fechaTablaHasta) return null;
+    if (!fechaTablaDesde || !fechaTablaHasta) return undefined;
+    return calcularRangoCrm('RANGO',fechaTablaDesde,fechaTablaDesde,fechaTablaHasta)
+      ?? undefined;
+  }, [fechaTablaDesde,fechaTablaHasta]);
 
 
   const rangoEvolucion = useMemo(() => {
     if (!rangoPeriodo) return null;
-
-    const fechaBase =
-      periodoModo === 'RANGO' ? fechaHasta : fechaReferencia;
-
-    const anio = Number(fechaBase.slice(0, 4));
-    const mes = Number(fechaBase.slice(5, 7));
-
+    if (periodoGraficoPersonalizado) return rangoPeriodo;
+    const fechaBase = fechaReferencia;
+    const anio = Number(fechaBase.slice(0,4));
+    const mes = Number(fechaBase.slice(5,7));
     if (!anio || mes < 1 || mes > 12) return null;
-
-    const inicio = new Date(Date.UTC(anio, mes - 6, 1));
-    const fin = new Date(Date.UTC(anio, mes, 1));
-
+    const inicio = new Date(Date.UTC(anio,mes-6,1));
+    const fin = new Date(Date.UTC(anio,mes,1));
     return {
-      desde: `${inicio.toISOString().slice(0, 10)}T00:00:00-05:00`,
-      hastaExclusivo:
-        `${fin.toISOString().slice(0, 10)}T00:00:00-05:00`
+      desde: `${inicio.toISOString().slice(0,10)}T00:00:00-05:00`,
+      hastaExclusivo:`${fin.toISOString().slice(0,10)}T00:00:00-05:00`
     };
-  }, [rangoPeriodo, periodoModo, fechaReferencia, fechaHasta]);
+  },[rangoPeriodo,periodoGraficoPersonalizado,fechaReferencia]);
 
   const [evolucionItems, setEvolucionItems] = useState<CrmEvolucionMes[]>([]);
   const [evolucionLoading, setEvolucionLoading] = useState(false);
@@ -429,6 +413,9 @@ export function Crm() {
   // Expediente / Detalle
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [leadDetail, setLeadDetail] = useState<CrmDetail | null>(null);
+  const [personalLead, setPersonalLead] = useState<CrmProspect | null>(null);
+  const [revisionHistorialPersonal, setRevisionHistorialPersonal] = useState(0);
+  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyer | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
@@ -522,16 +509,17 @@ export function Crm() {
     }
   }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
 
+  // El período global solo entra en consultas de Visitas; Leads y Potenciales
+  // dependen únicamente de las fechas propias de sus tablas.
+  const rangoBusquedaLeads = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+
   const loadLeads = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
 
     try {
-      const rangoConsulta = tab === 'visitas'
-        ? rangoPeriodo
-        : rangoTabla;
-
-      if (!rangoConsulta) {
+      const rangoConsulta = rangoBusquedaLeads;
+      if (rangoConsulta === undefined || (tab === 'visitas' && !rangoConsulta)) {
         setLeadsList([]);
         setTotalLeads(0);
         setErrorMsg(
@@ -556,22 +544,18 @@ export function Crm() {
         tamano: pageSize
       };
 
+      const categoria = tab === 'potenciales' ? 'POTENCIAL' : 'LEAD';
+      // Sin fecha de tabla consulta todo el historial, conservando cartera y paginación.
       const res = tab === 'visitas'
-        ? await crmBackend.buscar({
-          ...filtros,
-          categoria: 'TODOS'
-        })
-        : await crmBackend.buscarPeriodo({
-          ...filtros,
-          categoria: tab === 'potenciales'
-            ? 'POTENCIAL'
-            : 'LEAD',
-          idProyecto: projectFilter === ''
-            ? undefined
-            : projectFilter,
-          desde: rangoConsulta.desde,
-          hastaExclusivo: rangoConsulta.hastaExclusivo
-        });
+        ? await crmBackend.buscar({...filtros,categoria:'TODOS'})
+        : rangoConsulta
+          ? await crmBackend.buscarPeriodo({
+              ...filtros,categoria,
+              idProyecto:projectFilter === '' ? undefined : projectFilter,
+              desde:rangoConsulta.desde,hastaExclusivo:rangoConsulta.hastaExclusivo
+            })
+          : await crmBackend.buscarSinPeriodo({...filtros,categoria,
+              idProyecto:projectFilter === '' ? undefined : projectFilter});
 
       setLeadsList(res.items ?? []);
       setTotalLeads(res.total ?? 0);
@@ -589,25 +573,16 @@ export function Crm() {
       setIsLoading(false);
     }
 
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoPeriodo, rangoTabla, puedeVerGestionGlobal]);
+  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoBusquedaLeads, puedeVerGestionGlobal]);
 
 
   const loadBuyers = useCallback(async () => {
     setBuyersLoading(true);
 
     try {
-      if (!rangoPeriodo) {
-        setBuyersList([]);
-        setBuyersTotal(0);
-        return;
-      }
-
-      const res = await crmBackend.compradoresPeriodo(
-        buyersQuery.trim() || undefined,
-        buyersPage,
-        15,
-        rangoPeriodo.desde,
-        rangoPeriodo.hastaExclusivo
+      // La tabla de compradores tampoco hereda el período global.
+      const res = await crmBackend.compradores(
+        buyersQuery.trim(),buyersPage,15
       );
 
       setBuyersList(res.items ?? []);
@@ -628,7 +603,7 @@ export function Crm() {
     } finally {
       setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage, rangoPeriodo]
+  }, [buyersQuery, buyersPage]
   );
 
 
@@ -985,50 +960,17 @@ export function Crm() {
   };
 
 
-  const handleVerifySale = async (lead: CrmProspect) => {
-    try {
-      const resultado = await crmBackend.verificarCompra(
-        lead.id_prospecto
-      );
-
-      if (!resultado.esComprador) {
-        toast.info('Compra pendiente de formalización', {
-          description: resultado.mensaje
-        });
-        return;
-      }
-
-      await Promise.all([
-        loadLeads(),
-        loadCatalogsAndAdvisors(),
-        loadBuyers()
-      ]);
-
-      setCategory('COMPRADOR');
-      setPage(1);
-
-      toast.success('Comprador verificado', {
-        description:
-          `${lead.nombre_completo} tiene una compra formalizada. ` +
-          `Venta: ${resultado.compra?.codigoVenta ?? 'Registrada'}. ` +
-          `Contrato: ${resultado.compra?.codigoContrato ?? 'Válido'}.`
-      });
-
-    } catch (err: unknown) {
-      toast.error('No se pudo verificar la compra', {
-        description:
-          err instanceof Error
-            ? err.message
-            : 'Error al consultar al servidor.'
-      });
-    }
-  };
-
   const handleStageSubmit = async () => {
     if (!stageLead || !newStageCode) return;
     if (newStageCode === stageLead.estado_codigo) {
       toast.error('Etapa sin cambios', {
         description: `El prospecto ya se encuentra en la etapa ${stageLead.estado_codigo}. Seleccione una etapa diferente.`
+      });
+      return;
+    }
+    if (stageLead.estado_codigo === 'CON_RESERVA' || newStageCode === 'CON_RESERVA') {
+      toast.error('Etapa automatica', {
+        description: 'Con Reserva solo se asigna o retira automaticamente desde Separaciones y Ventas.'
       });
       return;
     }
@@ -1280,7 +1222,7 @@ export function Crm() {
 
   const handleExportExcel = async () => {
     if (isExporting) return;
-    const rango = rangoTabla ?? rangoPeriodo;
+    const rango = rangoPeriodo;
     if (!rango) {
       toast.error('Sin rango de fechas', { description: 'Complete un rango de fechas valido.' });
       return;
@@ -1323,26 +1265,22 @@ export function Crm() {
         modo={periodoModo}
         onModoChange={(modo) => {
           setPeriodoModo(modo);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaReferencia={fechaReferencia}
         onFechaReferenciaChange={(fecha) => {
           setFechaReferencia(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaDesde={fechaDesde}
         onFechaDesdeChange={(fecha) => {
           setFechaDesde(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
         fechaHasta={fechaHasta}
         onFechaHastaChange={(fecha) => {
           setFechaHasta(fecha);
-          setPage(1);
-          setBuyersPage(1);
+          setPeriodoGraficoPersonalizado(true);
         }}
       />
 
@@ -1436,11 +1374,7 @@ export function Crm() {
         onChange={(newTab) => {
           setTab(newTab);
 
-          if (newTab === 'leads') {
-            setCategory('LEAD');
-          } else if (newTab === 'potenciales') {
-            setCategory('POTENCIAL');
-          }
+
 
           setPage(1);
         }}
@@ -1746,14 +1680,15 @@ export function Crm() {
                   );
 
                   const acciones: CrmMenuAction[] = [
-                    ...(lead.categoria === 'POTENCIAL' ? [{
-                      label: 'Verificar compra', icon: CheckCircleIcon, permission: 'crm.view' as const,
-                      onClick: () => void handleVerifySale(lead)
-                    }] : []),
+
                     {
                       label: 'Cambiar etapa', icon: RefreshCw, permission: 'crm.edit',
-                      disabled: isLeadFinal,
+                      disabled: isLeadFinal || lead.estado_codigo === 'CON_RESERVA',
                       onClick: () => { setStageLead(lead); setNewStageCode(lead.estado_codigo); }
+                    },
+                    {
+                      label: 'Editar datos personales', icon: PencilIcon, permission: 'crm.edit',
+                      onClick: () => setPersonalLead(lead)
                     },
                     {
                       label: 'Editar ficha comercial', icon: PencilIcon, permission: 'crm.edit',
@@ -2205,6 +2140,7 @@ export function Crm() {
                     <TH>Contrato / Estado</TH>
                     <TH align="right">Monto venta</TH>
                     <TH>Fecha formalizacion</TH>
+                    <TH align="right">Expediente</TH>
                   </>
                 }
               >
@@ -2223,6 +2159,15 @@ export function Crm() {
                       {currency(buyer.precio_venta)}
                     </TD>
                     <TD className="text-brand-500 tabular text-[12px]">{formatDateLima(buyer.fecha_venta)}</TD>
+                    <TD align="right">
+                      <Gate permission="sales.view">
+                        <Button size="sm" variant="ghost" icon={EyeIcon}
+                          onClick={()=>setCompradorExpediente(buyer)}
+                          className="font-semibold text-brand-700 hover:text-brand-900">
+                          Expediente
+                        </Button>
+                      </Gate>
+                    </TD>
                   </TR>
                 ))}
               </Table>
@@ -2320,12 +2265,37 @@ export function Crm() {
         />
       )}
 
+      <Modal open={Boolean(compradorExpediente)}
+        onClose={()=>setCompradorExpediente(null)}
+        title={compradorExpediente ? `Expediente del cliente ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
+        description={compradorExpediente?.nombre_completo??''}
+        width="max-w-5xl"
+        footer={<Button onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
+        {compradorExpediente&&
+          <ExpedienteCompradorPanel key={compradorExpediente.id_venta??compradorExpediente.id_cliente}
+            buyer={compradorExpediente}/>}
+      </Modal>
+
+      <EditarDatosPersonalesModal
+        idProspecto={personalLead?.id_prospecto??null}
+        codigo={personalLead?.codigo}
+        onClose={()=>setPersonalLead(null)}
+        onSaved={async()=>{
+          const id=personalLead?.id_prospecto;
+          setRevisionHistorialPersonal(n=>n+1);
+          await loadLeads();
+          if(id && detailModalOpen && leadDetail?.prospecto.id_prospecto===id)
+            await handleOpenDetail(id);
+        }}
+      />
+
       {/* MODAL: Expediente comercial (Detalle) */}
       <Modal
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         title="Expediente comercial del prospecto"
-        description="Ficha completa de identidad, medios de contacto e historial de interaccion comercial."
+        description="Identidad, contactos, asignaciones, correcciones auditadas y actividad comercial."
+        width="max-w-3xl"
         footer={
           <Button onClick={() => setDetailModalOpen(false)}>Cerrar expediente</Button>
         }
@@ -2337,17 +2307,17 @@ export function Crm() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg bg-brand-50 p-4 border border-brand-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-mono text-xs font-semibold text-brand-600">
+            <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-blue-50/60 p-4 shadow-sm sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="inline-flex rounded-md border border-brand-200 bg-white px-2 py-1 font-mono text-xs font-semibold text-brand-600">
                     {leadDetail.prospecto.codigo}
                   </span>
-                  <h3 className="text-base font-bold text-brand-900">
+                  <h3 className="mt-2 break-words text-lg font-bold text-brand-900">
                     {leadDetail.prospecto.nombre_completo}
                   </h3>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="brand">{leadDetail.prospecto.categoria}</Badge>
                   <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-white text-brand-800">
                     {leadDetail.prospecto.estado_nombre}
@@ -2356,7 +2326,18 @@ export function Crm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-[13px]">
+            {can('crm.edit') && (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button size="sm" icon={PencilIcon} variant="secondary"
+                  onClick={()=>setPersonalLead(leadDetail.prospecto)}>
+                  Editar datos personales
+                </Button>
+              </div>
+            )}
+
+            <section className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-800">Identificación y gestión</h4>
+              <div className="grid grid-cols-1 gap-4 text-[13px] sm:grid-cols-2">
               <div>
                 <p className="text-brand-400">Documento principal</p>
                 <p className="font-medium text-brand-900">
@@ -2380,17 +2361,18 @@ export function Crm() {
                 <p className="font-medium text-brand-900">{leadDetail.prospecto.puntuacion || 'Medio'}</p>
               </div>
             </div>
+            </section>
 
-            <div>
-              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-500 mb-1">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700 mb-2">
                 Contactos registrados
               </h4>
-              <div className="rounded border border-brand-100 divide-y divide-brand-50">
+              <div className="divide-y divide-brand-100 overflow-hidden rounded-lg border border-brand-100">
                 {leadDetail.contactos && leadDetail.contactos.length > 0 ? (
                   leadDetail.contactos.map((c, i) => (
-                    <div key={i} className="flex justify-between p-2 text-[12px]">
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/40 p-3 text-[12px]">
                       <span className="font-mono text-brand-600">{c.tipoCodigo}</span>
-                      <span className="font-medium text-brand-900">{c.valor}</span>
+                      <span className="min-w-0 break-all font-semibold text-brand-900">{c.valor}</span>
                     </div>
                   ))
                 ) : (
@@ -2401,16 +2383,16 @@ export function Crm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded border border-brand-100 p-2">
+            <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Seguimientos</p>
                 <p className="text-lg font-bold text-brand-900">{leadDetail.totalSeguimientos}</p>
               </div>
-              <div className="rounded border border-brand-100 p-2">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Visitas guiadas</p>
                 <p className="text-lg font-bold text-brand-900">{leadDetail.totalVisitas}</p>
               </div>
-              <div className="rounded border border-brand-100 p-2">
+              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Comprador</p>
                 <p className="text-lg font-bold text-brand-900">
                   {leadDetail.esComprador ? 'Si' : 'No'}
@@ -2427,9 +2409,14 @@ export function Crm() {
               </div>
             )}
 
+            <CrmHistorialDatosPersonalesPanel
+              idProspecto={leadDetail.prospecto.id_prospecto}
+              revision={revisionHistorialPersonal}
+            />
+
             {/* Historial de asignaciones comerciales */}
-            <div className="pt-2 border-t border-brand-100">
-              <h4 className="text-[12px] font-semibold uppercase text-brand-700 mb-2">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <h4 className="text-[12px] font-bold uppercase tracking-wide text-brand-700 mb-3">
                 Historial de asignaciones ({assignmentsList.length})
               </h4>
 
@@ -2442,7 +2429,7 @@ export function Crm() {
                   {assignmentsList.map((a) => (
                     <div
                       key={a.id_asignacion}
-                      className="rounded border border-brand-100 p-3 text-xs"
+                      className="rounded-lg border border-brand-100 bg-slate-50/40 p-3 text-xs"
                     >
                       <div className="flex justify-between">
                         <strong>{a.asesor_nombre}</strong>
@@ -2471,8 +2458,8 @@ export function Crm() {
             </div>
 
             {/* Historial de Seguimientos Comerciales */}
-            <div className="pt-2 border-t border-brand-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Historial de seguimientos ({followUpsList.length})
                 </h4>
@@ -2511,7 +2498,7 @@ export function Crm() {
                   {followUpsList.map((f, idx) => (
                     <div
                       key={f.id_seguimiento || idx}
-                      className="rounded border border-brand-100 bg-white p-2.5 text-xs shadow-xs"
+                      className="rounded-xl border border-brand-100 bg-slate-50/50 p-3 text-xs shadow-sm"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
@@ -2544,8 +2531,8 @@ export function Crm() {
             </div>
 
             {/* Visitas guiadas en el Expediente */}
-            <div className="pt-2 border-t border-brand-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
                   Visitas guiadas ({detailVisitsList.length})
                 </h4>
@@ -2581,7 +2568,7 @@ export function Crm() {
                   {detailVisitsList.map((v) => (
                     <div
                       key={v.id_visita}
-                      className="rounded border border-brand-100 bg-white p-2 text-xs flex justify-between items-center"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-100 bg-slate-50/50 p-3 text-xs"
                     >
                       <div>
                         <p className="font-semibold text-brand-900">
@@ -2894,8 +2881,10 @@ export function Crm() {
                 isSubmitting ||
                 !newStageCode ||
                 newStageCode === stageLead?.estado_codigo ||
+                stageLead?.estado_codigo === 'CON_RESERVA' ||
                 Boolean(
                   catalogs?.estados.find((e) => e.codigo === stageLead?.estado_codigo)?.final ||
+                  stageLead?.estado_codigo === 'CON_RESERVA' ||
                   stageLead?.categoria === 'COMPRADOR' ||
                   stageLead?.categoria === 'CERRADO'
                 )
@@ -2930,6 +2919,7 @@ export function Crm() {
               disabled={
                 Boolean(
                   catalogs?.estados.find((e) => e.codigo === stageLead?.estado_codigo)?.final ||
+                  stageLead?.estado_codigo === 'CON_RESERVA' ||
                   stageLead?.categoria === 'COMPRADOR' ||
                   stageLead?.categoria === 'CERRADO'
                 )
@@ -2937,7 +2927,7 @@ export function Crm() {
             >
               {catalogs?.estados ? (
                 catalogs.estados
-                  .filter((est) => est.codigo !== 'CONVERTIDO')
+                  .filter((est) => est.codigo !== 'CONVERTIDO' && est.codigo !== 'CON_RESERVA')
                   .map((est) => (
                     <option key={est.codigo} value={est.codigo}>
                       {est.nombre} {est.final ? '(Definitiva)' : ''}

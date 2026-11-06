@@ -35,7 +35,7 @@ export interface SalesFilter {
   tab?: 'todas' | 'Separación' | 'Venta';
 }
 
-function mapOperacion(row: CrmOperacionItem): Sale {
+export function mapOperacion(row: CrmOperacionItem): Sale {
   const esVenta = row.tipo === 'VENTA';
 
   let modalidad: Sale['modality'] = undefined;
@@ -54,9 +54,15 @@ function mapOperacion(row: CrmOperacionItem): Sale {
     document: row.documento ?? '',
     lot: row.lote,
     project: row.proyecto,
-    modality: modalidad,
+    modality: esVenta ? modalidad : undefined,
+    paymentMethod: esVenta ? null : (row.metodo_pago ?? null),
+    expiresAt: !esVenta && row.fecha_vencimiento
+      ? new Date(row.fecha_vencimiento).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })
+      : null,
     amount: Number(row.monto),
     advisor: row.asesor ?? '',
+    dateIso: row.fecha,
+    expiresAtIso: !esVenta ? (row.fecha_vencimiento ?? null) : null,
     date: row.fecha
       ? esVenta
         ? new Date(row.fecha).toLocaleString('es-PE', {

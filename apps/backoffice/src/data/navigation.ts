@@ -78,9 +78,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Anulaciones',
     to: '/anulaciones',
     icon: ScrollTextIcon,
-    module: 'sales',
-    permission: 'sales.view',
-    anyPermissions: ['sales.view', 'finance.edit', 'sales.legal.review']
+    module: 'annulments',
+    permission: 'annulments.view'
   },
   {
     label: 'Marketing',

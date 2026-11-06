@@ -191,7 +191,11 @@ export function App({
               }
             />
 
-            <Route path="/anulaciones" element={<Anulaciones />} />
+            <Route path="/anulaciones" element={
+              <PermissionRoute permission="annulments.view">
+                <Anulaciones />
+              </PermissionRoute>
+            } />
 
             <Route
               path="/financiamiento"

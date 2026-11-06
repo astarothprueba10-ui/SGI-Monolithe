@@ -6,6 +6,8 @@ export type ModuleKey =
   | 'marketing'
   | 'web_content'
   | 'sales'
+  | 'annulments'
+  | 'web_content'
   | 'financing'
   | 'finance'
   | 'advisors'
@@ -23,6 +25,8 @@ export type Action =
   | 'approve'
   | 'annul'
   | 'reject'
+  | 'review_finance'
+  | 'review_legal'
   | 'export'
   | 'configure'
   | 'activate'
@@ -127,9 +131,12 @@ export interface Sale {
   amount: number;
   advisor: string;
   date: string;
+  dateIso?: string | null;
   contract?: string;
   status: string;
   paymentMethod?: string | null;
+  expiresAt?: string | null;
+  expiresAtIso?: string | null;
 }
 
 export interface Installment {

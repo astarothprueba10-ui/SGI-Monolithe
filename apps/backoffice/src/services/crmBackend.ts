@@ -63,6 +63,9 @@ export interface CrmAsesoresPeriodo {
 
 export interface CrmBuyer {
   id_cliente: number;
+  id_venta?: number;
+  id_contrato?: number;
+  id_prospecto?: number;
   codigo_cliente: string;
   nombre_completo: string;
   codigo_venta: string;
@@ -101,6 +104,33 @@ export interface CrmDetail {
   totalVisitas: number;
   esComprador: boolean;
 }
+export interface CrmDatosPersonales {
+  idProspecto:number;
+  nombres:string;
+  apellidoPaterno:string;
+  apellidoMaterno:string;
+  telefono:string;
+  correo:string;
+  tipoDocumento:'DNI'|'CE'|'PASAPORTE'|'RUC';
+  numeroDocumento:string;
+  documentoVerificado:boolean;
+  direccion:string;
+  historial: CrmCambioDatoPersonal[];
+}
+export interface CrmCambioDatoPersonal {
+  id:number;
+  fecha:string;
+  motivo:string;
+  actor:string;
+  antes:Omit<CrmDatosPersonales,'historial'>;
+  despues:Omit<CrmDatosPersonales,'historial'>;
+}
+export type CrmDatosPersonalesEdicion = Pick<
+  CrmDatosPersonales,
+  'nombres'|'apellidoPaterno'|'apellidoMaterno'|'telefono'|'correo'|
+  'tipoDocumento'|'numeroDocumento'|'direccion'
+>;
+
 export interface CrmAssignment {
   id_asignacion: number;
   id_asesor: number;
@@ -311,6 +341,7 @@ export interface CrmOperacionItem {
   comprador: string;
   documento: string | null;
   modalidad: 'CONTADO' | 'FINANCIADA' | null;
+  metodo_pago: string | null;
   monto: number;
   estado: string;
   fecha: string;
@@ -320,10 +351,155 @@ export interface CrmOperacionItem {
   asesor: string | null;
 }
 
+export interface CrmComprobanteVentaLectura {
+  idComprobante: number;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanioBytes: number;
+  estadoRevision: string;
+}
+
+export interface CrmCuotaCronograma {
+  numero:number;
+  fechaVencimiento:string;
+  capital:number;
+  interes:number;
+  cuota:number;
+  estado:string;
+  fechaPagoCompleto?:string|null;
+}
+export interface CrmCronogramaVenta {
+  idVenta:number;
+  codigoVenta:string;
+  codigoPlan?:string|null;
+  tipoCronograma:'REGISTRADO'|'PROYECTADO'|'SIN_PLAN'|'SIN_CUOTAS';
+  numeroCuotas?:number;
+  capitalFinanciado?:number;
+  fechaPrimeraCuota?:string|null;
+  tasaAnualNominal?:number;
+  advertencia?:string;
+  items:CrmCuotaCronograma[];
+}
+export interface CrmDetalleVenta {
+  idVenta: number;
+  codigoVenta: string;
+  modalidad: 'CONTADO' | 'FINANCIADA';
+  precioVenta: number;
+  tieneExpediente: boolean;
+  comprador: {
+    nombreCompleto: string | null;
+    tipoDocumento: string | null;
+    numeroDocumento: string | null;
+    telefono: string | null;
+    correo: string | null;
+    estadoCivil: string | null;
+  };
+  conyuge: {
+    nombres: string;
+    apellidoPaterno: string;
+    apellidoMaterno?: string | null;
+    telefono?: string | null;
+    correo?: string | null;
+    tipoDocumento: string;
+    numeroDocumento: string;
+  } | null;
+  domicilio: {
+    direccion: string | null;
+    referencia: string | null;
+    pais: string | null;
+    departamento: string | null;
+    provincia: string | null;
+    distrito: string | null;
+  };
+  pago: {
+    metodo: string | null;
+    numeroOperacion: string | null;
+    tipoAbono: 'CONTADO' | 'INICIAL' | null;
+    montoPorRevisar: number | null;
+    estadoRevision: string | null;
+    comprobantes: CrmComprobanteVentaLectura[];
+  };
+  financiamiento: {
+    sistema: string;
+    montoInicial: number;
+    abonoReserva: number;
+    capitalFinanciado: number;
+    numeroCuotas: number;
+    interesesTotales: number;
+    totalPendienteEnCuotas: number;
+    saldoCuotasPendiente: number;
+    tasaAnualNominal: number | null;
+    cuotaMensual: number | null;
+    cuotaFija: boolean;
+    descripcionCondiciones: string | null;
+  } | null;
+}
+
 export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
   paginas: number;
 }
 
+
+export interface CrmReservaVigenteVenta {
+  idReserva: number;
+  codigoReserva: string;
+  idLote: number;
+  idProyecto: number;
+  idEtapa: number;
+  montoReserva: number;
+  fechaVencimiento: string;
+}
+
+export interface CrmReservasVigentesVenta {
+  idLotes: number[];
+  reservas: CrmReservaVigenteVenta[];
+}
+
+export type EstadoCivilReniec = 'SOLTERO' | 'CASADO' | 'DIVORCIADO' | 'VIUDO';
+export interface CrmDatosConyugeVenta {
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono: string;
+  correo: string;
+  tipoDocumento: 'DNI' | 'CE' | 'RUC' | 'PASAPORTE';
+  numeroDocumento: string;
+}
+export interface CrmVoucherVenta {
+  claveArchivo: string;
+  nombreArchivo: string;
+  tipoMime: string;
+  tamanioBytes: number;
+}
+export interface CrmDatosPagoVenta {
+  metodoPago: 'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO';
+  numeroOperacion: string | null;
+  comprobantes: CrmVoucherVenta[];
+}
+
+export interface CrmDatosCompradorVenta {
+  idProspecto: number;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  telefono: string;
+  correo: string;
+  idProyectoInteres: number;
+  origenCodigo: string;
+  motivoContacto: string;
+  mensaje: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  direccion: string;
+  referencia: string;
+  idPais: number | null;
+  idDepartamento: number | null;
+  idProvincia: number | null;
+  idDistrito: number | null;
+  idAsesor: number | null;
+  estadoCivil: EstadoCivilReniec | null;
+  conyuge: CrmDatosConyugeVenta | null;
+}
 
 export interface CrmSaleValidationInput {
   idProspecto: number;
@@ -332,7 +508,10 @@ export interface CrmSaleValidationInput {
   montoTotal: number;
   montoInicial?: number | null;
   numeroCuotas?: number | null;
+  tasaInteresMensualPct?: number | null;
   observaciones?: string | null;
+  datosComprador?: CrmDatosCompradorVenta;
+  datosPago?: CrmDatosPagoVenta;
 }
 
 export interface CrmSaleValidationResult {
@@ -346,6 +525,9 @@ export interface CrmSaleValidationResult {
   idProyecto: number;
   modalidad: 'CONTADO' | 'FINANCIADA';
   precioVigente: number;
+  montoReservaAplicable: number;
+  saldoContado: number;
+  planFrances: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number; cuotaMensual: number } | null;
   idMoneda: number;
   mensaje: string;
 }
@@ -720,6 +902,16 @@ export const crmBackend = {
     categoria: f.categoria ?? 'TODOS', pagina: f.pagina ?? 1, tamano: f.tamano ?? 20
   })}`),
 
+  buscarSinPeriodo: (f: CrmSearch & {idProyecto?: number}) =>
+    coreApi.get<CrmPage<CrmProspect>>(
+      `/crm/prospectos/buscar-sin-periodo${qs({
+        consulta:f.consulta?.trim(),etapa:f.etapa,origen:f.origen,
+        idAsesor:f.idAsesor,sinAsignar:f.sinAsignar,
+        categoria:f.categoria ?? 'TODOS',pagina:f.pagina ?? 1,
+        tamano:f.tamano ?? 15,idProyecto:f.idProyecto
+      })}`
+    ),
+
   buscarPeriodo: (f: CrmSearchPeriodo) =>
     coreApi.get<CrmPage<CrmProspect>>(
       `/crm/prospectos/buscar-periodo${qs({
@@ -738,6 +930,13 @@ export const crmBackend = {
     ),
 
   detalle: (id: number) => coreApi.get<CrmDetail>(`/crm/prospectos/${id}`),
+  datosPersonales: (id:number) =>
+    coreApi.get<CrmDatosPersonales>(`/crm/prospectos/${id}/datos-personales`),
+  corregirDatosPersonales: (id:number, datos:CrmDatosPersonalesEdicion, motivo:string) =>
+    coreApi.patch<{actualizado:boolean;idProspecto:number}>(
+      `/crm/prospectos/${id}/datos-personales`,{datos,motivo}
+    ),
+
   crear: (data: CrmLeadCreate) => coreApi.post<Record<string, unknown>>('/crm/prospectos', data as Record<string, unknown>),
   actualizar: (id: number, body: { origenCodigo?: string; observaciones?: string; idProyectoInteres?: number }) =>
     coreApi.patch<Record<string, unknown>>(`/crm/prospectos/${id}/ficha`, body as Record<string, unknown>),
@@ -788,6 +987,41 @@ export const crmBackend = {
         hastaExclusivo
       })}`
     ),
+
+  subirComprobanteVenta: async (
+    condiciones: Pick<CrmSaleValidationInput,
+      'idProspecto' | 'idLote' | 'modalidad' | 'montoTotal' | 'montoInicial' | 'numeroCuotas'>,
+    archivo: File
+  ): Promise<CrmVoucherVenta> => {
+    if (!archivo || archivo.size < 1 || archivo.size > 5 * 1024 * 1024
+        || archivo.name.length > 255 || !archivo.name.trim()
+        || !['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)) {
+      throw new Error('El comprobante debe ser PDF o imagen de hasta 5 MB.');
+    }
+    const carga = await coreApi.post<CrmSeparacionUpload>(
+      '/crm/ventas/preparar-comprobante',
+      {
+        ...condiciones,
+        nombreArchivo: archivo.name,
+        tipoMime: archivo.type
+      }
+    );
+    const token = new URL(carga.urlCarga).searchParams.get('token');
+    if (!token || carga.bucket !== 'vouchers-ventas-private') {
+      throw new Error('Enlace de carga de venta inválido.');
+    }
+    const { error } = await supabase.storage.from(carga.bucket)
+      .uploadToSignedUrl(carga.claveArchivo, token, archivo, {
+        contentType: carga.tipoMime, upsert: false
+      });
+    if (error) throw new Error('No se pudo cargar el comprobante: ' + error.message);
+    return {
+      claveArchivo: carga.claveArchivo,
+      nombreArchivo: archivo.name,
+      tipoMime: archivo.type,
+      tamanioBytes: archivo.size
+    };
+  },
 
   prepararComprobanteSeparacion: (body: {
     idProspecto: number;
@@ -891,6 +1125,56 @@ export const crmBackend = {
       })}`
     ),
 
+  obtenerCronogramaVenta: (idVenta:number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta<=0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmCronogramaVenta>(`/crm/ventas/${idVenta}/cronograma`);
+  },
+
+  obtenerDetalleVenta: (idVenta: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmDetalleVenta>(`/crm/ventas/${idVenta}/detalle`);
+  },
+
+  obtenerComprobanteVenta: (idVenta: number, idComprobante: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0
+      || !Number.isSafeInteger(idComprobante) || idComprobante <= 0)
+      throw new Error('Identificador de comprobante inválido.');
+    return coreApi.get<CrmVoucherReadUrl>(
+      `/crm/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
+    );
+  },
+
+  obtenerComprobanteSeparacion: (idReserva: number) => {
+    if (!Number.isSafeInteger(idReserva) || idReserva <= 0) {
+      throw new Error('Identificador de separacion invalido.');
+    }
+    return coreApi.get<CrmVoucherReadUrl>(
+      '/crm/separaciones/' + idReserva + '/comprobante/url-firmada'
+    );
+  },
+
+  /** Exportación de ventas validada por sales.export y cartera en backend/SQL. */
+  listarVentasParaExportacion: (params: { pagina: number; tamano: number }) =>
+    coreApi.get<CrmOperacionesResponse>(
+      `/crm/ventas/exportacion${qs({
+        pagina: params.pagina, tamano: params.tamano
+      })}`
+    ),
+
+  /** Usa sales.export en backend, nunca eleva el alcance del asesor. */
+  listarOperacionesParaExportacion: (params: {
+    pagina: number;
+    tamano: number;
+  }) =>
+    coreApi.get<CrmOperacionesResponse>(
+      `/crm/separaciones/exportacion${qs({
+        pagina: params.pagina,
+        tamano: params.tamano
+      })}`
+    ),
+
   prepararLecturaVoucherSeparacion: (idVoucher: number) =>
     coreApi.get<CrmVoucherReadUrl>(
       `/crm/separaciones/vouchers/${idVoucher}/url-firmada`
@@ -965,6 +1249,7 @@ export const crmBackend = {
         montoTotal: body.montoTotal,
         montoInicial: body.montoInicial ?? null,
         numeroCuotas: body.numeroCuotas ?? null,
+        tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
         observaciones: body.observaciones ?? null
       }
     ),
@@ -979,7 +1264,10 @@ export const crmBackend = {
         montoTotal: body.montoTotal,
         montoInicial: body.montoInicial ?? null,
         numeroCuotas: body.numeroCuotas ?? null,
-        observaciones: body.observaciones ?? null
+        tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
+        observaciones: body.observaciones ?? null,
+        datosComprador: body.datosComprador ?? null,
+        datosPago: body.datosPago ?? null
       }
     ),
   cancelarVentaPendiente: (
@@ -994,6 +1282,16 @@ export const crmBackend = {
     coreApi.get<CrmBuyerVerification>(
       `/crm/prospectos/${idProspecto}/verificar-compra`
     ),
+  datosCompradorParaVenta: (idProspecto: number) =>
+    coreApi.get<CrmDatosCompradorVenta>(
+      `/crm/prospectos/${idProspecto}/datos-comprador-venta`
+    ),
+
+  listarReservasVigentesParaVenta: (idProspecto: number) =>
+    coreApi.get<CrmReservasVigentesVenta>(
+      `/crm/prospectos/${idProspecto}/reservas-vigentes-venta`
+    ),
+
   listarLotesReservadosDelProspecto: (idProspecto: number) =>
     coreApi.get<{ idLotes: number[] }>(
       `/crm/prospectos/${idProspecto}/lotes-reservados`

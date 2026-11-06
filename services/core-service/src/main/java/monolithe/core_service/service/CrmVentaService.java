@@ -72,14 +72,15 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v6(
+                SELECT public.sp_crm_validar_formalizacion_v9(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS varchar),
                     CAST(? AS numeric),
                     CAST(? AS numeric),
-                    CAST(? AS integer)
+                    CAST(? AS integer),
+                    CAST(? AS numeric)
                 )::text
                 """,
                 actor,
@@ -88,7 +89,8 @@ public class CrmVentaService {
                 req.modalidad(),
                 req.montoTotal(),
                 req.montoInicial(),
-                req.numeroCuotas());
+                req.numeroCuotas(),
+                req.tasaInteresMensualPct());
     }
 
     @Transactional(readOnly = true)
@@ -111,6 +113,38 @@ public class CrmVentaService {
                 """,
                 actor,
                 idProspecto);
+    }
+
+    /** Expediente contractual editable, delimitado por cartera y permiso sales.create en BD. */
+    @Transactional(readOnly = true)
+    public JsonNode datosCompradorParaVenta(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto == null || idProspecto <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Prospecto invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_datos_comprador_para_venta_v3(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idProspecto);
+    }
+
+    /** Obtiene las reservas vigentes del prospecto con proyecto, etapa y abono acreditado. */
+    @Transactional(readOnly = true)
+    public JsonNode listarReservasVigentesParaVenta(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto == null || idProspecto <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador del prospecto invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_reservas_vigentes_para_venta_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor, idProspecto);
     }
 
     @Transactional(readOnly = true)
@@ -154,8 +188,19 @@ public class CrmVentaService {
                     "Datos obligatorios de venta incompletos.");
         }
 
+        if (req.datosComprador() == null || !req.datosComprador().isObject()
+                || req.datosComprador().toString().length() > 15000
+                || req.datosComprador().path("idProspecto").asLong() != req.idProspecto()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Revise la ficha contractual del comprador antes de registrar.");
+        }
+        if (req.datosPago() == null || !req.datosPago().isObject()
+                || req.datosPago().toString().length() > 16000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indique metodo de pago y comprobantes de la venta.");
+        }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v6(
+                SELECT public.sp_crm_registrar_venta_pendiente_v13(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -163,7 +208,10 @@ public class CrmVentaService {
                     CAST(? AS numeric),
                     CAST(? AS numeric),
                     CAST(? AS integer),
-                    CAST(? AS text)
+                    CAST(? AS numeric),
+                    CAST(? AS text),
+                    CAST(? AS jsonb),
+                    CAST(? AS jsonb)
                 )::text
                 """,
                 actor,
@@ -173,7 +221,10 @@ public class CrmVentaService {
                 req.montoTotal(),
                 req.montoInicial(),
                 req.numeroCuotas(),
-                req.observaciones());
+                req.tasaInteresMensualPct(),
+                req.observaciones(),
+                req.datosComprador().toString(),
+                req.datosPago().toString());
     }
 
     @Transactional(readOnly = true)
@@ -325,6 +376,23 @@ public class CrmVentaService {
                 actor, estado, busqueda, pagina, tamano);
     }
 
+    /** Ruta validada de un comprobante, segun el alcance comercial de la reserva. */
+    @Transactional(readOnly = true)
+    public JsonNode obtenerRutaComprobanteSeparacion(Long actor, Long idReserva) {
+        validarActor(actor);
+        if (idReserva == null || idReserva <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de separacion invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_obtener_comprobante_separacion_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS bigint)
+                )::text
+                """,
+                actor, idReserva);
+    }
+
     @Transactional
     public JsonNode revisarVoucherSeparacion(
             Long actor, Long idVoucher, RevisarVoucherSeparacionRequest request) {
@@ -403,6 +471,61 @@ public class CrmVentaService {
                 request.motivo().trim());
     }
 
+    /** Ficha personal y cambios auditados; la BD valida crm.view y cartera. */
+    @Transactional(readOnly = true)
+    public JsonNode datosPersonalesCrm(Long actor, Long idProspecto) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Prospecto inválido.");
+        return ejecutar("""
+            SELECT public.sp_crm_datos_personales_edicion_v1(
+                CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idProspecto);
+    }
+
+    /** Corrección personal: jamás sustituye los datos sin auditoría de identidad. */
+    @Transactional
+    public JsonNode corregirDatosPersonalesCrm(Long actor, Long idProspecto,
+            JsonNode datos, String motivo) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0 || datos==null || !datos.isObject()
+                || datos.toString().length()>5000 || motivo==null
+                || motivo.trim().length()<8 || motivo.trim().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos personales o motivo de corrección inválidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_corregir_datos_personales_v1(
+                CAST(? AS bigint),CAST(? AS bigint),
+                CAST(? AS jsonb),CAST(? AS text)
+            )::text
+            """,actor,idProspecto,datos.toString(),motivo.trim());
+    }
+
+    /** Buscar CRM sin fecha global; filtros, proyecto y alcance siguen comprobados en PostgreSQL. */
+    @Transactional(readOnly = true)
+    public JsonNode buscarCarteraSinPeriodo(Long actor, String busqueda, String etapa,
+            String origen, Long idAsesor, Boolean sinAsignar,
+            String categoria, Integer pagina, Integer tamano, Long idProyecto) {
+        validarActor(actor);
+        int numero=pagina==null?1:pagina, cantidad=tamano==null?15:tamano;
+        if (numero<1 || numero>100000 || cantidad<1 || cantidad>100
+                || (idProyecto!=null && idProyecto<=0)
+                || (idAsesor!=null && idAsesor<=0)
+                || (busqueda!=null && busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de CRM o paginación inválidos.");
+        return ejecutar("""
+                SELECT public.sp_crm_buscar_v7(
+                  CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS bigint),CAST(? AS boolean),
+                  CAST(? AS varchar),CAST(? AS integer),CAST(? AS integer),
+                  CAST(? AS bigint),CAST(NULL AS timestamptz),CAST(NULL AS timestamptz)
+                )::text
+                """,actor,busqueda,etapa,origen,idAsesor,sinAsignar,
+                categoria==null?"TODOS":categoria,numero,cantidad,idProyecto);
+    }
+
     /** Listado unificado paginado, con alcance comercial por actor. */
     @Transactional(readOnly = true)
     public JsonNode listarOperaciones(
@@ -445,6 +568,88 @@ public class CrmVentaService {
                 """,
                 actor, filtroTipo, filtroBusqueda,
                 paginaActual, tamanoActual);
+    }
+
+    /** Expediente de venta de solo lectura, con autorización por venta en PostgreSQL. */
+    @Transactional(readOnly = true)
+    public JsonNode detalleVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de venta invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_detalle_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta);
+    }
+
+    /** Cronograma financiero: cuotas reales o proyección expresamente identificada. */
+    @Transactional(readOnly = true)
+    public JsonNode cronogramaVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta==null || idVenta<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
+        return ejecutar("""
+            SELECT public.sp_crm_cronograma_venta_v1(
+              CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idVenta);
+    }
+
+    /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
+    @Transactional(readOnly = true)
+    public JsonNode rutaComprobanteVenta(Long actor, Long idVenta, Long idComprobante) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0 || idComprobante == null || idComprobante <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de comprobante invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_autorizar_lectura_comprobante_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta, idComprobante);
+    }
+
+    /** La BD vuelve a validar sales.export y limita los registros al actor. */
+    @Transactional(readOnly = true)
+    public JsonNode listarSeparacionesParaExportacion(
+            Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int numero = pagina == null ? 1 : pagina;
+        int cantidad = tamano == null ? 100 : tamano;
+        if (numero < 1 || numero > 100000 || cantidad < 1 || cantidad > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginacion de exportacion invalida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_exportar_separaciones_v1(
+                    CAST(? AS bigint),
+                    CAST(? AS integer),
+                    CAST(? AS integer)
+                )::text
+                """,
+                actor, numero, cantidad);
+    }
+
+    /** Exportación de ventas: sales.view + sales.export y alcance de cartera en la BD. */
+    @Transactional(readOnly = true)
+    public JsonNode listarVentasParaExportacion(
+            Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int numero = pagina == null ? 1 : pagina;
+        int cantidad = tamano == null ? 100 : tamano;
+        if (numero < 1 || numero > 100000 || cantidad < 1 || cantidad > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de exportación inválida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_exportar_ventas_v1(
+                    CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """, actor, numero, cantidad);
     }
 
     @Transactional
@@ -1208,6 +1413,15 @@ public class CrmVentaService {
         ResponseStatusException errorAnulacion = mapearErrorAnulacion(mensaje, ex);
         if (errorAnulacion != null) {
             return errorAnulacion;
+        }
+
+        if (mensaje.contains("VENTA_NO_DISPONIBLE|")
+                || mensaje.contains("COMPROBANTE_NO_DISPONIBLE|")) {
+            // Evita revelar si una venta existe fuera del alcance autorizado.
+            return new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No se encontró la venta o el comprobante en su cartera autorizada.",
+                    ex);
         }
 
         if (mensaje.contains("DENEGADO|")) {
