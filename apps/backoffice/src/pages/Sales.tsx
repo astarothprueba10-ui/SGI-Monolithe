@@ -197,6 +197,7 @@ export function Sales() {
     codigoProspecto: string;
     codigoLote: string;
     idAsesor?: number | null;
+    resumen: NonNullable<typeof resumenVenta>;
   } | null>(null);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
@@ -666,14 +667,17 @@ export function Sales() {
       (
         !formSaleDownPayment.trim() ||
         !Number.isFinite(montoInicial) ||
-        montoInicial <= 0 ||
-        montoInicial >= montoTotal ||
-        !Number.isInteger(numeroCuotas) ||
-        numeroCuotas < 1 ||
-        numeroCuotas > 36
+        montoInicial < 5000 ||
+        montoInicial + reservaAplicable >= montoTotal ||
+        !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments) ||
+        !formSaleRate.trim() ||
+        !Number.isFinite(Number(formSaleRate)) ||
+        Number(formSaleRate) <= 0 ||
+        Number(formSaleRate) > 100 ||
+        Number(Number(formSaleRate).toFixed(4)) !== Number(formSaleRate)
       )
     ) {
-      toast.error('Revise el monto inicial y las cuotas de financiamiento.');
+      toast.error('La inicial adicional debe ser mínimo S/ 5,000, el plazo de 1 a 36 meses y la tasa mensual válida.');
       return;
     }
 
@@ -684,6 +688,7 @@ export function Sales() {
       montoTotal,
       montoInicial: esFinanciada ? montoInicial : null,
       numeroCuotas: esFinanciada ? numeroCuotas : null,
+      tasaInteresMensualPct: esFinanciada ? Number(formSaleRate) : null,
       observaciones: formObservations.trim() || null
     };
 
@@ -695,6 +700,7 @@ export function Sales() {
       const validacion = await crmBackend.validarVenta(datos);
 
       if (
+        !resumenVenta ||
         !validacion.elegible ||
         validacion.idProspecto !== idProspecto ||
         validacion.idLote !== idLote ||
@@ -708,7 +714,8 @@ export function Sales() {
         datos,
         codigoProspecto: validacion.codigoProspecto,
         codigoLote: validacion.codigoLote,
-        idAsesor: validacion.idAsesor
+        idAsesor: validacion.idAsesor,
+        resumen: resumenVenta!
       });
 
     } catch (err: unknown) {
@@ -771,19 +778,24 @@ export function Sales() {
         if (
           !formSaleDownPayment.trim() ||
           !Number.isFinite(montoInicial) ||
-          montoInicial <= 0 ||
-          montoInicial >= montoTotal
+          montoInicial < 5000 ||
+          montoInicial + reservaAplicable >= montoTotal
         ) {
-          toast.error('La inicial debe ser mayor que cero y menor que el precio.');
+          toast.error('La inicial adicional debe ser desde S/ 5,000 y dejar saldo financiable después de la reserva.');
           return;
         }
 
         if (
-          !Number.isInteger(numeroCuotas) ||
-          numeroCuotas < 1 ||
-          numeroCuotas > 36
+          !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
         ) {
-          toast.error('El número de cuotas debe estar entre 1 y 36.');
+          toast.error('El plazo de financiamiento debe ser un número entero entre 1 y 36 meses.');
+          return;
+        }
+        if (!formSaleRate.trim() ||
+            !Number.isFinite(Number(formSaleRate)) ||
+            Number(formSaleRate) <= 0 || Number(formSaleRate) > 100 ||
+            Number(Number(formSaleRate).toFixed(4)) !== Number(formSaleRate)) {
+          toast.error('Indique la tasa de interés mensual pactada para calcular las cuotas.');
           return;
         }
       }
@@ -798,6 +810,7 @@ export function Sales() {
           montoTotal,
           montoInicial: financiada ? montoInicial : null,
           numeroCuotas: financiada ? numeroCuotas : null,
+          tasaInteresMensualPct: financiada ? Number(formSaleRate) : null,
           observaciones: formObservations.trim() || null
         });
 
