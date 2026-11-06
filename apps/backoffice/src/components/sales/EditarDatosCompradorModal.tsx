@@ -6,6 +6,7 @@ import { Input, Select } from '../ui/Field';
 import { crmBackend, type CrmCatalogs, type CrmAdvisor, type CrmDatosCompradorVenta } from '../../services/crmBackend';
 import { sanitizarLead, validarNuevoLead, type LeadField, type LeadFormValues } from '../../utils/crmLeadValidation';
 import { toast } from 'sonner';
+import { coreService, type UbicacionGeograficaResponse } from '../../services/coreService';
 
 interface Props {
   open: boolean;
@@ -36,7 +37,22 @@ export function EditarDatosCompradorModal({
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
   const [tocados, setTocados] = useState<Partial<Record<LeadField, boolean>>>({});
-  const errores = useMemo(() => validarNuevoLead(form), [form]);
+  const [referencia, setReferencia] = useState('');
+  const [paises, setPaises] = useState<UbicacionGeograficaResponse[]>([]);
+  const [departamentos, setDepartamentos] = useState<UbicacionGeograficaResponse[]>([]);
+  const [provincias, setProvincias] = useState<UbicacionGeograficaResponse[]>([]);
+  const [distritos, setDistritos] = useState<UbicacionGeograficaResponse[]>([]);
+  const [geo, setGeo] = useState<{
+    idPais: number | null;
+    idDepartamento: number | null;
+    idProvincia: number | null;
+    idDistrito: number | null;
+  }>({idPais: null, idDepartamento: null, idProvincia: null, idDistrito: null});
+  const [errorGeo, setErrorGeo] = useState<string | null>(null);
+  // El motivo corresponde a la captación del lead; no se pide en una venta.
+  const errores = useMemo(() => validarNuevoLead({
+    ...form, motivoContacto: 'Revisión de datos contractuales'
+  }), [form]);
   const actualizar = (campo: LeadField, valor: string) => {
     setForm(previo => ({
       ...previo,
@@ -58,20 +74,34 @@ export function EditarDatosCompradorModal({
     setEnviado(false);
     setTocados({});
     setOriginal(null);
+    setReferencia('');
+    setGeo({idPais: null,idDepartamento: null,idProvincia: null,idDistrito: null});
+    setPaises([]);setDepartamentos([]);setProvincias([]);setDistritos([]);
+    setErrorGeo(null);
     Promise.all([
       crmBackend.datosCompradorParaVenta(idProspecto),
       crmBackend.catalogos(),
-      puedeReasignar ? crmBackend.asesores() : Promise.resolve([] as CrmAdvisor[])
-    ]).then(([datos, lista, asesoresDisponibles]) => {
+      puedeReasignar ? crmBackend.asesores() : Promise.resolve([] as CrmAdvisor[]),
+      coreService.getUbicaciones()
+    ]).then(([datos, lista, asesoresDisponibles, paisesDisponibles]) => {
       if (!activo) return;
       setOriginal(datos);
       setCatalogos(lista);
       setAsesores(asesoresDisponibles);
+      const peru = paisesDisponibles.find(p => p.codigo === 'PE' && p.tipo === 'PAIS');
+      setPaises(peru ? [peru] : []);
+      setGeo({
+        idPais: datos.idPais ?? peru?.idUbicacion ?? null,
+        idDepartamento: datos.idDepartamento ?? null,
+        idProvincia: datos.idProvincia ?? null,
+        idDistrito: datos.idDistrito ?? null
+      });
+      setReferencia(datos.referencia ?? '');
       setForm({
         names: datos.nombres ?? '',
         paternalSurname: datos.apellidoPaterno ?? '',
         maternalSurname: datos.apellidoMaterno ?? '',
-        phone: datos.telefono ?? '',
+        phone: sanitizarLead('phone', datos.telefono ?? ''),
         email: datos.correo ?? '',
         idProyecto: datos.idProyectoInteres || '',
         origenCodigo: datos.origenCodigo ?? 'WEB',
@@ -95,6 +125,15 @@ export function EditarDatosCompradorModal({
       toast.error('Corrige los campos marcados en rojo antes de continuar.');
       return;
     }
+    if (!form.direccion.trim() || !geo.idPais || !geo.idDepartamento ||
+        !geo.idProvincia || !geo.idDistrito) {
+      toast.error('Complete la dirección, país, departamento, provincia y distrito.');
+      return;
+    }
+    if (referencia.trim().length > 255) {
+      toast.error('La referencia del domicilio no debe superar 255 caracteres.');
+      return;
+    }
     if (!puedeReasignar && form.idAsesor !== (original.idAsesor ?? '')) {
       toast.error('No tienes permiso para reasignar al asesor comercial.');
       return;
@@ -113,6 +152,11 @@ export function EditarDatosCompradorModal({
       tipoDocumento: form.tipoDocumento,
       numeroDocumento: form.numeroDocumento.trim(),
       direccion: form.direccion.trim(),
+      referencia: referencia.trim(),
+      idPais: geo.idPais,
+      idDepartamento: geo.idDepartamento,
+      idProvincia: geo.idProvincia,
+      idDistrito: geo.idDistrito,
       idAsesor: form.idAsesor === '' ? null : Number(form.idAsesor)
     });
   };
