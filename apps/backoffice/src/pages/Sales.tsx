@@ -705,7 +705,10 @@ export function Sales() {
         validacion.idProspecto !== idProspecto ||
         validacion.idLote !== idLote ||
         validacion.modalidad !== formSaleModality ||
-        Number(validacion.precioVigente) !== montoTotal
+        Number(validacion.precioVigente) !== montoTotal ||
+        Number(validacion.montoReservaAplicable) !== reservaAplicable ||
+        (esFinanciada && Number(validacion.planAleman?.capitalFinanciado) !==
+          resumenVenta.capitalFinanciado)
       ) {
         throw new Error('La validación comercial no coincide con la operación.');
       }
@@ -2269,11 +2272,27 @@ export function Sales() {
                   {currency(confirmacionVenta.datos.montoTotal)}
                 </dd>
               </div>
+              {confirmacionVenta.resumen.abonoReserva > 0 && (
+                <div>
+                  <dt className="text-emerald-700">Pago de reserva acreditado</dt>
+                  <dd className="font-semibold text-emerald-800">
+                    − {currency(confirmacionVenta.resumen.abonoReserva)}
+                  </dd>
+                </div>
+              )}
+              {confirmacionVenta.datos.modalidad === 'CONTADO' && (
+                <div>
+                  <dt className="text-brand-500">Saldo al contado</dt>
+                  <dd className="font-semibold text-brand-900">
+                    {currency(confirmacionVenta.resumen.saldoContado)}
+                  </dd>
+                </div>
+              )}
 
               {confirmacionVenta.datos.modalidad === 'FINANCIADA' && (
                 <>
                   <div>
-                    <dt className="text-brand-500">Inicial pactada</dt>
+                    <dt className="text-brand-500">Inicial adicional (sin reserva)</dt>
                     <dd className="font-semibold text-brand-900">
                       {currency(confirmacionVenta.datos.montoInicial ?? 0)}
                     </dd>
@@ -2283,6 +2302,30 @@ export function Sales() {
                     <dt className="text-brand-500">Número de cuotas</dt>
                     <dd className="font-semibold text-brand-900">
                       {confirmacionVenta.datos.numeroCuotas}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-brand-500">Tasa mensual pactada</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {confirmacionVenta.datos.tasaInteresMensualPct} %
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-brand-500">Capital financiado</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {currency(confirmacionVenta.resumen.capitalFinanciado)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-brand-500">Intereses totales</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {currency(confirmacionVenta.resumen.interesTotal)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-brand-500">Total incluyendo intereses</dt>
+                    <dd className="font-semibold text-brand-900">
+                      {currency(confirmacionVenta.resumen.totalOperacionConIntereses)}
                     </dd>
                   </div>
                 </>
