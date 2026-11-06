@@ -34,12 +34,27 @@ export function getStoredAuthUser(): StoredAuthUser | null {
     }
 }
 
+/** El único rol de negocio excluido del Backoffice es CLIENTE.
+ *  Los nuevos roles internos que emite auth-service no requieren una lista
+ *  manual de habilitación en el frontend. Los permisos reales siguen en JWT.
+ */
 export function getSessionRoles(
     autoridades: string[]
 ): RoleName[] {
-    return autoridades
-        .map((authority) => ROLE_MAP[authority])
-        .filter((role): role is RoleName => Boolean(role));
+    const roles = autoridades
+        .filter((authority) =>
+            /^ROLE_[A-Z][A-Z0-9_]*$/.test(authority) &&
+            authority !== 'ROLE_CLIENTE'
+        )
+        .map((authority) => {
+            const conocido = ROLE_MAP[authority];
+            if (conocido) return conocido;
+            // Solo sirve para presentación. No se asignan permisos por el nombre.
+            return authority.slice(5).toLowerCase().split('_')
+                .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+                .join(' ') as RoleName;
+        });
+    return [...new Set(roles)];
 }
 
 export function getSessionPermissions(
