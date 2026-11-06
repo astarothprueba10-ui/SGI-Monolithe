@@ -1390,31 +1390,89 @@ export function Sales() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-end gap-3 border-b border-brand-100 px-5 py-3.5">
-              <label className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-xs font-semibold text-brand-700">Buscar comprador</span>
-                <SearchInput value={query} onValueChange={setQuery}
-                  placeholder="Comprador, código o lote…" className="w-full sm:w-72" />
-              </label>
-              <label className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-xs font-semibold text-brand-700">Modalidad de venta</span>
-                <Select value={modality} onChange={(e) => setModality(e.target.value as typeof modality)}
-                  className="w-full sm:w-40">
-                  <option value="all">Todas</option>
-                  <option value="Contado">Contado</option>
-                  <option value="Financiado">Financiado</option>
-                </Select>
-              </label>
-              <label className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-xs font-semibold text-brand-700">Asesor</span>
-                <Select value={advisorFilter}
-                  onChange={(e) => setAdvisorFilter(e.target.value as typeof advisorFilter)}
-                  className="w-full sm:w-44">
-                  <option value="all">Todos los asesores</option>
-                  <option value="with_advisor">Con asesor</option>
-                  <option value="without_advisor">Sin asesor</option>
-                </Select>
-              </label>
+            <div className="space-y-4 border-b border-brand-100 bg-gradient-to-b from-slate-50/80 to-white px-4 py-5 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-brand-900">Filtros de ventas</h3>
+                  <p className="mt-1 text-xs text-brand-500">
+                    Filtra únicamente la tabla. Los indicadores dependen del período comercial global.
+                  </p>
+                </div>
+                <span className="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700">
+                  {rows.length} de {salesCount} ventas
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[275px]">
+                    <span className="text-xs font-semibold text-brand-700">Buscar comprador</span>
+                    <SearchInput value={filtrosVenta.busqueda}
+                      onValueChange={v=>cambiarFiltroVenta('busqueda',v)}
+                      placeholder="Comprador, DNI, código o lote…" className="w-full"/>
+                  </label>
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[165px]">
+                    <span className="text-xs font-semibold text-brand-700">Modalidad de venta</span>
+                    <Select value={filtrosVenta.modalidad}
+                      onChange={e=>cambiarFiltroVenta('modalidad',e.target.value)} className="w-full">
+                      <option value="all">Todas</option>
+                      <option value="Contado">Contado</option>
+                      <option value="Financiado">Financiado</option>
+                    </Select>
+                  </label>
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[195px]">
+                    <span className="text-xs font-semibold text-brand-700">Asesor</span>
+                    <Select value={filtrosVenta.asesor}
+                      onChange={e=>cambiarFiltroVenta('asesor',e.target.value)} className="w-full">
+                      <option value="all">Todos los asesores</option>
+                      {asesoresVentasFiltro.map(asesor=>
+                        <option key={asesor} value={asesor}>{asesor}</option>)}
+                      {salesList.some(op=>op.type==='Venta' && !op.advisor?.trim()) &&
+                        <option value="__sin_asesor__">Sin asesor</option>}
+                    </Select>
+                  </label>
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[195px]">
+                    <span className="text-xs font-semibold text-brand-700">Proyecto</span>
+                    <Select value={filtrosVenta.proyecto}
+                      onChange={e=>cambiarFiltroVenta('proyecto',e.target.value)} className="w-full">
+                      <option value="all">Todos los proyectos</option>
+                      {proyectosVentasFiltro.map(proyecto=>
+                        <option key={proyecto} value={proyecto}>{proyecto}</option>)}
+                    </Select>
+                  </label>
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[175px]">
+                    <span className="text-xs font-semibold text-brand-700">Estado</span>
+                    <Select value={filtrosVenta.estado}
+                      onChange={e=>cambiarFiltroVenta('estado',e.target.value)} className="w-full">
+                      <option value="all">Todos los estados</option>
+                      {estadosVentasFiltro.map(estado=>
+                        <option key={estado} value={estado}>{estado.replaceAll('_',' ')}</option>)}
+                    </Select>
+                  </label>
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[190px]">
+                    <span className="text-xs font-semibold text-brand-700">Fecha desde</span>
+                    <Input type="date" value={filtrosVenta.desde} className="w-full"
+                      max={filtrosVenta.hasta || undefined}
+                      onChange={e=>cambiarFiltroVenta('desde',e.target.value)}/>
+                  </label>
+                  <label className="flex w-full min-w-0 flex-col gap-1.5 sm:w-[190px]">
+                    <span className="text-xs font-semibold text-brand-700">Fecha hasta</span>
+                    <Input type="date" value={filtrosVenta.hasta} className="w-full"
+                      min={filtrosVenta.desde || undefined}
+                      onChange={e=>cambiarFiltroVenta('hasta',e.target.value)}/>
+                  </label>
+                  <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
+                    <span className="select-none text-xs font-semibold text-transparent" aria-hidden="true">
+                      Acciones
+                    </span>
+                    <Button icon={RotateCcwIcon} variant="secondary"
+                      onClick={limpiarFiltrosVenta} className="w-full sm:w-auto">
+                      Limpiar filtros
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1431,7 +1489,7 @@ export function Sales() {
             <Table
               className={tab === 'Separación'
                 ? '[&_table]:min-w-[1180px] [&_thead]:bg-slate-100/90 [&_th]:py-3.5 [&_th]:text-slate-600 [&_th]:font-bold [&_tbody_tr]:hover:bg-brand-50/50'
-                : '[&_table]:min-w-[1560px]'
+                : '[&_table]:min-w-[1480px] [&_thead]:bg-slate-100/90 [&_th]:py-3.5 [&_th]:text-slate-600 [&_th]:font-bold [&_tbody_tr]:hover:bg-brand-50/50'
               }
               head={tab === 'Separación' ? (
                 <>
@@ -1462,7 +1520,7 @@ export function Sales() {
                 </>
               )}
             >
-              {(tab === 'Separación' ? filasSeparacionesPagina : rows).map((sale) => (
+              {(tab === 'Separación' ? filasSeparacionesPagina : filasVentasPagina).map((sale) => (
                 tab === 'Separación' ? (
                   <TR key={sale.id} className="group hover:bg-brand-50/60">
                     <TD className="whitespace-nowrap py-4 text-xs font-medium tabular-nums text-brand-600">
@@ -1519,32 +1577,36 @@ export function Sales() {
                     </TD>
                   </TR>
                 ) : (
-                  <TR key={sale.id}>
-                    <TD className="whitespace-nowrap text-xs text-brand-700">
+                  <TR key={sale.id} className="group hover:bg-brand-50/60">
+                    <TD className="whitespace-nowrap py-4 text-xs font-medium tabular-nums text-brand-600">
                       {sale.date || '—'}
                     </TD>
 
-                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-900">
-                      {sale.code}
+                    <TD className="whitespace-nowrap">
+                      <span className="inline-flex rounded-md border border-brand-200 bg-brand-50/70 px-2.5 py-1 font-mono text-xs font-semibold text-brand-900">
+                        {sale.code}
+                      </span>
                     </TD>
 
-                    <TD className="min-w-[150px] font-medium text-brand-900">
+                    <TD className="min-w-[160px] font-semibold leading-snug text-brand-900">
                       {sale.buyer || '—'}
                     </TD>
 
-                    <TD className="min-w-[170px] text-brand-700">
+                    <TD className="min-w-[175px] text-xs leading-relaxed text-brand-700">
                       {sale.project || '—'}
                     </TD>
 
-                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-brand-800">
-                      {sale.lot || '—'}
+                    <TD className="whitespace-nowrap">
+                      <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">
+                        {sale.lot || '—'}
+                      </span>
                     </TD>
 
-                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
+                    <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
                       {currency(sale.amount)}
                     </TD>
 
-                    <TD className="whitespace-nowrap text-brand-700">
+                    <TD className="whitespace-nowrap text-xs text-brand-700">
                       {sale.modality ?? 'Por definir'}
                     </TD>
 
@@ -1581,15 +1643,10 @@ export function Sales() {
                     </TD>
 
                     <TD align="right">
-                      <button
-                        type="button"
+                      <Button size="sm" variant="ghost" icon={EyeIcon}
                         onClick={() => setDetail(sale)}
-                        title="Ver ficha de venta"
-                        aria-label={`Ver ficha de ${sale.buyer}`}
-                        className="inline-flex items-center justify-center rounded-lg p-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900"
-                      >
-                        <EyeIcon className="h-5 w-5" />
-                      </button>
+                        className="font-semibold text-brand-700 hover:text-brand-900"
+                      >Ver</Button>
                     </TD>
                   </TR>
                 )
@@ -1597,14 +1654,12 @@ export function Sales() {
             </Table>
 
           )}
-          {tab === 'Separación' && (
-            <Pagination
-              page={paginaSeparacionesActual}
-              pageSize={tamanoPaginaSeparaciones}
-              total={rows.length}
-              onPageChange={setPaginaSeparaciones}
-            />
-          )}
+          <Pagination
+            page={tab === 'Separación' ? paginaSeparacionesActual : paginaVentasActual}
+            pageSize={tab === 'Separación' ? tamanoPaginaSeparaciones : tamanoPaginaVentas}
+            total={rows.length}
+            onPageChange={tab === 'Separación' ? setPaginaSeparaciones : setPaginaVentas}
+          />
         </Card>
       )}
 
