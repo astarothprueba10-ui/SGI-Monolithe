@@ -54,7 +54,11 @@ function mapOperacion(row: CrmOperacionItem): Sale {
     document: row.documento ?? '',
     lot: row.lote,
     project: row.proyecto,
-    modality: modalidad,
+    modality: esVenta ? modalidad : undefined,
+    paymentMethod: esVenta ? null : (row.metodo_pago ?? null),
+    expiresAt: !esVenta && row.fecha_vencimiento
+      ? new Date(row.fecha_vencimiento).toLocaleDateString('es-PE', { timeZone: 'America/Lima' })
+      : null,
     amount: Number(row.monto),
     advisor: row.asesor ?? '',
     date: row.fecha
