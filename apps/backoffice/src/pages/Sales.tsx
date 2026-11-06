@@ -32,6 +32,7 @@ import { ApiError } from '../lib/apiClient';
 import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
+import { DetalleVentaAmpliadoPanel } from '../components/sales/DetalleVentaAmpliadoPanel';
 import { EditarDatosCompradorModal } from '../components/sales/EditarDatosCompradorModal';
 import {
   FILTROS_SEPARACIONES_INICIALES,
@@ -1550,7 +1551,7 @@ export function Sales() {
         onClose={() => setDetail(null)}
         title={detail ? `Operación ${detail.code}` : ''}
         description={detail ? `${detail.type} · ${detail.buyer}` : ''}
-        width="max-w-3xl"
+        width={detail?.type === 'Venta' ? 'max-w-4xl' : 'max-w-3xl'}
       >
         {detail ? (
           <div className="space-y-5">
@@ -1643,11 +1644,15 @@ export function Sales() {
               />
             )}
 
+            {detail.type === 'Venta' && (
+              <DetalleVentaAmpliadoPanel
+                key={detail.id}
+                idVenta={Number(detail.id.slice('VENTA-'.length))}
+              />
+            )}
+
             {detail.type === 'Venta' && documentosPorVenta[detail.id] && (
               <section className="border-t border-brand-100 pt-4">
-                <h3 className="mb-3 text-sm font-semibold text-brand-900">
-                  Documentación asociada a la venta
-                </h3>
                 <AnexosContratoPanel
                   idContrato={documentosPorVenta[detail.id].idContrato}
                   codigoContrato={documentosPorVenta[detail.id].codigoContrato}
