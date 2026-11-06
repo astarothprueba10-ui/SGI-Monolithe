@@ -33,3 +33,13 @@ Nunca configurar claves privadas `sb_secret_`, `service_role` o JWT en variables
 
 ## Gate para merge en main
 Primero conciliar cambios locales con esta rama, ejecutar builds Vite, Maven y PostgreSQL IT aislada, comprobar publicación y GET públicos, revisar diff contra `main` y solo después abrir PR de integración. No ejecutar despliegues ni publicación real sin verificación del entorno.
+
+## Confirmación: primera publicación de textos
+
+- 2026-11-06 04:44 UTC: Borrador **#13** publicado exitosamente por Backoffice autenticado.
+- Sección única actualizada: `HERO_SLIDE_2_PROMO` (id 2); subtítulo `Descubre nuestros proyectos inmobiliarios`.
+- Revisión pública INICIO: **0 → 1**; historial **#1**; borrador pasó a **PUBLICADO**.
+- Supabase verificado en solo lectura: slide 1 sin cambios, slide 2 visible, slide 3 aún oculto.
+- Prueba HTTP ejecutada desde Windows/Docker por el usuario: `node scripts/cms-public-smoke.mjs http://localhost:8082` → `PASS: INICIO (2 secciones), proyectos (2)` y `PASS: solo endpoints GET públicos; sin token, sin borradores ni escritura`.
+- El fallo previo `permission denied for table cms_paginas` se corrigió con la migración `cms_permiso_bloqueo_publicacion_20261106`, versionada en `database/migrations/44_cms_permiso_bloqueo_publicacion.sql`. El rol `sigi_cms_user` solo recibió permiso UPDATE sobre `fecha_actualizacion` con política limitada a página INICIO.
+- Pendiente comprobar la presentación visual del carrusel React con ambos flags de lectura CMS habilitados en Docker QA; aún **no** está validada la publicación de imágenes.
