@@ -163,6 +163,22 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** URL de solo lectura y corta duracion para el comprobante de una separacion. */
+        @GetMapping("/separaciones/{idReserva}/comprobante/url-firmada")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteSeparacion(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long idReserva) {
+
+                var enlace = separacionStorageService.prepararLecturaPorReserva(
+                                obtenerActor(jwt),
+                                idReserva);
+
+                return ResponseEntity.ok()
+                                .cacheControl(CacheControl.noStore())
+                                .body(enlace);
+        }
+
         @GetMapping("/separaciones/vouchers/{idVoucher}/url-firmada")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<EnlaceLecturaVoucherResponse> prepararLecturaVoucher(
