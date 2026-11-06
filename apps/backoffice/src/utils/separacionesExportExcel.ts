@@ -49,7 +49,7 @@ async function obtenerSeparacionesAutorizadas(): Promise<Sale[]> {
   for (let pagina = 1; pagina <= MAX_PAGINAS; pagina++) {
     // Endpoint exclusivo sales.export; conserva el alcance del SP comercial.
     const respuesta = await crmBackend.listarOperacionesParaExportacion({
-      tipo: 'SEPARACION', pagina, tamano: TAMANO
+      pagina, tamano: TAMANO
     });
     if (!Array.isArray(respuesta.items) || !Number.isFinite(respuesta.total)) {
       throw new Error('Respuesta inválida del servidor al preparar el Excel.');
@@ -197,7 +197,7 @@ export async function exportarSeparacionesExcel(
     ws.getCell('A7').font = { italic: true, color: { argb: 'FF64748B' } };
   }
   ws.autoFilter = { from: { row: filaHeader, column: 1 },
-    to: { row: Math.max(filaHeader + registros.length, filaHeader + 1), column: columnas.length } };
+    to: { row: filaHeader + registros.length, column: columnas.length } };
   ws.views = [{ state: 'frozen', ySplit: filaHeader, xSplit: 0 }];
   ws.getColumn(3).alignment = { vertical: 'middle', wrapText: true };
   ws.getColumn(5).alignment = { vertical: 'middle', wrapText: true };
