@@ -10,7 +10,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   marketing: 'Marketing y campañas',
   sales: 'Separaciones y ventas',
   annulments: 'Anulaciones',
-  web_content: 'Contenido Web',
+  web_content: 'Contenido de la página web',
   financing: 'Financiamiento y pagos',
   finance: 'Finanzas',
   advisors: 'Asesores y comisiones',
@@ -36,7 +36,9 @@ export const ACTION_LABELS: Record<Action, string> = {
   activate: 'Activar',
   deactivate: 'Desactivar',
   assign_role: 'Asignar rol',
-  assign_permissions: 'Asignar permisos'
+  assign_permissions: 'Asignar permisos',
+  projects_visibility: 'Cambiar visibilidad pública de proyectos',
+  publish: 'Publicar contenido web'
 };
 
 /** Acciones que tienen sentido por módulo (la matriz de permisos solo ofrece estas). */
@@ -48,7 +50,7 @@ export const MODULE_ACTIONS: Record<ModuleKey, Action[]> = {
   marketing: ['view', 'create', 'edit', 'export'],
   sales: ['view', 'create', 'edit', 'approve', 'reject', 'annul', 'export'],
   annulments: ['view', 'create', 'approve', 'reject', 'review_finance', 'review_legal'],
-  web_content: ['view', 'edit'],
+  web_content: ['view', 'edit', 'projects_visibility', 'publish'],
   financing: ['view', 'create', 'edit', 'approve', 'reject', 'export'],
   finance: ['view', 'create', 'edit', 'export'],
   advisors: ['view', 'create', 'edit', 'approve', 'export'],
@@ -82,6 +84,7 @@ export const ROLES: Record<RoleName, Role> = {
       ...perms('lots', ['view', 'export']),
       ...perms('crm', ['view', 'export']),
       ...perms('marketing', ['view', 'export']),
+      ...perms('web_content', ['view', 'edit', 'projects_visibility', 'publish']),
       ...perms('sales', ['view', 'annul', 'export']),
       ...perms('financing', ['view', 'export']),
       ...perms('finance', ['view', 'export']),
@@ -123,9 +126,10 @@ export const ROLES: Record<RoleName, Role> = {
     permissions: [
       ...perms('dashboard', ['view']),
       ...perms('crm', ['view', 'create', 'edit', 'export']),
-      ...perms('marketing', ['view', 'create', 'edit', 'export'])]
+      ...perms('marketing', ['view', 'create', 'edit', 'export']),
+      ...perms('web_content', ['view', 'edit', 'projects_visibility', 'publish'])]
 
-  },
+  }
   RRHH: {
     name: 'RRHH',
     description: 'Trabajadores, asesores, comisiones, horarios y descuentos.',
