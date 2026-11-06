@@ -36,7 +36,7 @@ import {
   type FiltrosSeparaciones
 } from '../utils/separacionesFiltros';
 import { exportarSeparacionesExcel } from '../utils/separacionesExportExcel';
-import { calcularVenta } from '../utils/financiamientoAleman';
+import { calcularVenta, type ResumenVentaCalculado } from '../utils/financiamientoAleman';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -197,7 +197,7 @@ export function Sales() {
     codigoProspecto: string;
     codigoLote: string;
     idAsesor?: number | null;
-    resumen: NonNullable<typeof resumenVenta>;
+    resumen: ResumenVentaCalculado;
   } | null>(null);
   const [loadingFormData, setLoadingFormData] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
