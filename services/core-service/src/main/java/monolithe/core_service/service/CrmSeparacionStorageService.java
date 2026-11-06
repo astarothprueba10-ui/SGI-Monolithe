@@ -72,9 +72,13 @@ public class CrmSeparacionStorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Solicitud de comprobante de venta invalida.");
         }
-        ventaService.validar(actor, new FormalizarVentaCrmRequest(
+        JsonNode validacion = ventaService.validar(actor, new FormalizarVentaCrmRequest(
                 req.idProspecto(), req.idLote(), req.modalidad(), req.montoTotal(),
                 req.montoInicial(), req.numeroCuotas(), null, null, null, null));
+        if (!validacion.path("elegible").asBoolean(false)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El prospecto o lote no es elegible para la venta.");
+        }
         String extension = resolverExtension(req.tipoMime());
         String clave = "ventas/p-" + req.idProspecto() + "/l-" + req.idLote()
                 + "/" + UUID.randomUUID() + "." + extension;
