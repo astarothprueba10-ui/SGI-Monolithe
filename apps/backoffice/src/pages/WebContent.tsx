@@ -383,7 +383,7 @@ export function WebContent() {
     );
 
     if (slideDestino?.estado !== 'EDITOR_CMS' || !seccionDestino) {
-      setError(`El Slide ${numero} no está disponible para edición.`);
+      setError(`«${nombreZona(numero)}» todavía no está disponible para editar.`);
       return;
     }
 
@@ -497,8 +497,8 @@ export function WebContent() {
 
     setMensaje(
       slidesAsociados.length === 1
-        ? `Borrador #${borrador.idBorrador} asociado a ${slidesTexto}. Solo puedes editar las diapositivas guardadas en este borrador.`
-        : `El borrador #${borrador.idBorrador} contiene cambios en ${slidesTexto}. Se abrió el Slide ${numeroSlide}; los demás cambios se conservarán.`
+        ? `Cambios de «${nombreZona(numeroSlide)}» abiertos. Guarda antes de cambiar de zona.`
+        : `Se recuperaron tus cambios de ${slidesTexto}. Puedes seguir editando.`
     );
   }
 
@@ -830,7 +830,7 @@ export function WebContent() {
                 puedes seguir trabajando con las zonas disponibles.
               </p>
             )}
-          </fieldset>          </fieldset>
+          </fieldset>
 
           {!seleccionado && hayCambiosFormulario && (
             <p role="status" className="mb-4 text-xs text-amber-800">
@@ -840,14 +840,12 @@ export function WebContent() {
 
           {seleccionado && (
             <div className="mb-4 rounded-md border border-brand-200 bg-brand-50 p-3">
-              <p className="text-sm font-semibold text-brand-900">
-                Borrador #{seleccionado.idBorrador} seleccionado
-              </p>
+              <p className="text-sm font-semibold text-brand-900">Estás retomando un cambio guardado</p>
               <p className="mt-1 text-xs leading-relaxed text-brand-700">
                 {slidesDelBorrador.length === 1
-                  ? `Este borrador pertenece al Slide ${slidesDelBorrador[0]}. Las demás diapositivas están bloqueadas para evitar guardar cambios en otra sección.`
+                  ? `Este cambio corresponde a «${nombreZona(slidesDelBorrador[0])}». Guarda antes de editar otra zona.`
                   : slidesDelBorrador.length > 1
-                    ? `Este borrador contiene cambios en ${slidesDelBorrador.map((numero) => `Slide ${numero}`).join(', ')}. Puedes alternar entre ellos después de guardar los cambios de cada slide; los demás se conservarán.`
+                    ? `Este cambio contiene ${slidesDelBorrador.map((numero) => nombreZona(numero)).join(' y ')}. Guarda antes de cambiar de zona.`
                     : 'No se pudo reconocer la diapositiva asociada a este borrador. No se permitirá editarlo hasta revisar su contenido.'}
               </p>
               {hayCambiosFormulario && (
@@ -861,7 +859,7 @@ export function WebContent() {
           {slideActivo !== 1 && (
             <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3">
               <p className="text-xs leading-relaxed text-amber-800">
-                En este slide solamente puedes modificar el subtítulo promocional.
+                En esta zona solo puedes modificar la frase breve de presentación.
                 Los títulos, las descripciones comerciales y los datos oficiales del proyecto no se modifican aquí.
               </p>
             </div>
@@ -871,7 +869,7 @@ export function WebContent() {
 
           <section>
             <h3 className="mb-3 text-sm font-semibold text-brand-900">
-              2. Edita el contenido
+              2. Escribe lo que quieres mostrar
             </h3>
 
             {cargandoSeccion && (
@@ -881,10 +879,15 @@ export function WebContent() {
             )}
 
             {!cargandoSeccion && errorSeccion && (
-              <p role="alert" className="text-sm text-rose-700">
-                {errorSeccion}
-              </p>
-            )}
+              <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                <p className="font-semibold">No pudimos cargar esta parte de Inicio.</p>
+                <p className="mt-1">{errorSeccion}</p>
+                <button type="button" className="mt-3 rounded-md bg-brand-900 px-4 py-2 font-semibold text-white"
+                  disabled={ocupado} onClick={() => setIntentoCarga((actual) => actual + 1)}>
+                  Volver a intentar
+                </button>
+              </div>
+            )
 
             {!cargandoSeccion && !errorSeccion && (
               <div className="grid gap-4">
@@ -900,12 +903,7 @@ export function WebContent() {
 
                   const obligatorio = campo === 'titulo';
 
-                  const etiqueta =
-                    campo === 'titulo'
-                      ? 'Título promocional'
-                      : campo === 'subtitulo'
-                        ? 'Subtítulo promocional'
-                        : 'Descripción promocional';
+                  const etiqueta = nombreCampo(campo);
 
                   const valor = camposPromo[campo];
                   const limite = MAXIMOS_CAMPOS[campo];
@@ -945,7 +943,7 @@ export function WebContent() {
                               ? `error-${campo}`
                               : `contador-${campo}`
                           }
-                          placeholder="Escribe una descripción breve y clara..."
+                          placeholder="Cuenta en pocas palabras qué quieres comunicar..."
                           onChange={(event) => {
                             setCamposPromo((actual) => ({
                               ...actual,
@@ -976,8 +974,8 @@ export function WebContent() {
                           }
                           placeholder={
                             campo === 'titulo'
-                              ? 'Escribe el título principal...'
-                              : 'Escribe un subtítulo promocional...'
+                              ? 'Ejemplo: Un lugar para crecer en familia'
+                              : 'Ejemplo: Conoce un entorno diferente'
                           }
                           onChange={(event) => {
                             setCamposPromo((actual) => ({
@@ -1029,7 +1027,7 @@ export function WebContent() {
               </div>
             )}
 
-            {errorCampos && (
+            {errorCampos && hayCambiosFormulario && !cargandoSeccion && (
               <p
                 role="status"
                 className="mt-3 text-xs text-amber-800"
@@ -1049,13 +1047,13 @@ export function WebContent() {
 
           <section className="mt-5 border-t border-brand-100 pt-4">
             <h3 className="mb-2 text-sm font-semibold text-brand-900">
-              3. Guarda tus cambios
+              3. Guarda tu trabajo
             </h3>
 
             <p className="mb-3 text-xs leading-relaxed text-brand-500">
               {seleccionado
-                ? 'Estás editando un borrador existente. Guarda los cambios en ese mismo borrador; no se creará otro.'
-                : 'Crear un borrador nuevo genera una copia independiente. Después de seleccionarlo, podrás seguir editándolo sin cambiar de diapositiva.'}
+                ? 'Actualiza lo que ya guardaste. Los visitantes aún no verán estos cambios.'
+                : 'Guarda tu trabajo para revisarlo antes de mostrárselo a los visitantes.'}
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -1072,7 +1070,7 @@ export function WebContent() {
                   }
                   onClick={() => guardarSlide(true)}
                 >
-                  Crear borrador nuevo
+                  Guardar para revisar
                 </button>
               )}
 
@@ -1089,7 +1087,7 @@ export function WebContent() {
                     }
                     onClick={() => guardarSlide(false)}
                   >
-                    Guardar cambios en borrador #{seleccionado.idBorrador}
+                    Guardar mis cambios
                   </button>
 
                   <button
@@ -1103,7 +1101,7 @@ export function WebContent() {
                         : 'Conserva el borrador y libera el selector de diapositivas.'
                     }
                   >
-                    Dejar de editar (conservar borrador)
+                    Terminar edición
                   </button>
                 </>
               )}
@@ -1119,7 +1117,7 @@ export function WebContent() {
                 }
                 onClick={prepararSoloImagen}
               >
-                Preparar solo imagen
+                Quiero cambiar solo la foto
               </button>
 
               <button
@@ -1143,7 +1141,7 @@ export function WebContent() {
                   );
                 }}
               >
-                Descartar borrador seleccionado
+                Eliminar cambio guardado
               </button>
 
               <button
@@ -1160,14 +1158,14 @@ export function WebContent() {
                     .finally(() => setOcupado(false));
                 }}
               >
-                Recargar lista
+                Actualizar información
               </button>
 
             </div>
 
-            <p className="mt-3 text-xs text-brand-400">
-              La versión del borrador aumenta cuando guardas cambios.
-              Si no has modificado ningún campo, no necesitas volver a guardarlo.
+            <p className="mt-3 text-xs leading-relaxed text-brand-600">
+              ¿Solo quieres cambiar una foto? Pulsa «Quiero cambiar solo la foto» y después
+              «Ver cómo quedará» para elegirla y guardarla. La página pública no cambia todavía.
             </p>
           </section>
 
@@ -1175,7 +1173,7 @@ export function WebContent() {
 
           <section className="mt-5 border-t border-brand-100 pt-4">
             <h3 className="mb-2 text-sm font-semibold text-brand-900">
-              4. Revisa cómo quedará tu página
+              4. Comprueba cómo se verá
             </h3>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -1193,11 +1191,11 @@ export function WebContent() {
                 }
                 onClick={() => void previsualizarBorrador()}
               >
-                Previsualizar borrador guardado
+                Ver cómo quedará
               </button>
 
               <span className="text-xs text-brand-500">
-                Primero guarda los cambios. Después podrás revisar el resultado antes de publicarlo.
+                Guarda primero, después compara la página actual con tu propuesta.
               </span>
             </div>
 
@@ -1208,88 +1206,8 @@ export function WebContent() {
             )}
 
             <p className="mt-3 text-xs text-brand-400">
-              Las imágenes nuevas deben guardarse mediante el flujo de imágenes privadas antes de publicar.
+              En la vista previa también podrás elegir una fotografía y guardarla.
             </p>
-          </section>
-
-          {/* LISTA DE BORRADORES */}
-
-          <section className="mt-6 border-t border-brand-100 pt-4">
-            <h3 className="mb-3 text-sm font-semibold text-brand-900">
-              5. Tus borradores de Inicio
-            </h3>
-
-            {cargando && (
-              <p className="text-sm text-brand-400">
-                Cargando borradores...
-              </p>
-            )}
-
-            {!cargando && pruebasInicio.length === 0 && (
-              <p className="text-sm text-brand-400">
-                Todavía no tienes borradores pendientes para Inicio.
-              </p>
-            )}
-
-            <div className="space-y-2">
-              {pruebasInicio.map((borrador) => {
-                const slidesAsociados = identificarSlidesBorrador(
-                  borrador,
-                  inventarioSlides,
-                  PAGINA_INICIO
-                );
-                const esSeleccionado =
-                  seleccionado?.idBorrador === borrador.idBorrador;
-                const etiquetaSlides = slidesAsociados.length > 0
-                  ? slidesAsociados.map((numero) => `Slide ${numero}`).join(' · ')
-                  : 'No asociado a un slide editable';
-
-                return (
-                  <div
-                    key={borrador.idBorrador}
-                    className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 ${esSeleccionado
-                      ? 'border-brand-500 bg-brand-50'
-                      : 'border-brand-100'
-                      }`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-brand-800">
-                        Borrador #{borrador.idBorrador}
-                      </p>
-
-                      <p className="mt-1 text-xs text-brand-500">
-                        {etiquetaSlides}
-                      </p>
-
-                      <p className="mt-1 text-xs text-brand-500">
-                        Versión guardada: {borrador.revisionEdicion}
-                        {esSeleccionado
-                          ? ' · Actualmente seleccionado'
-                          : ''}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      disabled={
-                        ocupado ||
-                        cargandoSeccion ||
-                        !puedeEditar ||
-                        slidesAsociados.length === 0 ||
-                        (
-                          !esSeleccionado &&
-                          hayCambiosFormulario
-                        )
-                      }
-                      onClick={() => seleccionarBorrador(borrador)}
-                    >
-                      {esSeleccionado ? 'Seleccionado' : 'Seleccionar'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
           </section>
 
           {/* COMPONENTE DE PREVISUALIZACIÓN */}
@@ -1336,7 +1254,7 @@ export function WebContent() {
               className="mt-5 rounded-lg border border-brand-200 bg-white p-4"
             >
               <h3 className="text-sm font-semibold text-brand-900">
-                6. Publicar cambios
+                5. Haz visibles tus cambios
               </h3>
 
               <p className="mt-1 text-xs text-brand-600">
@@ -1350,7 +1268,7 @@ export function WebContent() {
                     role="status"
                     className="mt-2 text-xs text-amber-800"
                   >
-                    La publicación está deshabilitada hasta aprobar las migraciones y los permisos del entorno.
+                    Por ahora puedes guardar y revisar. Para publicar, el administrador debe habilitar esta función.
                   </p>
                 )}
 
@@ -1385,10 +1303,10 @@ export function WebContent() {
 
                   <div className="rounded border border-brand-100 p-3 text-xs">
                     <p className="font-semibold text-brand-800">
-                      Imágenes privadas pendientes: {imagenesPendientes.length}
+                      Fotos pendientes de publicación: {imagenesPendientes.length}
                     </p>
                     <p className="mt-1 text-brand-600">
-                      Campos de texto pendientes: {evaluacionPublicacion.secciones.reduce(
+                      Textos que cambiarán: {evaluacionPublicacion.secciones.reduce(
                         (total, item) => total + item.textos.length, 0
                       )}
                     </p>
@@ -1398,7 +1316,7 @@ export function WebContent() {
                         key={imagen.idSeccion}
                         className="mt-1 text-brand-600"
                       >
-                        Sección #{imagen.idSeccion} · {imagen.mimeType} · {imagen.tamanoBytes ?? 0} bytes
+                        Fotografía guardada para revisión
                       </p>
                     ))}
 
@@ -1416,12 +1334,12 @@ export function WebContent() {
                       className="rounded border border-brand-100 p-3 text-xs"
                     >
                       <p className="font-semibold text-brand-800">
-                        {seccion.codigo} · Sección #{seccion.idSeccion}
+                        {nombreSeccion(seccion.codigo)}
                       </p>
 
                       {seccion.textos.map((texto) => (
                         <div
-                          key={texto.campo}
+                          key={nombreCampo(texto.campo)}
                           className="mt-2 break-words"
                         >
                           <p className="font-medium text-brand-800">
@@ -1510,6 +1428,86 @@ export function WebContent() {
               )}
             </section>
           )}
+
+          {/* LISTA DE BORRADORES */}
+
+          <section className="mt-6 border-t border-brand-100 pt-4">
+            <h3 className="mb-3 text-sm font-semibold text-brand-900">
+              Tus cambios guardados y pendientes de publicación
+            </h3>
+
+            {cargando && (
+              <p className="text-sm text-brand-400">
+                Cargando borradores...
+              </p>
+            )}
+
+            {!cargando && pruebasInicio.length === 0 && (
+              <p className="text-sm text-brand-400">
+                Todavía no tienes cambios guardados. Cuando pulses Guardar, aparecerán aquí.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {pruebasInicio.map((borrador) => {
+                const slidesAsociados = identificarSlidesBorrador(
+                  borrador,
+                  inventarioSlides,
+                  PAGINA_INICIO
+                );
+                const esSeleccionado =
+                  seleccionado?.idBorrador === borrador.idBorrador;
+                const etiquetaSlides = slidesAsociados.length > 0
+                  ? slidesAsociados.map((numero) => `Slide ${numero}`).join(' · ')
+                  : 'Zona no identificada';
+
+                return (
+                  <div
+                    key={borrador.idBorrador}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 ${esSeleccionado
+                      ? 'border-brand-500 bg-brand-50'
+                      : 'border-brand-100'
+                      }`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-brand-800">
+                        Borrador #{borrador.idBorrador}
+                      </p>
+
+                      <p className="mt-1 text-xs text-brand-500">
+                        {etiquetaSlides}
+                      </p>
+
+                      <p className="mt-1 text-xs text-brand-500">
+                        Guardado para revisión
+                        {esSeleccionado
+                          ? ' · Actualmente seleccionado'
+                          : ''}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      disabled={
+                        ocupado ||
+                        cargandoSeccion ||
+                        !puedeEditar ||
+                        slidesAsociados.length === 0 ||
+                        (
+                          !esSeleccionado &&
+                          hayCambiosFormulario
+                        )
+                      }
+                      onClick={() => seleccionarBorrador(borrador)}
+                    >
+                      {esSeleccionado ? 'Editando ahora' : 'Continuar edición'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
         </CardBody>
       </Card>
