@@ -355,6 +355,11 @@ export interface CrmDatosCompradorVenta {
   tipoDocumento: string;
   numeroDocumento: string;
   direccion: string;
+  referencia: string;
+  idPais: number | null;
+  idDepartamento: number | null;
+  idProvincia: number | null;
+  idDistrito: number | null;
   idAsesor: number | null;
 }
 
