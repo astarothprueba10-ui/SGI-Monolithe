@@ -17,7 +17,7 @@ export function PermissionRoute({
   return <>{children}</>;
 }
 
-/** Restricts account administration to active Admin/Gerencia session roles and their permissions. */
+/** Restricted to Admin/Gerencia/RRHH roles with the corresponding explicit permissions. */
 export function AccountAdminPermissionRoute({
   permission,
   children
