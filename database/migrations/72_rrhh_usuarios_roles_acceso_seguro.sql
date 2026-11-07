@@ -374,7 +374,7 @@ BEGIN
             RETURN;
         END IF;
         IF EXISTS (SELECT 1 FROM unnest(COALESCE(p_codigos_permisos,ARRAY[]::text[])) AS x(codigo)
-                   WHERE btrim(x.codigo) ~ '^(users|roles|permissions|audit)\\.') THEN
+                   WHERE split_part(btrim(x.codigo), '.', 1) IN ('users','roles','permissions','audit')) THEN
             p_estado := 'DENEGADO';
             p_mensaje := 'RRHH no puede delegar permisos de administracion de seguridad.';
             RETURN;
