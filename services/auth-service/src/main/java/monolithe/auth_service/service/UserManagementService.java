@@ -69,7 +69,7 @@ public class UserManagementService {
 
                 if (!puedeGestionarCuentas("users.create", "users.assign_role")) {
                         return new CreatedUserResult(null, "DENEGADO",
-                                        "Solo Administrador o Gerencia con los permisos correspondientes puede crear cuentas.");
+                                        "Solo Administrador, Gerencia o RRHH con los permisos correspondientes puede crear cuentas.");
                 }
 
                 List<String> roles = normalizarRoles(codigosRol);
@@ -176,10 +176,15 @@ public class UserManagementService {
         }
 
         private boolean puedeAsignarRolesInternosProtegidos() {
-                return puedeGestionarCuentas("users.create", "users.assign_role", "roles.assign_permissions");
+                // No permitir que RRHH evada asignable_rrhh por tener roles.assign_permissions.
+                return tieneAutorizacionDeGestion(true, "users.create", "users.assign_role", "roles.assign_permissions");
         }
 
         private boolean puedeGestionarCuentas(String... permisosRequeridos) {
+                return tieneAutorizacionDeGestion(false, permisosRequeridos);
+        }
+
+        private boolean tieneAutorizacionDeGestion(boolean rolesProtegidos, String... permisosRequeridos) {
                 Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();
                 if (autenticacion == null || !autenticacion.isAuthenticated()) {
                         return false;
@@ -188,9 +193,11 @@ public class UserManagementService {
                 Set<String> autoridades = autenticacion.getAuthorities().stream()
                                 .map(authority -> authority.getAuthority())
                                 .collect(Collectors.toSet());
-                boolean tieneRolPrivilegiado = autoridades.contains("ROLE_ADMINISTRADOR")
+                boolean esAdminGerencia = autoridades.contains("ROLE_ADMINISTRADOR")
                                 || autoridades.contains("ROLE_GERENCIA");
-                return tieneRolPrivilegiado && autoridades.containsAll(Set.of(permisosRequeridos));
+                boolean tieneRolPermitido = esAdminGerencia
+                                || (!rolesProtegidos && autoridades.contains("ROLE_RRHH"));
+                return tieneRolPermitido && autoridades.containsAll(Set.of(permisosRequeridos));
         }
 
         private List<String> normalizarRoles(List<String> codigosRol) {
