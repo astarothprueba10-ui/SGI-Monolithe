@@ -26,7 +26,7 @@ public class CrmConsultaController {
     }
 
     @GetMapping("/asesores")
-    @PreAuthorize("hasAuthority('crm.view')")
+    @PreAuthorize("hasAnyAuthority('crm.view', 'advisors.view')")
     public JsonNode listarAsesores(@AuthenticationPrincipal Jwt jwt) {
         return servicio.listarAsesores(obtenerIdActor(jwt));
     }

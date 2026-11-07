@@ -24,6 +24,7 @@ export function Advisors() {
   const [advisorsLoading, setAdvisorsLoading] = useState(true);
   const [settlementsLoading, setSettlementsLoading] = useState(true);
   const [advisorsError, setAdvisorsError] = useState<string | null>(null);
+  const [settlementsError, setSettlementsError] = useState<string | null>(null);
 
   const fetchAdvisors = useCallback(async () => {
     setAdvisorsLoading(true);
@@ -41,11 +42,14 @@ export function Advisors() {
 
   const fetchSettlements = useCallback(async () => {
     setSettlementsLoading(true);
+    setSettlementsError(null);
     try {
       setSettlements(await commissionsService.getSettlements());
     } catch (error: unknown) {
       setSettlements([]);
-      toast.error(error instanceof Error ? error.message : 'No fue posible consultar las liquidaciones.');
+      const mensaje = error instanceof Error ? error.message : 'No fue posible consultar las liquidaciones.';
+      setSettlementsError(mensaje);
+      toast.error('No fue posible consultar las liquidaciones.', { description: mensaje });
     } finally {
       setSettlementsLoading(false);
     }
@@ -89,9 +93,9 @@ export function Advisors() {
       />
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { label: 'Asesores operativos', value: advisorsLoading ? '—' : number(advisors.length) },
-          { label: 'Comisiones generadas', value: settlementsLoading ? '—' : currency(totalCommissions) },
-          { label: 'Comisiones aprobadas (devengadas)', value: settlementsLoading ? '—' : currency(approvedCommissions) }
+          { label: 'Asesores operativos', value: advisorsLoading || advisorsError ? '—' : number(advisors.length) },
+          { label: 'Comisiones generadas', value: settlementsLoading || settlementsError ? '—' : currency(totalCommissions) },
+          { label: 'Comisiones aprobadas (devengadas)', value: settlementsLoading || settlementsError ? '—' : currency(approvedCommissions) }
         ].map((item) => (
           <Card key={item.label} className="p-5">
             <p className="text-[12px] text-brand-400">{item.label}</p>
@@ -161,6 +165,10 @@ export function Advisors() {
         {tab === 'liquidaciones' && (
           settlementsLoading ? (
             <p className="p-6 text-sm text-brand-500">Cargando liquidaciones...</p>
+          ) : settlementsError ? (
+            <div role="alert" className="p-6 text-sm text-rose-700">
+              No fue posible cargar las liquidaciones: {settlementsError}
+            </div>
           ) : filteredSettlements.length === 0 ? (
             <EmptyState
               icon={FileTextIcon}

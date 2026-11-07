@@ -53,6 +53,46 @@ class CrmConsultaServiceTest {
     }
 
     @Test
+    void rrhhConAdvisorsViewPuedeListarAsesoresSinAccesoACrm() {
+        when(repository.tienePermisoVista(12L)).thenReturn(false);
+        when(repository.tienePermisoVistaAsesores(12L)).thenReturn(true);
+        when(repository.listarAsesores()).thenReturn("[{\"id_asesor\":5,\"codigo\":\"ASE-005\"}]");
+
+        var resultado = service.listarAsesores(12L);
+
+        assertEquals(1, resultado.size());
+        assertEquals(5L, resultado.get(0).path("id_asesor").asLong());
+        verify(repository).tienePermisoVistaAsesores(12L);
+        verify(repository).listarAsesores();
+        verify(repository, never()).listarProspectos(anyLong());
+    }
+
+    @Test
+    void usuarioSinNingunPermisoNoPuedeVerAsesores() {
+        when(repository.tienePermisoVista(12L)).thenReturn(false);
+        when(repository.tienePermisoVistaAsesores(12L)).thenReturn(false);
+
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.listarAsesores(12L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
+        verify(repository, never()).listarAsesores();
+    }
+
+    @Test
+    void rrhhNoPuedeConsultarProspectosSinCrmView() {
+        when(repository.tienePermisoVista(12L)).thenReturn(false);
+        when(repository.tienePermisoVistaAsesores(12L)).thenReturn(true);
+
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.listarProspectos(12L));
+
+        assertEquals(HttpStatus.FORBIDDEN, error.getStatusCode());
+        verify(repository, never()).tienePermisoVistaAsesores(12L);
+        verify(repository, never()).listarProspectos(anyLong());
+    }
+
+    @Test
     void niegaAccesoCuandoPermisoNoEstaVigente() {
         when(repository.tienePermisoVista(10L)).thenReturn(false);
 
