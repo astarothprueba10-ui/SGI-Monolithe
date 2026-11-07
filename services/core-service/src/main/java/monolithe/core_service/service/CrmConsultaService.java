@@ -35,10 +35,14 @@ public class CrmConsultaService {
 
     @Transactional(readOnly = true)
     public JsonNode listarAsesores(Long idActor) {
-        return consultar(idActor, repository::listarAsesores);
+        return consultar(idActor, repository::listarAsesores, true);
     }
 
     private JsonNode consultar(Long idActor, Supplier<String> consulta) {
+        return consultar(idActor, consulta, false);
+    }
+
+    private JsonNode consultar(Long idActor, Supplier<String> consulta, boolean admiteVistaAsesores) {
         if (idActor == null || idActor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "La identidad de la sesion no es valida.");
@@ -46,9 +50,11 @@ public class CrmConsultaService {
 
         final String json;
         try {
-            if (!repository.tienePermisoVista(idActor)) {
+            boolean autorizado = repository.tienePermisoVista(idActor)
+                    || (admiteVistaAsesores && repository.tienePermisoVistaAsesores(idActor));
+            if (!autorizado) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "No tiene permisos vigentes para consultar el CRM.");
+                        "No tiene permisos vigentes para consultar el recurso.");
             }
             json = consulta.get();
         } catch (DataAccessException ex) {
