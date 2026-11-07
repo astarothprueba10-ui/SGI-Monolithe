@@ -22,7 +22,7 @@ public class RolePermissionController {
     private final RolePermissionService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.create')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('roles.create')")
     public ResponseEntity<SecurityOperationResult> crearRol(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateRoleRequest request) {
@@ -48,7 +48,7 @@ public class RolePermissionController {
     }
 
     @PutMapping("/{codigoRol}/permissions")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.assign_permissions')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('roles.assign_permissions')")
     public ResponseEntity<SecurityOperationResult> actualizarPermisos(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String codigoRol,
@@ -77,7 +77,7 @@ public class RolePermissionController {
 
     /** Actualiza únicamente el nombre y la descripción del rol identificado por su código. */
     @PutMapping("/{codigoRol}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.edit')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('roles.edit')")
     public ResponseEntity<SecurityOperationResult> actualizarRol(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String codigoRol,
@@ -88,7 +88,7 @@ public class RolePermissionController {
 
     /** Desactiva un rol si su política y sus asignaciones activas lo permiten. */
     @PatchMapping("/{codigoRol}/deactivate")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.deactivate')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('roles.deactivate')")
     public ResponseEntity<SecurityOperationResult> desactivarRol(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String codigoRol) {
@@ -97,7 +97,7 @@ public class RolePermissionController {
 
     /** Reactiva un rol con autorización explícita y renovación de sesiones afectadas. */
     @PatchMapping("/{codigoRol}/activate")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('roles.activate')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('roles.activate')")
     public ResponseEntity<SecurityOperationResult> reactivarRol(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String codigoRol) {
