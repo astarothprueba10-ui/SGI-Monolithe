@@ -34,7 +34,7 @@ AS $function$
          AND p.codigo = p_codigo_permiso
         WHERE u.id_usuario = p_id_actor
     );
-$function$
+$function$;
 
 
 -- fn_usuario_objetivo_gestionable
@@ -87,7 +87,7 @@ BEGIN
     );
 
 END;
-$function$
+$function$;
 
 
 -- sp_asignar_rol_usuario
@@ -205,7 +205,7 @@ BEGIN
  );
  p_estado:='ASIGNADO';p_mensaje:='Rol asignado correctamente.';
 END;
-$procedure$
+$procedure$;
 
 
 -- sp_revocar_rol_usuario
@@ -309,7 +309,7 @@ BEGIN
  );
  p_estado:='REVOCADO';p_mensaje:='Rol revocado correctamente.';
 END;
-$procedure$
+$procedure$;
 
 
 -- sp_actualizar_permisos_rol_seguridad
@@ -502,7 +502,7 @@ BEGIN
     p_estado := 'OK';
     p_mensaje := 'Permisos del rol actualizados correctamente.';
 END;
-$procedure$
+$procedure$;
 
 
 -- sp_actualizar_datos_rol_seguridad
@@ -602,7 +602,7 @@ BEGIN
     p_mensaje := 'Se actualizaron el nombre y la descripción. Los permisos del rol no cambiaron.';
     PERFORM public.fn_auditar_rol_crud(p_id_actor, 'EDITAR_ROL', p_codigo_rol, 'EXITOSO', p_mensaje, v_antes, v_despues);
 END;
-$procedure$
+$procedure$;
 
 
 -- sp_reactivar_rol_seguridad
@@ -697,7 +697,7 @@ BEGIN
         jsonb_build_object('nombre', v_nombre, 'activo', FALSE),
         jsonb_build_object('nombre', v_nombre, 'activo', TRUE, 'sesionesInvalidables', cardinality(v_usuarios)));
 END;
-$procedure$
+$procedure$;
 
 
 -- La matriz de permisos de RRHH requiere permiso de consulta adicional.
