@@ -13,6 +13,12 @@ public class CrmConsultaRepository {
             SELECT public.fn_usuario_tiene_permiso_seguridad(?, 'crm.view'::varchar)
             """;
 
+    // El listado de asesores se comparte con RRHH bajo advisors.view.
+    // NO extiende acceso a prospectos ni al resto del CRM.
+    private static final String SQL_PERMISO_ASESORES = """
+            SELECT public.fn_usuario_tiene_permiso_seguridad(?, 'advisors.view'::varchar)
+            """;
+
     // Reutiliza las consultas vigentes en Supabase; no crea tablas ni duplica SQL
     // de negocio.
 
@@ -138,6 +144,11 @@ public class CrmConsultaRepository {
     public boolean tienePermisoVista(Long idActor) {
         return Boolean.TRUE.equals(
                 jdbcTemplate.queryForObject(SQL_PERMISO, Boolean.class, idActor));
+    }
+
+    public boolean tienePermisoVistaAsesores(Long idActor) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                SQL_PERMISO_ASESORES, Boolean.class, idActor));
     }
 
     public String listarProspectos(Long idActor) {
