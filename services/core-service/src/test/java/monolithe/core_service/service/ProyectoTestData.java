@@ -10,7 +10,7 @@ final class ProyectoTestData {
 
     static ProyectoRequest request(String departamento, String provincia, String distrito,
                                    String pais, LocalDate inicio, LocalDate fin) {
-        return new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto de prueba", null, null, null,
+        return new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto de prueba", "Proyecto inmobiliario de prueba", null, null,
                 distrito, provincia, departamento, pais, null, null, null, inicio, fin, true);
     }
 }

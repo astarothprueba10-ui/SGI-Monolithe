@@ -1,5 +1,5 @@
 import type { ProyectoRequest, ProyectoResponse } from '../types/core';
-import type { ProjectFormErrors, ProjectFormValues, Ubigeo } from '../types/projectForm';
+import type { ProjectCreationContext, ProjectFormErrors, ProjectFormValues, Ubigeo } from '../types/projectForm';
 import { resolveUbigeo } from './ubigeo';
 import { validateProjectForm } from './projectFormValidation';
 import { canChangeProjectNumber, isProjectNumberField, normalizeProjectNumber } from './projectNumberValidation';
@@ -41,7 +41,7 @@ export function projectRequest(form: ProjectFormValues, rows: Ubigeo[]): Proyect
 
 /** Actualiza los errores relacionados sin borrar errores pendientes de otros campos. */
 export function changeProjectField(form: ProjectFormValues, previous: ProjectFormErrors,
-  field: keyof ProjectFormValues, value: string | boolean, rows: Ubigeo[]) {
+  field: keyof ProjectFormValues, value: string | boolean, rows: Ubigeo[], creation?: ProjectCreationContext) {
   if (isProjectNumberField(field) && typeof value === 'string') {
     value = normalizeProjectNumber(value);
     if (!canChangeProjectNumber(field, form[field], value)) return { form, errors: previous };
@@ -51,7 +51,7 @@ export function changeProjectField(form: ProjectFormValues, previous: ProjectFor
   if (field === 'departamento') next.provincia = '';
   if (field === 'departamento' || field === 'provincia') next.distrito = '';
   const errors = { ...previous, general: undefined };
-  const validated = validateProjectForm(next, rows);
+  const validated = validateProjectForm(next, rows, creation);
   for (const key of [field, ...related]) errors[key] = validated[key];
   return { form: next, errors };
 }

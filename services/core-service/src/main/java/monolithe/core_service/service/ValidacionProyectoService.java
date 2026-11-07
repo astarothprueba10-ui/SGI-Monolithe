@@ -7,9 +7,10 @@ import monolithe.core_service.exception.ReglaNegocioException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
-/** Reglas de ubicación, fechas y cantidad de cifras compartidas por altas y modificaciones. */
+/** Valida el alta y las reglas comunes de ubicación, fechas y cantidad de cifras. */
 @Service
 @RequiredArgsConstructor
 public class ValidacionProyectoService {
@@ -28,6 +29,12 @@ public class ValidacionProyectoService {
         validarDigitos(request.latitud(), "La latitud");
         validarDigitos(request.longitud(), "La longitud");
         return ubigeoService.resolver(request.departamento(), request.provincia(), request.distrito());
+    }
+
+    /** Aplica las restricciones del alta con el día actual de Perú. */
+    public void validarAlta(ProyectoRequest request) {
+        ValidacionAltaProyecto.validar(request.descripcion(), request.fechaInicio(), request.fechaFinEstimada(),
+                ValidacionAltaProyecto.fechaRegistro(Instant.now()));
     }
 
     private void validarDigitos(BigDecimal valor, String campo) {

@@ -5,10 +5,12 @@ import { changeProjectField, initialProjectForm, projectRequest } from '../lib/p
 import { validateProjectForm } from '../lib/projectFormValidation';
 import { validateProjectDates } from '../lib/projectDateValidation';
 import { coreService } from '../services/coreService';
-import type { ProjectFormErrors, ProjectFormProps, ProjectFormValues, Ubigeo } from '../types/projectForm';
+import type { ProjectCreationContext, ProjectFormErrors, ProjectFormProps, ProjectFormValues, Ubigeo } from '../types/projectForm';
 import { useProjectCatalogs } from './useProjectCatalogs';
+import { usePeruToday } from './usePeruToday';
+import { getPeruTodayDateString } from '../components/Workers/workerDateUtils';
 
-function useProjectEditor(props: ProjectFormProps, rows: Ubigeo[]) {
+function useProjectEditor(props: ProjectFormProps, rows: Ubigeo[], creation?: ProjectCreationContext) {
   const { open, project } = props;
   const [state, setState] = useState({ form: initialProjectForm(project), errors: {} as ProjectFormErrors });
   useEffect(() => {
@@ -16,10 +18,10 @@ function useProjectEditor(props: ProjectFormProps, rows: Ubigeo[]) {
   }, [open, project]);
   const setErrors = (errors: ProjectFormErrors) => setState((previous) => ({ ...previous, errors }));
   const change = (field: keyof ProjectFormValues, value: string | boolean) =>
-    setState((previous) => changeProjectField(previous.form, previous.errors, field, value, rows));
+    setState((previous) => changeProjectField(previous.form, previous.errors, field, value, rows, creation));
   const invalidate = (field: keyof ProjectFormValues) => setState((previous) => ({ ...previous, errors: {
-    ...previous.errors, ...validateProjectDates(previous.form),
-    [field]: validateProjectForm(previous.form, rows)[field] ??
+    ...previous.errors, ...validateProjectDates(previous.form, creation?.registrationDate),
+    [field]: validateProjectForm(previous.form, rows, creation)[field] ??
       (field.startsWith('fecha') ? 'Ingresa una fecha válida (año 0001 a 9999).' : 'Revisa este campo.')
   } }));
   return { ...state, setErrors, change, invalidate };
@@ -36,6 +38,8 @@ async function persistProject(props: ProjectFormProps, form: ProjectFormValues, 
   if (props.project) await coreService.updateProject(props.project.idProyecto, request);
   else await coreService.createProject(request);
   toast.success(props.project ? 'Proyecto actualizado correctamente.' : 'Proyecto creado correctamente.');
+  props.onClose();
+  await props.onSuccess();
 }
 
 function useProjectSubmit(props: ProjectFormProps, editor: ReturnType<typeof useProjectEditor>,
@@ -44,15 +48,13 @@ function useProjectSubmit(props: ProjectFormProps, editor: ReturnType<typeof use
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitting || catalogs.loading || catalogs.error) return;
-    const errors = validateProjectForm(editor.form, catalogs.ubigeos);
+    const errors = validateProjectForm(editor.form, catalogs.ubigeos,
+      props.project ? undefined : { registrationDate: getPeruTodayDateString() });
     editor.setErrors(errors);
     if (Object.keys(errors).length) return;
     setSubmitting(true);
-    try {
-      await persistProject(props, editor.form, catalogs.ubigeos);
-      props.onClose();
-      await props.onSuccess();
-    } catch (error: unknown) { editor.setErrors(apiErrors(error)); }
+    try { await persistProject(props, editor.form, catalogs.ubigeos); }
+    catch (error: unknown) { editor.setErrors(apiErrors(error)); }
     finally { setSubmitting(false); }
   };
   return { submitting, submit };
@@ -61,9 +63,11 @@ function useProjectSubmit(props: ProjectFormProps, editor: ReturnType<typeof use
 /** Coordina edición, catálogos y envío compartidos por crear y editar proyectos. */
 export function useProjectForm(props: ProjectFormProps) {
   const catalogs = useProjectCatalogs(props.open);
-  const editor = useProjectEditor(props, catalogs.ubigeos);
+  const today = usePeruToday(props.open);
+  const creation = props.project ? undefined : { registrationDate: today };
+  const editor = useProjectEditor(props, catalogs.ubigeos, creation);
   const submission = useProjectSubmit(props, editor, catalogs);
-  return { ...editor, ...submission, catalogs, isEdit: props.project != null };
+  return { ...editor, ...submission, catalogs, creation, isEdit: props.project != null };
 }
 
 /** Estado y acciones que consumen los campos del formulario. */
