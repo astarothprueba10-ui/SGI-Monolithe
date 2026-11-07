@@ -144,7 +144,7 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: ShieldCheckIcon,
     module: 'users',
     permission: 'users.view',
-    allowedRoles: ['Administrador', 'Gerencia']
+    allowedRoles: ['Administrador', 'Gerencia', 'RRHH']
   },
   {
     label: 'Auditoría',

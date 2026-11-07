@@ -1,7 +1,7 @@
 import type { Permission, RoleName } from '../types';
 
 export function tieneRolAdministradorDeCuentas(roles: readonly RoleName[]): boolean {
-  return roles.includes('Administrador') || roles.includes('Gerencia');
+  return roles.includes('Administrador') || roles.includes('Gerencia') || roles.includes('RRHH');
 }
 
 export function puedeAdministrarCuentas(

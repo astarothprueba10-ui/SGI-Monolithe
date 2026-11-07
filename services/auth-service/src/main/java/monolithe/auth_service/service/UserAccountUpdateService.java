@@ -21,7 +21,7 @@ public class UserAccountUpdateService {
 
     /** Guarda el correo principal de la persona vinculada con las protecciones de cuenta. */
     @Transactional
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.edit')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.edit')")
     public SecurityOperationResult actualizar(Long actor, Long usuario, UpdateUserRequest request) {
         if (request.getCorreoElectronico() == null) {
             return users.actualizarUsuario(actor, usuario, request.getUsuarioLogin());

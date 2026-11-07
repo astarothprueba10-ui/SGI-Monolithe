@@ -58,7 +58,7 @@ const MODULE_LABELS: Record<string, string> = {
   audit: 'Auditoría'
 };
 
-export function PermissionMatrix({ roleCode }: { roleCode: string }) {
+export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: string; esSistema?: boolean }) {
   const { role, user, permissions: effectivePermissions } = useAuth();
 
   const [permissions, setPermissions] = useState<SecurityPermission[]>([]);
@@ -67,8 +67,12 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const rrhhDelegado = user.roles.includes('RRHH')
+    && !user.roles.includes('Administrador')
+    && !user.roles.includes('Gerencia');
   const editable =
     puedeAdministrarCuentas(user.roles, effectivePermissions, 'roles.assign_permissions') &&
+    !(rrhhDelegado && esSistema) &&
     roleCode !== 'GERENCIA' &&
     (roleCode !== 'ADMINISTRADOR' || role === 'Gerencia');
 
@@ -116,7 +120,7 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
   }, [granted, originalGranted]);
 
   const toggle = (codigo: string) => {
-    if (!editable || saving) return;
+    if (!editable || saving || (rrhhDelegado && /^(users|roles|permissions|audit)\./.test(codigo))) return;
 
     setGranted((prev) => {
       const next = new Set(prev);
@@ -133,6 +137,10 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
 
   const guardar = async () => {
     if (!editable || !dirty || saving) return;
+    if (rrhhDelegado && Array.from(granted).some((codigo) => /^(users|roles|permissions|audit)\./.test(codigo))) {
+      toast.error('RRHH no puede delegar permisos de seguridad.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -259,7 +267,7 @@ export function PermissionMatrix({ roleCode }: { roleCode: string }) {
                           <input
                             type="checkbox"
                             checked={granted.has(permission.codigo)}
-                            disabled={!editable || saving}
+                            disabled={!editable || saving || (rrhhDelegado && /^(users|roles|permissions|audit)\./.test(permission.codigo))}
                             onChange={() => toggle(permission.codigo)}
                             aria-label={`${ACTION_LABELS[action] ?? action} en ${MODULE_LABELS[module] ?? module}`}
                             className="h-4 w-4 rounded border-brand-300 accent-brand-700 disabled:cursor-not-allowed"
