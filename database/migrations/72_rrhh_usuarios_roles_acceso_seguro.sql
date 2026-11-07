@@ -699,3 +699,16 @@ BEGIN
 END;
 $procedure$
 
+
+-- La matriz de permisos de RRHH requiere permiso de consulta adicional.
+-- La migracion es idempotente y no modifica ninguna otra asignacion.
+INSERT INTO public.seg_roles_permisos (id_rol,id_permiso,fecha_asignacion,asignado_por,activo)
+SELECT r.id_rol,p.id_permiso,NOW(),NULL,TRUE
+FROM public.seg_roles r
+JOIN public.seg_permisos p ON p.codigo='permissions.view' AND p.activo IS TRUE
+WHERE r.codigo='RRHH' AND r.activo IS TRUE
+ON CONFLICT (id_rol,id_permiso)
+DO UPDATE SET activo=TRUE,fecha_asignacion=EXCLUDED.fecha_asignacion;
+
+-- La persona que tenga una sesion previa debe volver a iniciar sesion
+-- para recibir la nueva autorizacion permissions.view en su JWT.
