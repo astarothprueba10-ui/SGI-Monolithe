@@ -10,6 +10,7 @@ import { Table, TD, TH, TR } from '../components/ui/Table';
 import { StatusBadge, Badge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { AccountAdminGate } from '../components/auth/PermissionRoute';
+import { useAuth } from '../contexts/AuthContext';
 import { PermissionMatrix } from '../components/users/PermissionMatrix';
 import { CreateUserModal } from '../components/users/CreateUserModal';
 import { ManageUserRolesModal } from '../components/users/ManageUserRolesModal';
@@ -48,6 +49,10 @@ function filterUser(
 }
 
 export function UsersAndRoles() {
+  const { user: sesionUsuario } = useAuth();
+  const rrhhDelegado = sesionUsuario.roles.includes('RRHH')
+    && !sesionUsuario.roles.includes('Administrador')
+    && !sesionUsuario.roles.includes('Gerencia');
   const [tab, setTab] = useState('usuarios');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('ACTIVO');
@@ -184,6 +189,9 @@ export function UsersAndRoles() {
   );
 
   const selectedSecurityRole = securityRoles.find((role) => role.codigo === selectedRoleCode);
+  const rolesAsignables = rrhhDelegado
+    ? securityRoles.filter((role) => role.asignableRrhh || role.codigo === 'CLIENTE')
+    : securityRoles;
 
   return (
     <div>
@@ -224,7 +232,7 @@ export function UsersAndRoles() {
           setCreateUserModalOpen(false);
           setEditingUser(null);
         }}
-        roles={securityRoles}
+        roles={rolesAsignables}
         onSuccess={recargarCatalogos}
         user={editingUser}
       />
@@ -232,7 +240,7 @@ export function UsersAndRoles() {
       <ManageUserRolesModal
         open={rolesModalOpen}
         user={rolesUser}
-        roles={securityRoles}
+        roles={rolesAsignables}
         onClose={() => {
           setRolesModalOpen(false);
           setRolesUser(null);
@@ -535,7 +543,7 @@ export function UsersAndRoles() {
                         {role.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </button>
-                    <AccountAdminGate permissions="roles.edit">
+                    {(!rrhhDelegado || !role.esSistema) && <AccountAdminGate permissions="roles.edit">
                       <IconButton
                         icon={PencilIcon}
                         label={`Editar ${role.nombre}`}
@@ -543,8 +551,8 @@ export function UsersAndRoles() {
                         disabled={updatingRoleCode !== null}
                         onClick={() => setEditingRole(role)}
                       />
-                    </AccountAdminGate>
-                    <AccountAdminGate permissions={role.activo ? 'roles.deactivate' : 'roles.activate'}>
+                    </AccountAdminGate>}
+                    {(!rrhhDelegado || !role.esSistema) && <AccountAdminGate permissions={role.activo ? 'roles.deactivate' : 'roles.activate'}>
                       <IconButton
                         icon={role.activo ? PowerIcon : RotateCcwIcon}
                         label={`${role.activo ? 'Desactivar' : 'Reactivar'} ${role.nombre}`}
@@ -553,7 +561,7 @@ export function UsersAndRoles() {
                         disabled={updatingRoleCode !== null || (role.activo && bloqueo !== null)}
                         onClick={() => void cambiarEstadoRol(role)}
                       />
-                    </AccountAdminGate>
+                    </AccountAdminGate>}
                   </li>
                 );
               })}
@@ -570,7 +578,7 @@ export function UsersAndRoles() {
             />
 
             {selectedSecurityRole && (
-              <PermissionMatrix roleCode={selectedSecurityRole.codigo} />
+              <PermissionMatrix roleCode={selectedSecurityRole.codigo} esSistema={selectedSecurityRole.esSistema} />
             )}
           </Card>
         </div>
