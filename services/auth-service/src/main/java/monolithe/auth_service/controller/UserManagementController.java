@@ -33,7 +33,7 @@ public class UserManagementController {
         private final UserAccountUpdateService userAccountUpdateService;
 
         @PostMapping
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.create') and hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.create') and hasAuthority('users.assign_role')")
         public ResponseEntity<CreatedUserResponse> crearUsuario(
                         @Valid @RequestBody CreateUserRequest request,
                         @AuthenticationPrincipal Jwt jwt,
@@ -131,7 +131,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}/activate")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.activate')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.activate')")
         public ResponseEntity<UserOperationResponse> activarUsuario(
                         @PathVariable Long idUsuario,
                         @AuthenticationPrincipal Jwt jwt) {
@@ -147,7 +147,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}/deactivate")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.deactivate')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.deactivate')")
         public ResponseEntity<UserOperationResponse> desactivarUsuario(
                         @PathVariable Long idUsuario,
                         @AuthenticationPrincipal Jwt jwt) {
@@ -163,7 +163,7 @@ public class UserManagementController {
         }
 
         @PostMapping("/{idUsuario}/roles")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> asignarRol(
                         @PathVariable Long idUsuario,
                         @Valid @RequestBody UserRoleRequest request,
@@ -181,7 +181,7 @@ public class UserManagementController {
         }
 
         @PutMapping("/{idUsuario}/roles/{codigoRolActual}")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> reemplazarRol(
                         @PathVariable Long idUsuario,
                         @PathVariable String codigoRolActual,
@@ -200,7 +200,7 @@ public class UserManagementController {
         }
 
         @DeleteMapping("/{idUsuario}/roles/{codigoRol}")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.assign_role')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.assign_role')")
         public ResponseEntity<UserOperationResponse> revocarRol(
                         @PathVariable Long idUsuario,
                         @PathVariable String codigoRol,
@@ -218,7 +218,7 @@ public class UserManagementController {
         }
 
         @PatchMapping("/{idUsuario}")
-        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA') and hasAuthority('users.edit')")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR','ROLE_GERENCIA','ROLE_RRHH') and hasAuthority('users.edit')")
         public ResponseEntity<UserOperationResponse> actualizarUsuario(
                         @PathVariable Long idUsuario,
                         @Valid @RequestBody UpdateUserRequest request,
