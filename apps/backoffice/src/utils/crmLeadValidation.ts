@@ -1,3 +1,5 @@
+import type { CountryCode } from 'libphonenumber-js/mobile';
+import { leadPhoneError } from '../lib/leadPhone';
 
 export type TipoDocumentoLead =
     | ''
@@ -11,6 +13,8 @@ export interface LeadFormValues {
     paternalSurname: string;
     maternalSurname: string;
     phone: string;
+    phoneCountry?: CountryCode;
+    phoneInputError?: string;
     email: string;
     idProyecto: number | '';
     origenCodigo: string;
@@ -35,8 +39,6 @@ const NOMBRE_REGEX = new RegExp(
 const EMAIL_REGEX =
     /^[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}$/i;
 
-const PHONE_REGEX =
-    /^(?:[0-9]{7,15}|\+[1-9][0-9]{6,14})$/;
 
 export function sanitizarLead(
     campo: LeadField,
@@ -121,10 +123,8 @@ export function validarNuevoLead(
         errores.names = 'El nombre completo supera los 150 caracteres.';
     }
 
-    if (!PHONE_REGEX.test(form.phone.trim())) {
-        errores.phone =
-            'Ingresa de 7 a 15 dígitos. Usa + solo al inicio para números internacionales.';
-    }
+    const phoneError = form.phoneInputError || leadPhoneError(form.phone.trim(), form.phoneCountry);
+    if (phoneError) errores.phone = phoneError;
 
     if (
         !EMAIL_REGEX.test(form.email.trim()) ||

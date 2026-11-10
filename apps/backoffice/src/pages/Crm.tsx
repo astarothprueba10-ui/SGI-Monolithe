@@ -1,3 +1,7 @@
+import { LeadPhoneField } from '../components/crm/LeadPhoneField';
+import { serializeLeadPhone } from '../lib/leadPhone';
+import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
+import { useLeadIdentity } from '../hooks/useLeadIdentity';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
@@ -163,6 +167,7 @@ const INITIAL_FORM: LeadFormData = {
   paternalSurname: '',
   maternalSurname: '',
   phone: '',
+  phoneCountry: 'PE',
   email: '',
   idProyecto: '',
   origenCodigo: 'WEB',
@@ -344,6 +349,7 @@ export function Crm() {
   const [solicitudId, setSolicitudId] = useState<string>(() => crypto.randomUUID());
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
   const [form, setForm] = useState<LeadFormData>(INITIAL_FORM);
+  const leadIdentity = useLeadIdentity(isNewLeadOpen, form, setForm);
   const [leadIntentoGuardar, setLeadIntentoGuardar] = useState(false);
 
   const [leadCamposVisitados, setLeadCamposVisitados] =
@@ -842,7 +848,7 @@ export function Crm() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isSubmitting) return;
+    if (isSubmitting || leadIdentity.loading) return;
 
     setLeadIntentoGuardar(true);
     const errores = validarNuevoLead(form);
@@ -863,7 +869,7 @@ export function Crm() {
         apellidoPaterno: form.paternalSurname.trim(),
         apellidoMaterno: form.maternalSurname.trim() || undefined,
         correo: form.email.trim().toLowerCase(),
-        telefono: form.phone.trim(),
+        telefono: serializeLeadPhone(form.phone.trim(), form.phoneCountry ?? 'PE'),
         idProyecto: Number(form.idProyecto),
         origenCodigo: form.origenCodigo,
         motivoContacto: form.motivoContacto.trim(),
@@ -2631,7 +2637,7 @@ export function Crm() {
             <Button onClick={() => setIsNewLeadOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting}>
+            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting || leadIdentity.loading}>
               {isSubmitting ? 'Guardando...' : 'Registrar lead'}
             </Button>
           </>
@@ -2639,42 +2645,35 @@ export function Crm() {
       >
 
         <form noValidate onSubmit={handleCreateSubmit} className="space-y-3">
-          <div className="rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] text-slate-500">
-            ID Solicitud: {solicitudId}
-          </div>
-
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <LeadDocumentFields form={form} lookup={leadIdentity}
+              errorProps={propiedadesError} errorMessage={mensajeError} />
             <div>
-              <label className="text-xs font-medium text-brand-700">Nombres *</label>
-              <Input required maxLength={120} value={form.names}
+              <label htmlFor="lead-nombres" className="text-xs font-medium text-brand-700">Nombres *</label>
+              <Input id="lead-nombres" required maxLength={120} value={form.names}
                 onChange={e => actualizarCampoTexto('names', e.target.value)}
                 placeholder="Ej. Juan Carlos" {...propiedadesError('names')} />
               {mensajeError('names')}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-brand-700">Apellido paterno *</label>
-              <Input required maxLength={80} value={form.paternalSurname}
+              <label htmlFor="lead-apellido-paterno" className="text-xs font-medium text-brand-700">Apellido paterno *</label>
+              <Input id="lead-apellido-paterno" required maxLength={80} value={form.paternalSurname}
                 onChange={e => actualizarCampoTexto('paternalSurname', e.target.value)}
                 placeholder="Ej. Pérez" {...propiedadesError('paternalSurname')} />
               {mensajeError('paternalSurname')}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-brand-700">Apellido materno</label>
-              <Input maxLength={80} value={form.maternalSurname}
+              <label htmlFor="lead-apellido-materno" className="text-xs font-medium text-brand-700">Apellido materno</label>
+              <Input id="lead-apellido-materno" maxLength={80} value={form.maternalSurname}
                 onChange={e => actualizarCampoTexto('maternalSurname', e.target.value)}
                 placeholder="Ej. Gómez" {...propiedadesError('maternalSurname')} />
               {mensajeError('maternalSurname')}
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-brand-700">Teléfono / WhatsApp *</label>
-              <Input required type="tel" inputMode="tel" maxLength={16} value={form.phone}
-                onChange={e => actualizarCampoTexto('phone', e.target.value)}
-                placeholder="+51987654321" {...propiedadesError('phone')} />
-              {mensajeError('phone')}
-            </div>
+            <LeadPhoneField form={form} setForm={setForm} disabled={isSubmitting}
+              errorProps={propiedadesError} errorMessage={mensajeError} />
 
             <div>
               <label className="text-xs font-medium text-brand-700">Correo electrónico *</label>
@@ -2748,30 +2747,6 @@ export function Crm() {
               </div>
             )}
 
-
-            <div>
-              <label className="text-xs font-medium text-brand-700">Tipo de documento *</label>
-              <Select aria-label="Tipo de documento" value={form.tipoDocumento}
-                onChange={e => setForm(p => ({ ...p, tipoDocumento: e.target.value, numeroDocumento: '' }))}
-                {...propiedadesError('tipoDocumento')}>
-                <option value="DNI">DNI</option>
-                <option value="CE">Carné de extranjería</option>
-                <option value="PASAPORTE">Pasaporte</option>
-                <option value="RUC">RUC</option>
-              </Select>
-              {mensajeError('tipoDocumento')}
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-brand-700">Número de documento *</label>
-              <Input required value={form.numeroDocumento}
-                maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
-                inputMode={form.tipoDocumento === 'PASAPORTE' ? 'text' : 'numeric'}
-                onChange={e => actualizarCampoTexto('numeroDocumento', e.target.value)}
-                placeholder={form.tipoDocumento === 'DNI' ? '8 dígitos' : form.tipoDocumento === 'RUC' ? '11 dígitos' : form.tipoDocumento === 'CE' ? '12 dígitos' : 'Letras y números'}
-                {...propiedadesError('numeroDocumento')} />
-              {mensajeError('numeroDocumento')}
-            </div>
 
             <div className="sm:col-span-2">
               <label className="text-xs font-medium text-brand-700">Dirección (opcional)</label>
