@@ -43,6 +43,11 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/securityAccess.test.cjs
 
+      - name: Validate sales period labels
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs
+
   crm-frontend-tests:
     name: CRM frontend tests
     runs-on: ubuntu-latest
