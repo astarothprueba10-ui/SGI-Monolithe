@@ -123,6 +123,9 @@ public final class BrevoJavaMailSender implements JavaMailSender {
     private void enviarHttps(MimeMessage message) {
         final Map<String, Object> payload;
         try {
+            // MimeMessageHelper construye multipart en memoria: guardar los cambios
+            // antes de inspeccionar las partes evita leer un cuerpo MIME incompleto.
+            message.saveChanges();
             Address[] senders = message.getFrom();
             Address[] recipients = message.getRecipients(Message.RecipientType.TO);
             if (senders == null || senders.length != 1 || recipients == null || recipients.length == 0) {
