@@ -34,6 +34,8 @@ services:
     container_name: sgi-core-service
     env_file:
       - .env
+      - path: .secret/supabase.env
+        required: false
     ports:
       - ${CORE_SERVICE_PORT:-8083}:8083
     environment:

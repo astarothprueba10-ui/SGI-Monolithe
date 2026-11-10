@@ -11,7 +11,10 @@
     "test:users": "node --require ./tests/register-types.cjs --test tests/editUserEmail.test.cjs",
     "test:session": "node --require ./tests/register-types.cjs --test tests/inactivitySession.test.cjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:lead-identity": "node --require ./tests/register-types.cjs --test tests/leadIdentity.test.cjs",
+    "test:lead-phone": "node --require ./tests/register-types.cjs --test tests/leadPhone.test.cjs",
+    "test:navigation": "node --require ./tests/register-types.cjs --test tests/navigationCounts.test.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
@@ -19,6 +22,7 @@
     "@supabase/supabase-js": "^2.49.1",
     "exceljs": "^4.4.0",
     "framer-motion": "^11.5.4",
+    "libphonenumber-js": "1.13.15",
     "lucide-react": "0.522.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

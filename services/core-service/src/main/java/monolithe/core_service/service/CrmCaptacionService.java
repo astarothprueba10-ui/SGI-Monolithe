@@ -29,6 +29,8 @@ public class CrmCaptacionService {
                     "La identidad de la sesion no es valida.");
         }
 
+        ValidacionTelefonoLead.validar(solicitud.telefono());
+
         final String payload;
         try {
             Map<String, Object> datos = new LinkedHashMap<>();

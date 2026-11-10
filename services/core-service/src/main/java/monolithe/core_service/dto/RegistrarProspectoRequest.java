@@ -21,7 +21,7 @@ public record RegistrarProspectoRequest(
     @NotBlank @Email @Size(max = 180) String correo,
 
     @NotBlank @Size(max = 30)
-    @Pattern(regexp = "^(?:[0-9]{7,15}|\\+[1-9][0-9]{6,14})$", message = "Ingrese de 7 a 15 dígitos; + solo al inicio.")
+    @Pattern(regexp = "^(?:9[0-9]{8}|\\+[1-9][0-9]{6,14})$", message = "Ingresa un celular peruano de 9 dígitos o un número internacional con su prefijo.")
     String telefono,
 
     @NotNull @Positive Long idProyecto,

@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { LeadPhoneField } from '../components/crm/LeadPhoneField';
+import { serializeLeadPhone } from '../lib/leadPhone';
+import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
+import { useLeadIdentity } from '../hooks/useLeadIdentity';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { queryLeadTable } from '../lib/crmTableQueries';
+import { useCrmTableCounts } from '../hooks/useCrmTableCounts';
 import { toast } from 'sonner';
 import {
   CalendarIcon,
@@ -163,6 +169,7 @@ const INITIAL_FORM: LeadFormData = {
   paternalSurname: '',
   maternalSurname: '',
   phone: '',
+  phoneCountry: 'PE',
   email: '',
   idProyecto: '',
   origenCodigo: 'WEB',
@@ -344,6 +351,7 @@ export function Crm() {
   const [solicitudId, setSolicitudId] = useState<string>(() => crypto.randomUUID());
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
   const [form, setForm] = useState<LeadFormData>(INITIAL_FORM);
+  const leadIdentity = useLeadIdentity(isNewLeadOpen, form, setForm);
   const [leadIntentoGuardar, setLeadIntentoGuardar] = useState(false);
 
   const [leadCamposVisitados, setLeadCamposVisitados] =
@@ -512,8 +520,17 @@ export function Crm() {
   // El período global solo entra en consultas de Visitas; Leads y Potenciales
   // dependen únicamente de las fechas propias de sus tablas.
   const rangoBusquedaLeads = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+  const tableFilters = useMemo(() => ({ consulta: query.trim() || undefined,
+    etapa: stage === 'all' ? undefined : stage, origen: origin === 'all' ? undefined : origin,
+    idAsesor: puedeVerGestionGlobal && typeof advisorFilter === 'number' ? advisorFilter : undefined,
+    sinAsignar: puedeVerGestionGlobal ? onlyUnassigned || undefined : undefined,
+    idProyecto: projectFilter === '' ? undefined : projectFilter
+  }), [query, stage, origin, advisorFilter, onlyUnassigned, projectFilter, puedeVerGestionGlobal]);
+  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyersQuery);
+  const leadRequest = useRef(0); const buyerRequest = useRef(0);
 
   const loadLeads = useCallback(async () => {
+    const request = ++leadRequest.current;
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -528,39 +545,21 @@ export function Crm() {
         return;
       }
 
-      const filtros = {
-        consulta: query.trim() || undefined,
-        etapa: stage === 'all' ? undefined : stage,
-        origen: origin === 'all' ? undefined : origin,
-
-        idAsesor: puedeVerGestionGlobal &&
-          typeof advisorFilter === 'number'
-          ? advisorFilter
-          : undefined,
-        sinAsignar: puedeVerGestionGlobal
-          ? onlyUnassigned || undefined
-          : undefined,
-        pagina: page,
-        tamano: pageSize
-      };
+      const filtros = { ...tableFilters, pagina: page, tamano: pageSize };
 
       const categoria = tab === 'potenciales' ? 'POTENCIAL' : 'LEAD';
       // Sin fecha de tabla consulta todo el historial, conservando cartera y paginación.
       const res = tab === 'visitas'
         ? await crmBackend.buscar({...filtros,categoria:'TODOS'})
-        : rangoConsulta
-          ? await crmBackend.buscarPeriodo({
-              ...filtros,categoria,
-              idProyecto:projectFilter === '' ? undefined : projectFilter,
-              desde:rangoConsulta.desde,hastaExclusivo:rangoConsulta.hastaExclusivo
-            })
-          : await crmBackend.buscarSinPeriodo({...filtros,categoria,
-              idProyecto:projectFilter === '' ? undefined : projectFilter});
+        : await queryLeadTable({ ...filtros, categoria }, rangoConsulta);
 
+      if (request !== leadRequest.current) return;
       setLeadsList(res.items ?? []);
       setTotalLeads(res.total ?? 0);
+      refreshTableCounts();
 
     } catch (err: unknown) {
+      if (request !== leadRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'Error al consultar lista de prospectos.';
@@ -570,13 +569,14 @@ export function Crm() {
       setTotalLeads(0);
 
     } finally {
-      setIsLoading(false);
+      if (request === leadRequest.current) setIsLoading(false);
     }
 
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoBusquedaLeads, puedeVerGestionGlobal]);
+  }, [tableFilters, page, pageSize, tab, rangoBusquedaLeads, refreshTableCounts]);
 
 
   const loadBuyers = useCallback(async () => {
+    const request = ++buyerRequest.current;
     setBuyersLoading(true);
 
     try {
@@ -585,10 +585,13 @@ export function Crm() {
         buyersQuery.trim(),buyersPage,15
       );
 
+      if (request !== buyerRequest.current) return;
       setBuyersList(res.items ?? []);
       setBuyersTotal(res.total ?? 0);
+      refreshTableCounts();
 
     } catch (err: unknown) {
+      if (request !== buyerRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'Error al cargar compradores.';
@@ -601,9 +604,9 @@ export function Crm() {
       setBuyersTotal(0);
 
     } finally {
-      setBuyersLoading(false);
+      if (request === buyerRequest.current) setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage]
+  }, [buyersQuery, buyersPage, refreshTableCounts]
   );
 
 
@@ -674,18 +677,18 @@ export function Crm() {
   }, [tab]);
 
   useEffect(() => {
-    if (tab === 'leads' || tab === 'potenciales') {
+    if (tab === 'leads' || tab === 'potenciales' || tab === 'visitas') {
       void loadLeads();
-    } else if (tab === 'visitas') {
-      if (leadsList.length === 0) {
-        void loadLeads();
-      }
-    } else if (tab === 'compradores') {
-      void loadBuyers();
-    } else if (tab === 'fuentes') {
-      void loadPortfolioLeads();
     }
-  }, [tab, leadsList.length, loadLeads, loadBuyers, loadPortfolioLeads]);
+  }, [tab, loadLeads]);
+
+  useEffect(() => {
+    if (tab === 'compradores') void loadBuyers();
+  }, [tab, loadBuyers]);
+
+  useEffect(() => {
+    if (tab === 'fuentes') void loadPortfolioLeads();
+  }, [tab, loadPortfolioLeads]);
 
 
   useEffect(() => {
@@ -842,7 +845,7 @@ export function Crm() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isSubmitting) return;
+    if (isSubmitting || leadIdentity.loading) return;
 
     setLeadIntentoGuardar(true);
     const errores = validarNuevoLead(form);
@@ -863,7 +866,7 @@ export function Crm() {
         apellidoPaterno: form.paternalSurname.trim(),
         apellidoMaterno: form.maternalSurname.trim() || undefined,
         correo: form.email.trim().toLowerCase(),
-        telefono: form.phone.trim(),
+        telefono: serializeLeadPhone(form.phone.trim(), form.phoneCountry ?? 'PE'),
         idProyecto: Number(form.idProyecto),
         origenCodigo: form.origenCodigo,
         motivoContacto: form.motivoContacto.trim(),
@@ -1382,17 +1385,17 @@ export function Crm() {
           {
             id: 'leads',
             label: 'Leads',
-            count: summary?.leads
+            count: countingTables ? null : tableCounts.leads
           },
           {
             id: 'potenciales',
             label: 'Clientes potenciales',
-            count: summary?.potenciales
+            count: countingTables ? null : tableCounts.potenciales
           },
           {
             id: 'compradores',
             label: 'Clientes compradores',
-            count: summary?.compradores
+            count: countingTables ? null : tableCounts.compradores
           },
           {
             id: 'fuentes',
@@ -1755,17 +1758,17 @@ export function Crm() {
                       <TD className="whitespace-nowrap text-xs text-brand-500">
                         {formatDateLima(lead.fecha_registro)}
                       </TD>
-                      <TD>
+                      <TD className="min-w-44">
                         <p className="font-semibold text-brand-900">{lead.nombre_completo}</p>
                         <p className="font-mono text-[11px] text-brand-400">{lead.codigo}</p>
                       </TD>
-                      <TD>
+                      <TD className="min-w-56">
                         <p className="whitespace-nowrap text-brand-700">{lead.telefono}</p>
-                        <p className="text-xs text-brand-400">{lead.email}</p>
+                        <p className="whitespace-nowrap text-xs text-brand-400">{lead.email}</p>
                       </TD>
                       <TD className="min-w-44 text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
                       <TD><Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge></TD>
-                      <TD className="text-brand-600">
+                      <TD className="min-w-40 text-brand-600">
                         {lead.asesor_nombre || <span className="italic text-brand-400">Sin asignar</span>}
                       </TD>
                       <TD>
@@ -2631,7 +2634,7 @@ export function Crm() {
             <Button onClick={() => setIsNewLeadOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting}>
+            <Button variant="primary" onClick={handleCreateSubmit} disabled={isSubmitting || leadIdentity.loading}>
               {isSubmitting ? 'Guardando...' : 'Registrar lead'}
             </Button>
           </>
@@ -2639,42 +2642,35 @@ export function Crm() {
       >
 
         <form noValidate onSubmit={handleCreateSubmit} className="space-y-3">
-          <div className="rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] text-slate-500">
-            ID Solicitud: {solicitudId}
-          </div>
-
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <LeadDocumentFields form={form} lookup={leadIdentity}
+              errorProps={propiedadesError} errorMessage={mensajeError} />
             <div>
-              <label className="text-xs font-medium text-brand-700">Nombres *</label>
-              <Input required maxLength={120} value={form.names}
+              <label htmlFor="lead-nombres" className="text-xs font-medium text-brand-700">Nombres *</label>
+              <Input id="lead-nombres" required maxLength={120} value={form.names}
                 onChange={e => actualizarCampoTexto('names', e.target.value)}
                 placeholder="Ej. Juan Carlos" {...propiedadesError('names')} />
               {mensajeError('names')}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-brand-700">Apellido paterno *</label>
-              <Input required maxLength={80} value={form.paternalSurname}
+              <label htmlFor="lead-apellido-paterno" className="text-xs font-medium text-brand-700">Apellido paterno *</label>
+              <Input id="lead-apellido-paterno" required maxLength={80} value={form.paternalSurname}
                 onChange={e => actualizarCampoTexto('paternalSurname', e.target.value)}
                 placeholder="Ej. Pérez" {...propiedadesError('paternalSurname')} />
               {mensajeError('paternalSurname')}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-brand-700">Apellido materno</label>
-              <Input maxLength={80} value={form.maternalSurname}
+              <label htmlFor="lead-apellido-materno" className="text-xs font-medium text-brand-700">Apellido materno</label>
+              <Input id="lead-apellido-materno" maxLength={80} value={form.maternalSurname}
                 onChange={e => actualizarCampoTexto('maternalSurname', e.target.value)}
                 placeholder="Ej. Gómez" {...propiedadesError('maternalSurname')} />
               {mensajeError('maternalSurname')}
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-brand-700">Teléfono / WhatsApp *</label>
-              <Input required type="tel" inputMode="tel" maxLength={16} value={form.phone}
-                onChange={e => actualizarCampoTexto('phone', e.target.value)}
-                placeholder="+51987654321" {...propiedadesError('phone')} />
-              {mensajeError('phone')}
-            </div>
+            <LeadPhoneField form={form} setForm={setForm} disabled={isSubmitting}
+              errorProps={propiedadesError} errorMessage={mensajeError} />
 
             <div>
               <label className="text-xs font-medium text-brand-700">Correo electrónico *</label>
@@ -2748,30 +2744,6 @@ export function Crm() {
               </div>
             )}
 
-
-            <div>
-              <label className="text-xs font-medium text-brand-700">Tipo de documento *</label>
-              <Select aria-label="Tipo de documento" value={form.tipoDocumento}
-                onChange={e => setForm(p => ({ ...p, tipoDocumento: e.target.value, numeroDocumento: '' }))}
-                {...propiedadesError('tipoDocumento')}>
-                <option value="DNI">DNI</option>
-                <option value="CE">Carné de extranjería</option>
-                <option value="PASAPORTE">Pasaporte</option>
-                <option value="RUC">RUC</option>
-              </Select>
-              {mensajeError('tipoDocumento')}
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-brand-700">Número de documento *</label>
-              <Input required value={form.numeroDocumento}
-                maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
-                inputMode={form.tipoDocumento === 'PASAPORTE' ? 'text' : 'numeric'}
-                onChange={e => actualizarCampoTexto('numeroDocumento', e.target.value)}
-                placeholder={form.tipoDocumento === 'DNI' ? '8 dígitos' : form.tipoDocumento === 'RUC' ? '11 dígitos' : form.tipoDocumento === 'CE' ? '12 dígitos' : 'Letras y números'}
-                {...propiedadesError('numeroDocumento')} />
-              {mensajeError('numeroDocumento')}
-            </div>
 
             <div className="sm:col-span-2">
               <label className="text-xs font-medium text-brand-700">Dirección (opcional)</label>
