@@ -46,7 +46,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[12px] font-medium',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[12px] font-medium',
         STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-600 border-slate-200',
         className
       )}>
@@ -77,7 +77,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+        'inline-flex items-center whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide',
         tones[tone],
         className
       )}>

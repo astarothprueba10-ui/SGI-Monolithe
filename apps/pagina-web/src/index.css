@@ -133,3 +133,17 @@ img, video, iframe {
     font-size: 16px;
   }
 }
+
+table {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+table th {
+  white-space: nowrap;
+}
+table td {
+  vertical-align: middle;
+}
+table :is(time, [data-cell="email"], [data-cell="phone"]) {
+  white-space: nowrap;
+}

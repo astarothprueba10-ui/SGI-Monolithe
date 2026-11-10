@@ -2,7 +2,9 @@ import { LeadPhoneField } from '../components/crm/LeadPhoneField';
 import { serializeLeadPhone } from '../lib/leadPhone';
 import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
 import { useLeadIdentity } from '../hooks/useLeadIdentity';
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { queryLeadTable } from '../lib/crmTableQueries';
+import { useCrmTableCounts } from '../hooks/useCrmTableCounts';
 import { toast } from 'sonner';
 import {
   CalendarIcon,
@@ -518,8 +520,17 @@ export function Crm() {
   // El período global solo entra en consultas de Visitas; Leads y Potenciales
   // dependen únicamente de las fechas propias de sus tablas.
   const rangoBusquedaLeads = tab === 'visitas' ? rangoPeriodo : rangoTabla;
+  const tableFilters = useMemo(() => ({ consulta: query.trim() || undefined,
+    etapa: stage === 'all' ? undefined : stage, origen: origin === 'all' ? undefined : origin,
+    idAsesor: puedeVerGestionGlobal && typeof advisorFilter === 'number' ? advisorFilter : undefined,
+    sinAsignar: puedeVerGestionGlobal ? onlyUnassigned || undefined : undefined,
+    idProyecto: projectFilter === '' ? undefined : projectFilter
+  }), [query, stage, origin, advisorFilter, onlyUnassigned, projectFilter, puedeVerGestionGlobal]);
+  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyersQuery);
+  const leadRequest = useRef(0); const buyerRequest = useRef(0);
 
   const loadLeads = useCallback(async () => {
+    const request = ++leadRequest.current;
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -534,39 +545,21 @@ export function Crm() {
         return;
       }
 
-      const filtros = {
-        consulta: query.trim() || undefined,
-        etapa: stage === 'all' ? undefined : stage,
-        origen: origin === 'all' ? undefined : origin,
-
-        idAsesor: puedeVerGestionGlobal &&
-          typeof advisorFilter === 'number'
-          ? advisorFilter
-          : undefined,
-        sinAsignar: puedeVerGestionGlobal
-          ? onlyUnassigned || undefined
-          : undefined,
-        pagina: page,
-        tamano: pageSize
-      };
+      const filtros = { ...tableFilters, pagina: page, tamano: pageSize };
 
       const categoria = tab === 'potenciales' ? 'POTENCIAL' : 'LEAD';
       // Sin fecha de tabla consulta todo el historial, conservando cartera y paginación.
       const res = tab === 'visitas'
         ? await crmBackend.buscar({...filtros,categoria:'TODOS'})
-        : rangoConsulta
-          ? await crmBackend.buscarPeriodo({
-              ...filtros,categoria,
-              idProyecto:projectFilter === '' ? undefined : projectFilter,
-              desde:rangoConsulta.desde,hastaExclusivo:rangoConsulta.hastaExclusivo
-            })
-          : await crmBackend.buscarSinPeriodo({...filtros,categoria,
-              idProyecto:projectFilter === '' ? undefined : projectFilter});
+        : await queryLeadTable({ ...filtros, categoria }, rangoConsulta);
 
+      if (request !== leadRequest.current) return;
       setLeadsList(res.items ?? []);
       setTotalLeads(res.total ?? 0);
+      refreshTableCounts();
 
     } catch (err: unknown) {
+      if (request !== leadRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'Error al consultar lista de prospectos.';
@@ -576,13 +569,14 @@ export function Crm() {
       setTotalLeads(0);
 
     } finally {
-      setIsLoading(false);
+      if (request === leadRequest.current) setIsLoading(false);
     }
 
-  }, [query, stage, origin, advisorFilter, onlyUnassigned, page, pageSize, tab, projectFilter, rangoBusquedaLeads, puedeVerGestionGlobal]);
+  }, [tableFilters, page, pageSize, tab, rangoBusquedaLeads, refreshTableCounts]);
 
 
   const loadBuyers = useCallback(async () => {
+    const request = ++buyerRequest.current;
     setBuyersLoading(true);
 
     try {
@@ -591,10 +585,13 @@ export function Crm() {
         buyersQuery.trim(),buyersPage,15
       );
 
+      if (request !== buyerRequest.current) return;
       setBuyersList(res.items ?? []);
       setBuyersTotal(res.total ?? 0);
+      refreshTableCounts();
 
     } catch (err: unknown) {
+      if (request !== buyerRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'Error al cargar compradores.';
@@ -607,9 +604,9 @@ export function Crm() {
       setBuyersTotal(0);
 
     } finally {
-      setBuyersLoading(false);
+      if (request === buyerRequest.current) setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage]
+  }, [buyersQuery, buyersPage, refreshTableCounts]
   );
 
 
@@ -680,18 +677,18 @@ export function Crm() {
   }, [tab]);
 
   useEffect(() => {
-    if (tab === 'leads' || tab === 'potenciales') {
+    if (tab === 'leads' || tab === 'potenciales' || tab === 'visitas') {
       void loadLeads();
-    } else if (tab === 'visitas') {
-      if (leadsList.length === 0) {
-        void loadLeads();
-      }
-    } else if (tab === 'compradores') {
-      void loadBuyers();
-    } else if (tab === 'fuentes') {
-      void loadPortfolioLeads();
     }
-  }, [tab, leadsList.length, loadLeads, loadBuyers, loadPortfolioLeads]);
+  }, [tab, loadLeads]);
+
+  useEffect(() => {
+    if (tab === 'compradores') void loadBuyers();
+  }, [tab, loadBuyers]);
+
+  useEffect(() => {
+    if (tab === 'fuentes') void loadPortfolioLeads();
+  }, [tab, loadPortfolioLeads]);
 
 
   useEffect(() => {
@@ -1388,17 +1385,17 @@ export function Crm() {
           {
             id: 'leads',
             label: 'Leads',
-            count: summary?.leads
+            count: countingTables ? null : tableCounts.leads
           },
           {
             id: 'potenciales',
             label: 'Clientes potenciales',
-            count: summary?.potenciales
+            count: countingTables ? null : tableCounts.potenciales
           },
           {
             id: 'compradores',
             label: 'Clientes compradores',
-            count: summary?.compradores
+            count: countingTables ? null : tableCounts.compradores
           },
           {
             id: 'fuentes',
@@ -1761,17 +1758,17 @@ export function Crm() {
                       <TD className="whitespace-nowrap text-xs text-brand-500">
                         {formatDateLima(lead.fecha_registro)}
                       </TD>
-                      <TD>
+                      <TD className="min-w-44">
                         <p className="font-semibold text-brand-900">{lead.nombre_completo}</p>
                         <p className="font-mono text-[11px] text-brand-400">{lead.codigo}</p>
                       </TD>
-                      <TD>
+                      <TD className="min-w-56">
                         <p className="whitespace-nowrap text-brand-700">{lead.telefono}</p>
-                        <p className="text-xs text-brand-400">{lead.email}</p>
+                        <p className="whitespace-nowrap text-xs text-brand-400">{lead.email}</p>
                       </TD>
                       <TD className="min-w-44 text-brand-700">{lead.interes || 'Sin proyecto asignado'}</TD>
                       <TD><Badge tone="neutral">{lead.origen_nombre || lead.origen_codigo}</Badge></TD>
-                      <TD className="text-brand-600">
+                      <TD className="min-w-40 text-brand-600">
                         {lead.asesor_nombre || <span className="italic text-brand-400">Sin asignar</span>}
                       </TD>
                       <TD>

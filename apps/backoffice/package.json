@@ -13,7 +13,8 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "vite preview",
     "test:lead-identity": "node --require ./tests/register-types.cjs --test tests/leadIdentity.test.cjs",
-    "test:lead-phone": "node --require ./tests/register-types.cjs --test tests/leadPhone.test.cjs"
+    "test:lead-phone": "node --require ./tests/register-types.cjs --test tests/leadPhone.test.cjs",
+    "test:navigation": "node --require ./tests/register-types.cjs --test tests/navigationCounts.test.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",

@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   BellIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
   CircleUserIcon,
   LogOutIcon,
   MenuIcon,
@@ -19,6 +18,7 @@ import { Dropdown, DropdownItem, DropdownLabel } from '../ui/Dropdown';
 import { Badge } from '../ui/Badge';
 import { cn } from '../../utils/cn';
 import { authApi } from '../../lib/apiClient';
+import { Breadcrumbs } from './Breadcrumbs';
 import {
   clearStoredSession,
   getRefreshToken
@@ -34,15 +34,8 @@ export function Header({
   mobileMenuOpen = false
 }: HeaderProps) {
   const { user, can, hasModule } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-
-  const current = ALL_NAV_ITEMS.find(
-    (item) =>
-      item.to === location.pathname ||
-      (item.to !== '/' && location.pathname.startsWith(item.to))
-  );
 
   const notifications = useMemo(
     () => NOTIFICATIONS.filter((n) => hasModule(n.module)),
@@ -75,26 +68,7 @@ export function Header({
         <MenuIcon className="h-5 w-5" aria-hidden="true" />
       </button>
 
-      <nav
-        aria-label="Ruta de navegación"
-        className="hidden min-w-0 items-center gap-1.5 md:flex"
-      >
-        <Link
-          to="/"
-          className="text-[13px] text-brand-400 transition-colors duration-150 ease-smooth hover:text-brand-700"
-        >
-          SIGI
-        </Link>
-
-        <ChevronRightIcon
-          className="h-3.5 w-3.5 text-brand-300"
-          aria-hidden="true"
-        />
-
-        <span className="truncate text-[13px] font-medium text-brand-800">
-          {current?.label ?? 'Acceso no autorizado'}
-        </span>
-      </nav>
+      <Breadcrumbs className="hidden max-h-14 max-w-[50%] overflow-y-auto md:block" />
 
       <div className="relative ml-auto min-w-0 flex-1 md:max-w-sm">
         <SearchIcon

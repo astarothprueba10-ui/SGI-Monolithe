@@ -22,6 +22,7 @@ import { ProjectBlocksTab } from '../components/projects/detail/ProjectBlocksTab
 import { ProjectLotsTab } from '../components/projects/detail/ProjectLotsTab';
 import { number } from '../utils/format';
 import type { ProyectoResponse } from '../types/core';
+import { useNavigationDetail } from '../hooks/useNavigationTrail';
 
 export function ProjectDetail() {
   const { idProyecto } = useParams<{ idProyecto: string }>();
@@ -30,6 +31,7 @@ export function ProjectDetail() {
   const canViewLots = can('lots.view');
 
   const [project, setProject] = useState<ProyectoResponse | null>(null);
+  useNavigationDetail(project?.idProyecto === Number(idProyecto) ? project.nombre : 'Proyecto');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
