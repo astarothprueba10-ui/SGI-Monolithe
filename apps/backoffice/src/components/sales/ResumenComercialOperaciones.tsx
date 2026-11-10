@@ -41,6 +41,16 @@ export function ResumenComercialOperaciones({ operaciones, periodo, onChange }: 
     };
   },[autorizado]);
   const valido = periodoValido(periodo);
+  const esDiaUnico = valido && periodo.desde === periodo.hasta;
+  const fechaLegible = esDiaUnico
+    ? new Intl.DateTimeFormat('es-PE', {
+        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+      }).format(new Date(`${periodo.desde}T12:00:00Z`))
+    : '';
+  const tituloGrafico = esDiaUnico ? 'Operaciones del día' : 'Evolución mensual de operaciones';
+  const descripcionGrafico = esDiaUnico
+    ? `Separaciones y ventas del ${fechaLegible}`
+    : 'Separaciones y ventas agrupadas por mes, solo dentro del período seleccionado';
   return (
     <section className="mb-5 space-y-4" aria-label="Resumen comercial global autorizado">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-white px-4 py-4 shadow-sm sm:px-5">
@@ -121,15 +131,15 @@ export function ResumenComercialOperaciones({ operaciones, periodo, onChange }: 
         <div className="min-w-0 rounded-xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-brand-900">Evolución mensual de operaciones</h3>
-              <p className="mt-0.5 text-xs text-brand-500">Comparativo de separaciones y ventas por mes</p>
+              <h3 className="text-sm font-bold text-brand-900">{tituloGrafico}</h3>
+              <p className="mt-0.5 text-xs text-brand-500">{descripcionGrafico}</p>
             </div>
             <span className="rounded-lg bg-brand-50 p-2 text-brand-700">
               <TrendingUpIcon className="h-4 w-4" />
             </span>
           </div>
           <div className="w-full overflow-x-auto" role="img"
-            aria-label="Gráfico de barras por mes: separaciones y ventas de la cartera autorizada">
+            aria-label={`${tituloGrafico}: separaciones y ventas de la cartera autorizada`}>
             <div style={{minWidth: Math.max(300,mensual.length*63)}} className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={mensual} margin={{top:8,right:10,left:-20,bottom:2}} barGap={4}>
