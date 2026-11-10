@@ -297,8 +297,6 @@ export function Crm() {
   const [exportStatus, setExportStatus] = useState('');
 
   const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
-  // Hasta que el usuario cambie el período, el gráfico presenta seis meses históricos.
-  const [periodoGraficoPersonalizado, setPeriodoGraficoPersonalizado] = useState(false);
   const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
   const [fechaDesde, setFechaDesde] = useState(obtenerFechaHoyLima);
   const [fechaHasta, setFechaHasta] = useState(obtenerFechaHoyLima);
@@ -329,20 +327,8 @@ export function Crm() {
   }, [fechaTablaDesde,fechaTablaHasta]);
 
 
-  const rangoEvolucion = useMemo(() => {
-    if (!rangoPeriodo) return null;
-    if (periodoGraficoPersonalizado) return rangoPeriodo;
-    const fechaBase = fechaReferencia;
-    const anio = Number(fechaBase.slice(0,4));
-    const mes = Number(fechaBase.slice(5,7));
-    if (!anio || mes < 1 || mes > 12) return null;
-    const inicio = new Date(Date.UTC(anio,mes-6,1));
-    const fin = new Date(Date.UTC(anio,mes,1));
-    return {
-      desde: `${inicio.toISOString().slice(0,10)}T00:00:00-05:00`,
-      hastaExclusivo:`${fin.toISOString().slice(0,10)}T00:00:00-05:00`
-    };
-  },[rangoPeriodo,periodoGraficoPersonalizado,fechaReferencia]);
+  // El gráfico usa siempre el mismo período global que los indicadores.
+  const rangoEvolucion = rangoPeriodo;
 
   const [evolucionItems, setEvolucionItems] = useState<CrmEvolucionMes[]>([]);
   const [evolucionLoading, setEvolucionLoading] = useState(false);
@@ -1268,22 +1254,18 @@ export function Crm() {
         modo={periodoModo}
         onModoChange={(modo) => {
           setPeriodoModo(modo);
-          setPeriodoGraficoPersonalizado(true);
         }}
         fechaReferencia={fechaReferencia}
         onFechaReferenciaChange={(fecha) => {
           setFechaReferencia(fecha);
-          setPeriodoGraficoPersonalizado(true);
         }}
         fechaDesde={fechaDesde}
         onFechaDesdeChange={(fecha) => {
           setFechaDesde(fecha);
-          setPeriodoGraficoPersonalizado(true);
         }}
         fechaHasta={fechaHasta}
         onFechaHastaChange={(fecha) => {
           setFechaHasta(fecha);
-          setPeriodoGraficoPersonalizado(true);
         }}
       />
 
@@ -1367,6 +1349,8 @@ export function Crm() {
           <CrmEvolucionChart
             items={evolucionItems}
             loading={evolucionLoading}
+            modo={periodoModo}
+            fechaReferencia={fechaReferencia}
           />
         </>
       )}
