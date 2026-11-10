@@ -38,10 +38,16 @@ test('filtra asesor sin asignar y conserva identificación inicial 0 en búsqued
 test('periodo global no modifica tabla y gráfico distribuye por mes',()=>{
   const p={modo:'rango',desde:'2026-10-01',hasta:'2026-11-30'};
   assert.deepEqual(resumenMensualComercial(ventas,p),[
-    {mes:'oct 26',separaciones:0,ventas:1},
-    {mes:'nov 26',separaciones:1,ventas:1}
+    {mes:'oct 2026',separaciones:0,ventas:1},
+    {mes:'nov 2026',separaciones:1,ventas:1}
   ]);
   assert.equal(filtrarVentas(ventas,FILTROS_VENTAS_INICIALES).length,2);
+});
+test('un solo día muestra la fecha exacta y no parece un día 26',()=>{
+  const p={modo:'hoy',desde:'2026-11-05',hasta:'2026-11-05'};
+  assert.deepEqual(resumenMensualComercial(ventas,p),[
+    {mes:'5 nov 2026',separaciones:1,ventas:1}
+  ]);
 });
 test('rango invertido se rechaza y no muestra resultados equivocados',()=>{
   const p={modo:'rango',desde:'2026-12-01',hasta:'2026-11-01'};
