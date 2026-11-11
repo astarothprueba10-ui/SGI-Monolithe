@@ -51,6 +51,16 @@ Solo `sigi_app_user` accede desde el Core Service autenticado.
 - No se usa `supabase.rpc` desde el navegador ni se expone una llave
   privilegiada a React.
 
+## Guarda de sobreaplicación global
+
+La migración `78_saldo_validar_sobreaplicacion_pago_v1.sql`
+refuerza `sp_crm_saldo_venta_v1`: la suma de aplicaciones
+activas de un pago confirmado no puede superar el importe de ese
+pago, aunque ninguna cuota individual exceda su propio monto.
+Probado en PostgreSQL 17 aislado y en Supabase de testeo con
+S/ 2,400 de pago frente a S/ 2,600 de aplicaciones hipotéticas,
+con reversión transaccional completa.
+
 ## Migración de seguridad
 
 `77_financiamiento_bloqueo_acceso_directo_v1.sql` elimina las
