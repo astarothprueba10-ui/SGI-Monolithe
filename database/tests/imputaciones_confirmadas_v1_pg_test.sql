@@ -113,6 +113,11 @@ BEGIN
  ) VALUES(v_inicial_pago,1,true,'CI-534-VOUINI',1,
   'inicial.pdf','ventas/p-2016/l-92/11111111-2222-3333-4444-aaaaaaaaaaaa.pdf',
   'application/pdf',1000,now(),5,6,now());
+ -- Voucher histórico sintético con evidencia presente en bucket privado.
+ INSERT INTO storage.objects(bucket_id,name,metadata)
+ VALUES('vouchers-ventas-private',
+  'ventas/p-2016/l-92/11111111-2222-3333-4444-aaaaaaaaaaaa.pdf',
+  '{"mimetype":"application/pdf","size":1000}'::jsonb);
  appini:=public.sp_fin_aplicar_pago_confirmado_v1(
    5,gen_random_uuid(),v_inicial_pago,'INICIAL',NULL,75,'Pago de inicial comprobado');
  IF (appini->>'montoAplicado')::numeric<>75
