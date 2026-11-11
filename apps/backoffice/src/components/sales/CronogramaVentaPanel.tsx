@@ -144,7 +144,12 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
        <FileClock className="h-5 w-5 shrink-0"/>Todavía no se han generado cuotas y fechas para esta operación.
      </div>:
     <>
-      {datos.tipoCronograma==='REGISTRADO'&&<div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+      {datos.fuenteEstados==='HISTORICO_NO_EXIGIBLE'&&<p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
+        Plan cerrado: los importes y estados visibles pertenecen al historial
+        y no representan cuotas actualmente exigibles.
+      </p>}
+      {datos.tipoCronograma==='REGISTRADO'&&datos.fuenteEstados==='APLICACIONES_CONFIRMADAS'&&
+       <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <div className="rounded-lg bg-green-50 p-3 text-green-800">
           <span className="block">Pagadas</span><strong>{datos.cuotasPagadas??0}</strong>
         </div>
