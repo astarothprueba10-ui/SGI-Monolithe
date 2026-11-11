@@ -382,6 +382,60 @@ export interface CrmCronogramaVenta {
   advertencia?:string;
   items:CrmCuotaCronograma[];
 }
+export interface CrmSaldoCuota {
+  idCuota: number;
+  numero: number;
+  fechaVencimiento: string;
+  capital: number;
+  interes: number;
+  montoCuota: number;
+  abonadoConfirmado: number;
+  saldoCuota: number;
+  estadoRegistrado: string;
+}
+
+/** Cifras contables de venta, construidas solo desde aplicaciones confirmadas. */
+export interface CrmSaldoVenta {
+  idVenta: number;
+  codigoVenta: string;
+  idCliente: number | null;
+  modalidad: 'FINANCIADA' | 'CONTADO';
+  tipoSaldo: 'FINANCIADA' | 'NO_FINANCIADA' | 'SIN_PLAN';
+  estadoPlan?: 'ACTIVO' | 'PENDIENTE' | 'ANULADO' | 'COMPLETADO' | string;
+  numeroVersion?: number;
+  idPlanPago?: number;
+  cuotasExigibles?: boolean;
+  inicialAdicionalPactada?: number;
+  reservaAplicada?: number;
+  inicialTotalPactada?: number;
+  inicialAbonadaConfirmada?: number;
+  inicialSinAplicacionConfirmada?: number;
+  capitalFinanciado?: number;
+  interesTotal?: number;
+  totalPlanCuotas?: number;
+  abonadoCuotasConfirmado?: number;
+  saldoFinanciamiento?: number;
+  montoCuotasRegistradas?: number;
+  saldoCuotasRegistradas?: number;
+  diferenciaCronograma?: number;
+  pagosConfirmadosSinAplicar?: number;
+  numeroCuotasRegistradas?: number;
+  numeroCuotasPactadas?: number;
+  alertasConciliacion?: string[];
+  cuotas: CrmSaldoCuota[];
+}
+
+export interface CrmSaldoCliente {
+  idCliente: number;
+  numeroVentas: number;
+  saldoFinanciamientoActivo: number;
+  saldoFinanciamientoPendienteFirma: number;
+  inicialSinAplicacionConfirmada: number;
+  abonadoCuotasConfirmado: number;
+  advertencia: string;
+  ventas: CrmSaldoVenta[];
+}
+
 export interface CrmDetalleVenta {
   idVenta: number;
   codigoVenta: string;
@@ -1136,6 +1190,18 @@ export const crmBackend = {
     if (!Number.isSafeInteger(idVenta) || idVenta<=0)
       throw new Error('Identificador de venta inválido.');
     return coreApi.get<CrmCronogramaVenta>(`/crm/ventas/${idVenta}/cronograma`);
+  },
+
+  obtenerSaldoVenta: (idVenta: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmSaldoVenta>(`/crm/ventas/${idVenta}/saldo`);
+  },
+
+  obtenerSaldoCliente: (idCliente: number) => {
+    if (!Number.isSafeInteger(idCliente) || idCliente <= 0)
+      throw new Error('Identificador de cliente inválido.');
+    return coreApi.get<CrmSaldoCliente>(`/crm/clientes/${idCliente}/saldo`);
   },
 
   obtenerDetalleVenta: (idVenta: number) => {
