@@ -83,5 +83,20 @@ No modifica el contenido de planes, contratos, pagos o cuotas existentes.
 Se validaron 120 escenarios matemáticos de la calculadora TypeScript,
 sin anomalías; también se contrastaron 60 escenarios de la fórmula V2
 propuesta en SQL de **solo lectura** y se comprobó igualdad en centavos.
-**No se ha aplicado la migración 73 ni ejecutado una prueba integrada
-en un entorno de BD aislado.**
+
+En GitHub Actions CI #457 se creó PostgreSQL 17 efímero:
+- Se ejecutó la función SQL V3 extraída de la migración 73 y se verificaron
+  120 escenarios, 7 valores de referencia y 3 rechazos esperados.
+- Se cargó un esquema mínimo de prueba y las definiciones reales legadas
+  recuperadas mediante consultas de solo lectura de Supabase.
+- **La migración 73 completa compiló y creó sus versiones** en la BD efímera.
+- Se ejecutaron las verificaciones SQL de 120 escenarios, permisos y reserva;
+  también se probaron los casos de voucher no aprobado y pago duplicado.
+- El resto del pipeline aprobó TypeScript, frontend, backend Java y linter.
+
+**Queda pendiente una prueba de integración comercial con esquema y datos
+representativos de Supabase (registro de venta, firma y cronograma)**,
+porque no existe una rama de base de datos de pruebas autorizada y crearlo
+implica confirmar un costo. En producción NO se ha aplicado la migración 73.
+La rama de GitHub se mantiene activa para seguir programando y el PR #99
+está cerrado sin fusionar a main.
