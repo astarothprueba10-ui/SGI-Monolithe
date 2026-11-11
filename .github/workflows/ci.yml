@@ -201,6 +201,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/rachas_resolutorias_v1_pg_fixture.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/83_financiamiento_revision_tres_cuotas_consecutivas_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/rachas_resolutorias_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/vouchers_cuotas_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/84_vouchers_cuotas_bandeja_segura_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/vouchers_cuotas_bandeja_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
