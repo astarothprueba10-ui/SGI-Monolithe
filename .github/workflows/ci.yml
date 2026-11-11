@@ -184,6 +184,11 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/saldo_cliente_v1_pg_fixture.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/76_financiamiento_saldo_cliente_confirmado_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/saldo_cliente_confirmado_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -c "GRANT SELECT,INSERT,UPDATE,DELETE ON public.pag_planes_pago,public.pag_cuotas TO anon,authenticated"
+          psql -v ON_ERROR_STOP=1 -c "CREATE POLICY \"Cliente lee sus propios planes de pago\" ON public.pag_planes_pago FOR SELECT USING (true)"
+          psql -v ON_ERROR_STOP=1 -c "CREATE POLICY \"Cliente lee sus propias cuotas\" ON public.pag_cuotas FOR SELECT USING (true)"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/77_financiamiento_bloqueo_acceso_directo_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_bloqueo_rls_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
