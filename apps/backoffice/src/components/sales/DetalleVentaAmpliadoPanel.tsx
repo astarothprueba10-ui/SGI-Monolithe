@@ -11,6 +11,7 @@ import {
   type CrmComprobanteVentaLectura
 } from '../../services/crmBackend';
 import { currency } from '../../utils/format';
+import { SaldoFinancieroVentaPanel } from './SaldoFinancieroVentaPanel';
 
 const presente = (valor: string | number | null | undefined): string =>
   valor == null || String(valor).trim() === '' ? 'No registrado' : String(valor);
@@ -253,14 +254,12 @@ export function DetalleVentaAmpliadoPanel({ idVenta }: { idVenta: number }) {
                 <Campo etiqueta="Plazo de financiamiento">
                   {plan.numeroCuotas} {plan.numeroCuotas === 1 ? 'mes' : 'meses'}
                 </Campo>
-                <Campo etiqueta="Capital restante financiado">
+                <Campo etiqueta="Capital originalmente financiado">
                   {currency(plan.capitalFinanciado)}
                 </Campo>
                 <Campo etiqueta="Intereses totales">{currency(plan.interesesTotales)}</Campo>
                 <Campo etiqueta="Total del plan en cuotas">{currency(plan.totalPendienteEnCuotas)}</Campo>
-                <Campo etiqueta="Cuotas pendientes por cancelar">
-                  {currency(plan.saldoCuotasPendiente)}
-                </Campo>
+
                 <Campo etiqueta="Sistema de amortización">
                   {plan.sistema === 'FRANCES' ? 'Francés'
                     : plan.sistema === 'ALEMAN' ? 'Alemán' : 'No especificado'}
@@ -271,6 +270,7 @@ export function DetalleVentaAmpliadoPanel({ idVenta }: { idVenta: number }) {
                   )}
                 </Campo>
               </dl>
+              <SaldoFinancieroVentaPanel idVenta={idVenta} />
               <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3 sm:p-4">
                 <p className="text-xs font-semibold text-sky-900">
                   {plan.cuotaFija ? 'Cuota mensual fija' : 'Primera cuota mensual registrada'}
