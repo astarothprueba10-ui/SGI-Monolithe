@@ -228,6 +228,20 @@ public class CrmVentaController {
                             obtenerActor(jwt),estado,busqueda,pagina,tamano));
         }
 
+        /** Solo Finanzas: revisión humana independiente, auditada y sin
+         * imputación de saldos; el registrador nunca se autoaprueba.
+         */
+        @PutMapping("/finanzas/vouchers/cuotas/{idVoucher}/decision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idVoucher,
+                @Valid @RequestBody monolithe.core_service.dto.RevisarVoucherCuotaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarVoucherCuota(
+                            obtenerActor(jwt),idVoucher,request));
+        }
+
         /** Solo URLs temporales verificadas en Storage privado; sin rutas públicas. */
         @GetMapping("/finanzas/vouchers/cuotas/{idVoucher}/url-firmada")
         @PreAuthorize("hasAuthority('finance.view')")
