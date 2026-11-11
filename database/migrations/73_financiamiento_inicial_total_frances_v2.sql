@@ -155,6 +155,11 @@ BEGIN
  v_reserva_nominal:=coalesce(v_reserva_nominal,0);
  IF v_id_reserva IS NOT NULL THEN
    v_reserva_acreditable:=public.fn_crm_reserva_acreditable_v1(v_id_reserva);
+   -- No registrar la venta con un saldo y luego acreditar una separacion
+   -- todavia no confirmada; eso generaria un doble descuento al firmar.
+   IF v_reserva_acreditable<>v_reserva_nominal THEN
+      RAISE EXCEPTION 'RESERVA_PENDIENTE|Finanzas debe confirmar el pago y aprobar su comprobante antes de formalizar esta reserva.';
+   END IF;
  END IF;
  IF p_modalidad='FINANCIADA' THEN
    IF p_monto_inicial IS NULL OR p_monto_inicial<5000
