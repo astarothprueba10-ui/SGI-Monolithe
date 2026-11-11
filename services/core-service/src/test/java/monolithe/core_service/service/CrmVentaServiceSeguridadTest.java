@@ -59,6 +59,41 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
+        var resultado=service.listarVouchersCuotas(5L,"TODOS",null,1,20);
+        assertEquals(0,resultado.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_listar_vouchers_cuotas_v1"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"bucket\":\"vouchers-ventas-private\",\"clave_archivo\":\"ventas/p-3/l-1/11111111-2222-3333-4444-555555555555.pdf\"}");
+        var ruta=service.obtenerRutaVoucherCuota(5L,103L);
+        assertEquals("vouchers-ventas-private",ruta.path("bucket").asText());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_obtener_ruta_voucher_cuota_v1"));
+    }
+
+    @Test
+    void vouchersCuotasRechazanFiltrosInvalidosSinAccederALaBase() {
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(null,"TODOS",null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"OTRO",null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"TODOS",null,1,101)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"TODOS",null,0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.obtenerRutaVoucherCuota(5L,-1L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                ()->service.obtenerRutaVoucherCuota(null,1L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void exportacionSeparacionesUtilizaProcedimientoAutorizado() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":100,\"paginas\":0}");
