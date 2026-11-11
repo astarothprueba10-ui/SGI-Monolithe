@@ -145,6 +145,47 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void alertasCuotasRestringeParametrosYConsultaProcedimientoSeguro() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"total\":2,\"vencidas\":1,\"proximas\":1,\"items\":[]}");
+        var resultado=service.alertasCuotas(5L,"CUOTA_VENCIDA",1,20);
+        assertEquals(2,resultado.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_alertas_cuotas_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"MORA_FICTICIA",1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"TODAS",0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"TODAS",1,500)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(null,"TODAS",1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void prepararAvisosSoloInvocaProcedimientoDePortalYSinEnviarCorreo() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"creados\":1,\"deduplicados\":0,\"enviosExternos\":false}");
+        var respuesta=service.prepararAvisosCuotasPortal(5L,100);
+        assertEquals(1,respuesta.path("creados").asInt());
+        assertFalse(respuesta.path("enviosExternos").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_avisos_portal_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(5L,0)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(5L,501)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(null,100)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void cronogramaVentaUsaProcedimientoYRechazaVentaInvalida() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
             .thenReturn("{\"tipoCronograma\":\"REGISTRADO\",\"items\":[]}");
