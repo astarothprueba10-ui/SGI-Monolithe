@@ -366,6 +366,14 @@ export interface CrmCuotaCronograma {
   interes:number;
   cuota:number;
   estado:string;
+  estadoCalculado?:'PENDIENTE'|'PARCIAL'|'VENCIDA'|'PAGADA'|'ANULADA';
+  estadoRegistrado?:string;
+  estadoDifiereRegistro?:boolean;
+  abonadoConfirmado?:number;
+  saldoCuota?:number;
+  cuotaAtrasada?:boolean;
+  diasMora?:number;
+  proxima7Dias?:boolean;
   fechaPagoCompleto?:string|null;
 }
 export interface CrmCronogramaVenta {
@@ -380,6 +388,19 @@ export interface CrmCronogramaVenta {
   fechaPrimeraCuota?:string|null;
   tasaAnualNominal?:number;
   advertencia?:string;
+  fechaCorte?:string;
+  fuenteEstados?:'APLICACIONES_CONFIRMADAS'|'SIN_CUOTAS_EXIGIBLES';
+  cuotasPendientes?:number;
+  cuotasParciales?:number;
+  cuotasVencidas?:number;
+  cuotasPagadas?:number;
+  cuotasAnuladas?:number;
+  cuotasProximas?:number;
+  cuotasAtrasadas?:number;
+  montoVencido?:number;
+  montoProximo?:number;
+  estadosDiferentesRegistro?:number;
+  advertenciaEstados?:string|null;
   items:CrmCuotaCronograma[];
 }
 export interface CrmSaldoCuota {
