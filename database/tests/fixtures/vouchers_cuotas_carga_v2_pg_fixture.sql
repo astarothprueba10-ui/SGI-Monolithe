@@ -22,6 +22,7 @@ ALTER TABLE public.pag_pagos ADD COLUMN id_usuario_registro bigint;
 ALTER TABLE public.pag_vouchers ADD COLUMN id_usuario_carga bigint;
 
 -- Claves ya presentes en el esquema de producción.
+ALTER TABLE public.pag_cuotas ADD CONSTRAINT pag_cuotas_pk_ci PRIMARY KEY(id_cuota);
 ALTER TABLE public.pag_pagos ADD CONSTRAINT pag_pagos_pk_ci PRIMARY KEY(id_pago);
 ALTER TABLE public.pag_vouchers ADD CONSTRAINT pag_vouchers_pk_ci PRIMARY KEY(id_voucher);
 ALTER TABLE public.pag_pagos ALTER COLUMN id_pago ADD GENERATED ALWAYS AS IDENTITY;
