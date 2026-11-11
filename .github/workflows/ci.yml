@@ -181,6 +181,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/74_cronograma_cuotas_frances_v2.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/75_cronograma_guardas_integridad_v3.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/cronograma_frances_v2_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/saldo_cliente_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/76_financiamiento_saldo_cliente_confirmado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/saldo_cliente_confirmado_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
