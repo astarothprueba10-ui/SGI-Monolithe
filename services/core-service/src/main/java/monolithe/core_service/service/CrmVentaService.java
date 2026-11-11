@@ -1625,6 +1625,22 @@ public class CrmVentaService {
             return errorAnulacion;
         }
 
+        // Revisión independiente 5.3.3: no revelar vouchers de terceros.
+        if(mensaje.contains("AUTOAPROBACION_DENEGADA|")) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Quien registró el comprobante no puede revisarlo.",ex);
+        }
+        if(mensaje.contains("VOUCHER_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "El comprobante no está disponible para revisión de cuotas.",ex);
+        }
+        if(mensaje.contains("REVISION_CERRADA|")
+                ||mensaje.contains("MONTO_NO_DISPONIBLE|")
+                ||mensaje.contains("CUOTA_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El comprobante ya fue revisado o la cuota cambió de estado. Actualice la bandeja.",ex);
+        }
+
         // Errores funcionales del registro de cuotas (5.3.2).
         // Los identificadores ajenos y los archivos inexistentes no se revelan.
         if (mensaje.contains("CARGA_NO_DISPONIBLE|")
