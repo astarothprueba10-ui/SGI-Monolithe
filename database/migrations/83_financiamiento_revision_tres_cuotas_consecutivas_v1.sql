@@ -155,10 +155,11 @@ END;
 $fn$;
 
 -- La función auxiliar no se ofrece públicamente vía Supabase Data API.
+-- La rutina interna sin actor queda solo accesible por el propietario;
+-- ni siquiera el rol Core puede consultarla directamente sin el wrapper
+-- que vuelve a verificar permisos y cartera.
 REVOKE ALL ON FUNCTION public.fn_fin_rachas_impagas_v1(date)
-  FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_fin_rachas_impagas_v1(date)
-  TO sigi_app_user;
+  FROM PUBLIC,anon,authenticated,sigi_app_user;
 REVOKE ALL ON FUNCTION public.sp_fin_alertas_resolutoria_v1(bigint,integer,integer)
   FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.sp_fin_alertas_resolutoria_v1(bigint,integer,integer)
