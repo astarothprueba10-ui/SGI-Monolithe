@@ -308,6 +308,21 @@ public class CrmVentaController {
                     .body(service.alertasCuotas(obtenerActor(jwt), tipo, pagina, tamano));
         }
 
+        /** Posible causal de tres cuotas consecutivas; solo revisión sin resolver contrato. */
+        @GetMapping("/financiamiento/clausula-resolutoria/revision")
+        @PreAuthorize("hasAuthority('sales.view') and ("
+                + "hasAuthority('sales.legal.review') or "
+                + "hasAuthority('sales.annul') or "
+                + "hasAuthority('financing.approve'))")
+        public ResponseEntity<JsonNode> revisarTresCuotasConsecutivas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarTresCuotasConsecutivas(
+                            obtenerActor(jwt),pagina,tamano));
+        }
+
         /** Operación explícita para avisos internos; NO envía correo. */
         @PostMapping("/financiamiento/alertas/portal/preparar")
         @PreAuthorize("hasAuthority('financing.approve')")
