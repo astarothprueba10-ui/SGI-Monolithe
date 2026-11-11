@@ -145,6 +145,22 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void correccionNormalizaSoloNombresYConservaIdentidadMotivoYActor() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class))).thenReturn("{\"estado\":\"OK\"}");
+        var data = new JsonMapper().createObjectNode().put("nombres", "MARÍA elena").put("apellidoPaterno", "MUÑOZ").put("telefono", "987654321");
+        service.corregirDatosPersonalesCrm(5L, 21L, data, "Corrección autorizada");
+        var args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(contains("sp_crm_corregir_datos_personales_v1"), eq(String.class), args.capture());
+        assertEquals(5L, args.getValue()[0]); assertEquals(21L, args.getValue()[1]);
+        var normalized = new JsonMapper().readTree((String) args.getValue()[2]);
+        assertEquals("María Elena", normalized.path("nombres").asString());
+        assertEquals("Muñoz", normalized.path("apellidoPaterno").asString());
+        assertEquals("987654321", normalized.path("telefono").asString());
+        assertEquals("Corrección autorizada", args.getValue()[3]);
+        assertFalse(normalized.has("apellidoMaterno")); assertEquals("MARÍA elena", data.path("nombres").asString());
+    }
+
+    @Test
     void cronogramaVentaUsaProcedimientoYRechazaVentaInvalida() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
             .thenReturn("{\"tipoCronograma\":\"REGISTRADO\",\"items\":[]}");

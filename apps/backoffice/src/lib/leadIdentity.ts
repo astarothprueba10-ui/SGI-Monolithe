@@ -1,5 +1,6 @@
 import type { AutomaticLeadNames, LeadIdentityResponse } from '../types/leadIdentity';
 import type { LeadFormValues } from '../utils/crmLeadValidation';
+import { formatPersonName } from './personName';
 
 const PATTERNS: Record<string, RegExp> = {
   DNI: /^[0-9]{8}$/, RUC: /^[0-9]{11}$/, CE: /^[0-9]{9,12}$/, PASAPORTE: /^[A-Z0-9]{6,20}$/
@@ -22,7 +23,7 @@ export function automaticLeadNames(form: LeadFormValues, response: LeadIdentityR
     maternalSurname: response.persona.apellidoMaterno };
   return Object.fromEntries(Object.entries(values).filter(([field, value]) =>
     !form[field as keyof AutomaticLeadNames].trim() && typeof value === 'string' && value.trim()
-  ).map(([field, value]) => [field, value!.trim()]));
+  ).map(([field, value]) => [field, formatPersonName(value)]));
 }
 
 /** Retira datos del documento anterior conservando cualquier corrección manual. */

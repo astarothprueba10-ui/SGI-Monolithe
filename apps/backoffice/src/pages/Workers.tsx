@@ -26,15 +26,16 @@ import { FilterBar } from '../components/ui/filters/FilterBar';
 import { FilterSelect } from '../components/ui/filters/FilterSelect';
 import { FilterDateRange } from '../components/ui/filters/FilterDateRange';
 import { formatWorkerDate } from '../components/Workers/workerForm';
+import { formatPersonName } from '../lib/personName';
 
 function nombreCompleto(trabajador: TrabajadorResponse): string {
   const persona = trabajador.informacionPersonal;
 
-  return [
+  return formatPersonName([
     persona.nombres,
     persona.apellidoPaterno,
     persona.apellidoMaterno
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean).join(' '));
 }
 
 function obtenerIniciales(nombre: string): string {

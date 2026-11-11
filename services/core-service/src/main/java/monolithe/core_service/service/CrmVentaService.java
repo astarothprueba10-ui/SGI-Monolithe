@@ -499,7 +499,13 @@ public class CrmVentaService {
                 CAST(? AS bigint),CAST(? AS bigint),
                 CAST(? AS jsonb),CAST(? AS text)
             )::text
-            """,actor,idProspecto,datos.toString(),motivo.trim());
+            """,actor,idProspecto,normalizarDatosPersonales(datos).toString(),motivo.trim());
+    }
+
+    private JsonNode normalizarDatosPersonales(JsonNode datos) {
+        var copia = ((tools.jackson.databind.node.ObjectNode) datos).deepCopy();
+        monolithe.core_service.validation.NombrePersona.normalizarCampos(copia);
+        return copia;
     }
 
     /** Buscar CRM sin fecha global; filtros, proyecto y alcance siguen comprobados en PostgreSQL. */
