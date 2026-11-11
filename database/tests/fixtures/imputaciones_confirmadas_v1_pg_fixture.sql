@@ -18,6 +18,15 @@ ALTER TABLE public.pag_aplicaciones_pago
  ADD COLUMN motivo_anulacion varchar(255),
  ADD COLUMN fecha_actualizacion timestamptz DEFAULT now();
 
+-- Los procedimientos legados de los fixtures insertaron aplicaciones sin ID.
+-- Solo CI: completar sus IDs antes de añadir PK; nunca tocar producción.
+WITH sin_id AS (
+ SELECT ctid,row_number() OVER(ORDER BY ctid) ordinal
+ FROM public.pag_aplicaciones_pago WHERE id_aplicacion_pago IS NULL
+)
+UPDATE public.pag_aplicaciones_pago a
+SET id_aplicacion_pago=200000+sin_id.ordinal
+FROM sin_id WHERE a.ctid=sin_id.ctid;
 -- En las fixtures previas la columna existía, pero no la PK real.
 ALTER TABLE public.pag_aplicaciones_pago
  ADD CONSTRAINT pag_aplicaciones_pago_ci_pk PRIMARY KEY(id_aplicacion_pago);
