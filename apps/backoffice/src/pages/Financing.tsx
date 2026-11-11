@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckIcon, DownloadIcon, EyeIcon, PlusIcon, XIcon, RefreshCw } from 'lucide-react';
+import { EyeIcon, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -11,14 +11,13 @@ import { Tabs } from '../components/ui/Tabs';
 import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
-import { useAuth } from '../contexts/AuthContext';
 import { FINANCING_PLANS, INSTALLMENTS, VOUCHERS } from '../data/financing';
 import { currency, percent } from '../utils/format';
-import { financingService, OverdueContractAlert } from '../services/financingService';
+import { financingService } from '../services/financingService';
+import { AlertasCuotasPanel } from '../components/financing/AlertasCuotasPanel';
 import type { PaymentStatus, Voucher, Installment } from '../types';
 
 export function Financing() {
-  const { can } = useAuth();
   const [tab, setTab] = useState('cuotas');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | PaymentStatus>('all');
@@ -26,10 +25,9 @@ export function Financing() {
 
   const [installmentsList, setInstallmentsList] = useState<Installment[]>(INSTALLMENTS);
   const [vouchersList, setVouchersList] = useState<Voucher[]>(VOUCHERS);
-  const [resolutoryAlerts, setResolutoryAlerts] = useState<OverdueContractAlert[]>([]);
+  const [revisionAlertas, setRevisionAlertas] = useState(0);
   const [, setLoading] = useState(false);
 
-  const canValidate = can('financing.approve');
 
   const loadFinancingData = async () => {
     setLoading(true);
@@ -52,8 +50,6 @@ export function Financing() {
         setVouchersList(mergedVouchers);
       }
 
-      const alerts = await financingService.evaluateResolutoryClause();
-      setResolutoryAlerts(alerts.filter((a) => a.applicableClause));
     } catch (err: any) {
       console.error('Error al cargar datos financieros:', err.message);
     } finally {
@@ -65,36 +61,9 @@ export function Financing() {
     loadFinancingData();
   }, []);
 
-  const handleUpdateOverdue = async () => {
-    try {
-      const res = await financingService.updateInstallmentsOverdue();
-      toast.success(res?.mensaje || 'Cartera y semáforo actualizados');
-      await loadFinancingData();
-    } catch (err: any) {
-      toast.error('Error al actualizar cartera: ' + err.message);
-    }
-  };
+  // Refresca la consulta autorizada, sin alterar id_estado_cuota ni llamar al SP legado.
+  const handleRefreshAlerts = () => setRevisionAlertas(n => n + 1);
 
-  const handleProcessVoucher = async (voucherIdStr: string, action: 'APROBAR' | 'RECHAZAR', reason?: string) => {
-    try {
-      const vId = parseInt(voucherIdStr, 10);
-      if (isNaN(vId)) {
-        toast.success(action === 'APROBAR' ? 'Voucher aprobado' : 'Voucher rechazado');
-        setVouchersList((prev) =>
-          prev.map((v) => (v.id === voucherIdStr ? { ...v, status: action === 'APROBAR' ? 'Aprobado' : 'Rechazado' } : v))
-        );
-        setVoucher(null);
-        return;
-      }
-
-      await financingService.validateVoucher(vId, action, reason);
-      toast.success(action === 'APROBAR' ? 'Voucher validado y cuota amortizada' : 'Voucher rechazado');
-      setVoucher(null);
-      await loadFinancingData();
-    } catch (err: any) {
-      toast.error('Error en validación: ' + err.message);
-    }
-  };
 
   const installments = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -108,7 +77,6 @@ export function Financing() {
     });
   }, [installmentsList, query, status]);
 
-  const overdue = installmentsList.filter((i) => i.status === 'Vencido');
 
   return (
     <div>
@@ -117,59 +85,32 @@ export function Financing() {
         description="Planes de financiamiento, cronogramas, cuotas, saldos y validación de vouchers de pago."
         actions={
           <div className="flex items-center gap-2">
-            <Button icon={RefreshCw} variant="secondary" onClick={handleUpdateOverdue}>
-              Actualizar cartera
+            <Button icon={RefreshCw} variant="secondary" onClick={handleRefreshAlerts}>
+              Actualizar alertas
             </Button>
-            <Gate permission="financing.export">
-              <Button icon={DownloadIcon}>Exportar cartera</Button>
-            </Gate>
-            <Gate permission="financing.create">
-              <Button icon={PlusIcon} variant="primary">
-                Registrar pago
-              </Button>
-            </Gate>
           </div>
         }
       />
 
-      {resolutoryAlerts.length > 0 && (
-        <Alert
-          tone="danger"
-          title="Alerta de Cláusula Resolutoria Activa"
-          className="mb-5"
-        >
-          {resolutoryAlerts.map((a) => (
-            <div key={a.saleId}>
-              El contrato {a.saleCode} ({a.buyer}, Lote {a.lotCode}) acumula {a.overdueCount} cuotas impagas consecutivas por un total de {currency(a.overdueAmount)}. Corresponde activar el procedimiento de resolución contractual.
-            </div>
-          ))}
-        </Alert>
-      )}
+      <AlertasCuotasPanel revision={revisionAlertas}/>
 
-      {overdue.length > 0 ? (
-        <Alert
-          tone="danger"
-          title={`${overdue.length} cuotas vencidas en la cartera`}
-          className="mb-5"
-        >
-          Suman {currency(overdue.reduce((sum, i) => sum + (i.amount - i.paid), 0))} pendientes de cobranza.
-        </Alert>
-      ) : null}
+      <Alert tone="info" title="Listados de demostración en integración" className="mb-5">
+        Las pestañas de cuotas, vouchers y planes todavía contienen datos de prueba.
+        No constituyen un estado de cuenta oficial. Las alertas superiores
+        sí se calculan con pagos confirmados y cartera autorizada.
+        La gestión de comprobantes se completará en el bloque 5.3.
+      </Alert>
 
-      {!canValidate ? (
-        <Alert tone="info" title="Consulta sin validación" className="mb-5">
-          Tu rol puede ver cuotas, pagos y vouchers, pero la aprobación o rechazo de vouchers corresponde al área de Finanzas.
-        </Alert>
-      ) : null}
+
 
       <Tabs
         className="mb-5"
         active={tab}
         onChange={setTab}
         items={[
-          { id: 'cuotas', label: 'Cuotas y saldos', count: installmentsList.length },
-          { id: 'vouchers', label: 'Vouchers', count: vouchersList.length },
-          { id: 'planes', label: 'Planes de financiamiento', count: FINANCING_PLANS.length }
+          { id: 'cuotas', label: 'Cuotas (demo)', count: installmentsList.length },
+          { id: 'vouchers', label: 'Vouchers (demo)', count: vouchersList.length },
+          { id: 'planes', label: 'Planes (demo)', count: FINANCING_PLANS.length }
         ]}
       />
 
@@ -265,30 +206,9 @@ export function Financing() {
                     <Button size="sm" icon={EyeIcon} onClick={() => setVoucher(v)}>
                       Ver
                     </Button>
-                    {v.status === 'En revisión' ? (
-                      <>
-                        <Gate permission="financing.approve">
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={CheckIcon}
-                            onClick={() => handleProcessVoucher(v.id, 'APROBAR')}
-                          >
-                            Validar
-                          </Button>
-                        </Gate>
-                        <Gate permission="financing.reject">
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            icon={XIcon}
-                            onClick={() => handleProcessVoucher(v.id, 'RECHAZAR', 'Observado por tesorería')}
-                          >
-                            Rechazar
-                          </Button>
-                        </Gate>
-                      </>
-                    ) : null}
+                    <span className="text-[11px] text-brand-500">
+                      Validación pendiente del bloque 5.3
+                    </span>
                   </div>
                 </TD>
               </TR>
@@ -358,15 +278,6 @@ export function Financing() {
   footer={
     <div className="flex justify-end gap-2">
       <Button onClick={() => setVoucher(null)}>Cerrar</Button>
-      {voucher?.status === 'En revisión' && canValidate && (
-        <Button
-          variant="primary"
-          icon={CheckIcon}
-          onClick={() => handleProcessVoucher(voucher.id, 'APROBAR')}
-        >
-          Validar voucher
-        </Button>
-      )}
     </div>
   }
 >
