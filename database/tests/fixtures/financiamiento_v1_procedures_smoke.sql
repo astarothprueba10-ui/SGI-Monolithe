@@ -5,7 +5,7 @@ CREATE ROLE sigi_app_user NOLOGIN;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
 CREATE TABLE public.pag_planes_pago(
-  id_plan_pago bigint,id_venta bigint,id_estado_plan_pago integer,id_moneda integer,
+  id_plan_pago bigint PRIMARY KEY,id_venta bigint,id_estado_plan_pago integer,id_moneda integer,
   codigo varchar,numero_version integer,monto_venta numeric,monto_inicial numeric,
   capital_financiado numeric,tasa_interes_pct numeric,monto_interes_total numeric,
   monto_total_financiado numeric,numero_cuotas integer,fecha_inicio date,
