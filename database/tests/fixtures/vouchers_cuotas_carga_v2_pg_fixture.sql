@@ -24,6 +24,14 @@ ALTER TABLE public.pag_vouchers ADD COLUMN id_usuario_carga bigint;
 -- Claves ya presentes en el esquema de producción.
 ALTER TABLE public.pag_cuotas ADD CONSTRAINT pag_cuotas_pk_ci PRIMARY KEY(id_cuota);
 ALTER TABLE public.pag_pagos ADD CONSTRAINT pag_pagos_pk_ci PRIMARY KEY(id_pago);
+-- Los vouchers históricos del fixture 73 fueron insertados ANTES de añadir
+-- id_voucher en 5.3.1; asignarles IDs sintéticos deterministas antes de PK.
+WITH sin_id AS (
+  SELECT ctid,row_number() OVER(ORDER BY ctid) AS ordinal
+  FROM public.pag_vouchers WHERE id_voucher IS NULL
+)
+UPDATE public.pag_vouchers v SET id_voucher=100000+sin_id.ordinal
+FROM sin_id WHERE v.ctid=sin_id.ctid;
 ALTER TABLE public.pag_vouchers ADD CONSTRAINT pag_vouchers_pk_ci PRIMARY KEY(id_voucher);
 ALTER TABLE public.pag_pagos ALTER COLUMN id_pago ADD GENERATED ALWAYS AS IDENTITY;
 ALTER TABLE public.pag_vouchers ALTER COLUMN id_voucher ADD GENERATED ALWAYS AS IDENTITY;
