@@ -216,6 +216,14 @@ BEGIN
     '  v_precio_base numeric;'||E'\n'||
     '  v_inicial_adicional numeric;'||E'\n'||
     '  v_reserva_base numeric;');
+ -- Los desplazamientos cambian tras renombrar y agregar declaraciones.
+ -- Recalcular marcadores para no cortar la definicion PL/pgSQL original.
+ v_inicio:=strpos(v_def,'    v_cuota_base:=trunc(v_capital/v_num_cuotas,2);');
+ v_fin:=strpos(v_def,'    IF v_interes_acumulado<>coalesce(v_interes_previsto,0)');
+ IF v_inicio=0 OR v_fin<=v_inicio THEN
+   RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|No fue posible segmentar la firma V8.';
+ END IF;
+ v_legado:=substr(v_def,v_inicio,v_fin-v_inicio);
  v_nuevo:=$bloque$
     IF EXISTS(
       SELECT 1 FROM public.pag_planes_pago
