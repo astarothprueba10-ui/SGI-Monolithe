@@ -192,6 +192,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/77_financiamiento_bloqueo_acceso_directo_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_bloqueo_rls_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/79_financiamiento_estados_cuotas_confirmadas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/80_financiamiento_cronograma_planes_cerrados_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/estados_cuotas_confirmadas_v1_pg_test.sql
 
   deploy-oracle:
