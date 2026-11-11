@@ -404,6 +404,14 @@ export interface CrmImputacionResultado {
   reutilizado:boolean;
   activo:boolean;
 }
+export interface CrmReversionAplicacionResultado {
+  idAplicacion:number;
+  idPago:number;
+  tipo:'CUOTA'|'INICIAL';
+  montoRevertido:number;
+  reutilizado:boolean;
+  activo:false;
+}
 
 export interface CrmRevisionVoucherCuotaInput {
   aprobar:boolean;
@@ -1644,7 +1652,7 @@ export const crmBackend = {
     idSolicitud:string;idPago:number;tipo:'CUOTA'|'INICIAL';
     idCuota:number|null;monto:number;observaciones:string|null;
   })=>{
-    if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(req.idSolicitud)
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.idSolicitud)
       ||!Number.isSafeInteger(req.idPago)||req.idPago<=0
       ||!['CUOTA','INICIAL'].includes(req.tipo)
       ||(req.tipo==='CUOTA'&&(!Number.isSafeInteger(req.idCuota)||Number(req.idCuota)<=0))
@@ -1661,7 +1669,7 @@ export const crmBackend = {
     if(!Number.isSafeInteger(idAplicacion)||idAplicacion<=0
       ||motivo.trim().length<5||motivo.trim().length>255)
       throw new Error('Debe justificar la reversión con al menos 5 caracteres.');
-    return coreApi.put<CrmImputacionResultado>(
+    return coreApi.put<CrmReversionAplicacionResultado>(
       `/crm/finanzas/imputaciones/${idAplicacion}/reversion`,
       {motivo:motivo.trim()}
     );
