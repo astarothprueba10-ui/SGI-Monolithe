@@ -51,6 +51,17 @@ Solo `sigi_app_user` accede desde el Core Service autenticado.
 - No se usa `supabase.rpc` desde el navegador ni se expone una llave
   privilegiada a React.
 
+## Migración de seguridad
+
+`77_financiamiento_bloqueo_acceso_directo_v1.sql` elimina las
+únicas dos políticas de lectura basadas en `user_metadata` para
+`pag_planes_pago` y `pag_cuotas`. Revoca
+SELECT/INSERT/UPDATE/DELETE directos para `anon` y `authenticated`
+en dichas tablas. No modifica datos ni restringe el backend.
+La migración se probó en PostgreSQL 17 efímero y se aplicó
+a Supabase de testeo; se verificó que ambos roles públicos
+carecen de SELECT y que `sigi_app_user` conserva ese permiso.
+
 ## Verificaciones y pruebas
 
 GitHub Actions: pruebas SQL con datos sintéticos en PostgreSQL 17:
@@ -81,9 +92,14 @@ SQL de verificación:
 La actividad 5.2.4 deja calculado el saldo financiero por venta y
 cliente titular. La gestión de estados de cuotas, pagos en mora y reglas
 para registrar, reprogramar o revertir aplicaciones pertenece a 5.2.5
-y los bloques posteriores. La auditoría de RLS histórica con
-`user_metadata` sigue pendiente de endurecimiento y no se da por
-resuelta únicamente con estos endpoints.
+y los bloques posteriores. Las políticas RLS históricas que utilizaban `user_metadata` en
+`pag_planes_pago` y `pag_cuotas` fueron eliminadas mediante
+`77_financiamiento_bloqueo_acceso_directo_v1.sql`.
+Se revocaron sus privilegios directos a `anon` y `authenticated`,
+manteniendo RLS activado y lectura para `sigi_app_user`.
+El portal cliente deberá utilizar endpoints backend que verifiquen
+titularidad; no se debe restablecer lectura directa mediante
+`user_metadata`.
 
 El código se conserva en
 `feature/pagosy-financiamiento-sprint-4`. No fusionar con `main`
