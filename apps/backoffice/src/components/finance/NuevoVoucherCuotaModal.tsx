@@ -11,10 +11,11 @@ import {
 
 const MIMES=['application/pdf','image/jpeg','image/png','image/webp'];
 const hoyLima=()=>{
-  const d=new Date();
-  return new Intl.DateTimeFormat('en-CA',{
+  const partes=new Intl.DateTimeFormat('es-PE',{
     timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'
-  }).format(d);
+  }).formatToParts(new Date());
+  const parte=(tipo:string)=>partes.find(p=>p.type===tipo)?.value??'';
+  return `${parte('year')}-${parte('month')}-${parte('day')}`;
 };
 
 export function NuevoVoucherCuotaModal({
@@ -125,6 +126,7 @@ export function NuevoVoucherCuotaModal({
             Buscar venta o cuota (código)
             <input value={busqueda} maxLength={120}
               onChange={e=>setBusqueda(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();buscar();}}}
               placeholder="Ej. VTA-2026-0001"
               className="mt-1 block w-full rounded-lg border border-brand-200 px-3 py-2"
             />
@@ -216,6 +218,11 @@ export function NuevoVoucherCuotaModal({
       {idCargaPendiente&&<div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
         El archivo ya fue subido. El registro está pendiente; puede reintentar
         sin volver a cargarlo ni crear un segundo pago.
+        <button type="button" disabled={guardando}
+          onClick={()=>{setIdCargaPendiente(null);setError(null);}}
+          className="mt-2 block font-semibold underline disabled:opacity-50">
+          Descartar este intento y comenzar una carga nueva
+        </button>
       </div>}
       {error&&<p role="alert" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
         <AlertCircle className="h-4 w-4 shrink-0"/>{error}
