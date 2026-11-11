@@ -307,6 +307,54 @@ export interface CrmSeparacionVoucherItem {
   observaciones_validacion?: string | null;
 }
 
+export interface CrmCuotaDisponibleParaPago {
+  id_venta:number;
+  codigo_venta:string;
+  id_plan_pago:number;
+  id_cuota:number;
+  numero_cuota:number;
+  fecha_vencimiento:string;
+  monto_cuota:number;
+  saldo_pendiente:number;
+}
+export interface CrmMetodoPagoDisponible {
+  idMetodoPago:number;
+  codigo:string;
+  nombre:string;
+}
+export interface CrmOpcionesRegistroCuota {
+  items:CrmCuotaDisponibleParaPago[];
+  metodos:CrmMetodoPagoDisponible[];
+}
+export interface CrmPrepararCargaCuotaInput {
+  idVenta:number;
+  idCuota:number;
+  monto:number;
+  idMetodoPago:number;
+  fechaOperacion:string;
+  numeroOperacion:string|null;
+  nombreArchivo:string;
+  tipoMime:string;
+  tamanioBytes:number;
+}
+export interface CrmCargaVoucherCuota {
+  idCarga:string;
+  bucket:'vouchers-ventas-private';
+  claveArchivo:string;
+  urlCarga:string;
+  tipoMime:string;
+  maxBytes:number;
+  expiresInSeconds:number;
+}
+export interface CrmRegistroVoucherCuota {
+  idPago:number;
+  idVoucher:number;
+  idCuota:number;
+  estadoPago:'REGISTRADO';
+  estadoVoucher:'PENDIENTE';
+  reutilizado:boolean;
+  saldoAplicado:0;
+}
 export interface CrmVoucherCuotaItem {
   id_voucher: number;
   codigo_voucher: string;
@@ -1467,6 +1515,52 @@ export const crmBackend = {
         tamano: params?.tamano ?? 20
       })}`
     ),
+
+  /** Retorna únicamente cuotas exigibles de contratos firmados y medios activos. */
+  opcionesRegistroVoucherCuota: (busqueda='',limite=60) => {
+    if(busqueda.trim().length>120
+        ||!Number.isSafeInteger(limite)||limite<1||limite>100)
+      throw new Error('Búsqueda de cuotas inválida.');
+    return coreApi.get<CrmOpcionesRegistroCuota>(
+      `/crm/finanzas/vouchers/cuotas/opciones${qs({busqueda:busqueda.trim(),limite})}`
+    );
+  },
+
+  /** Preautorización vinculada por el servidor al actor y la cuota. */
+  prepararCargaVoucherCuota: (datos:CrmPrepararCargaCuotaInput) =>
+    coreApi.post<CrmCargaVoucherCuota>(
+      '/crm/finanzas/vouchers/cuotas/preparar-carga',datos
+    ),
+
+  /** Carga un único archivo de la preparación anterior en Storage privado. */
+  subirArchivoVoucherCuota: async(carga:CrmCargaVoucherCuota,archivo:File) => {
+    if(!archivo||archivo.size<1||archivo.size>5242880
+        ||archivo.name.trim().length<1||archivo.name.length>180
+        ||!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)
+        ||carga.bucket!=='vouchers-ventas-private'
+        ||carga.tipoMime!==archivo.type
+        ||carga.maxBytes<archivo.size) {
+      throw new Error('Archivo no válido: PDF, JPG, PNG o WebP hasta 5 MiB.');
+    }
+    const enlace=new URL(carga.urlCarga);
+    if(enlace.protocol!=='https:') throw new Error('Enlace de carga no seguro.');
+    const token=enlace.searchParams.get('token');
+    if(!token)throw new Error('No se recibió token de carga válido.');
+    const {error}=await supabase.storage.from(carga.bucket)
+      .uploadToSignedUrl(carga.claveArchivo,token,archivo,{
+        contentType:carga.tipoMime,upsert:false
+      });
+    if(error)throw new Error('No se pudo subir el comprobante: '+error.message);
+  },
+
+  /** Reintento seguro: el mismo idCarga devuelve el mismo pago pendiente. */
+  registrarVoucherCuotaPendiente:(idCarga:string)=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
+      throw new Error('Identificador de carga incorrecto.');
+    return coreApi.post<CrmRegistroVoucherCuota>(
+      '/crm/finanzas/vouchers/cuotas/registrar',{idCarga}
+    );
+  },
 
   /** Solo Finanzas: comprobantes de cuotas, nunca separaciones ni mocks. */
   listarVouchersCuotas: (params:{
