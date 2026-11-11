@@ -624,7 +624,7 @@ public class CrmVentaService {
         if (idVenta==null || idVenta<=0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
         return ejecutar("""
-            SELECT public.sp_crm_cronograma_venta_v3(
+            SELECT public.sp_crm_cronograma_venta_v4(
               CAST(? AS bigint),CAST(? AS bigint)
             )::text
             """,actor,idVenta);
