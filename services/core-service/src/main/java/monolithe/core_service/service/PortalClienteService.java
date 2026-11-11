@@ -23,6 +23,21 @@ public class PortalClienteService {
 
     @Transactional(readOnly = true)
     public JsonNode resumenPrivado(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_resumen_v1(CAST(? AS bigint))::text");
+    }
+
+    /**
+     * 5.4.2: proyectos, lotes y metadatos contractuales de las operaciones
+     * vinculadas al JWT. No permite pasar una venta o cliente externo.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode lotesContratosPrivados(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_lotes_contratos_v1(CAST(? AS bigint))::text");
+    }
+
+    private JsonNode consultarPrivado(Long actor, String consulta) {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Se requiere una sesión de cliente válida.");
@@ -30,7 +45,7 @@ public class PortalClienteService {
         final String respuesta;
         try {
             respuesta = jdbc.queryForObject(
-                    "SELECT public.sp_portal_cliente_resumen_v1(CAST(? AS bigint))::text",
+                    consulta,
                     String.class, actor);
         } catch (DataAccessException ex) {
             String message = String.valueOf(ex.getMostSpecificCause().getMessage());
