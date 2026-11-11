@@ -22,8 +22,8 @@ const p=StyleSheet.create({
  band:{backgroundColor:'#EAF2FA',padding:12,borderRadius:5,marginVertical:12},
  row:{display:'flex',flexDirection:'row',borderBottomWidth:0.5,borderBottomColor:'#E3EAF1',paddingVertical:7},
  head:{backgroundColor:'#17314B',color:'#FFFFFF',fontFamily:'Helvetica-Bold',paddingVertical:10},
- cellN:{width:'8%',paddingHorizontal:4},cellDate:{width:'19%',paddingHorizontal:4},
- cellAmount:{width:'18%',paddingHorizontal:4,textAlign:'right'},cellStatus:{width:'19%',paddingHorizontal:4,textAlign:'right'},
+ cellN:{width:'7%',paddingHorizontal:3},cellDate:{width:'15%',paddingHorizontal:3},
+ cellAmount:{width:'13%',paddingHorizontal:3,textAlign:'right'},cellStatus:{width:'13%',paddingHorizontal:3,textAlign:'right'},
  footer:{position:'absolute',bottom:22,left:34,right:34,fontSize:8,color:'#60718A'},
  warn:{fontSize:8,color:'#935116',marginTop:6}
 });
@@ -44,6 +44,8 @@ function CronogramaDocumento({datos}:{datos:CrmCronogramaVenta}) {
       <PdfText style={p.cellAmount}>Capital</PdfText>
       <PdfText style={p.cellAmount}>Interés</PdfText>
       <PdfText style={p.cellAmount}>Cuota</PdfText>
+      <PdfText style={p.cellAmount}>Abonado</PdfText>
+      <PdfText style={p.cellAmount}>Saldo</PdfText>
       <PdfText style={p.cellStatus}>Estado</PdfText>
     </PdfView>
     {datos.items.map(item=><PdfView key={item.numero} style={p.row} wrap={false}>
@@ -52,15 +54,27 @@ function CronogramaDocumento({datos}:{datos:CrmCronogramaVenta}) {
       <PdfText style={p.cellAmount}>{formatoSoles(item.capital)}</PdfText>
       <PdfText style={p.cellAmount}>{formatoSoles(item.interes)}</PdfText>
       <PdfText style={p.cellAmount}>{formatoSoles(item.cuota)}</PdfText>
-      <PdfText style={p.cellStatus}>{item.estado.replaceAll('_',' ')}</PdfText>
+      <PdfText style={p.cellAmount}>
+        {item.abonadoConfirmado===undefined?'—':formatoSoles(item.abonadoConfirmado)}
+      </PdfText>
+      <PdfText style={p.cellAmount}>
+        {item.saldoCuota===undefined?'—':formatoSoles(item.saldoCuota)}
+      </PdfText>
+      <PdfText style={p.cellStatus}>
+        {item.estado.replaceAll('_',' ')}{item.cuotaAtrasada?' (atrasada)':''}
+      </PdfText>
     </PdfView>)}
     <PdfView style={p.band}>
       <PdfText>Capital programado: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.capital*100),0)/100)}</PdfText>
       <PdfText>Intereses programados: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.interes*100),0)/100)}</PdfText>
       <PdfText>Total de cuotas: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.cuota*100),0)/100)}</PdfText>
+      {datos.tipoCronograma==='REGISTRADO'&&
+        <PdfText>Saldo vencido: {formatoSoles(datos.montoVencido??0)} · Cuotas atrasadas: {datos.cuotasAtrasadas??0}</PdfText>}
     </PdfView>
     {datos.tipoCronograma==='PROYECTADO'&&
       <PdfText style={p.warn}>{datos.advertencia??'Proyección sujeta a aprobación contractual.'}</PdfText>}
+    {!!datos.estadosDiferentesRegistro&&
+      <PdfText style={p.warn}>Estado calculado desde pagos confirmados; existen diferencias con el registro histórico.</PdfText>}
     <PdfText style={p.footer} fixed>
       Documento informativo de SGI MONOLITHE. Fecha de consulta: {fecha(new Date().toISOString())}.
       {' '}No constituye constancia de pago.
@@ -130,13 +144,33 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
        <FileClock className="h-5 w-5 shrink-0"/>Todavía no se han generado cuotas y fechas para esta operación.
      </div>:
     <>
+      {datos.tipoCronograma==='REGISTRADO'&&<div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <div className="rounded-lg bg-green-50 p-3 text-green-800">
+          <span className="block">Pagadas</span><strong>{datos.cuotasPagadas??0}</strong>
+        </div>
+        <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
+          <span className="block">Parciales</span><strong>{datos.cuotasParciales??0}</strong>
+        </div>
+        <div className="rounded-lg bg-rose-50 p-3 text-rose-800">
+          <span className="block">Atrasadas</span>
+          <strong>{datos.cuotasAtrasadas??0} · {formatoSoles(datos.montoVencido??0)}</strong>
+        </div>
+        <div className="rounded-lg bg-blue-50 p-3 text-blue-800">
+          <span className="block">Próximos 7 días</span><strong>{datos.cuotasProximas??0}</strong>
+        </div>
+      </div>}
+      {!!datos.estadosDiferentesRegistro&&<p role="alert"
+        className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        Hay {datos.estadosDiferentesRegistro} cuotas cuyo estado almacenado difiere del
+        calculado con pagos confirmados. Se conserva el historial para conciliación.
+      </p>}
       {datos.tipoCronograma==='PROYECTADO'&&<p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
         <strong>Proyección orientativa:</strong> {datos.advertencia??'Los importes definitivos requieren la formalización del contrato.'}
       </p>}
       <div className="mt-4 max-w-full overflow-x-auto rounded-lg border border-brand-100" tabIndex={0}>
-       <table className="w-full min-w-[680px] text-left text-xs">
+       <table className="w-full min-w-[860px] text-left text-xs">
         <thead className="bg-slate-100 text-brand-700">
-         <tr>{['N.º','Vencimiento','Capital','Interés','Cuota','Estado'].map(h=>
+         <tr>{['N.º','Vencimiento','Capital','Interés','Cuota','Abonado','Saldo','Estado'].map(h=>
            <th key={h} className="whitespace-nowrap px-3 py-3 font-bold">{h}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-brand-100">
@@ -146,7 +180,25 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
           <td className="whitespace-nowrap px-3 py-2.5">{formatoSoles(c.capital)}</td>
           <td className="whitespace-nowrap px-3 py-2.5">{formatoSoles(c.interes)}</td>
           <td className="whitespace-nowrap px-3 py-2.5 font-semibold">{formatoSoles(c.cuota)}</td>
-          <td className="whitespace-nowrap px-3 py-2.5 text-brand-600">{c.estado.replaceAll('_',' ')}</td>
+          <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+            {c.abonadoConfirmado===undefined?'—':formatoSoles(c.abonadoConfirmado)}
+          </td>
+          <td className="whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums">
+            {c.saldoCuota===undefined?'—':formatoSoles(c.saldoCuota)}
+          </td>
+          <td className="whitespace-nowrap px-3 py-2.5">
+            <span className={
+              c.estado==='PAGADA'?'font-semibold text-green-700':
+              c.estado==='VENCIDA'?'font-semibold text-rose-700':
+              c.estado==='PARCIAL'?'font-semibold text-amber-800':'text-brand-600'
+            }>{c.estado.replaceAll('_',' ')}</span>
+            {c.cuotaAtrasada&&
+              <span className="ml-1 font-semibold text-rose-700">
+                · {c.diasMora??0} d. atraso
+              </span>}
+            {c.proxima7Dias&&<span className="ml-1 text-amber-700">· Próxima</span>}
+            {c.estadoDifiereRegistro&&<span title="Difiere del estado registrado" className="ml-1 text-amber-700">*</span>}
+          </td>
          </tr>)}
         </tbody>
        </table>
