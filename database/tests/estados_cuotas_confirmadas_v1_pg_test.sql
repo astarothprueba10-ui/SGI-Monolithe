@@ -115,6 +115,17 @@ BEGIN
     OR (v->'items'->0->>'saldoCuota')::numeric<>0
  THEN RAISE EXCEPTION 'Cuota totalmente abonada se clasificó incorrectamente'; END IF;
 
+ -- Plan cerrado: no reclamar mora sobre un contrato anulado.
+ INSERT INTO public.cfg_estados_plan_pago VALUES(3,'ANULADO');
+ UPDATE public.pag_planes_pago SET id_estado_plan_pago=3 WHERE id_plan_pago=1003;
+ v:=public.sp_crm_cronograma_venta_v4(5,1003);
+ IF v->>'fuenteEstados'<>'HISTORICO_NO_EXIGIBLE'
+    OR (v->>'cuotasAtrasadas')::int<>0
+    OR (v->>'montoVencido')::numeric<>0
+    OR jsonb_array_length(v->'items')<>1
+ THEN RAISE EXCEPTION 'Plan cerrado no debe generar mora nueva'; END IF;
+ UPDATE public.pag_planes_pago SET id_estado_plan_pago=2 WHERE id_plan_pago=1003;
+
  -- El usuario de otra cartera carece de permiso para consultar.
  v_excepcion:=false;
  BEGIN PERFORM public.sp_crm_cronograma_venta_v4(6,1003);
