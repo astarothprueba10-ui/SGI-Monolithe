@@ -355,6 +355,56 @@ export interface CrmRegistroVoucherCuota {
   reutilizado:boolean;
   saldoAplicado:0;
 }
+export interface CrmImputacionPendiente {
+  id_pago:number;
+  codigo_pago:string;
+  id_venta:number;
+  id_plan_pago:number;
+  codigo_venta:string;
+  monto_pago:number;
+  fecha_confirmacion:string;
+  cuota_preautorizada:number|null;
+  numero_cuota:number|null;
+  tipo_destino:'CUOTA'|'INICIAL';
+  saldo_pago:number;
+  saldo_destino:number;
+}
+export interface CrmImputacionHistorica {
+  id_aplicacion_pago:number;
+  id_pago:number;
+  codigo_pago:string;
+  id_plan_pago:number;
+  id_cuota:number|null;
+  tipo:'CUOTA'|'INICIAL';
+  monto:number;
+  id_actor:number;
+  fecha_registro:string;
+  observaciones:string|null;
+  activo:boolean;
+  fecha_anulacion:string|null;
+  id_usuario_anulacion:number|null;
+  motivo_anulacion:string|null;
+}
+export interface CrmImputacionesRespuesta {
+  items:CrmImputacionPendiente[];
+  historial:CrmImputacionHistorica[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+}
+export interface CrmImputacionResultado {
+  idAplicacion:number;
+  idPago:number;
+  tipo:'CUOTA'|'INICIAL';
+  idCuota?:number|null;
+  montoAplicado:number;
+  saldoPagoRestante?:number;
+  saldoDestinoRestante?:number;
+  reutilizado:boolean;
+  activo:boolean;
+}
+
 export interface CrmRevisionVoucherCuotaInput {
   aprobar:boolean;
   motivo?:string|null;
@@ -1577,6 +1627,43 @@ export const crmBackend = {
       throw new Error('Identificador de carga incorrecto.');
     return coreApi.post<CrmRegistroVoucherCuota>(
       '/crm/finanzas/vouchers/cuotas/registrar',{idCarga}
+    );
+  },
+
+  /** Solo dinero confirmado y aprobaciones bancarias; sin saldos de prueba. */
+  listarImputaciones:(pagina=1,tamano=20)=>{
+    if(!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+       ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Paginación de imputaciones inválida.');
+    return coreApi.get<CrmImputacionesRespuesta>(
+      `/crm/finanzas/imputaciones${qs({pagina,tamano})}`
+    );
+  },
+
+  aplicarPagoConfirmado:(req:{
+    idSolicitud:string;idPago:number;tipo:'CUOTA'|'INICIAL';
+    idCuota:number|null;monto:number;observaciones:string|null;
+  })=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(req.idSolicitud)
+      ||!Number.isSafeInteger(req.idPago)||req.idPago<=0
+      ||!['CUOTA','INICIAL'].includes(req.tipo)
+      ||(req.tipo==='CUOTA'&&(!Number.isSafeInteger(req.idCuota)||Number(req.idCuota)<=0))
+      ||(req.tipo==='INICIAL'&&req.idCuota!==null)
+      ||!Number.isFinite(req.monto)||req.monto<=0
+      ||Math.abs(req.monto*100-Math.round(req.monto*100))>1e-7
+      ||(req.observaciones?.length??0)>255)
+      throw new Error('Importe, cuota o solicitud de aplicación inválidos.');
+    return coreApi.post<CrmImputacionResultado>(
+      '/crm/finanzas/imputaciones',req);
+  },
+
+  revertirAplicacion:(idAplicacion:number,motivo:string)=>{
+    if(!Number.isSafeInteger(idAplicacion)||idAplicacion<=0
+      ||motivo.trim().length<5||motivo.trim().length>255)
+      throw new Error('Debe justificar la reversión con al menos 5 caracteres.');
+    return coreApi.put<CrmImputacionResultado>(
+      `/crm/finanzas/imputaciones/${idAplicacion}/reversion`,
+      {motivo:motivo.trim()}
     );
   },
 
