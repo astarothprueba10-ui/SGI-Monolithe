@@ -1686,6 +1686,27 @@ public class CrmVentaService {
             return errorAnulacion;
         }
 
+        // Imputación de dinero confirmado / reversión auditada 5.3.4.
+        if(mensaje.contains("AUTOANULACION_DENEGADA|")) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "La aplicación debe ser revertida por otra persona autorizada.",ex);
+        }
+        if(mensaje.contains("APLICACION_NO_DISPONIBLE|")
+                ||mensaje.contains("PAGO_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "El pago o la aplicación no está disponible para esta operación.",ex);
+        }
+        if(mensaje.contains("APLICACION_CERRADA|")
+                ||mensaje.contains("SOLICITUD_DUPLICADA|")
+                ||mensaje.contains("DESTINO_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La aplicación cambió de estado o el destino no corresponde al pago.",ex);
+        }
+        if(mensaje.contains("MONTO_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El importe supera el saldo disponible del pago o del destino.",ex);
+        }
+
         // Revisión independiente 5.3.3: no revelar vouchers de terceros.
         if(mensaje.contains("AUTOAPROBACION_DENEGADA|")) {
             return new ResponseStatusException(HttpStatus.FORBIDDEN,
