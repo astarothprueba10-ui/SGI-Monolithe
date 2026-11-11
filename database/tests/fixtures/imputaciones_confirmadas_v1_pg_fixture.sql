@@ -18,6 +18,10 @@ ALTER TABLE public.pag_aplicaciones_pago
  ADD COLUMN motivo_anulacion varchar(255),
  ADD COLUMN fecha_actualizacion timestamptz DEFAULT now();
 
+-- En las fixtures previas la columna existía, pero no la PK real.
+ALTER TABLE public.pag_aplicaciones_pago
+ ADD CONSTRAINT pag_aplicaciones_pago_ci_pk PRIMARY KEY(id_aplicacion_pago);
+
 -- Producción ya dispone de la secuencia asociada al PK.
 CREATE SEQUENCE IF NOT EXISTS public.pag_aplicaciones_pago_id_aplicacion_pago_seq START WITH 400000;
 ALTER TABLE public.pag_aplicaciones_pago
