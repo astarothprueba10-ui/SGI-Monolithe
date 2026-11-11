@@ -436,6 +436,30 @@ public class CrmVentaService {
           """,actor,idCarga);
     }
 
+    /** Revisión segregada de voucher de cuota. Aprobación confirma el pago
+     * pero NO aplica abonos ni cambia pag_cuotas. Rechazo exige motivo.
+     */
+    @Transactional
+    public JsonNode revisarVoucherCuota(Long actor, Long idVoucher,
+            monolithe.core_service.dto.RevisarVoucherCuotaRequest req) {
+        validarActor(actor);
+        if(idVoucher==null||idVoucher<=0||req==null||req.aprobar()==null
+                ||(req.observaciones()!=null&&req.observaciones().length()>500)
+                ||(req.motivo()!=null&&req.motivo().length()>255)
+                ||(!req.aprobar()&&(req.motivo()==null
+                   ||req.motivo().trim().length()<5))
+                ||(req.aprobar()&&req.motivo()!=null&&!req.motivo().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La decisión o motivo de rechazo no es válido.");
+        }
+        return ejecutar("""
+            SELECT public.sp_finanzas_revisar_voucher_cuota_v1(
+              CAST(? AS bigint),CAST(? AS bigint),CAST(? AS boolean),
+              CAST(? AS varchar),CAST(? AS varchar)
+            )::text
+            """,actor,idVoucher,req.aprobar(),req.motivo(),req.observaciones());
+    }
+
     /** Bandeja de comprobantes de cuotas: datos reales y archivos verificados. */
     @Transactional(readOnly = true)
     public JsonNode listarVouchersCuotas(Long actor, String estado,
