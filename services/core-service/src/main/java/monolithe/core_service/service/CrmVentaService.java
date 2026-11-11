@@ -1601,6 +1601,24 @@ public class CrmVentaService {
             return errorAnulacion;
         }
 
+        // Errores funcionales del registro de cuotas (5.3.2).
+        // Los identificadores ajenos y los archivos inexistentes no se revelan.
+        if (mensaje.contains("CARGA_NO_DISPONIBLE|")
+                || mensaje.contains("ARCHIVO_NO_EXISTE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No se encontró una carga o comprobante disponible para su usuario.", ex);
+        }
+        if (mensaje.contains("CARGA_EXPIRADA|")
+                || mensaje.contains("CUOTA_NO_DISPONIBLE|")
+                || mensaje.contains("PAGO_DUPLICADO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El comprobante no puede registrarse con su estado actual. Revise la cuota, fecha o número de operación.", ex);
+        }
+        if (mensaje.contains("IMPORTE_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El importe declarado supera el saldo real pendiente de la cuota.", ex);
+        }
+
         if (mensaje.contains("VENTA_NO_DISPONIBLE|")
                 || mensaje.contains("COMPROBANTE_NO_DISPONIBLE|")) {
             // Evita revelar si una venta existe fuera del alcance autorizado.
