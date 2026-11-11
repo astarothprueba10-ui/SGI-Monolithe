@@ -10,6 +10,7 @@ AS $fn$
  OR (p_actor IN(6,7) AND p_perm IN('finance.view','finance.edit'));
 $fn$;
 
+ALTER TABLE public.cfg_tipos_aplicacion_pago ADD COLUMN activo boolean DEFAULT true;
 ALTER TABLE public.pag_aplicaciones_pago
  ADD COLUMN id_usuario_aplicacion bigint,
  ADD COLUMN observaciones varchar(255),
