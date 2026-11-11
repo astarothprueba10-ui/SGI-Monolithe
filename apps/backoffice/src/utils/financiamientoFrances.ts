@@ -1,9 +1,12 @@
 /**
- * Sistema francés: cuota mensual constante, interés sobre saldo pendiente y
- * amortización creciente. Se ajusta la ÚLTIMA cuota por redondeo a céntimos.
+ * Sistema francés para NUEVAS ventas: tasa nominal anual fija del 10%.
  *
- * La política comercial para nuevas ventas fija una TASA NOMINAL ANUAL del 10%;
- * la tasa mensual aplicada es 10% / 12 (no se trata de una TEA del 10%).
+ * El comprador elige una INICIAL TOTAL (mínimo S/ 5,000), que puede incluir
+ * la separación de S/ 500 si fue confirmada y es aplicable a esta venta.
+ * El backend autoriza la aplicación; esta utilidad es solo una previsualización.
+ *
+ * Cuotas en céntimos y última cuota ajustada para amortizar el 100% del capital.
+ * El backend es la fuente definitiva y debe verificar el mismo cronograma.
  */
 export interface CuotaFrancesa {
   numero: number;
@@ -16,6 +19,7 @@ export interface CuotaFrancesa {
 export interface ResumenVentaCalculado {
   precioOficial: number;
   abonoReserva: number;
+  inicialTotal: number;
   inicialAdicional: number;
   capitalFinanciado: number;
   interesTotal: number;
@@ -28,49 +32,54 @@ export interface ResumenVentaCalculado {
 
 export const TASA_ANUAL_FIJA_PCT = 10;
 export const TASA_MENSUAL_NOMINAL_PCT = TASA_ANUAL_FIJA_PCT / 12;
-export const MINIMO_INICIAL_ADICIONAL = 5000;
+export const MINIMO_INICIAL_TOTAL = 5000;
 
+const monedaValida = (valor: number) =>
+  Number.isFinite(valor) && valor >= 0
+  && Math.abs(valor * 100 - Math.round(valor * 100)) < 0.000001
+  && Number.isSafeInteger(Math.round(valor * 100));
 const centavos = (valor: number) => Math.round((valor + Number.EPSILON) * 100);
 const soles = (valor: number) => valor / 100;
 
-export function validarInicialAdicional(
+export function validarInicialTotal(
   valor: string,
   precioOficial: number | null,
   abonoReserva = 0
 ): string | null {
   if (!valor.trim()) return null;
   const monto = Number(valor);
-  if (!Number.isFinite(monto) || monto < 0) return 'Ingrese un monto inicial válido.';
-  if (monto < MINIMO_INICIAL_ADICIONAL) return 'El monto inicial mínimo es de S/ 5,000.';
-  if (precioOficial !== null && Number.isFinite(precioOficial)
-      && monto + abonoReserva >= precioOficial) {
-    return 'La inicial debe dejar un saldo positivo después de descontar la reserva.';
-  }
+  if (!monedaValida(monto)) return 'Ingrese una inicial válida con máximo dos decimales.';
+  if (monto < MINIMO_INICIAL_TOTAL) return 'La inicial total mínima es de S/ 5,000.';
+  if (!monedaValida(abonoReserva) || abonoReserva > monto)
+    return 'La separación aplicada no puede superar la inicial total.';
+  if (precioOficial !== null && (!monedaValida(precioOficial) || monto >= precioOficial))
+    return 'La inicial total debe dejar un capital positivo por financiar.';
   return null;
 }
 
 export function calcularVenta(
   precioOficial: number,
   abonoReserva = 0,
-  inicialAdicional = 0,
+  inicialTotal = 0,
   numeroCuotas = 0
 ): ResumenVentaCalculado {
-  if (![precioOficial, abonoReserva, inicialAdicional].every(Number.isFinite)
-      || precioOficial <= 0 || abonoReserva < 0 || inicialAdicional < 0
-      || abonoReserva + inicialAdicional > precioOficial
-      || !Number.isInteger(numeroCuotas)
-      || numeroCuotas < 0 || numeroCuotas > 36
-      || (numeroCuotas > 0 && inicialAdicional < MINIMO_INICIAL_ADICIONAL)) {
+  if (![precioOficial, abonoReserva, inicialTotal].every(monedaValida)
+      || precioOficial <= 0 || abonoReserva > precioOficial
+      || !Number.isInteger(numeroCuotas) || numeroCuotas < 0 || numeroCuotas > 36
+      || (numeroCuotas === 0 && inicialTotal !== 0)
+      || (numeroCuotas > 0 && (
+        inicialTotal < MINIMO_INICIAL_TOTAL ||
+        inicialTotal >= precioOficial ||
+        abonoReserva > inicialTotal
+      ))) {
     throw new Error('Condiciones de venta no válidas.');
   }
 
   const precio = centavos(precioOficial);
   const reserva = centavos(abonoReserva);
-  const inicial = centavos(inicialAdicional);
-  const principal = precio - reserva - inicial;
-  if (principal < 0 || (numeroCuotas > 0 && principal <= 0)) {
-    throw new Error('No existe saldo financiable.');
-  }
+  const inicial = centavos(inicialTotal);
+  const adicional = numeroCuotas > 0 ? inicial - reserva : 0;
+  const principal = numeroCuotas > 0 ? precio - inicial : 0;
 
   const tasa = TASA_ANUAL_FIJA_PCT / 1200;
   const potencia = Math.pow(1 + tasa, numeroCuotas);
@@ -85,9 +94,8 @@ export function calcularVenta(
     const interes = Math.round(saldo * tasa);
     const capital = numero === numeroCuotas ? saldo : cuotaBase - interes;
     const cuota = numero === numeroCuotas ? saldo + interes : cuotaBase;
-    if (capital <= 0 || capital > saldo || cuota <= 0) {
+    if (capital <= 0 || capital > saldo || cuota <= 0)
       throw new Error('Cronograma francés inconsistente.');
-    }
     saldo -= capital;
     interesTotal += interes;
     cuotas.push({
@@ -99,11 +107,13 @@ export function calcularVenta(
     });
   }
 
-  if (saldo !== 0 && numeroCuotas > 0) throw new Error('Saldo pendiente al finalizar.');
+  if (saldo !== 0 && numeroCuotas > 0)
+    throw new Error('Saldo pendiente al finalizar.');
   return {
     precioOficial: soles(precio),
     abonoReserva: soles(reserva),
-    inicialAdicional: soles(inicial),
+    inicialTotal: soles(inicial),
+    inicialAdicional: soles(adicional),
     capitalFinanciado: soles(principal),
     interesTotal: soles(interesTotal),
     cuotaMensual: soles(cuotaBase),
