@@ -228,6 +228,42 @@ public class CrmVentaController {
                             obtenerActor(jwt),estado,busqueda,pagina,tamano));
         }
 
+        /** Lista pagos CONFIRMADOS pendientes de imputar y auditados.
+         * No da acceso a otras carteras desde el navegador.
+         */
+        @GetMapping("/finanzas/imputaciones")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarImputacionesFinancieras(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarImputacionesFinancieras(
+                            obtenerActor(jwt),pagina,tamano));
+        }
+
+        /** Abono a la cuota o inicial pactada, solo si el pago fue confirmado. */
+        @PostMapping("/finanzas/imputaciones")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> aplicarPagoConfirmado(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.AplicarPagoConfirmadoRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.aplicarPagoConfirmado(obtenerActor(jwt),request));
+        }
+
+        /** Anulación lógica, con motivo, sin eliminar el asiento original. */
+        @PutMapping("/finanzas/imputaciones/{idAplicacion}/reversion")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revertirAplicacionPago(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idAplicacion,
+                @Valid @RequestBody monolithe.core_service.dto.RevertirAplicacionPagoRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revertirAplicacionPago(
+                            obtenerActor(jwt),idAplicacion,request));
+        }
+
         /** Solo Finanzas: revisión humana independiente, auditada y sin
          * imputación de saldos; el registrador nunca se autoaprueba.
          */
