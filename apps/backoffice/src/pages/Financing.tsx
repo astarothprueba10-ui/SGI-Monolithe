@@ -14,6 +14,7 @@ import { FINANCING_PLANS, INSTALLMENTS, VOUCHERS } from '../data/financing';
 import { currency, percent } from '../utils/format';
 import { financingService } from '../services/financingService';
 import { AlertasCuotasPanel } from '../components/financing/AlertasCuotasPanel';
+import { RevisionClausulaPanel } from '../components/financing/RevisionClausulaPanel';
 import type { PaymentStatus, Voucher, Installment } from '../types';
 
 export function Financing() {
@@ -92,6 +93,7 @@ export function Financing() {
       />
 
       <AlertasCuotasPanel revision={revisionAlertas}/>
+      <RevisionClausulaPanel revision={revisionAlertas}/>
 
       <Alert tone="info" title="Listados de demostración en integración" className="mb-5">
         Las pestañas de cuotas, vouchers y planes todavía contienen datos de prueba.
