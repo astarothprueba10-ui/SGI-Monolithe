@@ -120,6 +120,51 @@ jobs:
           ls -la database/migrations/*.sql
           echo "All migrations found and valid."
 
+  financing-postgres-validation:
+    name: French Financing V3 - PostgreSQL 17
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: financiamiento_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: financiamiento_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d financiamiento_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract financing function from migration 73
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("database/migrations/73_financiamiento_inicial_total_frances_v2.sql").read_text()
+          start = src.index("CREATE OR REPLACE FUNCTION public.fn_crm_simular_frances_v3(")
+          end = src.index("\n-- Conserva validacion", start)
+          content = src[start:end].strip()
+          if not content.endswith("END $fn$;"):
+              raise SystemExit("La funcion de financiamiento no finaliza correctamente")
+          Path("/tmp/financiamiento_v3.sql").write_text(content + "\n")
+          PY
+
+      - name: Execute pure SQL financial tests on isolated Postgres
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: financiamiento_ci
+          PGDATABASE: financiamiento_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -f /tmp/financiamiento_v3.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_frances_v3_pg_test.sql
+
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: [frontend-validation, backend-validation, database-validation]
