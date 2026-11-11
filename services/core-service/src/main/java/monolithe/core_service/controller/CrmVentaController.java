@@ -228,6 +228,31 @@ public class CrmVentaController {
                             obtenerActor(jwt),estado,busqueda,pagina,tamano));
         }
 
+        /** Conciliación integral: los indicadores no alteran la contabilidad. */
+        @GetMapping("/finanzas/conciliacion-integral")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> conciliacionIntegral(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue="TODOS") String estado,
+            @RequestParam(required=false) String busqueda,
+            @RequestParam(defaultValue="1") Integer pagina,
+            @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.conciliacionFinanciera(
+                    obtenerActor(jwt),estado,busqueda,pagina,tamano));
+        }
+
+        /** Seguimiento auditado de incidencias. No declara un pago conciliado. */
+        @PutMapping("/finanzas/conciliacion-integral/pagos/{idPago}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> marcarConciliacion(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long idPago,
+            @Valid @RequestBody monolithe.core_service.dto.MarcarConciliacionRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.marcarRevisionConciliacion(obtenerActor(jwt),idPago,request));
+        }
+
         /** Lista pagos CONFIRMADOS pendientes de imputar y auditados.
          * No da acceso a otras carteras desde el navegador.
          */
