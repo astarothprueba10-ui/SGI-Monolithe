@@ -43,6 +43,41 @@ class PortalClienteServiceSeguridadTest {
     }
 
     @Test
+    void lotesYContratosSoloSeConsultanConActorJwt() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                ()->service.lotesContratosPrivados(null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                ()->service.lotesContratosPrivados(-1L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenReturn("{\"total\":0,\"items\":[],\"fechaConsulta\":\"2026-11-11\"}");
+        var resultado=service.lotesContratosPrivados(9L);
+        assertEquals(0,resultado.path("total").asInt());
+        assertTrue(resultado.path("items").isArray());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_portal_cliente_lotes_contratos_v1"));
+        assertFalse(sql.getValue().contains("FROM public.ven_ventas"));
+        verifyNoMoreInteractions(jdbc);
+    }
+
+    @Test
+    void sinRolClienteNoPuedeObtenerMetadatosContractuales() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenThrow(new DataAccessResourceFailureException(
+                "PORTAL_ACCESO_DENEGADO|Identidad cliente no autorizada."));
+        var ex=assertThrows(ResponseStatusException.class,
+            ()->service.lotesContratosPrivados(5L));
+        assertEquals(HttpStatus.FORBIDDEN,ex.getStatusCode());
+    }
+
+    @Test
     void cuentaSinRolVigenteNoRevelaResumen() {
         JdbcTemplate jdbc=mock(JdbcTemplate.class);
         PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
