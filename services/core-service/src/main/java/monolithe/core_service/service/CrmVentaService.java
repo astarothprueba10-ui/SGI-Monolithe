@@ -376,6 +376,66 @@ public class CrmVentaService {
                 actor, estado, busqueda, pagina, tamano);
     }
 
+    /** Cuotas disponibles y métodos de pago para registrar un comprobante. */
+    @Transactional(readOnly = true)
+    public JsonNode opcionesRegistroVoucherCuota(Long actor, String busqueda, Integer limite) {
+        validarActor(actor);
+        int cantidad=limite==null?60:limite;
+        if(cantidad<1||cantidad>100||(busqueda!=null&&busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de cuotas inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_opciones_registro_cuota_v1(
+                CAST(? AS bigint),CAST(? AS varchar),CAST(? AS integer)
+            )::text
+            """,actor,busqueda,cantidad);
+    }
+
+    /** La preautorización no inserta pagos ni aplicaciones contables. */
+    @Transactional
+    public JsonNode prepararCargaVoucherCuota(
+            Long actor,monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest req) {
+        validarActor(actor);
+        if(req==null||req.idVenta()==null||req.idVenta()<=0
+                ||req.idCuota()==null||req.idCuota()<=0
+                ||req.monto()==null||req.monto().signum()<=0
+                ||req.monto().scale()>2
+                ||req.idMetodoPago()==null||req.idMetodoPago()<=0
+                ||req.fechaOperacion()==null
+                ||req.nombreArchivo()==null||req.nombreArchivo().isBlank()
+                ||req.nombreArchivo().length()>180
+                ||req.tipoMime()==null
+                ||req.tamanioBytes()==null||req.tamanioBytes()<1
+                ||req.tamanioBytes()>5242880L
+                ||(req.numeroOperacion()!=null&&req.numeroOperacion().length()>100)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos del comprobante de cuota inválidos.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_preparar_carga_voucher_cuota_v1(
+            CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+            CAST(? AS numeric),CAST(? AS integer),CAST(? AS date),
+            CAST(? AS varchar),CAST(? AS varchar),
+            CAST(? AS varchar),CAST(? AS bigint)
+          )::text
+          """,actor,req.idVenta(),req.idCuota(),req.monto(),
+            req.idMetodoPago(),req.fechaOperacion(),req.numeroOperacion(),
+            req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Finalización idempotente: solo REGISTRADO/PENDIENTE, sin imputar cuota. */
+    @Transactional
+    public JsonNode registrarVoucherCuotaPendiente(Long actor,java.util.UUID idCarga) {
+        validarActor(actor);
+        if(idCarga==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Identificador de carga inválido.");
+        return ejecutar("""
+          SELECT public.sp_fin_registrar_voucher_cuota_pendiente_v1(
+            CAST(? AS bigint),CAST(? AS uuid)
+          )::text
+          """,actor,idCarga);
+    }
+
     /** Bandeja de comprobantes de cuotas: datos reales y archivos verificados. */
     @Transactional(readOnly = true)
     public JsonNode listarVouchersCuotas(Long actor, String estado,
