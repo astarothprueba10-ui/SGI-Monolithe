@@ -436,6 +436,67 @@ public class CrmVentaService {
           """,actor,idCarga);
     }
 
+    /** Finanzas: pagos confirmados disponibles y historial auditable. */
+    @Transactional(readOnly = true)
+    public JsonNode listarImputacionesFinancieras(Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int page=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(page<1||page>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de aplicaciones financieras inválida.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_imputaciones_v1(
+            CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+          )::text
+          """,actor,page,size);
+    }
+
+    /** Aplicación contable de pago ya CONFIRMADO, sin modificar cronogramas. */
+    @Transactional
+    public JsonNode aplicarPagoConfirmado(Long actor,
+            monolithe.core_service.dto.AplicarPagoConfirmadoRequest req) {
+        validarActor(actor);
+        if(req==null||req.idSolicitud()==null
+                ||req.idPago()==null||req.idPago()<=0
+                ||req.tipo()==null||!java.util.Set.of("CUOTA","INICIAL").contains(req.tipo())
+                ||req.monto()==null||req.monto().signum()<=0
+                ||req.monto().scale()>2
+                ||(req.tipo().equals("CUOTA")&&(req.idCuota()==null||req.idCuota()<=0))
+                ||(req.tipo().equals("INICIAL")&&req.idCuota()!=null)
+                ||(req.observaciones()!=null&&req.observaciones().length()>255)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Pago o destino de imputación inválidos.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_aplicar_pago_confirmado_v1(
+            CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+            CAST(? AS varchar),CAST(? AS bigint),CAST(? AS numeric),
+            CAST(? AS varchar)
+          )::text
+          """,actor,req.idSolicitud(),req.idPago(),req.tipo(),
+             req.idCuota(),req.monto(),req.observaciones());
+    }
+
+    /** Reversión de aplicación propia del 5.3.4, por una segunda persona. */
+    @Transactional
+    public JsonNode revertirAplicacionPago(Long actor, Long idAplicacion,
+            monolithe.core_service.dto.RevertirAplicacionPagoRequest req) {
+        validarActor(actor);
+        if(idAplicacion==null||idAplicacion<=0||req==null
+            ||req.motivo()==null||req.motivo().trim().length()<5
+            ||req.motivo().length()>255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El identificador y motivo de reversión son obligatorios.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_revertir_aplicacion_v1(
+            CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar)
+          )::text
+          """,actor,idAplicacion,req.motivo().trim());
+    }
+
     /** Revisión segregada de voucher de cuota. Aprobación confirma el pago
      * pero NO aplica abonos ni cambia pag_cuotas. Rechazo exige motivo.
      */
