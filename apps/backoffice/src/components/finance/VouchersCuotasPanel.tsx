@@ -1,10 +1,11 @@
 import {useEffect,useState} from 'react';
-import {Eye,FileWarning,Plus,RefreshCw,Search,ShieldCheck} from 'lucide-react';
+import {CheckCircle2,Eye,FileWarning,Plus,RefreshCw,Search,ShieldCheck,XCircle} from 'lucide-react';
 import {toast} from 'sonner';
 import {crmBackend,type CrmVoucherCuotaItem} from '../../services/crmBackend';
 import {currency} from '../../utils/format';
 import {useAuth} from '../../contexts/AuthContext';
 import {NuevoVoucherCuotaModal} from './NuevoVoucherCuotaModal';
+import {RevisarVoucherCuotaModal} from './RevisarVoucherCuotaModal';
 
 type Estado='TODOS'|'PENDIENTE'|'APROBADO'|'RECHAZADO';
 const estados:Estado[]=['TODOS','PENDIENTE','APROBADO','RECHAZADO'];
@@ -18,6 +19,8 @@ const fecha=(valor:string)=>{
 export function VouchersCuotasPanel() {
   const {can}=useAuth();
   const [nuevoAbierto,setNuevoAbierto]=useState(false);
+  const [revisando,setRevisando]=useState<CrmVoucherCuotaItem|null>(null);
+  const [decision,setDecision]=useState<'APROBAR'|'RECHAZAR'>('APROBAR');
   const [items,setItems]=useState<CrmVoucherCuotaItem[]>([]);
   const [estado,setEstado]=useState<Estado>('TODOS');
   const [busqueda,setBusqueda]=useState('');
@@ -165,11 +168,28 @@ export function VouchersCuotasPanel() {
                   </span>}
               </td>
               <td className="px-3 py-2">
-                <button type="button" onClick={()=>void abrir(v)}
-                  disabled={!v.archivo_disponible||leyendo!==null}
-                  className="inline-flex items-center gap-1 rounded-lg border border-brand-200 px-3 py-1.5 font-semibold text-brand-700 disabled:cursor-not-allowed disabled:opacity-40">
-                  <Eye className="h-3.5 w-3.5"/>Ver archivo
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={()=>void abrir(v)}
+                    disabled={!v.archivo_disponible||leyendo!==null}
+                    className="inline-flex items-center gap-1 rounded-lg border border-brand-200 px-3 py-1.5 font-semibold text-brand-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <Eye className="h-3.5 w-3.5"/>Ver archivo
+                  </button>
+                  {can('finance.edit')&&v.estado_voucher==='PENDIENTE'
+                      &&v.estado_pago==='REGISTRADO'&&<>
+                    <button type="button"
+                      onClick={()=>{setDecision('APROBAR');setRevisando(v);}}
+                      disabled={!v.archivo_disponible}
+                      title="Confirma el pago, pero no abona aún la cuota"
+                      className="inline-flex items-center gap-1 rounded-lg border border-green-200 px-2 py-1.5 font-semibold text-green-800 disabled:opacity-40">
+                      <CheckCircle2 className="h-3.5 w-3.5"/>Aprobar
+                    </button>
+                    <button type="button"
+                      onClick={()=>{setDecision('RECHAZAR');setRevisando(v);}}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1.5 font-semibold text-rose-800">
+                      <XCircle className="h-3.5 w-3.5"/>Rechazar
+                    </button>
+                  </>}
+                </div>
               </td>
             </tr>)}</tbody>
         </table>
@@ -191,10 +211,15 @@ export function VouchersCuotasPanel() {
       </div>
     </div>}
     <p className="mt-4 text-[11px] text-brand-500">
-      La ausencia de archivo no altera el pago histórico. Los nuevos pagos
-      quedan REGISTRADOS y sus vouchers PENDIENTES, sin abonos aplicados.
-      La aprobación por Finanzas e imputación contable corresponden a 5.3.3 y 5.3.4.
+      El revisor debe ser diferente del registrador. Aprobar confirma el pago
+      sin aplicarlo a la cuota; rechazar registra el motivo y anula el pago.
+      La aplicación de abonos confirmados se completará en el 5.3.4.
     </p>
+    {can('finance.edit')&&<RevisarVoucherCuotaModal
+      item={revisando} decision={decision}
+      onClose={()=>setRevisando(null)}
+      onRevisado={()=>setRevision(n=>n+1)}
+    />}
     {can('finance.create')&&<NuevoVoucherCuotaModal
       open={nuevoAbierto}
       onClose={()=>setNuevoAbierto(false)}
