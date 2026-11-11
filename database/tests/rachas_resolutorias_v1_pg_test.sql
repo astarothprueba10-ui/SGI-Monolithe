@@ -95,6 +95,8 @@ BEGIN
      'public.fn_fin_rachas_impagas_v1(date)','EXECUTE')
     OR has_function_privilege('authenticated',
      'public.sp_fin_alertas_resolutoria_v1(bigint,integer,integer)','EXECUTE')
+    OR has_function_privilege('sigi_app_user',
+     'public.fn_fin_rachas_impagas_v1(date)','EXECUTE')
     OR NOT has_function_privilege('sigi_app_user',
      'public.sp_fin_alertas_resolutoria_v1(bigint,integer,integer)','EXECUTE')
  THEN RAISE EXCEPTION 'Permisos SQL de revisión contractual inseguros'; END IF;
