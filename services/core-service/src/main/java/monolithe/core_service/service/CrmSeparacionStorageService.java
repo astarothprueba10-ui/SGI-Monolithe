@@ -72,7 +72,7 @@ public class CrmSeparacionStorageService {
         String idCarga=preautorizacion.path("idCarga").asString("");
         if(!BUCKET_VENTAS.equals(bucket)
                 ||!mime.equals(req.tipoMime())
-                ||!clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\\\.(pdf|jpg|png|webp)$")) {
+                ||!clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\.(pdf|jpg|png|webp)$")) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Referencia de carga inválida.");
         }
