@@ -110,6 +110,49 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void revisionVoucherCuotaConfirmaPagoSinImputarYUsaSqlProtegido() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idRevision\":1,\"estadoVoucher\":\"APROBADO\","
+                + "\"estadoPago\":\"CONFIRMADO\",\"saldoAplicado\":0,"
+                + "\"reutilizado\":false}");
+        var solicitud=new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+          true,null,"Operación bancaria verificada");
+        var resultado=service.revisarVoucherCuota(15L,105L,solicitud);
+        assertEquals("CONFIRMADO",resultado.path("estadoPago").asString());
+        assertEquals("APROBADO",resultado.path("estadoVoucher").asString());
+        assertEquals(0,resultado.path("saldoAplicado").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_revisar_voucher_cuota_v1"));
+        assertFalse(sql.getValue().contains("UPDATE public.pag_cuotas"));
+    }
+
+    @Test
+    void revisionVoucherCuotaExigeMotivoYActorAntesDeAccederABase() {
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(null,3L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              false,"Motivo suficiente",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,0L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              true,null,null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              false,"No",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              true,"No es necesario",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              null,null,null))).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
