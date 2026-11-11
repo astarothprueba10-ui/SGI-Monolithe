@@ -24,9 +24,22 @@ import tools.jackson.databind.JsonNode;
 public class PortalClienteController {
     private final PortalClienteService service;
 
+    /** Expediente inmobiliario y contratos: solo metadatos de ventas propias. */
+    @GetMapping("/lotes-contratos")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> lotesContratos(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.lotesContratosPrivados(obtenerActor(jwt)));
+    }
+
     @GetMapping("/resumen")
     @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
     public ResponseEntity<JsonNode> resumen(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.resumenPrivado(obtenerActor(jwt)));
+    }
+
+    private static long obtenerActor(Jwt jwt) {
         if (jwt == null || jwt.getSubject() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "La sesión del cliente no está disponible.");
@@ -39,7 +52,6 @@ public class PortalClienteController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Identidad de sesión inválida.");
         }
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(service.resumenPrivado(actor));
+        return actor;
     }
 }
