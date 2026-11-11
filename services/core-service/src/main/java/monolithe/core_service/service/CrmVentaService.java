@@ -72,7 +72,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v9(
+                SELECT public.sp_crm_validar_formalizacion_v10(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -139,7 +139,7 @@ public class CrmVentaService {
                     "Identificador del prospecto invalido.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_reservas_vigentes_para_venta_v1(
+                SELECT public.sp_crm_reservas_vigentes_para_venta_v2(
                     CAST(? AS bigint),
                     CAST(? AS bigint)
                 )::text
@@ -200,7 +200,7 @@ public class CrmVentaService {
                     "Indique metodo de pago y comprobantes de la venta.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v13(
+                SELECT public.sp_crm_registrar_venta_pendiente_v14(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -592,7 +592,7 @@ public class CrmVentaService {
         if (idVenta==null || idVenta<=0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
         return ejecutar("""
-            SELECT public.sp_crm_cronograma_venta_v1(
+            SELECT public.sp_crm_cronograma_venta_v2(
               CAST(? AS bigint),CAST(? AS bigint)
             )::text
             """,actor,idVenta);
@@ -1016,7 +1016,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_aprobar_firma_contrato_v6(
+                SELECT public.sp_crm_aprobar_firma_contrato_v7(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
