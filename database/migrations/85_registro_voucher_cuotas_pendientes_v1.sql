@@ -250,7 +250,7 @@ BEGIN
  ) VALUES(
   NULL,r.id_venta,r.id_plan_pago,v_estado_pago,r.id_metodo_pago,
   v_moneda,'PAG-CUO-'||replace(r.id_carga::text,'-',''),
-  r.monto,(r.fecha_operacion::timestamp+time '12:00') AT TIME ZONE 'America/Lima',
+  r.monto,(r.fecha_operacion+time '12:00') AT TIME ZONE 'America/Lima',
   r.numero_operacion,'Voucher pendiente para cuota '||r.id_cuota,r.id_actor
  ) RETURNING id_pago INTO v_pago;
 
