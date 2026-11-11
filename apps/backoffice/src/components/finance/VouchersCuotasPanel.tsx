@@ -1,8 +1,10 @@
 import {useEffect,useState} from 'react';
-import {Eye,FileWarning,RefreshCw,Search,ShieldCheck} from 'lucide-react';
+import {Eye,FileWarning,Plus,RefreshCw,Search,ShieldCheck} from 'lucide-react';
 import {toast} from 'sonner';
 import {crmBackend,type CrmVoucherCuotaItem} from '../../services/crmBackend';
 import {currency} from '../../utils/format';
+import {useAuth} from '../../contexts/AuthContext';
+import {NuevoVoucherCuotaModal} from './NuevoVoucherCuotaModal';
 
 type Estado='TODOS'|'PENDIENTE'|'APROBADO'|'RECHAZADO';
 const estados:Estado[]=['TODOS','PENDIENTE','APROBADO','RECHAZADO'];
@@ -14,6 +16,8 @@ const fecha=(valor:string)=>{
 };
 
 export function VouchersCuotasPanel() {
+  const {can}=useAuth();
+  const [nuevoAbierto,setNuevoAbierto]=useState(false);
   const [items,setItems]=useState<CrmVoucherCuotaItem[]>([]);
   const [estado,setEstado]=useState<Estado>('TODOS');
   const [busqueda,setBusqueda]=useState('');
@@ -68,11 +72,18 @@ export function VouchersCuotasPanel() {
           consultan directamente en el backend; no son datos de demostración.
         </p>
       </div>
-      <button type="button" onClick={()=>setRevision(n=>n+1)}
-        disabled={cargando}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
-        <RefreshCw className="h-4 w-4"/>Actualizar
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={()=>setRevision(n=>n+1)}
+          disabled={cargando}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+          <RefreshCw className="h-4 w-4"/>Actualizar
+        </button>
+        {can('finance.create')&&<button type="button"
+          onClick={()=>setNuevoAbierto(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-900 px-3 py-2 text-xs font-semibold text-white">
+          <Plus className="h-4 w-4"/>Nuevo comprobante de cuota
+        </button>}
+      </div>
     </div>
     <div className="mt-4 flex flex-wrap items-end gap-3">
       <label className="block min-w-[155px] text-xs text-brand-700">
@@ -180,9 +191,14 @@ export function VouchersCuotasPanel() {
       </div>
     </div>}
     <p className="mt-4 text-[11px] text-brand-500">
-      La ausencia de archivo no altera el pago histórico.
-      La validación y aplicación de nuevos pagos se implementará en las
-      siguientes actividades del 5.3; esta bandeja no aprueba comprobantes.
+      La ausencia de archivo no altera el pago histórico. Los nuevos pagos
+      quedan REGISTRADOS y sus vouchers PENDIENTES, sin abonos aplicados.
+      La aprobación por Finanzas e imputación contable corresponden a 5.3.3 y 5.3.4.
     </p>
+    {can('finance.create')&&<NuevoVoucherCuotaModal
+      open={nuevoAbierto}
+      onClose={()=>setNuevoAbierto(false)}
+      onRegistrado={()=>setRevision(n=>n+1)}
+    />}
   </section>;
 }
