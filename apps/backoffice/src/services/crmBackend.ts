@@ -448,7 +448,7 @@ export interface CrmReservaVigenteVenta {
   idEtapa: number;
   montoReserva: number;
   /** Crédito financiero confirmado y aprobado; puede ser cero si la reserva está pendiente. */
-  montoReservaAplicable: number;
+  montoReservaAplicable?: number;
   fechaVencimiento: string;
 }
 
@@ -528,9 +528,9 @@ export interface CrmSaleValidationResult {
   modalidad: 'CONTADO' | 'FINANCIADA';
   precioVigente: number;
   montoReservaAplicable: number;
-  montoReservaNominal: number;
-  montoInicialTotal: number | null;
-  montoInicialAdicional: number | null;
+  montoReservaNominal?: number;
+  montoInicialTotal?: number | null;
+  montoInicialAdicional?: number | null;
   saldoContado: number;
   planFrances: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number; cuotaMensual: number } | null;
   idMoneda: number;
