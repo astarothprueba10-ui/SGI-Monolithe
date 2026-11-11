@@ -100,6 +100,26 @@ BEGIN
  WHERE referencia_modulo='FINANCIAMIENTO' AND activo;
  IF v_count<>3 THEN RAISE EXCEPTION 'No se reactivó un aviso después de reversión'; END IF;
 
+ -- Cambio de titular: avisos de la persona anterior se desactivan.
+ UPDATE public.ven_ventas_clientes SET id_cliente=703 WHERE id_venta=1004;
+ v_r:=public.sp_fin_preparar_avisos_portal_v1(5,100);
+ IF (v_r->>'creados')::integer<>1 OR (v_r->>'desactivados')::integer<>1 THEN
+   RAISE EXCEPTION 'Cambio de titular no aisló la notificación: %',v_r;
+ END IF;
+ IF EXISTS(SELECT 1 FROM public.not_notificaciones
+   WHERE referencia_modulo='FINANCIAMIENTO' AND referencia_id='1004'
+     AND id_persona=502 AND activo)
+ THEN RAISE EXCEPTION 'El antiguo titular conserva un aviso activo'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.not_notificaciones
+   WHERE referencia_modulo='FINANCIAMIENTO' AND referencia_id='1004'
+     AND id_persona=504 AND activo)
+ THEN RAISE EXCEPTION 'Nuevo titular no obtuvo su aviso'; END IF;
+ UPDATE public.ven_ventas_clientes SET id_cliente=701 WHERE id_venta=1004;
+ v_r:=public.sp_fin_preparar_avisos_portal_v1(5,100);
+ IF (v_r->>'creados')::integer<>0 OR (v_r->>'desactivados')::integer<>1 THEN
+   RAISE EXCEPTION 'Restauración de titular produjo un duplicado: %',v_r;
+ END IF;
+
  v_bloqueado:=false;
  BEGIN PERFORM public.sp_fin_preparar_avisos_portal_v1(6,100);
  EXCEPTION WHEN others THEN v_bloqueado:=true;
