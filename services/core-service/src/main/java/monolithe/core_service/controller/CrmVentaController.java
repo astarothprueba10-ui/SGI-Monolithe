@@ -14,6 +14,7 @@ import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherInicialRequest;
 import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
@@ -174,6 +175,40 @@ public class CrmVentaController {
                                 busqueda,
                                 pagina,
                                 tamano);
+        }
+
+        /** Inicial adicional: no reutiliza ni vuelve a acreditar reserva S/500. */
+        @GetMapping("/finanzas/vouchers/inicial/opciones")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> opcionesRegistroVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required=false) String busqueda,
+            @RequestParam(defaultValue="60") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.opcionesRegistroVoucherInicial(
+                    obtenerActor(jwt),busqueda,limite));
+        }
+
+        /** Prepara objeto Storage para la inicial, aún sin pago confirmado. */
+        @PostMapping("/finanzas/vouchers/inicial/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody PrepararCargaVoucherInicialRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(separacionStorageService.prepararCargaInicial(
+                    obtenerActor(jwt),request));
+        }
+
+        /** Voucher PENDIENTE de inicial; el revisor sigue siendo otra persona. */
+        @PostMapping("/finanzas/vouchers/inicial/registrar")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> registrarVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody RegistrarVoucherCuotaPendienteRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.registrarVoucherInicialPendiente(
+                    obtenerActor(jwt),request.idCarga()));
         }
 
         /** Búsqueda controlada de cuotas y métodos de pago, sólo Finanzas. */
