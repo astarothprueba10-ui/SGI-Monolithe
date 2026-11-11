@@ -355,6 +355,56 @@ export interface CrmRegistroVoucherCuota {
   reutilizado:boolean;
   saldoAplicado:0;
 }
+export type CrmEstadoConciliacion='TODOS'|'CON_ALERTA'|'SIN_ALERTA';
+export type CrmIncidenciaFinanciera=
+  'SOBREAPLICACION'|'APLICACION_NO_CONFIRMADA'
+  |'CONFIRMADO_SIN_VOUCHER_APROBADO'|'PENDIENTE_DE_REVISION'
+  |'PAGO_SIN_VOUCHER'|'EVIDENCIA_HISTORICA_NO_VERIFICABLE'
+  |'PAGO_CONFIRMADO_SIN_IMPUTAR'|'SIN_ALERTA';
+export interface CrmPagoConciliado {
+  id_pago:number;
+  codigo_pago:string;
+  id_venta:number|null;
+  id_plan_pago:number|null;
+  id_reserva:number|null;
+  monto:number;
+  aplicado:number;
+  saldo_no_aplicado:number;
+  concepto:'SEPARACION'|'CUOTA'|'INICIAL'|'SIN_DESTINO';
+  estado_pago:string;
+  estado_voucher:string|null;
+  codigo_voucher:string|null;
+  archivo_disponible:boolean;
+  tiene_alerta:boolean;
+  codigo_incidencia:CrmIncidenciaFinanciera;
+  estado_revision:'EN_REVISION'|'REVISADA'|null;
+  comentario_revision:string|null;
+  revisor:number|null;
+}
+export interface CrmAlertaPlanHistorico {
+  idPlanPago:number;
+  idVenta:number;
+  estadoPlan:string;
+  numeroCuotas:number;
+  numeroCuotasPactadas:number;
+  importeCuotas:number;
+  totalFinanciado:number;
+  diferencia:number;
+}
+export interface CrmConciliacionIntegral {
+  items:CrmPagoConciliado[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+  alertasPagina:number;
+  alertasFiltradas:number;
+  montoConfirmado:number;
+  confirmadoSinAplicar:number;
+  cargasHuerfanasSinArchivoCandidatas:number;
+  planesConDiferenciasHistoricas:CrmAlertaPlanHistorico[];
+  advertencia:string;
+}
 export interface CrmImputacionPendiente {
   id_pago:number;
   codigo_pago:string;
@@ -1635,6 +1685,43 @@ export const crmBackend = {
       throw new Error('Identificador de carga incorrecto.');
     return coreApi.post<CrmRegistroVoucherCuota>(
       '/crm/finanzas/vouchers/cuotas/registrar',{idCarga}
+    );
+  },
+
+  /** Conciliación sin efectos contables, filtrada y paginada en PostgreSQL. */
+  conciliacionIntegral:(params?:{
+    estado?:CrmEstadoConciliacion;busqueda?:string;pagina?:number;tamano?:number;
+  })=>{
+    const estado=params?.estado??'TODOS';
+    const busqueda=(params?.busqueda??'').trim();
+    const pagina=params?.pagina??1;
+    const tamano=params?.tamano??20;
+    if(!['TODOS','CON_ALERTA','SIN_ALERTA'].includes(estado)
+       ||busqueda.length>120||!Number.isSafeInteger(pagina)||pagina<1
+       ||pagina>10000||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Filtros de conciliación inválidos.');
+    return coreApi.get<CrmConciliacionIntegral>(
+      `/crm/finanzas/conciliacion-integral${qs({estado,busqueda,pagina,tamano})}`
+    );
+  },
+
+  /** Seguimiento humano auditable; REVISADA nunca supone RESUELTA. */
+  marcarRevisionConciliacion:(pago:number,req:{
+    codigoIncidencia:CrmIncidenciaFinanciera;
+    estado:'EN_REVISION'|'REVISADA';
+    comentario:string;
+  })=>{
+    if(!Number.isSafeInteger(pago)||pago<=0
+       ||req.codigoIncidencia==='SIN_ALERTA'
+       ||!['EN_REVISION','REVISADA'].includes(req.estado)
+       ||req.comentario.trim().length<10||req.comentario.trim().length>500)
+      throw new Error('Comentario, incidencia o estado de revisión inválidos.');
+    return coreApi.put<{
+      idRevision:number;idPago:number;codigo:string;estado:string;
+      requiereVerificacion:boolean;
+    }>(
+      `/crm/finanzas/conciliacion-integral/pagos/${pago}/revision`,
+      {...req,comentario:req.comentario.trim()}
     );
   },
 
