@@ -355,6 +355,24 @@ export interface CrmRegistroVoucherCuota {
   reutilizado:boolean;
   saldoAplicado:0;
 }
+export interface CrmRevisionVoucherCuotaInput {
+  aprobar:boolean;
+  motivo?:string|null;
+  observaciones?:string|null;
+}
+export interface CrmRevisionVoucherCuotaResultado {
+  idRevision:number;
+  idVoucher:number;
+  idPago:number;
+  idCuota:number;
+  estadoVoucher:'APROBADO'|'RECHAZADO';
+  estadoPago:'CONFIRMADO'|'ANULADO';
+  accion:'APROBAR'|'RECHAZAR';
+  reutilizado:boolean;
+  saldoAplicado:0;
+  resolucionAutomatica:false;
+}
+
 export interface CrmVoucherCuotaItem {
   id_voucher: number;
   codigo_voucher: string;
@@ -1559,6 +1577,27 @@ export const crmBackend = {
       throw new Error('Identificador de carga incorrecto.');
     return coreApi.post<CrmRegistroVoucherCuota>(
       '/crm/finanzas/vouchers/cuotas/registrar',{idCarga}
+    );
+  },
+
+  /** Revisión humana independiente: NO aplica abonos a las cuotas. */
+  revisarVoucherCuota:(
+    idVoucher:number,decision:CrmRevisionVoucherCuotaInput
+  )=>{
+    if(!Number.isSafeInteger(idVoucher)||idVoucher<=0||typeof decision.aprobar!=='boolean')
+      throw new Error('Comprobante o decisión inválidos.');
+    if(decision.aprobar&&decision.motivo?.trim())
+      throw new Error('La aprobación no puede incluir motivo de rechazo.');
+    if(!decision.aprobar&&(decision.motivo?.trim().length??0)<5)
+      throw new Error('Indique un motivo de rechazo de al menos 5 caracteres.');
+    if((decision.motivo?.length??0)>255||(decision.observaciones?.length??0)>500)
+      throw new Error('La longitud del motivo u observaciones excede el límite.');
+    return coreApi.put<CrmRevisionVoucherCuotaResultado>(
+      `/crm/finanzas/vouchers/cuotas/${idVoucher}/decision`,{
+        aprobar:decision.aprobar,
+        motivo:decision.aprobar?null:decision.motivo?.trim()??null,
+        observaciones:decision.observaciones?.trim()||null
+      }
     );
   },
 
