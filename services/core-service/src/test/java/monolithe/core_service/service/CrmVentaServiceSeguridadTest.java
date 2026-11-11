@@ -152,7 +152,7 @@ class CrmVentaServiceSeguridadTest {
         assertEquals("REGISTRADO",cronograma.path("tipoCronograma").asString());
         var sql=ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v2"));
+        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v3"));
         assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
             ()->service.cronogramaVenta(5L,-1L)).getStatusCode());
     }
