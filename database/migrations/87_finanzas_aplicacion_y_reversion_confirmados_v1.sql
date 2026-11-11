@@ -248,14 +248,6 @@ BEGIN
      JOIN public.cfg_tipos_aplicacion_pago t ON t.id_tipo_aplicacion_pago=a.id_tipo_aplicacion_pago
      WHERE a.id_pago=p_id_pago AND a.activo AND t.codigo<>'INICIAL'
    ) THEN RAISE EXCEPTION 'DESTINO_INVALIDO|Pago vinculado a cuotas u otro concepto.'; END IF;
-   SELECT greatest(0,r.monto_inicial-coalesce(sum(a.monto_aplicado),0))
-   INTO v_saldo FROM public.pag_aplicaciones_pago a
-   JOIN public.cfg_tipos_aplicacion_pago t ON t.id_tipo_aplicacion_pago=a.id_tipo_aplicacion_pago
-      AND t.codigo='INICIAL'
-   JOIN public.pag_pagos p ON p.id_pago=a.id_pago AND p.id_plan_pago=r.id_plan_pago
-   JOIN public.cfg_estados_pago ep ON ep.id_estado_pago=p.id_estado_pago
-      AND ep.codigo='CONFIRMADO'
-   WHERE a.id_plan_pago=r.id_plan_pago AND a.activo AND a.id_cuota IS NULL;
    v_saldo:=greatest(0,r.monto_inicial-coalesce(
      (SELECT sum(a.monto_aplicado) FROM public.pag_aplicaciones_pago a
        JOIN public.cfg_tipos_aplicacion_pago t ON t.id_tipo_aplicacion_pago=a.id_tipo_aplicacion_pago
