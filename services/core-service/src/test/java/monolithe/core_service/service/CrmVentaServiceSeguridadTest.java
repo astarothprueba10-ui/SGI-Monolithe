@@ -231,6 +231,85 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void conciliacionIntegralConsultaRPCRestringidaSinMutarPagos() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"items\":[],\"total\":0,\"alertasPagina\":0}");
+        var resultado=service.conciliacionFinanciera(5L,"CON_ALERTA","PAG-",1,20);
+        assertTrue(resultado.path("items").isArray());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_conciliacion_integral_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.conciliacionFinanciera(5L,"FALSO","",1,20)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.conciliacionFinanciera(null,"TODOS","",1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void anotacionConciliacionExigeMotivoSinEditarAsientos() {
+        var req=new monolithe.core_service.dto.MarcarConciliacionRequest(
+          "PAGO_CONFIRMADO_SIN_IMPUTAR","EN_REVISION",
+          "Pendiente verificar cuenta bancaria y fecha.");
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idRevision\":1,\"requiereVerificacion\":true}");
+        var respuesta=service.marcarRevisionConciliacion(5L,7L,req);
+        assertTrue(respuesta.path("requiereVerificacion").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_marcar_revision_conciliacion_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.marcarRevisionConciliacion(5L,7L,
+            new monolithe.core_service.dto.MarcarConciliacionRequest(
+              "PAGO_SIN_VOUCHER","REVISADA","Corto"))).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.marcarRevisionConciliacion(null,7L,req)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void inicialAdicionalNoAceptaDocumentosInvalidosNiActoresAnonimos() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+          4L,3L,new BigDecimal("100.00"),6,
+          java.time.LocalDate.of(2026,11,11),"OP-TEST","voucher.pdf",
+          "application/pdf",1200L);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherInicial(null,req)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherInicial(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+              4L,3L,new BigDecimal("100.001"),6,req.fechaOperacion(),
+              req.numeroOperacion(),req.nombreArchivo(),req.tipoMime(),1200L))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherInicialPendiente(5L,null)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void registrarVoucherInicialPorProcedimientoSinCrearCuotas() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"destino\":\"INICIAL\",\"idPago\":100}");
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+          4L,3L,new BigDecimal("100.00"),6,
+          java.time.LocalDate.of(2026,11,11),null,"voucher.pdf",
+          "application/pdf",1200L);
+        var pre=service.prepararCargaVoucherInicial(5L,req);
+        assertEquals("INICIAL",pre.path("destino").asString());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_carga_voucher_inicial_v1"));
+        clearInvocations(jdbc);
+        var reg=service.registrarVoucherInicialPendiente(
+          5L,java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"));
+        assertEquals(100,reg.path("idPago").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_registrar_voucher_inicial_pendiente_v1"));
+    }
+
+    @Test
     void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
