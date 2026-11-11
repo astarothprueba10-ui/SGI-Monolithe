@@ -307,6 +307,31 @@ export interface CrmSeparacionVoucherItem {
   observaciones_validacion?: string | null;
 }
 
+export interface CrmPlanInicialDisponible {
+  id_venta:number;
+  codigo_venta:string;
+  id_plan_pago:number;
+  inicial_adicional_pactada:number;
+  reserva_ya_acreditada:number;
+  inicial_abonada:number;
+  saldo_pendiente:number;
+}
+export interface CrmOpcionesRegistroInicial {
+  items:CrmPlanInicialDisponible[];
+  metodos:CrmMetodoPagoDisponible[];
+}
+export interface CrmPrepararCargaInicialInput {
+  idVenta:number;
+  idPlanPago:number;
+  monto:number;
+  idMetodoPago:number;
+  fechaOperacion:string;
+  numeroOperacion:string|null;
+  nombreArchivo:string;
+  tipoMime:string;
+  tamanioBytes:number;
+}
+
 export interface CrmCuotaDisponibleParaPago {
   id_venta:number;
   codigo_venta:string;
@@ -482,6 +507,7 @@ export interface CrmRevisionVoucherCuotaResultado {
 }
 
 export interface CrmVoucherCuotaItem {
+  tipo_destino?:'CUOTA'|'INICIAL'|'HISTORICO';
   id_voucher: number;
   codigo_voucher: string;
   estado_voucher: 'PENDIENTE'|'APROBADO'|'RECHAZADO';
@@ -1641,6 +1667,25 @@ export const crmBackend = {
         tamano: params?.tamano ?? 20
       })}`
     ),
+
+  /** Inicial adicional de un plan ya firmado (reserva informativa separada). */
+  opcionesRegistroVoucherInicial:(busqueda='',limite=60)=>{
+    if(busqueda.trim().length>120||!Number.isSafeInteger(limite)
+      ||limite<1||limite>100)throw new Error('Filtro de iniciales inválido.');
+    return coreApi.get<CrmOpcionesRegistroInicial>(
+      `/crm/finanzas/vouchers/inicial/opciones${qs({busqueda:busqueda.trim(),limite})}`);
+  },
+
+  prepararCargaVoucherInicial:(datos:CrmPrepararCargaInicialInput)=>
+    coreApi.post<CrmCargaVoucherCuota>(
+      '/crm/finanzas/vouchers/inicial/preparar-carga',datos),
+
+  registrarVoucherInicialPendiente:(idCarga:string)=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
+      throw new Error('Referencia de carga de inicial inválida.');
+    return coreApi.post<CrmRegistroVoucherCuota>(
+      '/crm/finanzas/vouchers/inicial/registrar',{idCarga});
+  },
 
   /** Retorna únicamente cuotas exigibles de contratos firmados y medios activos. */
   opcionesRegistroVoucherCuota: (busqueda='',limite=60) => {
