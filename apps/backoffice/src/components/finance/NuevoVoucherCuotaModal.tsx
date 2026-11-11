@@ -59,15 +59,14 @@ export function NuevoVoucherCuotaModal({
       &&archivo.name.length<=180&&MIMES.includes(archivo.type));
   const montoValido=Boolean(cuota&&Number.isFinite(numeroMonto)
       &&numeroMonto>0&&numeroMonto<=cuota.saldo_pendiente
-      &&Math.round(numeroMonto*100)===numeroMonto*100);
+      &&Math.abs(Math.round(numeroMonto*100)-numeroMonto*100)<1e-7);
   const hayDatosValidos=Boolean(cuota&&montoValido&&archivoValido
       &&idMetodo&&fechaOperacion&&fechaOperacion<=fechaMax);
 
   const cerrar=()=>{
     if(!guardando)onClose();
   };
-  const buscar=(e:FormEvent<HTMLFormElement>)=>{
-    e.preventDefault();
+  const buscar=()=>{
     if(!guardando){setIdCuota('');setBusquedaAplicada(busqueda.trim());}
   };
   const registrar=async(e:FormEvent<HTMLFormElement>)=>{
@@ -121,7 +120,7 @@ export function NuevoVoucherCuotaModal({
         permanecerán sin cambios durante esta carga.
       </div>
       {!idCargaPendiente&&<>
-        <form className="flex gap-2" onSubmit={buscar}>
+        <div className="flex gap-2">
           <label className="flex-1 text-xs text-brand-700">
             Buscar venta o cuota (código)
             <input value={busqueda} maxLength={120}
@@ -130,12 +129,12 @@ export function NuevoVoucherCuotaModal({
               className="mt-1 block w-full rounded-lg border border-brand-200 px-3 py-2"
             />
           </label>
-          <button type="submit" disabled={consultando}
+          <button type="button" onClick={buscar} disabled={consultando}
             className="mt-5 rounded-lg border border-brand-200 px-3 text-brand-700 disabled:opacity-40"
             aria-label="Buscar venta">
             <Search className="h-4 w-4"/>
           </button>
-        </form>
+        </div>
         <label className="block text-xs text-brand-700">
           Venta y cuota a la que se propone imputar el abono
           <select required value={idCuota}
