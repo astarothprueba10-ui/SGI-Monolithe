@@ -54,6 +54,11 @@ function CronogramaDocumento({datos}:{datos:CrmCronogramaVenta}) {
       <PdfText style={p.cellAmount}>{formatoSoles(item.cuota)}</PdfText>
       <PdfText style={p.cellStatus}>{item.estado.replaceAll('_',' ')}</PdfText>
     </PdfView>)}
+    <PdfView style={p.band}>
+      <PdfText>Capital programado: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.capital*100),0)/100)}</PdfText>
+      <PdfText>Intereses programados: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.interes*100),0)/100)}</PdfText>
+      <PdfText>Total de cuotas: {formatoSoles(datos.items.reduce((s,x)=>s+Math.round(x.cuota*100),0)/100)}</PdfText>
+    </PdfView>
     {datos.tipoCronograma==='PROYECTADO'&&
       <PdfText style={p.warn}>{datos.advertencia??'Proyección sujeta a aprobación contractual.'}</PdfText>}
     <PdfText style={p.footer} fixed>
@@ -77,6 +82,15 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
     .finally(()=>{if(activo)setCargando(false);});
   return ()=>{activo=false};
  },[idVenta,version]);
+ const totales=datos?.items.reduce((a,x)=>({
+   capital:a.capital+Math.round(x.capital*100),
+   interes:a.interes+Math.round(x.interes*100),
+   cuota:a.cuota+Math.round(x.cuota*100)
+ }),{capital:0,interes:0,cuota:0})??{capital:0,interes:0,cuota:0};
+ const diferenciaCapital=datos?.tipoCronograma==='REGISTRADO'
+   &&datos.capitalFinanciado!=null
+   ? Math.round(datos.capitalFinanciado*100)-totales.capital
+   : 0;
  const descargar=async()=>{
   if(!datos?.items.length||generando)return;
   setGenerando(true);
@@ -137,6 +151,20 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
         </tbody>
        </table>
       </div>
+      <div className="mt-3 grid gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-700 sm:grid-cols-3">
+        <div><span className="block text-brand-500">Capital de las cuotas</span>
+          <strong className="tabular-nums">{formatoSoles(totales.capital/100)}</strong></div>
+        <div><span className="block text-brand-500">Intereses de las cuotas</span>
+          <strong className="tabular-nums">{formatoSoles(totales.interes/100)}</strong></div>
+        <div><span className="block text-brand-500">Total del cronograma</span>
+          <strong className="tabular-nums">{formatoSoles(totales.cuota/100)}</strong></div>
+      </div>
+      {diferenciaCapital!==0&&
+        <p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Diferencia histórica de {formatoSoles(Math.abs(diferenciaCapital)/100)}
+          {' '}entre el capital pactado y las cuotas registradas. Requiere revisión de Finanzas;
+          no se modifica automáticamente el contrato.
+        </p>}
       <p className="mt-3 flex items-center gap-2 text-[11px] text-brand-500">
         <RefreshCw className="h-3.5 w-3.5"/>La información se actualiza desde el plan autorizado.
       </p>
