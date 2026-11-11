@@ -17,6 +17,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
+import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
+import monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
@@ -48,6 +50,51 @@ public class CrmSeparacionStorageService {
         this.jsonMapper = jsonMapper;
         this.storageBaseUrl = storageUrl != null ? storageUrl.trim().replaceAll("/+$", "") : "";
         this.serviceRoleKey = key != null ? key.trim() : "";
+    }
+
+    /** 5.3.2: reserva una carga vinculada a venta/cuota y después firma
+     * exclusivamente la ruta emitida por PostgreSQL, nunca una ruta del navegador.
+     * La firma de Supabase puede durar más; el registro vence a los 30 minutos.
+     */
+    public EnlaceCargaVoucherCuotaResponse prepararCargaCuota(
+            Long actor,PrepararCargaVoucherCuotaRequest req) {
+        if(actor==null||actor<=0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        }
+        if(req==null||req.tipoMime()==null||!MIMES_PERMITIDOS.contains(req.tipoMime())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Formato de comprobante no permitido.");
+        }
+        JsonNode preautorizacion=ventaService.prepararCargaVoucherCuota(actor,req);
+        String bucket=preautorizacion.path("bucket").asString("");
+        String clave=preautorizacion.path("claveArchivo").asString("");
+        String mime=preautorizacion.path("tipoMime").asString("");
+        String idCarga=preautorizacion.path("idCarga").asString("");
+        if(!BUCKET_VENTAS.equals(bucket)
+                ||!mime.equals(req.tipoMime())
+                ||!clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\\\.(pdf|jpg|png|webp)$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Referencia de carga inválida.");
+        }
+        String base=validarYResolverBase();
+        String ruta="/object/upload/sign/"+BUCKET_VENTAS+"/"+clave;
+        String respuesta=solicitarUrlCargaStorage(base+ruta);
+        try {
+            JsonNode json=jsonMapper.readTree(respuesta);
+            String relativa=json.path("url").asString("");
+            URI enlace=URI.create(relativa);
+            if(enlace.isAbsolute()||!ruta.equals(enlace.getRawPath())
+                    ||enlace.getRawQuery()==null
+                    ||!enlace.getRawQuery().startsWith("token=")) {
+                throw new IllegalStateException("URL firmada inesperada.");
+            }
+            return new EnlaceCargaVoucherCuotaResponse(
+                java.util.UUID.fromString(idCarga),BUCKET_VENTAS,clave,
+                base+relativa,mime,MAX_BYTES,1800);
+        }catch(JacksonException|IllegalArgumentException|IllegalStateException ex){
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo interpretar la carga firmada.",ex);
+        }
     }
 
     public EnlaceCargaVoucherResponse prepararCarga(
