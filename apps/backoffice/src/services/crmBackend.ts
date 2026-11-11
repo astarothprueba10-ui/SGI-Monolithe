@@ -307,6 +307,40 @@ export interface CrmSeparacionVoucherItem {
   observaciones_validacion?: string | null;
 }
 
+export interface CrmVoucherCuotaItem {
+  id_voucher: number;
+  codigo_voucher: string;
+  estado_voucher: 'PENDIENTE'|'APROBADO'|'RECHAZADO';
+  nombre_estado_voucher: string;
+  id_pago: number;
+  codigo_pago: string;
+  id_venta: number;
+  id_plan_pago: number;
+  codigo_venta: string;
+  monto_pago: number;
+  estado_pago: 'REGISTRADO'|'CONFIRMADO'|'ANULADO';
+  metodo_pago: string;
+  numero_operacion?:string|null;
+  numero_version:number;
+  nombre_archivo:string;
+  tipo_mime?:string|null;
+  tamanio_bytes?:number|null;
+  fecha_carga:string;
+  fecha_validacion?:string|null;
+  motivo_rechazo?:string|null;
+  observaciones_validacion?:string|null;
+  nombre_cliente:string;
+  archivo_disponible:boolean;
+}
+
+export interface CrmVouchersCuotasResponse {
+  items:CrmVoucherCuotaItem[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+}
+
 export interface CrmSeparacionVouchersResponse {
   items: CrmSeparacionVoucherItem[];
   total: number;
@@ -1433,6 +1467,33 @@ export const crmBackend = {
         tamano: params?.tamano ?? 20
       })}`
     ),
+
+  /** Solo Finanzas: comprobantes de cuotas, nunca separaciones ni mocks. */
+  listarVouchersCuotas: (params:{
+    estado?:'TODOS'|'PENDIENTE'|'APROBADO'|'RECHAZADO';
+    busqueda?:string; pagina?:number; tamano?:number;
+  }={}) => {
+    const estado=params.estado??'TODOS';
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    const busqueda=params.busqueda?.trim()??'';
+    if(!['TODOS','PENDIENTE','APROBADO','RECHAZADO'].includes(estado)
+       ||!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+       ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100
+       ||busqueda.length>120) throw new Error('Filtros de vouchers inválidos.');
+    return coreApi.get<CrmVouchersCuotasResponse>(
+      `/crm/finanzas/vouchers/cuotas${qs({estado,busqueda,pagina,tamano})}`
+    );
+  },
+
+  /** URL firmada, únicamente si el archivo está presente en Storage privado. */
+  prepararLecturaVoucherCuota:(idVoucher:number)=>{
+    if(!Number.isSafeInteger(idVoucher)||idVoucher<=0)
+      throw new Error('Identificador de voucher inválido.');
+    return coreApi.get<CrmVoucherReadUrl>(
+      `/crm/finanzas/vouchers/cuotas/${idVoucher}/url-firmada`
+    );
+  },
 
   listarVouchersSeparacion: (params?: {
     estado?: string;
