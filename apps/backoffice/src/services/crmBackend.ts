@@ -403,6 +403,49 @@ export interface CrmCronogramaVenta {
   advertenciaEstados?:string|null;
   items:CrmCuotaCronograma[];
 }
+/** Señal administrativa de posibles tres cuotas consecutivas con deuda,
+ * no una declaración de resolución contractual. */
+export interface CrmCuotaRevisionLegal {
+  idCuota:number;
+  numeroCuota:number;
+  fechaVencimiento:string;
+  importeCuota:number;
+  abonadoConfirmado:number;
+  saldoPendiente:number;
+  estadoCuota:string;
+  diasMora:number;
+}
+
+export interface CrmRevisionResolutoria {
+  idVenta:number;
+  idPlanPago:number;
+  codigoVenta:string;
+  idCliente:number|null;
+  comprador:string|null;
+  desdeCuota:number;
+  hastaCuota:number;
+  cuotasConsecutivas:number;
+  saldoRacha:number;
+  fechaPrimerVencimiento:string;
+  fechaUltimoVencimiento:string;
+  cuotas:CrmCuotaRevisionLegal[];
+  requiereRevision:true;
+  resolucionAutomatica:false;
+  criterio:'TRES_CUOTAS_CONSECUTIVAS_VENCIDAS_CON_SALDO';
+}
+
+export interface CrmRevisionesResolutorias {
+  fechaCorte:string;
+  pagina:number;
+  tamano:number;
+  total:number;
+  paginas:number;
+  montoEnRevision:number;
+  items:CrmRevisionResolutoria[];
+  resolucionAutomatica:false;
+  advertencia:string;
+}
+
 export type CrmTipoAlertaCuota = 'TODAS'|'CUOTA_PROXIMA'|'CUOTA_VENCIDA';
 
 export interface CrmAlertaCuota {
@@ -1250,6 +1293,18 @@ export const crmBackend = {
         tamano: params?.tamano
       })}`
     ),
+
+  /** Consulta de posibles causales, requiere permiso legal/financiero y cartera. */
+  listarRevisionesResolutorias: (params:{pagina?:number;tamano?:number}={}) => {
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    if(!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+      ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Paginación de revisión contractual inválida.');
+    return coreApi.get<CrmRevisionesResolutorias>(
+      `/crm/financiamiento/clausula-resolutoria/revision${qs({pagina,tamano})}`
+    );
+  },
 
   /** Cartera autorizada: alertas reales, calculadas sin usar mocks ni RLS del navegador. */
   listarAlertasCuotas: (params: {
