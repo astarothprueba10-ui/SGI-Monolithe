@@ -1,25 +1,26 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PortalLayout } from './components/portal/PortalLayout';
+import { PortalFeaturePending } from './components/portal/PortalFeaturePending';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
-import { Cronograma } from './pages/portal/Cronograma';
-import { Documentos } from './pages/portal/Documentos';
 import { Inicio } from './pages/portal/Inicio';
-import { MiAsesor } from './pages/portal/MiAsesor';
-import { MiLote } from './pages/portal/MiLote';
-import { Pagos } from './pages/portal/Pagos';
-import { Perfil } from './pages/portal/Perfil';
-import { Soporte } from './pages/portal/Soporte';
 import { NotFound } from './pages/NotFound';
 
 
 function tieneSesion() {
-  return Boolean(
-    localStorage.getItem('monolithe_access_token') ||
-    sessionStorage.getItem('monolithe_access_token')
-  );
+  const token = localStorage.getItem('monolithe_access_token')
+    ?? sessionStorage.getItem('monolithe_access_token');
+  const raw = localStorage.getItem('monolithe_user')
+    ?? sessionStorage.getItem('monolithe_user');
+  if (!token || !raw) return false;
+  try {
+    const user: unknown = JSON.parse(raw);
+    return typeof user === 'object' && user !== null
+      && 'autoridades' in user && Array.isArray(user.autoridades)
+      && user.autoridades.includes('ROLE_CLIENTE');
+  } catch { return false; }
 }
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
@@ -50,13 +51,13 @@ export function App() {
           }
         >
           <Route index element={<Inicio />} />
-          <Route path="lote" element={<MiLote />} />
-          <Route path="cronograma" element={<Cronograma />} />
-          <Route path="pagos" element={<Pagos />} />
-          <Route path="documentos" element={<Documentos />} />
-          <Route path="asesor" element={<MiAsesor />} />
-          <Route path="soporte" element={<Soporte />} />
-          <Route path="perfil" element={<Perfil />} />
+          <Route path="lote" element={<PortalFeaturePending titulo="Mi lote" />} />
+          <Route path="cronograma" element={<PortalFeaturePending titulo="Cronograma de pagos" />} />
+          <Route path="pagos" element={<PortalFeaturePending titulo="Pagos y vouchers" />} />
+          <Route path="documentos" element={<PortalFeaturePending titulo="Documentos" />} />
+          <Route path="asesor" element={<PortalFeaturePending titulo="Mi asesor" />} />
+          <Route path="soporte" element={<PortalFeaturePending titulo="Soporte" />} />
+          <Route path="perfil" element={<PortalFeaturePending titulo="Mi perfil" />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
