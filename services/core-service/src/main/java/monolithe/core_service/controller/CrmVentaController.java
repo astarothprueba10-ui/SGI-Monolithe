@@ -296,6 +296,28 @@ public class CrmVentaController {
                 .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
         }
 
+        /** Alerta dinámica de cuotas: sin información fuera de la cartera del JWT. */
+        @GetMapping("/financiamiento/alertas")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> alertasCuotas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "TODAS") String tipo,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.alertasCuotas(obtenerActor(jwt), tipo, pagina, tamano));
+        }
+
+        /** Operación explícita para avisos internos; NO envía correo. */
+        @PostMapping("/financiamiento/alertas/portal/preparar")
+        @PreAuthorize("hasAuthority('financing.approve')")
+        public ResponseEntity<JsonNode> prepararAvisosCuotasPortal(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "100") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.prepararAvisosCuotasPortal(obtenerActor(jwt), limite));
+        }
+
         /** Saldo registrado por venta: aplicaciones confirmadas, no comprobantes pendientes. */
         @GetMapping("/ventas/{idVenta}/saldo")
         @PreAuthorize("hasAuthority('sales.view')")
