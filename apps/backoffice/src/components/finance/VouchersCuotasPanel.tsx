@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Eye,FileWarning,RefreshCw,Search,ShieldCheck} from 'lucide-react';
 import {toast} from 'sonner';
 import {crmBackend,type CrmVoucherCuotaItem} from '../../services/crmBackend';
@@ -25,13 +25,6 @@ export function VouchersCuotasPanel() {
   const [leyendo,setLeyendo]=useState<number|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [revision,setRevision]=useState(0);
-
-  const consultar=useCallback(async()=>{
-    const r=await crmBackend.listarVouchersCuotas({
-      estado,busqueda:textoAplicado,pagina,tamano:20
-    });
-    setItems(r.items);setTotal(r.total);setPaginas(r.paginas);
-  },[estado,textoAplicado,pagina]);
 
   useEffect(()=>{
     let activo=true;setCargando(true);setError(null);
