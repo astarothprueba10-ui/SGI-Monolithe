@@ -13,6 +13,9 @@ import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
 import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest;
+import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
+import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
@@ -171,6 +174,44 @@ public class CrmVentaController {
                                 busqueda,
                                 pagina,
                                 tamano);
+        }
+
+        /** Búsqueda controlada de cuotas y métodos de pago, sólo Finanzas. */
+        @GetMapping("/finanzas/vouchers/cuotas/opciones")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> opcionesRegistroVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required=false) String busqueda,
+                @RequestParam(defaultValue="60") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.opcionesRegistroVoucherCuota(
+                            obtenerActor(jwt),busqueda,limite));
+        }
+
+        /** Emite URL de carga firmada para venta/cuota/monto validados.
+         * No registra un pago ni afecta saldos en este paso.
+         */
+        @PostMapping("/finanzas/vouchers/cuotas/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararCargaVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody PrepararCargaVoucherCuotaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(separacionStorageService.prepararCargaCuota(
+                            obtenerActor(jwt),request));
+        }
+
+        /** Finaliza carga real y registra pago REGISTRADO/voucher PENDIENTE.
+         * La cuota no se abona antes de la confirmación por Finanzas.
+         */
+        @PostMapping("/finanzas/vouchers/cuotas/registrar")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> registrarVoucherCuotaPendiente(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody RegistrarVoucherCuotaPendienteRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.registrarVoucherCuotaPendiente(
+                            obtenerActor(jwt),request.idCarga()));
         }
 
         /** Solo Finanzas: no mezclar comprobantes de cuotas con separaciones. */
