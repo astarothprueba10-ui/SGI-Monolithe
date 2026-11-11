@@ -48,7 +48,7 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
-import { calcularVenta, validarInicialAdicional, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
+import { calcularVenta, validarInicialTotal, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -792,11 +792,11 @@ export function Sales() {
         !formSaleDownPayment.trim() ||
         !Number.isFinite(montoInicial) ||
         montoInicial < 5000 ||
-        montoInicial + reservaAplicable >= montoTotal ||
+        montoInicial >= montoTotal ||
         !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
       )
     ) {
-      toast.error('La inicial adicional mínima es S/ 5,000 y el plazo debe ser de 1 a 36 meses.');
+      toast.error('La inicial total mínima es S/ 5,000 y el plazo debe ser de 1 a 36 meses.');
       return;
     }
 
@@ -986,7 +986,7 @@ export function Sales() {
     paginaVentasActual*tamanoPaginaVentas
   );
   const reservaAplicable = opType === 'Venta' && formLotId
-    ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReserva ?? 0
+    ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReservaAplicable ?? 0
     : 0;
 
   const resumenVenta = useMemo(() => {
@@ -1007,7 +1007,7 @@ export function Sales() {
       formSaleDownPayment, formSaleInstallments, reservaAplicable]);
 
   const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
-    ? validarInicialAdicional(
+    ? validarInicialTotal(
         formSaleDownPayment,
         precioLote ? Number(precioLote.precio) : null,
         reservaAplicable
@@ -2189,14 +2189,14 @@ export function Sales() {
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
                       <div className="min-w-0">
                         <label htmlFor="venta-inicial" className="mb-1.5 block text-xs font-semibold text-brand-700">
-                          Inicial adicional (S/) *
+                          Inicial total acordada (S/) *
                         </label>
                         <Input
                           id="venta-inicial"
                           type="number"
                           min="5000"
                           max={precioLote
-                            ? Math.max(5000, Number(precioLote.precio) - reservaAplicable - 0.01)
+                            ? Math.max(5000, Number(precioLote.precio) - 0.01)
                             : undefined}
                           step="0.01"
                           placeholder="Mínimo S/ 5,000"
@@ -2214,7 +2214,7 @@ export function Sales() {
                           </p>
                         ) : (
                           <p id="venta-inicial-ayuda" className="mt-1.5 text-[11px] text-brand-500">
-                            Mínimo S/ 5,000, sin incluir la reserva.
+                            Mínimo S/ 5,000 de inicial total. La separación confirmada puede cubrir S/ 500 de ese importe.
                           </p>
                         )}
                       </div>
@@ -2287,11 +2287,19 @@ export function Sales() {
                       ) : (
                         <>
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <dt className="text-brand-600">Inicial adicional</dt>
+                            <dt className="text-brand-600">Inicial total pactada</dt>
                             <dd className="font-semibold tabular-nums text-brand-800">
-                              − {currency(resumenVenta.inicialAdicional)}
+                              − {currency(resumenVenta.inicialTotal)}
                             </dd>
                           </div>
+                          {resumenVenta.abonoReserva > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <dt className="text-brand-600">Inicial pendiente después de la separación</dt>
+                              <dd className="font-semibold tabular-nums text-brand-800">
+                                {currency(resumenVenta.inicialAdicional)}
+                              </dd>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Capital financiado</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
@@ -2361,7 +2369,7 @@ export function Sales() {
                   <h3 className="text-sm font-semibold text-brand-900">Pago y comprobantes</h3>
                   <p className="mt-1 text-xs text-brand-600">
                     {formSaleModality === 'FINANCIADA'
-                      ? 'Adjunta los comprobantes de la inicial adicional. La reserva se acredita por separado.'
+                      ? 'Adjunta los comprobantes de la inicial adicional. La separación confirmada se descuenta de la inicial pactada.'
                       : 'Adjunta los comprobantes del saldo al contado.'}
                     {' '}Serán revisados por Finanzas.
                   </p>
@@ -2578,7 +2586,7 @@ export function Sales() {
               {confirmacionVenta.datos.modalidad === 'FINANCIADA' && (
                 <>
                   <div>
-                    <dt className="text-brand-500">Inicial adicional (sin reserva)</dt>
+                    <dt className="text-brand-500">Inicial total pactada</dt>
                     <dd className="font-semibold text-brand-900">
                       {currency(confirmacionVenta.datos.montoInicial ?? 0)}
                     </dd>
