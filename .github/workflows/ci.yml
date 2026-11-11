@@ -165,6 +165,18 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f /tmp/financiamiento_v3.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_frances_v3_pg_test.sql
 
+      - name: Compile complete migration 73 against legacy procedure fixtures
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: financiamiento_ci
+          PGDATABASE: financiamiento_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/financiamiento_v1_procedures_smoke.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/73_financiamiento_inicial_total_frances_v2.sql
+          psql -v ON_ERROR_STOP=1 -f database/verification/73_financiamiento_inicial_total_v2_readonly.sql
+
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: [frontend-validation, backend-validation, database-validation]
