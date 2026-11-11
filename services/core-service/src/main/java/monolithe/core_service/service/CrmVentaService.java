@@ -630,6 +630,44 @@ public class CrmVentaService {
             """,actor,idVenta);
     }
 
+    /** Alertas próximas y vencidas verificadas, limitadas a la cartera del JWT. */
+    @Transactional(readOnly = true)
+    public JsonNode alertasCuotas(Long actor, String tipo, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String filtro = tipo == null || tipo.isBlank() ? "TODAS" : tipo;
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("TODAS", "CUOTA_PROXIMA", "CUOTA_VENCIDA").contains(filtro)
+                || page < 1 || page > 10000 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de alertas o paginacion invalidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_alertas_cuotas_v1(
+              CAST(? AS bigint), CAST(? AS varchar),
+              CAST(? AS integer), CAST(? AS integer)
+            )::text
+            """, actor, filtro, page, size);
+    }
+
+    /** Solo preparación de notificaciones internas PORTAL, nunca email/SMS.
+     * Se invoca explícitamente con autoridad de aprobación financiera.
+     */
+    @Transactional
+    public JsonNode prepararAvisosCuotasPortal(Long actor, Integer limite) {
+        validarActor(actor);
+        int cantidad = limite == null ? 100 : limite;
+        if (cantidad < 1 || cantidad > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Limite de avisos invalido.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_preparar_avisos_portal_v1(
+              CAST(? AS bigint), CAST(? AS integer)
+            )::text
+            """, actor, cantidad);
+    }
+
     /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
     @Transactional(readOnly = true)
     public JsonNode rutaComprobanteVenta(Long actor, Long idVenta, Long idComprobante) {
