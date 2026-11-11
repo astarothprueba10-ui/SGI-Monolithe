@@ -246,6 +246,37 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void saldoVentaYClienteConsultanProcedimientosProtegidos() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idVenta\":2,\"tipoSaldo\":\"FINANCIADA\",\"saldoFinanciamiento\":84000}");
+        var venta = service.saldoVenta(5L,2L);
+        assertEquals(84000,venta.path("saldoFinanciamiento").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_saldo_venta_v1"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idCliente\":2,\"numeroVentas\":1,\"saldoFinanciamientoActivo\":84000}");
+        var cliente = service.saldoCliente(5L,2L);
+        assertEquals(1,cliente.path("numeroVentas").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_saldo_cliente_v1"));
+    }
+
+    @Test
+    void saldosRechazanActorOIdsInvalidosSinAccederALaBase() {
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                () -> service.saldoVenta(5L,0L)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                () -> service.saldoCliente(5L,-1L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                () -> service.saldoVenta(null,2L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                () -> service.saldoCliente(null,2L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void detalleVentaConsultaProcedimientoProtegido() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"idVenta\":27,\"modalidad\":\"CONTADO\",\"pago\":{\"comprobantes\":[]}}");
