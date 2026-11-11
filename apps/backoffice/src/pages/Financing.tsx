@@ -1,30 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { EyeIcon, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { SearchInput, Select } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
-import { StatusBadge, Badge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { Alert, EmptyState } from '../components/ui/Feedback';
-import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
-import { FINANCING_PLANS, INSTALLMENTS, VOUCHERS } from '../data/financing';
+import { FINANCING_PLANS, INSTALLMENTS } from '../data/financing';
 import { currency, percent } from '../utils/format';
 import { financingService } from '../services/financingService';
 import { AlertasCuotasPanel } from '../components/financing/AlertasCuotasPanel';
 import { RevisionClausulaPanel } from '../components/financing/RevisionClausulaPanel';
-import type { PaymentStatus, Voucher, Installment } from '../types';
+import type { PaymentStatus, Installment } from '../types';
+import { VouchersCuotasPanel } from '../components/finance/VouchersCuotasPanel';
 
 export function Financing() {
   const [tab, setTab] = useState('cuotas');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | PaymentStatus>('all');
-  const [voucher, setVoucher] = useState<Voucher | null>(null);
 
   const [installmentsList, setInstallmentsList] = useState<Installment[]>(INSTALLMENTS);
-  const [vouchersList, setVouchersList] = useState<Voucher[]>(VOUCHERS);
   const [revisionAlertas, setRevisionAlertas] = useState(0);
   const [, setLoading] = useState(false);
 
@@ -41,14 +39,6 @@ export function Financing() {
         setInstallmentsList(mergedCuotas);
       }
 
-      const liveVouchers = await financingService.getVouchers();
-      if (liveVouchers && liveVouchers.length > 0) {
-        const mergedVouchers = [
-          ...liveVouchers,
-          ...VOUCHERS.filter((v) => !liveVouchers.some((lv) => lv.code === v.code))
-        ];
-        setVouchersList(mergedVouchers);
-      }
 
     } catch (err: any) {
       console.error('Error al cargar datos financieros:', err.message);
@@ -96,10 +86,10 @@ export function Financing() {
       <RevisionClausulaPanel revision={revisionAlertas}/>
 
       <Alert tone="info" title="Listados de demostración en integración" className="mb-5">
-        Las pestañas de cuotas, vouchers y planes todavía contienen datos de prueba.
-        No constituyen un estado de cuenta oficial. Las alertas superiores
-        sí se calculan con pagos confirmados y cartera autorizada.
-        La gestión de comprobantes se completará en el bloque 5.3.
+        Las pestañas de cuotas y planes todavía contienen datos de prueba.
+        No constituyen un estado de cuenta oficial. Las alertas superiores y
+        la bandeja de vouchers de cuotas sí consultan datos reales autorizados.
+        El registro y la validación de nuevos pagos se completarán en 5.3.
       </Alert>
 
 
@@ -110,7 +100,7 @@ export function Financing() {
         onChange={setTab}
         items={[
           { id: 'cuotas', label: 'Cuotas (demo)', count: installmentsList.length },
-          { id: 'vouchers', label: 'Vouchers (demo)', count: vouchersList.length },
+          { id: 'vouchers', label: 'Vouchers de cuotas' },
           { id: 'planes', label: 'Planes (demo)', count: FINANCING_PLANS.length }
         ]}
       />
@@ -175,48 +165,10 @@ export function Financing() {
       ) : null}
 
       {tab === 'vouchers' ? (
-        <Card>
-          <Table
-            head={
-              <>
-                <TH>Código</TH>
-                <TH>Cliente</TH>
-                <TH>Contrato / Lote</TH>
-                <TH>Método / Banco</TH>
-                <TH align="right">Monto</TH>
-                <TH>Cargado</TH>
-                <TH>Estado</TH>
-                <TH align="right">Acciones</TH>
-              </>
-            }
-          >
-            {vouchersList.map((v) => (
-              <TR key={v.id}>
-                <TD className="font-mono text-[12px] font-semibold text-brand-900">{v.code}</TD>
-                <TD className="font-medium">{v.buyer}</TD>
-                <TD className="text-brand-500 font-mono text-[12px]">{v.saleCode}</TD>
-                <TD>
-                  <Badge tone="neutral">{v.bank}</Badge>                  </TD>
-                <TD align="right" className="font-mono font-medium">{currency(v.amount)}</TD>
-                <TD className="text-brand-500">{v.uploadedAt}</TD>
-                <TD>
-                  <StatusBadge status={v.status} />
-                </TD>
-                <TD align="right">
-                  <div className="flex justify-end gap-1.5">
-                    <Button size="sm" icon={EyeIcon} onClick={() => setVoucher(v)}>
-                      Ver
-                    </Button>
-                    <span className="text-[11px] text-brand-500">
-                      Validación pendiente del bloque 5.3
-                    </span>
-                  </div>
-                </TD>
-              </TR>
-            ))}
-        </Table>
-        </Card>
-  ) : null
+        <Gate permission="finance.view">
+          <VouchersCuotasPanel />
+        </Gate>
+      ) : null
 }
 
 {
@@ -270,40 +222,7 @@ export function Financing() {
   ) : null
 }
 
-{/* Modal Detalle de Voucher */ }
-<Modal
-  open={Boolean(voucher)}
-  onClose={() => setVoucher(null)}
-  title={`Voucher ${voucher?.code ?? ''}`}
-  description={voucher ? `${voucher.buyer} · ${voucher.bank}` : undefined}
-  footer={
-    <div className="flex justify-end gap-2">
-      <Button onClick={() => setVoucher(null)}>Cerrar</Button>
-    </div>
-  }
->
-  {voucher ? (
-    <div className="space-y-4">
-      <div className="flex h-36 items-center justify-center rounded-md border border-dashed border-brand-200 bg-brand-50/60 text-[12px] text-brand-500 font-mono">
-        Vista previa del comprobante · {voucher.code}.pdf (SHA-256 Validado)
-      </div>
-      <dl className="divide-y divide-brand-50">
-        {[
-          { label: 'Contrato / Lote', value: voucher.saleCode },
-          { label: 'Monto declarado', value: currency(voucher.amount) },
-          { label: 'Método / Banco', value: voucher.bank },
-          { label: 'Fecha de carga', value: voucher.uploadedAt },
-          { label: 'Estado', value: voucher.status }
-        ].map((row) => (
-          <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5">
-            <dt className="text-[12px] text-brand-400">{row.label}</dt>
-            <dd className="text-[13px] font-medium text-brand-800">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  ) : null}
-</Modal>
+
     </div >
   );
 }
