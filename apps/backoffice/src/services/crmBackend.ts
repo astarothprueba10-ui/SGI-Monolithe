@@ -375,6 +375,8 @@ export interface CrmCronogramaVenta {
   tipoCronograma:'REGISTRADO'|'PROYECTADO'|'SIN_PLAN'|'SIN_CUOTAS';
   numeroCuotas?:number;
   capitalFinanciado?:number;
+  interesTotal?:number;
+  totalCuotas?:number;
   fechaPrimeraCuota?:string|null;
   tasaAnualNominal?:number;
   advertencia?:string;
