@@ -32,6 +32,8 @@ CREATE TABLE public.pag_aplicaciones_pago (
   id_plan_pago bigint,id_cuota bigint
 );
 CREATE TABLE public.cfg_tipos_aplicacion_pago (id_tipo_aplicacion_pago integer,codigo varchar);
+CREATE TABLE public.cfg_estados_plan_pago (id_estado_plan_pago integer,codigo varchar);
+CREATE TABLE public.pag_cuotas (id_cuota bigint,id_plan_pago bigint,monto_capital numeric);
 
 -- BASELINE sp_crm_validar_formalizacion_v6
 CREATE OR REPLACE FUNCTION public.sp_crm_validar_formalizacion_v6(p_actor bigint, p_prospecto bigint, p_lote bigint, p_modalidad character varying, p_monto_total numeric, p_monto_inicial numeric, p_numero_cuotas integer)
