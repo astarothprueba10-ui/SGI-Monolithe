@@ -272,18 +272,18 @@ BEGIN
  SELECT pg_get_functiondef(oid) INTO STRICT v_def FROM pg_proc
  WHERE pronamespace='public'::regnamespace
    AND proname='sp_crm_cronograma_venta_v1';
- IF strpos(v_def,'  v_interes numeric;')=0
-  OR strpos(v_def,'  v_interes:=10::numeric/1200;')=0
+ IF strpos(v_def,' v_interes numeric;')=0
+  OR strpos(v_def,' v_interes:=10::numeric/1200;')=0
   OR strpos(v_def,'round(v_plan.capital_financiado*v_interes,2)')=0
   OR strpos(v_def,'round(r.saldo*v_interes,2)')=0
  THEN RAISE EXCEPTION 'MIGRACION_INCOMPATIBLE|Cronograma v1 cambio.'; END IF;
  v_def:=replace(v_def,'sp_crm_cronograma_venta_v1(',
                     'sp_crm_cronograma_venta_v2(');
- v_def:=replace(v_def,'  v_interes numeric;',
-                    '  v_interes numeric;'||E'\n'||'  v_frances_v2 boolean;');
- v_def:=replace(v_def,'  v_interes:=10::numeric/1200;',
+ v_def:=replace(v_def,' v_interes numeric;',
+                    ' v_interes numeric;'||E'\n'||'  v_frances_v2 boolean;');
+ v_def:=replace(v_def,' v_interes:=10::numeric/1200;',
                     '  v_frances_v2:=v_plan.descripcion_condiciones LIKE ''FRANCES_ANUAL_FIJA_10_V2%'';'||
-                    E'\n'||'  v_interes:=10::numeric/1200;');
+                    E'\n'||' v_interes:=10::numeric/1200;');
  v_def:=replace(v_def,'round(v_plan.capital_financiado*v_interes,2)',
                     'CASE WHEN v_frances_v2 THEN round(v_plan.capital_financiado*10/1200,2)'||
                     ' ELSE round(v_plan.capital_financiado*v_interes,2) END');
