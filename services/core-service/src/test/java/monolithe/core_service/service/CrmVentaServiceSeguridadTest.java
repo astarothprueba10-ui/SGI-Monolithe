@@ -123,7 +123,7 @@ class CrmVentaServiceSeguridadTest {
         assertEquals(0,resultado.path("saldoAplicado").asInt());
         var sql=ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_finanzas_revisar_voucher_cuota_v1"));
+        assertTrue(sql.getValue().contains("sp_finanzas_revisar_voucher_financiamiento_v2"));
         assertFalse(sql.getValue().contains("UPDATE public.pag_cuotas"));
     }
 
@@ -238,7 +238,7 @@ class CrmVentaServiceSeguridadTest {
         assertEquals(0,resultado.path("total").asInt());
         var sql=ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_finanzas_listar_vouchers_cuotas_v1"));
+        assertTrue(sql.getValue().contains("sp_finanzas_listar_vouchers_financiamiento_v2"));
         clearInvocations(jdbc);
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"bucket\":\"vouchers-ventas-private\",\"clave_archivo\":\"ventas/p-3/l-1/11111111-2222-3333-4444-555555555555.pdf\"}");
