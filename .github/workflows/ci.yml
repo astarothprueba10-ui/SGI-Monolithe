@@ -215,6 +215,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/88_finanzas_imputaciones_identity_auto_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/89_fin_aplicaciones_evidencia_privada_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/imputaciones_confirmadas_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/90_fin_conciliacion_integral_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/91_fin_conciliacion_revision_auditada_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/conciliacion_integral_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
