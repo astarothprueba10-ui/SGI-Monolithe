@@ -585,6 +585,38 @@ public class CrmVentaService {
                 """, actor, idVenta);
     }
 
+    /** Saldo financiero por venta, basado en aplicaciones CUOTA confirmadas.
+     * No confunde inicial, reserva, pagos pendientes ni vouchers no conciliados.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode saldoVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de venta invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_saldo_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta);
+    }
+
+    /** Agregado del saldo de un cliente titular, limitado a la cartera del JWT. */
+    @Transactional(readOnly = true)
+    public JsonNode saldoCliente(Long actor, Long idCliente) {
+        validarActor(actor);
+        if (idCliente == null || idCliente <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de cliente invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_saldo_cliente_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idCliente);
+    }
+
     /** Cronograma financiero: cuotas reales o proyección expresamente identificada. */
     @Transactional(readOnly = true)
     public JsonNode cronogramaVenta(Long actor, Long idVenta) {
