@@ -183,6 +183,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/cronograma_frances_v2_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/saldo_cliente_v1_pg_fixture.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/76_financiamiento_saldo_cliente_confirmado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/78_saldo_validar_sobreaplicacion_pago_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/saldo_cliente_confirmado_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -c "GRANT SELECT,INSERT,UPDATE,DELETE ON public.pag_planes_pago,public.pag_cuotas TO anon,authenticated"
           psql -v ON_ERROR_STOP=1 -c "GRANT SELECT ON public.pag_planes_pago,public.pag_cuotas TO sigi_app_user"
