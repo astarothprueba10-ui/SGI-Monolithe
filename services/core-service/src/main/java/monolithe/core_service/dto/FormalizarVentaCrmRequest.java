@@ -22,6 +22,9 @@ public record FormalizarVentaCrmRequest(
     @DecimalMin("0.01")
     BigDecimal montoTotal,
 
+    // FINANCIADA: inicial TOTAL elegida por el comprador (minimo S/ 5,000).
+    // La reserva confirmada se acredita a este total y la BD deriva
+    // la inicial adicional. CONTADO: null.
     @DecimalMin("0.00")
     BigDecimal montoInicial,
 
