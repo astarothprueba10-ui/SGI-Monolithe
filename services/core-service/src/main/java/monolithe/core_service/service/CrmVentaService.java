@@ -436,6 +436,50 @@ public class CrmVentaService {
           """,actor,idCarga);
     }
 
+    /** Cierre 5.3.5: conciliación informativa, sin escrituras en el libro mayor. */
+    @Transactional(readOnly = true)
+    public JsonNode conciliacionFinanciera(Long actor,String estado,String busqueda,
+            Integer pagina,Integer tamano) {
+        validarActor(actor);
+        String filtro=estado==null?"TODOS":estado;
+        String buscar=busqueda==null?"":busqueda.trim();
+        int pag=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(!java.util.Set.of("TODOS","CON_ALERTA","SIN_ALERTA").contains(filtro)
+                ||buscar.length()>120||pag<1||pag>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de conciliación inválidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_conciliacion_integral_v1(
+              CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+              CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,filtro,buscar,pag,size);
+    }
+
+    /** Anotaciones con registro de eventos, no corrige ni anula pagos. */
+    @Transactional
+    public JsonNode marcarRevisionConciliacion(Long actor,Long pago,
+            monolithe.core_service.dto.MarcarConciliacionRequest req) {
+        validarActor(actor);
+        if(pago==null||pago<=0||req==null
+                ||req.codigoIncidencia()==null||req.codigoIncidencia().length()>55
+                ||req.estado()==null
+                ||!java.util.Set.of("EN_REVISION","REVISADA").contains(req.estado())
+                ||req.comentario()==null||req.comentario().trim().length()<10
+                ||req.comentario().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Incidencia o comentario inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_marcar_revision_conciliacion_v1(
+              CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar),
+              CAST(? AS varchar),CAST(? AS varchar)
+            )::text
+            """,actor,pago,req.codigoIncidencia(),req.estado(),
+                    req.comentario().trim());
+    }
+
     /** Finanzas: pagos confirmados disponibles y historial auditable. */
     @Transactional(readOnly = true)
     public JsonNode listarImputacionesFinancieras(Long actor, Integer pagina, Integer tamano) {
