@@ -2289,14 +2289,14 @@ export function Sales() {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Inicial total pactada</dt>
                             <dd className="font-semibold tabular-nums text-brand-800">
-                              − {currency(resumenVenta.inicialTotal)}
+                              {currency(resumenVenta.inicialTotal)}
                             </dd>
                           </div>
                           {resumenVenta.abonoReserva > 0 && (
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <dt className="text-brand-600">Inicial pendiente después de la separación</dt>
+                              <dt className="text-brand-600">Inicial adicional por completar después de la separación</dt>
                               <dd className="font-semibold tabular-nums text-brand-800">
-                                {currency(resumenVenta.inicialAdicional)}
+                                − {currency(resumenVenta.inicialAdicional)}
                               </dd>
                             </div>
                           )}
