@@ -650,6 +650,25 @@ public class CrmVentaService {
             """, actor, filtro, page, size);
     }
 
+    /** Posible causal resolutoria: sólo consulta y revisión jurídica.
+     * Tres cuotas numeradas consecutivamente, vencidas y con saldo confirmado.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode revisarTresCuotasConsecutivas(Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int page=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(page<1||page>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginacion de revision contractual invalida.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_alertas_resolutoria_v1(
+                CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,page,size);
+    }
+
     /** Solo preparación de notificaciones internas PORTAL, nunca email/SMS.
      * Se invoca explícitamente con autoridad de aprobación financiera.
      */
