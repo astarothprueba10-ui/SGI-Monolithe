@@ -133,8 +133,12 @@ BEGIN
  INTO v_recuento,v_alertas,v_monto_sin_aplicar,v_total_confirmado,v_items
  FROM (
     SELECT * FROM filtrados ORDER BY id_pago DESC
-    LIMIT p_tamano OFFSET (p_pagina-1)*p_tamano
  ) t;
+ -- La cantidad y los filtros se calculan ANTES de paginar.
+ SELECT coalesce(jsonb_agg(value ORDER BY ord),'[]'::jsonb)
+ INTO v_items
+ FROM jsonb_array_elements(v_items) WITH ORDINALITY AS e(value,ord)
+ WHERE ord>(p_pagina-1)*p_tamano AND ord<=p_pagina*p_tamano;
 
  -- Totales globales del estado (no solo de la página).
  WITH montos AS (
