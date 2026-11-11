@@ -152,7 +152,7 @@ class CrmVentaServiceSeguridadTest {
         assertEquals("REGISTRADO",cronograma.path("tipoCronograma").asString());
         var sql=ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v1"));
+        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v2"));
         assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
             ()->service.cronogramaVenta(5L,-1L)).getStatusCode());
     }
@@ -179,7 +179,7 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
-    void validacionVentaUsaSimuladorFrancesV9() {
+    void validacionVentaUsaSimuladorFrancesV10() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"elegible\":true,\"planFrances\":{\"sistema\":\"FRANCES\"}}");
         var req = new FormalizarVentaCrmRequest(
@@ -190,7 +190,7 @@ class CrmVentaServiceSeguridadTest {
                 respuesta.path("planFrances").path("sistema").asString());
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v9"));
+        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v10"));
     }
 
     @Test
@@ -207,7 +207,7 @@ class CrmVentaServiceSeguridadTest {
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v13"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v14"));
     }
 
     @Test
