@@ -223,6 +223,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/inicial_financiada_integral_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/94_fin_vouchers_verificacion_mime_tamano_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/voucher_privado_consistencia_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/portal_lotes_contratos_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/95_portal_cliente_resumen_privado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/96_portal_cliente_lotes_contratos_privados_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_lotes_contratos_privados_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
