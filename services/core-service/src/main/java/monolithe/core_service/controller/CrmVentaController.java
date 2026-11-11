@@ -296,6 +296,24 @@ public class CrmVentaController {
                 .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
         }
 
+        /** Saldo registrado por venta: aplicaciones confirmadas, no comprobantes pendientes. */
+        @GetMapping("/ventas/{idVenta}/saldo")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> saldoVenta(
+                @AuthenticationPrincipal Jwt jwt, @PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.saldoVenta(obtenerActor(jwt), idVenta));
+        }
+
+        /** Consolidado por cliente titular, únicamente de ventas visibles al usuario. */
+        @GetMapping("/clientes/{idCliente}/saldo")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> saldoCliente(
+                @AuthenticationPrincipal Jwt jwt, @PathVariable Long idCliente) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.saldoCliente(obtenerActor(jwt), idCliente));
+        }
+
         @GetMapping("/ventas/{idVenta}/detalle")
         @PreAuthorize("hasAuthority('sales.view')")
         public ResponseEntity<JsonNode> detalleVenta(
