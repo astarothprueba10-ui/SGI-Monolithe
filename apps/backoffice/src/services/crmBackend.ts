@@ -403,6 +403,50 @@ export interface CrmCronogramaVenta {
   advertenciaEstados?:string|null;
   items:CrmCuotaCronograma[];
 }
+export type CrmTipoAlertaCuota = 'TODAS'|'CUOTA_PROXIMA'|'CUOTA_VENCIDA';
+
+export interface CrmAlertaCuota {
+  idCuota:number;
+  idPlanPago:number;
+  idVenta:number;
+  codigoVenta:string;
+  idCliente:number|null;
+  comprador:string|null;
+  numeroCuota:number;
+  fechaVencimiento:string;
+  montoCuota:number;
+  abonadoConfirmado:number;
+  saldoCuota:number;
+  estadoCuota:'PENDIENTE'|'PARCIAL'|'VENCIDA';
+  tipoAlerta:Exclude<CrmTipoAlertaCuota,'TODAS'>;
+  diasMora:number;
+  diasParaVencer:number;
+}
+
+export interface CrmAlertasCuotas {
+  fechaCorte:string;
+  tipo:CrmTipoAlertaCuota;
+  pagina:number;
+  tamano:number;
+  total:number;
+  paginas:number;
+  proximas:number;
+  vencidas:number;
+  montoProximo:number;
+  montoVencido:number;
+  items:CrmAlertaCuota[];
+}
+
+export interface CrmAvisosPortalPreparados {
+  fechaCorte:string;
+  procesados:number;
+  creados:number;
+  deduplicados:number;
+  desactivados:number;
+  canal:'PORTAL';
+  enviosExternos:false;
+}
+
 export interface CrmSaldoCuota {
   idCuota: number;
   numero: number;
@@ -1206,6 +1250,33 @@ export const crmBackend = {
         tamano: params?.tamano
       })}`
     ),
+
+  /** Cartera autorizada: alertas reales, calculadas sin usar mocks ni RLS del navegador. */
+  listarAlertasCuotas: (params: {
+    tipo?:CrmTipoAlertaCuota;pagina?:number;tamano?:number;
+  }={}) => {
+    const tipo=params.tipo??'TODAS';
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    if (!['TODAS','CUOTA_PROXIMA','CUOTA_VENCIDA'].includes(tipo)
+      || !Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+      || !Number.isSafeInteger(tamano)||tamano<1||tamano>100) {
+      throw new Error('Parámetros de alerta inválidos.');
+    }
+    return coreApi.get<CrmAlertasCuotas>(
+      `/crm/financiamiento/alertas${qs({tipo,pagina,tamano})}`
+    );
+  },
+
+  /** Requiere financing.approve en Core y SQL; no crea not_envios ni emails. */
+  prepararAvisosPortal: (limite=100) => {
+    if(!Number.isSafeInteger(limite)||limite<1||limite>500)
+      throw new Error('Límite de avisos inválido.');
+    return coreApi.post<CrmAvisosPortalPreparados>(
+      `/crm/financiamiento/alertas/portal/preparar${qs({limite})}`,
+      {}
+    );
+  },
 
   obtenerCronogramaVenta: (idVenta:number) => {
     if (!Number.isSafeInteger(idVenta) || idVenta<=0)
