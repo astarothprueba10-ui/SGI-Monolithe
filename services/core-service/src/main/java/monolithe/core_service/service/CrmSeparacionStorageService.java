@@ -153,6 +153,30 @@ public class CrmSeparacionStorageService {
         return firmarReferencia(ventaService.obtenerRutaVoucher(actor, idVoucher));
     }
 
+    /** Voucher de cuotas: valida en SQL permiso de Finanzas y existencia
+     * física del archivo antes de emitir un enlace de lectura temporal. */
+    public EnlaceLecturaVoucherResponse prepararLecturaVoucherCuota(
+            Long actor, Long idVoucher) {
+        if (actor == null || actor <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesión inválida.");
+        }
+        JsonNode info = ventaService.obtenerRutaVoucherCuota(actor,idVoucher);
+        String bucket=info.path("bucket").asString("");
+        String clave=info.path("clave_archivo").asString("");
+        String nombre=info.path("nombre_archivo").asString("");
+        String mime=info.path("tipo_mime").asString("");
+        if (!BUCKET_VENTAS.equals(bucket) || !clave.matches(
+                "^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\.(pdf|jpg|png|webp)$")
+                || (mime != null && !mime.isBlank() && !MIMES_PERMITIDOS.contains(mime))) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Referencia de comprobante de cuota inválida.");
+        }
+        String base=validarYResolverBase();
+        String ruta="/object/sign/"+BUCKET_VENTAS+"/"+clave;
+        String respuesta=solicitarUrlLecturaStorage(base+ruta);
+        return extraerEnlaceLectura(respuesta,clave,base,nombre,mime,BUCKET_VENTAS);
+    }
+
     /** Enlaces de lectura privados por venta y comprobante; alcance validado en PostgreSQL. */
     public EnlaceLecturaVoucherResponse prepararLecturaComprobanteVenta(
             Long actor, Long idVenta, Long idComprobante) {
