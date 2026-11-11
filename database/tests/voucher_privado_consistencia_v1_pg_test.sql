@@ -9,7 +9,8 @@ DECLARE
 BEGIN
  SELECT vv.id_voucher,vv.tipo_mime INTO STRICT id_v,original_mime
  FROM public.pag_vouchers vv
- WHERE vv.codigo LIKE 'VOU-INI-%' ORDER BY vv.id_voucher DESC LIMIT 1;
+ WHERE vv.codigo LIKE 'VOU-INI-%' AND vv.tipo_mime='application/pdf'
+ ORDER BY vv.id_voucher DESC LIMIT 1;
  b:=public.sp_finanzas_listar_vouchers_financiamiento_v2(5,'TODOS',NULL,1,100);
  SELECT value INTO v FROM jsonb_array_elements(b->'items')
  WHERE (value->>'id_voucher')::bigint=id_v;
