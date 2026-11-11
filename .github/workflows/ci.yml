@@ -191,6 +191,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -c "CREATE POLICY \"Cliente lee sus propias cuotas\" ON public.pag_cuotas FOR SELECT USING (true)"
           psql -v ON_ERROR_STOP=1 -f database/migrations/77_financiamiento_bloqueo_acceso_directo_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_bloqueo_rls_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/79_financiamiento_estados_cuotas_confirmadas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/estados_cuotas_confirmadas_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
