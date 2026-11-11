@@ -145,6 +145,30 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void revisionTresCuotasConsecutivasConsultaSinModificarContratos() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenReturn("{\"total\":1,\"montoEnRevision\":260,"
+              + "\"resolucionAutomatica\":false,\"items\":[{\"cuotasConsecutivas\":3}]}");
+        var resultado=service.revisarTresCuotasConsecutivas(5L,1,20);
+        assertEquals(1,resultado.path("total").asInt());
+        assertFalse(resultado.path("resolucionAutomatica").asBoolean());
+        assertEquals(3,resultado.path("items").get(0).path("cuotasConsecutivas").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_alertas_resolutoria_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("UPDATE "));
+        assertFalse(sql.getValue().toUpperCase().contains("DELETE "));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(5L,0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(5L,1,101)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(null,1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void alertasCuotasRestringeParametrosYConsultaProcedimientoSeguro() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"total\":2,\"vencidas\":1,\"proximas\":1,\"items\":[]}");
