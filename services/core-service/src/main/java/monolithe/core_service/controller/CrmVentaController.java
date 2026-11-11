@@ -173,6 +173,31 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** Solo Finanzas: no mezclar comprobantes de cuotas con separaciones. */
+        @GetMapping("/finanzas/vouchers/cuotas")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarVouchersCuotas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="TODOS") String estado,
+                @RequestParam(required=false) String busqueda,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarVouchersCuotas(
+                            obtenerActor(jwt),estado,busqueda,pagina,tamano));
+        }
+
+        /** Solo URLs temporales verificadas en Storage privado; sin rutas públicas. */
+        @GetMapping("/finanzas/vouchers/cuotas/{idVoucher}/url-firmada")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idVoucher) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(separacionStorageService.prepararLecturaVoucherCuota(
+                            obtenerActor(jwt),idVoucher));
+        }
+
         @GetMapping("/separaciones/vouchers")
         @PreAuthorize("hasAuthority('finance.view')")
         public JsonNode listarVouchersSeparacion(
