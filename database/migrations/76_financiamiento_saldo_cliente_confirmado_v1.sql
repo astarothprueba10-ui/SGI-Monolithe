@@ -84,7 +84,8 @@ BEGIN
    LEFT JOIN public.pag_pagos pg ON pg.id_pago=a.id_pago
    LEFT JOIN public.cfg_estados_pago ep ON ep.id_estado_pago=pg.id_estado_pago
    WHERE c.id_plan_pago=v_plan.id_plan_pago
-   GROUP BY c.id_cuota,ec.codigo
+   GROUP BY c.id_cuota,c.numero_cuota,c.fecha_vencimiento,
+            c.monto_capital,c.monto_interes,c.monto_cuota,ec.codigo
  )
  SELECT COUNT(*)::integer,
         COALESCE(SUM(monto_cuota),0),COALESCE(SUM(abono),0),
