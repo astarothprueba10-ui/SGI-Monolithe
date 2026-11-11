@@ -376,6 +376,43 @@ public class CrmVentaService {
                 actor, estado, busqueda, pagina, tamano);
     }
 
+    /** Bandeja de comprobantes de cuotas: datos reales y archivos verificados. */
+    @Transactional(readOnly = true)
+    public JsonNode listarVouchersCuotas(Long actor, String estado,
+            String busqueda, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String filtro = (estado == null || estado.isBlank()) ? "TODOS" : estado;
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("TODOS", "PENDIENTE", "APROBADO", "RECHAZADO").contains(filtro)
+                || page < 1 || page > 10000 || size < 1 || size > 100
+                || (busqueda != null && busqueda.length() > 120)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de comprobantes inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_finanzas_listar_vouchers_cuotas_v1(
+                  CAST(? AS bigint), CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """, actor, filtro, busqueda, page, size);
+    }
+
+    /** Ruta para un comprobante de CUOTAS, jamás de separaciones. */
+    @Transactional(readOnly = true)
+    public JsonNode obtenerRutaVoucherCuota(Long actor, Long idVoucher) {
+        validarActor(actor);
+        if (idVoucher == null || idVoucher <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de comprobante inválido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_finanzas_obtener_ruta_voucher_cuota_v1(
+                  CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVoucher);
+    }
+
     /** Ruta validada de un comprobante, segun el alcance comercial de la reserva. */
     @Transactional(readOnly = true)
     public JsonNode obtenerRutaComprobanteSeparacion(Long actor, Long idReserva) {
