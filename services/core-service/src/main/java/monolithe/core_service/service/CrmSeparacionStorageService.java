@@ -19,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherInicialRequest;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
@@ -66,12 +67,28 @@ public class CrmSeparacionStorageService {
                     "Formato de comprobante no permitido.");
         }
         JsonNode preautorizacion=ventaService.prepararCargaVoucherCuota(actor,req);
+        return firmarCargaFinanciada(preautorizacion,req.tipoMime());
+    }
+
+    /** Comparte la firma privada del flujo de cuotas sin mezclar su origen SQL. */
+    public EnlaceCargaVoucherCuotaResponse prepararCargaInicial(
+            Long actor,PrepararCargaVoucherInicialRequest req) {
+        if(actor==null||actor<=0)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        if(req==null||req.tipoMime()==null||!MIMES_PERMITIDOS.contains(req.tipoMime()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Formato no permitido.");
+        return firmarCargaFinanciada(
+            ventaService.prepararCargaVoucherInicial(actor,req),req.tipoMime());
+    }
+
+    private EnlaceCargaVoucherCuotaResponse firmarCargaFinanciada(
+            JsonNode preautorizacion,String tipoMime) {
         String bucket=preautorizacion.path("bucket").asString("");
         String clave=preautorizacion.path("claveArchivo").asString("");
         String mime=preautorizacion.path("tipoMime").asString("");
         String idCarga=preautorizacion.path("idCarga").asString("");
         if(!BUCKET_VENTAS.equals(bucket)
-                ||!mime.equals(req.tipoMime())
+                ||!mime.equals(tipoMime)
                 ||!clave.matches("^ventas/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\\.(pdf|jpg|png|webp)$")) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Referencia de carga inválida.");
