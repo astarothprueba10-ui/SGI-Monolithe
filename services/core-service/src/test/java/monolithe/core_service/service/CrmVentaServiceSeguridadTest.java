@@ -59,6 +59,57 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void preautorizacionYRegistroCuotaSoloLlamanAlSqlProtegido() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+          2016L,120161L,new BigDecimal("40.00"),1,
+          java.time.LocalDate.of(2026,11,11),"OP-CI-1","voucher.pdf",
+          "application/pdf",1200L);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idCarga\":\"11111111-2222-3333-4444-555555555555\"}");
+        var r=service.prepararCargaVoucherCuota(5L,req);
+        assertEquals("11111111-2222-3333-4444-555555555555",
+          r.path("idCarga").asString());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_carga_voucher_cuota_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("UPDATE PUBLIC.PAG_CUOTAS"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idPago\":123,\"idVoucher\":124,\"saldoAplicado\":0,\"reutilizado\":false}");
+        var pagado=service.registrarVoucherCuotaPendiente(5L,
+          java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"));
+        assertEquals(0,pagado.path("saldoAplicado").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_registrar_voucher_cuota_pendiente_v1"));
+    }
+
+    @Test
+    void registroCuotaValidaActorImportesYReferenciasAntesDeSql() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+          2L,37L,new BigDecimal("150.00"),6,
+          java.time.LocalDate.of(2026,11,11),null,"abono.pdf",
+          "application/pdf",800L);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(null,req)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+              2L,37L,new BigDecimal("150.00"),6,req.fechaOperacion(),
+              null,"abono.pdf","application/pdf",5242881L))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+              2L,37L,new BigDecimal("0.001"),6,req.fechaOperacion(),
+              null,"abono.pdf","application/pdf",800L))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherCuotaPendiente(5L,null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherCuotaPendiente(null,
+              java.util.UUID.randomUUID())).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
