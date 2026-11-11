@@ -180,6 +180,13 @@ BEGIN
         AND x.id_persona=n.id_persona
         AND n.clave_deduplicacion=concat('FIN_CUOTA:',x.id_cuota,':',x.tipo_alerta,':',
                                 to_char(x.fecha_vencimiento,'YYYY-MM-DD'))
+        AND NOT EXISTS(
+           SELECT 1 FROM public.not_preferencias np
+           JOIN public.cfg_tipos_notificacion nt
+             ON nt.id_tipo_notificacion=np.id_tipo_notificacion
+           WHERE np.id_persona=x.id_persona AND nt.codigo=x.tipo_alerta
+             AND np.id_canal_notificacion=v_canal AND np.habilitado=false
+        )
    );
  GET DIAGNOSTICS v_desactivados=ROW_COUNT;
 
@@ -230,6 +237,19 @@ BEGIN
    ON CONFLICT(clave_deduplicacion) DO NOTHING
    RETURNING id_notificacion INTO v_nuevo;
    IF v_nuevo IS NULL THEN
+     -- Si la alerta se desactivó anteriormente y vuelve a ser pertinente,
+     -- reactivarla con la misma clave en vez de duplicarla. Actualizar
+     -- también el importe del aviso si hubo un pago parcial confirmado.
+     UPDATE public.not_notificaciones n
+     SET activo=true,mensaje=v_mensaje,
+         datos_contexto=jsonb_build_object('idVenta',v_r.id_venta,
+           'idCuota',v_r.id_cuota,
+           'fechaVencimiento',to_char(v_r.fecha_vencimiento,'YYYY-MM-DD'),
+           'tipoAlerta',v_r.tipo_alerta,'saldoCuota',v_r.saldo_cuota,
+           'fechaCorte',to_char(v_corte,'YYYY-MM-DD')),
+         fecha_actualizacion=now()
+     WHERE n.clave_deduplicacion=v_clave
+       AND (NOT n.activo OR n.mensaje IS DISTINCT FROM v_mensaje);
      v_omitidos:=v_omitidos+1;
    ELSE
      v_creados:=v_creados+1;
