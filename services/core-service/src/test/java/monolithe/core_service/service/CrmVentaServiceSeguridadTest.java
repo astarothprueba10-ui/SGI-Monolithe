@@ -153,6 +153,84 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void pagosImputablesSeConsultanConActorYProcedimientoProtegido() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"items\":[],\"historial\":[],\"total\":0}");
+        var out=service.listarImputacionesFinancieras(5L,1,20);
+        assertEquals(0,out.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_imputaciones_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.listarImputacionesFinancieras(null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.listarImputacionesFinancieras(5L,0,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void aplicaAbonoSoloConIdempotenciaYDestinoCorrecto() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idAplicacion\":45,\"montoAplicado\":40,\"reutilizado\":false}");
+        var req=new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+          java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"),
+          17L,"CUOTA",73L,new BigDecimal("40.00"),"Abono verificado");
+        var out=service.aplicarPagoConfirmado(5L,req);
+        assertEquals(40,out.path("montoAplicado").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_aplicar_pago_confirmado_v1"));
+    }
+
+    @Test
+    void imputacionYReversionRechazanOperacionesInsegurasAntesDeSql() {
+        var id=java.util.UUID.randomUUID();
+        var ok=new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+          id,17L,"INICIAL",null,new BigDecimal("10.00"),null);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(null,ok)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"INICIAL",73L,new BigDecimal("10.00"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"CUOTA",73L,new BigDecimal("10.001"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"OTRO",null,new BigDecimal("10.00"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revertirAplicacionPago(5L,1L,
+            new monolithe.core_service.dto.RevertirAplicacionPagoRequest("No"))
+          ).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revertirAplicacionPago(null,1L,
+            new monolithe.core_service.dto.RevertirAplicacionPagoRequest("Motivo válido"))
+          ).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void reversionUsaProcedimientoSQLSinBorrarAplicaciones() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idAplicacion\":8,\"activo\":false,\"reutilizado\":false}");
+        var out=service.revertirAplicacionPago(15L,8L,
+          new monolithe.core_service.dto.RevertirAplicacionPagoRequest(
+            "Conciliación de operación incorrecta"));
+        assertFalse(out.path("activo").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_revertir_aplicacion_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("DELETE"));
+    }
+
+    @Test
     void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
