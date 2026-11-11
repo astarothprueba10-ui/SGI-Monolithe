@@ -16,6 +16,7 @@ import { currency, number } from '../utils/format';
 import { SeparacionVouchersPanel } from '../components/finance/SeparacionVouchersPanel';
 import { VouchersCuotasPanel } from '../components/finance/VouchersCuotasPanel';
 import { AplicacionesPagosPanel } from '../components/finance/AplicacionesPagosPanel';
+import { ConciliacionIntegralPanel } from '../components/finance/ConciliacionIntegralPanel';
 import { ConciliacionesSeparacionPanel } from '../components/finance/ConciliacionesSeparacionPanel';
 
 export function Finance() {
@@ -115,6 +116,10 @@ export function Finance() {
                 label: 'Aplicación de pagos'
               },
               {
+                id: 'conciliacion_integral',
+                label: 'Conciliación integral'
+              },
+              {
                 id: 'vouchers_cuotas',
                 label: 'Vouchers de cuotas'
               },
@@ -211,6 +216,11 @@ export function Finance() {
       ) : tab === 'conciliaciones_separaciones' && can('finance.view') ? (
         <Gate permission="finance.view">
           <ConciliacionesSeparacionPanel />
+        </Gate>
+
+      ) : tab === 'conciliacion_integral' && can('finance.view') ? (
+        <Gate permission="finance.view">
+          <ConciliacionIntegralPanel />
         </Gate>
 
       ) : tab === 'imputaciones' && can('finance.view') ? (
