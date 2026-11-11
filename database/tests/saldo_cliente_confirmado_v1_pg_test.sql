@@ -66,6 +66,19 @@ BEGIN
  UPDATE public.pag_aplicaciones_pago SET monto_aplicado=100
  WHERE id_aplicacion_pago=10031;
 
+ -- Aunque la cuota sea 25,000, un pago recibido por 175 no puede
+ -- aplicar 150 a cuota y 50 a inicial: 200 > 175.
+ UPDATE public.pag_aplicaciones_pago SET monto_aplicado=150
+ WHERE id_aplicacion_pago=10031;
+ v_error:=false;
+ BEGIN
+   PERFORM public.sp_crm_saldo_venta_v1(5,1003);
+ EXCEPTION WHEN OTHERS THEN v_error:=true;
+ END;
+ IF NOT v_error THEN RAISE EXCEPTION 'No detectó sobreaplicación al pago'; END IF;
+ UPDATE public.pag_aplicaciones_pago SET monto_aplicado=100
+ WHERE id_aplicacion_pago=10031;
+
  -- Denegar lectura de venta/cliente ajeno a la cartera.
  v_error:=false;
  BEGIN
