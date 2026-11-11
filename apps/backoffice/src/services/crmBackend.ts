@@ -389,7 +389,7 @@ export interface CrmCronogramaVenta {
   tasaAnualNominal?:number;
   advertencia?:string;
   fechaCorte?:string;
-  fuenteEstados?:'APLICACIONES_CONFIRMADAS'|'SIN_CUOTAS_EXIGIBLES';
+  fuenteEstados?:'APLICACIONES_CONFIRMADAS'|'SIN_CUOTAS_EXIGIBLES'|'HISTORICO_NO_EXIGIBLE';
   cuotasPendientes?:number;
   cuotasParciales?:number;
   cuotasVencidas?:number;
