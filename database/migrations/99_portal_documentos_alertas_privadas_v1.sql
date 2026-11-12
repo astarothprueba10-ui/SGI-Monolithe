@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.fn_portal_documentos_publicados_v1(p_actor big
  SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
  WITH propias AS MATERIALIZED (
-   SELECT DISTINCT (op.value->>'id_venta')::bigint AS id_venta
+   SELECT DISTINCT ((op.value->>'id_venta'))::bigint AS id_venta
    FROM jsonb_array_elements(
      public.sp_portal_cliente_resumen_v1(p_actor)->'operaciones'
    ) op(value)
@@ -141,49 +141,49 @@ BEGIN
  v_docs:=public.sp_portal_cliente_documentos_v1(p_actor);
  WITH fuentes AS (
   SELECT
-   'CUOTA_'||q.value->>'estadoCalculado'||':'||q.value->>'idCuota' AS id,
-   CASE WHEN (q.value->>'cuotaAtrasada')::boolean THEN 'CUOTA_VENCIDA'
+   'CUOTA_'||(q.value->>'estadoCalculado')||':'||(q.value->>'idCuota') AS id,
+   CASE WHEN ((q.value->>'cuotaAtrasada'))::boolean THEN 'CUOTA_VENCIDA'
         ELSE 'CUOTA_PROXIMA' END tipo,
-   CASE WHEN (q.value->>'cuotaAtrasada')::boolean THEN 'critico'
+   CASE WHEN ((q.value->>'cuotaAtrasada'))::boolean THEN 'critico'
         ELSE 'atencion' END nivel,
-   CASE WHEN (q.value->>'cuotaAtrasada')::boolean THEN 'Cuota vencida'
+   CASE WHEN ((q.value->>'cuotaAtrasada'))::boolean THEN 'Cuota vencida'
         ELSE 'Próximo vencimiento' END titulo,
-   'Compra '||op.value->>'codigoVenta'||', cuota '||q.value->>'numero'||
-     ': saldo S/ '||to_char((q.value->>'saldoCuota')::numeric,'FM999999999.00')||
-     ', vence el '||q.value->>'fechaVencimiento'||'.' AS detalle,
+   'Compra '||(op.value->>'codigoVenta')||', cuota '||(q.value->>'numero')||
+     ': saldo S/ '||to_char(((q.value->>'saldoCuota'))::numeric,'FM999999999.00')||
+     ', vence el '||(q.value->>'fechaVencimiento')||'.' AS detalle,
    '/portal/cronograma'::text ruta,'Ver cronograma'::text accion,
-   CASE WHEN (q.value->>'cuotaAtrasada')::boolean THEN 1 ELSE 3 END prioridad,
-   q.value->>'fechaVencimiento' AS fecha_evento
+   CASE WHEN ((q.value->>'cuotaAtrasada'))::boolean THEN 1 ELSE 3 END prioridad,
+   (q.value->>'fechaVencimiento') AS fecha_evento
   FROM jsonb_array_elements(v_crono->'items') op(value)
   CROSS JOIN LATERAL jsonb_array_elements(op.value->'cuotas') q(value)
-  WHERE (q.value->>'saldoCuota')::numeric>0
-    AND ((q.value->>'cuotaAtrasada')::boolean
-         OR (q.value->>'proxima7Dias')::boolean)
+  WHERE ((q.value->>'saldoCuota'))::numeric>0
+    AND (((q.value->>'cuotaAtrasada'))::boolean
+         OR ((q.value->>'proxima7Dias'))::boolean)
   UNION ALL
-  SELECT 'VOUCHER:'||v.value->>'idVoucher',
-   CASE WHEN v.value->>'estadoVoucher'='RECHAZADO' THEN 'VOUCHER_RECHAZADO'
+  SELECT 'VOUCHER:'||(v.value->>'idVoucher'),
+   CASE WHEN (v.value->>'estadoVoucher')='RECHAZADO' THEN 'VOUCHER_RECHAZADO'
         ELSE 'VOUCHER_PENDIENTE' END,
-   CASE WHEN v.value->>'estadoVoucher'='RECHAZADO' THEN 'critico' ELSE 'info' END,
-   CASE WHEN v.value->>'estadoVoucher'='RECHAZADO' THEN 'Voucher rechazado'
+   CASE WHEN (v.value->>'estadoVoucher')='RECHAZADO' THEN 'critico' ELSE 'info' END,
+   CASE WHEN (v.value->>'estadoVoucher')='RECHAZADO' THEN 'Voucher rechazado'
         ELSE 'Voucher en revisión' END,
-   'Compra '||v.value->>'codigoVenta'||': '||
-     CASE WHEN v.value->>'estadoVoucher'='RECHAZADO'
+   'Compra '||(v.value->>'codigoVenta')||': '||
+     CASE WHEN (v.value->>'estadoVoucher')='RECHAZADO'
        THEN 'Finanzas rechazó el comprobante. '||
-          coalesce(nullif(v.value->>'motivoRechazo',''),'Revise el expediente.')
+          coalesce(nullif((v.value->>'motivoRechazo'),''),'Revise el expediente.')
        ELSE 'El comprobante fue recibido y no reduce el saldo hasta su aplicación.' END,
    '/portal/pagos','Ver comprobantes',
-   CASE WHEN v.value->>'estadoVoucher'='RECHAZADO' THEN 2 ELSE 4 END,
-   v.value->>'fechaRegistro'
+   CASE WHEN (v.value->>'estadoVoucher')='RECHAZADO' THEN 2 ELSE 4 END,
+   (v.value->>'fechaRegistro')
   FROM jsonb_array_elements(v_vouchers->'comprobantes') v(value)
-  WHERE v.value->>'estadoVoucher' IN ('PENDIENTE','RECHAZADO')
+  WHERE (v.value->>'estadoVoucher') IN ('PENDIENTE','RECHAZADO')
   UNION ALL
-  SELECT 'DOCUMENTO:'||d.value->>'tipo'||':'||d.value->>'idDocumento',
+  SELECT 'DOCUMENTO:'||(d.value->>'tipo')||':'||(d.value->>'idDocumento'),
     'DOCUMENTO_PUBLICADO','info','Documento disponible',
-    'Compra '||d.value->>'codigoVenta'||': '||d.value->>'nombre'||
+    'Compra '||(d.value->>'codigoVenta')||': '||(d.value->>'nombre')||
       ' publicado para consulta privada.',
-    '/portal/documentos','Ver documentos',5,d.value->>'fechaPublicacion'
+    '/portal/documentos','Ver documentos',5,(d.value->>'fechaPublicacion')
   FROM jsonb_array_elements(v_docs->'items') d(value)
-  WHERE (d.value->>'fechaPublicacion')::date
+  WHERE ((d.value->>'fechaPublicacion'))::date
     BETWEEN (now() AT TIME ZONE 'America/Lima')::date-7
         AND (now() AT TIME ZONE 'America/Lima')::date
  )
