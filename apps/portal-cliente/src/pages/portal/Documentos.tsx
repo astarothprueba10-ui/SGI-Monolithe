@@ -1,143 +1,185 @@
-import { useEffect, useState } from 'react';
-import {
-  DownloadIcon,
-  EyeIcon,
-  FileTextIcon,
-  FolderOpenIcon } from
-'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DownloadIcon, EyeIcon, FileTextIcon, FolderOpenIcon, RefreshCwIcon, ShieldCheckIcon } from 'lucide-react';
 import { PageHeader } from '../../components/portal/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
-import { EmptyState } from '../../components/ui/EmptyState';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { documentos } from '../../data/portal';
-import { documentoEstadoLabel, documentoEstadoTone } from '../../utils/estados';
+import { ApiError } from '../../lib/apiClient';
+import { portalCoreGet } from '../../lib/portalCoreApi';
+import type {
+  PortalDocumentoPublicado, PortalDocumentosResponse, PortalEnlaceDocumento
+} from '../../types/portal-documentos-alertas';
 import { formatDate } from '../../utils/format';
 
-const tipos = ['Todos', 'Contrato', 'Financiamiento', 'Plano', 'Estado de cuenta', 'Adenda'];
+type FiltroDocumento = 'TODOS' | 'CONTRATO' | 'PLANO_LOTE' | 'MEMORIA_DESCRIPTIVA';
+const filtros: { valor: FiltroDocumento; texto: string }[] = [
+  { valor: 'TODOS', texto: 'Todos' },
+  { valor: 'CONTRATO', texto: 'Contratos' },
+  { valor: 'PLANO_LOTE', texto: 'Planos publicados' },
+  { valor: 'MEMORIA_DESCRIPTIVA', texto: 'Memorias descriptivas' }
+];
+
+function validarEnlace(documento: PortalEnlaceDocumento): string {
+  const url = new URL(documento.urlLectura);
+  if (url.protocol !== 'https:' || !url.hostname.endsWith('.supabase.co')
+      || !url.pathname.startsWith('/storage/v1/object/sign/contratos-firmados-private/')
+      || !url.searchParams.has('token') || documento.tipoMime !== 'application/pdf'
+      || documento.expiresInSeconds > 120 || documento.expiresInSeconds <= 0) {
+    throw new Error('El servidor no proporcionó un enlace de lectura válido.');
+  }
+  return url.href;
+}
 
 export function Documentos() {
+  const navigate = useNavigate();
+  const [datos, setDatos] = useState<PortalDocumentosResponse | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [tipo, setTipo] = useState('Todos');
+  const [error, setError] = useState<string | null>(null);
+  const [errorDocumento, setErrorDocumento] = useState<string | null>(null);
+  const [documentoOcupado, setDocumentoOcupado] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<FiltroDocumento>('TODOS');
+  const [venta, setVenta] = useState('TODAS');
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    const id = setTimeout(() => setCargando(false), 700);
-    return () => clearTimeout(id);
-  }, []);
-
-  const visibles = documentos.filter(
-    (d) => tipo === 'Todos' || d.tipo === tipo
-  );
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Documentos"
-        title="Documentación de tu operación"
-        description="Contratos, cronogramas, planos y estados de cuenta asociados únicamente a tu compra." />
-      
-
-      <Card as="section">
-        <CardHeader
-          title="Mis documentos"
-          description={
-          cargando ?
-          'Cargando tu expediente…' :
-          `${visibles.length} documento${visibles.length === 1 ? '' : 's'} disponible${visibles.length === 1 ? '' : 's'}`
-          }
-          icon={<FolderOpenIcon className="h-[18px] w-[18px]" />} />
-        
-
-        <div className="flex flex-wrap gap-1.5 border-b border-slateux-200 px-5 py-4">
-          {tipos.map((t) => {
-            const activo = tipo === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTipo(t)}
-                aria-pressed={activo}
-                className={[
-                'h-8 rounded-full border px-3 text-[12.5px] font-medium outline-none',
-                'transition-[background-color,border-color,color] duration-150 ease-out',
-                'focus-visible:ring-2 focus-visible:ring-ink-700/25',
-                activo ?
-                'border-ink-800 bg-ink-800 text-white' :
-                'border-slateux-200 bg-white text-slateux-600 hover:border-slateux-300 hover:text-ink-700'].
-                join(' ')}>
-                
-                {t}
-              </button>);
-
-          })}
-        </div>
-
-        {cargando ?
-        <ul className="divide-y divide-slateux-200" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) =>
-          <li key={i} className="flex items-center gap-4 px-5 py-4">
-                <span className="h-9 w-9 shrink-0 animate-pulse rounded-field bg-slateux-200" />
-                <span className="flex-1">
-                  <span className="block h-3.5 w-1/2 animate-pulse rounded bg-slateux-200" />
-                  <span className="mt-2 block h-3 w-1/3 animate-pulse rounded bg-slateux-100" />
-                </span>
-                <span className="h-6 w-20 shrink-0 animate-pulse rounded-full bg-slateux-100" />
-              </li>
-          )}
-          </ul> :
-        visibles.length === 0 ?
-        <EmptyState
-          icon={<FileTextIcon className="h-5 w-5" />}
-          title="No hay documentos de este tipo"
-          description="Cuando MONOLITHE emita un documento de esta categoría para tu operación, aparecerá aquí."
-          action={
-          <Button variant="secondary" onClick={() => setTipo('Todos')}>
-                Ver todos
-              </Button>
-          } /> :
-
-
-        <ul className="divide-y divide-slateux-200">
-            {visibles.map((d) =>
-          <li
-            key={d.id}
-            className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
-            
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field border border-slateux-200 bg-slateux-50 text-slateux-500">
-                  <FileTextIcon className="h-[18px] w-[18px]" aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-semibold text-ink-800">
-                    {d.nombre}
-                  </p>
-                  <p className="mt-0.5 text-[12.5px] text-slateux-500">
-                    {d.tipo} · {formatDate(d.fecha)} · {d.peso}
-                  </p>
-                </div>
-                <StatusBadge tone={documentoEstadoTone[d.estado]}>
-                  {documentoEstadoLabel[d.estado]}
-                </StatusBadge>
-                <div className="flex shrink-0 gap-1 sm:ml-2">
-                  <Button
-                variant="ghost"
-                size="sm"
-                icon={<EyeIcon className="h-4 w-4" />}>
-                
-                    Visualizar
-                  </Button>
-                  <Button
-                variant="secondary"
-                size="sm"
-                icon={<DownloadIcon className="h-4 w-4" />}>
-                
-                    Descargar
-                  </Button>
-                </div>
-              </li>
-          )}
-          </ul>
+    const abort = new AbortController();
+    setCargando(true);
+    setError(null);
+    void portalCoreGet<PortalDocumentosResponse>('/portal-cliente/documentos', abort.signal)
+      .then(r => { if (!abort.signal.aborted) setDatos(r); })
+      .catch((err: unknown) => {
+        if (abort.signal.aborted) return;
+        setDatos(null);
+        if (err instanceof ApiError && err.status === 401) {
+          navigate('/login', { replace: true });
+          return;
         }
-      </Card>
-    </div>);
+        setError(err instanceof Error ? err.message : 'No se pudo consultar el expediente.');
+      })
+      .finally(() => { if (!abort.signal.aborted) setCargando(false); });
+    return () => abort.abort();
+  }, [navigate,version]);
 
+  const items = datos?.items ?? [];
+  const ventas = useMemo(() => Array.from(new Map(items.map(d =>
+    [d.idVenta,d.codigoVenta] as const)).entries()), [items]);
+  const visibles = useMemo(() => items.filter(d =>
+    (venta === 'TODAS' || String(d.idVenta) === venta)
+      && (filtro === 'TODOS' || (filtro === 'CONTRATO' ? d.tipo === 'CONTRATO'
+        : d.categoria === filtro))
+  ), [items,venta,filtro]);
+
+  async function abrirDocumento(d: PortalDocumentoPublicado, descargar: boolean) {
+    if (documentoOcupado !== null) return;
+    const llave = d.tipo + '-' + d.idDocumento;
+    setDocumentoOcupado(llave);
+    setErrorDocumento(null);
+    try {
+      const enlace = await portalCoreGet<PortalEnlaceDocumento>(
+        `/portal-cliente/documentos/${d.tipo}/${d.idDocumento}/url-firmada`);
+      const url = validarEnlace(enlace);
+      if (!descargar) {
+        const pestaña = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!pestaña) window.location.assign(url);
+      } else {
+        const respuesta = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+        if (!respuesta.ok) throw new Error('El archivo ya no está disponible para descarga.');
+        const blob = await respuesta.blob();
+        if (blob.size < 1 || blob.size > 10485760) {
+          throw new Error('El PDF no superó la verificación de tamaño.');
+        }
+        const temporal = URL.createObjectURL(blob);
+        try {
+          const enlaceDescarga = document.createElement('a');
+          enlaceDescarga.href = temporal;
+          enlaceDescarga.download = d.nombreArchivo.replace(/[^a-zA-Z0-9._ -]/g, '_');
+          document.body.appendChild(enlaceDescarga);
+          enlaceDescarga.click();
+          enlaceDescarga.remove();
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(temporal), 1500);
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) {
+        navigate('/login', { replace: true });
+      } else {
+        setErrorDocumento(err instanceof Error ? err.message : 'No fue posible abrir el documento.');
+      }
+    } finally {
+      setDocumentoOcupado(null);
+    }
+  }
+
+  return <div className="space-y-6">
+    <PageHeader eyebrow="Documentos" title="Documentación de mis compras"
+      description="Contratos y anexos publicados para su cuenta, disponibles solo mediante enlaces privados temporales." />
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-field border border-slateux-200 bg-white px-4 py-3">
+      <p className="flex items-center gap-2 text-xs text-slateux-600">
+        <ShieldCheckIcon className="h-4 w-4" />PDF publicados y verificados en Storage privado
+      </p>
+      <Button variant="secondary" size="sm" disabled={cargando}
+        onClick={() => setVersion(v => v + 1)}
+        icon={<RefreshCwIcon className="h-4 w-4" />}>Actualizar</Button>
+    </div>
+    {cargando && <Card as="section" className="p-7">
+      <p role="status" className="text-sm text-slateux-600">Verificando documentos publicados de sus compras…</p>
+    </Card>}
+    {error && <Card as="section" className="border-danger-200 p-6">
+      <p role="alert" className="text-sm text-danger-700">{error}</p>
+      <p className="mt-2 text-xs text-slateux-500">No se muestran documentos de ejemplo ni enlaces de descarga no autorizados.</p>
+    </Card>}
+    {!cargando && !error && datos && <Card as="section">
+      <CardHeader title="Mis documentos publicados"
+        description={`${datos.total} archivo(s) autorizados para esta cuenta`}
+        icon={<FolderOpenIcon className="h-[18px] w-[18px]" />}
+        action={ventas.length > 1 ? <select value={venta}
+          aria-label="Filtrar documentos por compra" onChange={e => setVenta(e.target.value)}
+          className="rounded-field border border-slateux-300 bg-white p-2 text-xs">
+          <option value="TODAS">Todas mis compras</option>
+          {ventas.map(([id,codigo]) => <option key={id} value={id}>{codigo}</option>)}
+        </select> : undefined}/>
+      <div className="flex flex-wrap gap-2 border-b border-slateux-200 px-5 py-4">
+        {filtros.map(o => <button key={o.valor} type="button"
+          aria-pressed={filtro===o.valor} onClick={() => setFiltro(o.valor)}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filtro===o.valor
+            ? 'border-ink-800 bg-ink-800 text-white'
+            : 'border-slateux-200 text-slateux-600'}`}>
+          {o.texto}
+        </button>)}
+      </div>
+      {errorDocumento && <p role="alert" className="m-5 rounded-field bg-danger-50 p-3 text-sm text-danger-700">
+        {errorDocumento}
+      </p>}
+      {visibles.length===0 ? <div className="p-6 text-sm text-slateux-600">
+        <p className="font-medium text-ink-800">No hay documentos disponibles en esta selección.</p>
+        <p className="mt-2">El área responsable debe publicar expresamente el PDF.
+          Los contratos, planos y anexos sin autorización o sin archivo real no aparecen aquí.</p>
+      </div> : <ul className="divide-y divide-slateux-200">
+        {visibles.map(d => {
+          const ocupado = documentoOcupado===d.tipo+'-'+d.idDocumento;
+          return <li key={d.tipo+'-'+d.idDocumento} className="flex flex-wrap items-center gap-4 px-5 py-4">
+            <FileTextIcon className="h-5 w-5 shrink-0 text-slateux-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink-800">{d.nombre}</p>
+              <p className="mt-1 text-xs text-slateux-600">
+                {d.codigoVenta} · {d.codigoContrato} · versión {d.numeroVersion}
+              </p>
+              <p className="mt-1 text-xs text-slateux-500">
+                Publicado {formatDate(d.fechaPublicacion)} · PDF · {(d.tamanioBytes/1024).toFixed(0)} KiB
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" size="sm" disabled={documentoOcupado!==null}
+                loading={ocupado} icon={<EyeIcon className="h-4 w-4" />}
+                onClick={() => void abrirDocumento(d,false)}>Ver</Button>
+              <Button variant="secondary" size="sm" disabled={documentoOcupado!==null}
+                icon={<DownloadIcon className="h-4 w-4" />}
+                onClick={() => void abrirDocumento(d,true)}>Descargar</Button>
+            </div>
+          </li>;
+        })}
+      </ul>}
+    </Card>}
+  </div>;
 }
