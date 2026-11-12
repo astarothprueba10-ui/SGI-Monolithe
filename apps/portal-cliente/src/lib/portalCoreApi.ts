@@ -2,7 +2,7 @@ import { ApiError } from './apiClient';
 
 /** El cliente nunca consulta funciones financieras con la clave pública de Supabase. */
 const coreBaseUrl =
-  import.meta.env.VITE_CORE_API_URL ?? 'http://localhost:8083/api/core';
+  import.meta.env.VITE_CORE_API_URL ?? '/api/core';
 
 async function portalCoreRequest<T>(
   path: string, method: 'GET' | 'POST',
