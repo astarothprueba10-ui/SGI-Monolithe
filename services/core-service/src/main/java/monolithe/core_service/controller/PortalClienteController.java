@@ -2,6 +2,11 @@ package monolithe.core_service.controller;
 
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.service.PortalClienteService;
+import monolithe.core_service.service.CrmSeparacionStorageService;
+import monolithe.core_service.dto.PortalPrepararVoucherRequest;
+import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
+import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,6 +30,39 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 public class PortalClienteController {
     private final PortalClienteService service;
+    private final CrmSeparacionStorageService storageService;
+
+    /** 5.4.4: comprobantes y cuotas propias, sin nombres ni rutas de Storage. */
+    @GetMapping("/vouchers")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> vouchers(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.vouchersPrivados(obtenerActor(jwt)));
+    }
+
+    /** Prepara un archivo privado después de la autorización SQL de la venta. */
+    @PostMapping("/vouchers/preparar-carga")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararVoucher(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody PortalPrepararVoucherRequest request) {
+        JsonNode preautorizacion = service.prepararVoucherPrivado(
+                obtenerActor(jwt),request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(storageService.firmarCargaPortal(preautorizacion,request.tipoMime()));
+    }
+
+    /** No confirma dinero: registra pago REGISTRADO y voucher PENDIENTE. */
+    @PostMapping("/vouchers/registrar")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> registrarVoucher(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody RegistrarVoucherCuotaPendienteRequest request,
+            @org.springframework.web.bind.annotation.RequestParam String destino) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.registrarVoucherPrivado(
+                        obtenerActor(jwt),request.idCarga(),destino));
+    }
 
     /** 5.4.3: cuotas, saldos y aplicaciones confirmadas de compras propias. */
     @GetMapping("/cronograma")
