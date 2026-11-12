@@ -123,4 +123,54 @@ class PortalClienteServiceSeguridadTest {
             ()->service.resumenPrivado(5L));
         assertEquals(HttpStatus.FORBIDDEN,error.getStatusCode());
     }
+
+    @Test
+    void vouchersSoloMuestranComprasAsociadasAlActorJwt() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        PortalClienteService service = new PortalClienteService(jdbc, new JsonMapper());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                () -> service.vouchersPrivados(null)).getStatusCode());
+        verifyNoInteractions(jdbc);
+
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+            .thenReturn("{\"operaciones\":[],\"comprobantes\":[],\"metodos\":[],\"total\":0}");
+        var respuesta = service.vouchersPrivados(9L);
+        assertEquals(0, respuesta.path("total").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_portal_cliente_vouchers_v1"));
+        assertFalse(sql.getValue().contains("FROM public.pag_vouchers"));
+    }
+
+    @Test
+    void clienteNoPuedePrepararVoucherSinDatosNiRegistrarCargaAjenaSinJwt() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        PortalClienteService service = new PortalClienteService(jdbc, new JsonMapper());
+        assertEquals(HttpStatus.BAD_REQUEST,
+            assertThrows(ResponseStatusException.class,
+                () -> service.prepararVoucherPrivado(9L, null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                () -> service.registrarVoucherPrivado(null, java.util.UUID.randomUUID(), "CUOTA"))
+                    .getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,
+            assertThrows(ResponseStatusException.class,
+                () -> service.registrarVoucherPrivado(9L, java.util.UUID.randomUUID(), "OTRO"))
+                    .getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void clienteRecibeProhibicionSiCompraNoLePertenece() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        PortalClienteService service = new PortalClienteService(jdbc, new JsonMapper());
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+            .thenThrow(new DataAccessResourceFailureException(
+                "PORTAL_VENTA_NO_AUTORIZADA|La compra no admite esta carga."));
+        assertEquals(HttpStatus.FORBIDDEN,
+            assertThrows(ResponseStatusException.class,
+                () -> service.registrarVoucherPrivado(
+                    9L, java.util.UUID.randomUUID(), "CUOTA")).getStatusCode());
+    }
 }
