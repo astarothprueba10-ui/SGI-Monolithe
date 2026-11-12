@@ -234,6 +234,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/portal_documentos_alertas_v1_pg_fixture.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/99_portal_documentos_alertas_privadas_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/portal_documentos_alertas_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_integracion_end_to_end_546_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
