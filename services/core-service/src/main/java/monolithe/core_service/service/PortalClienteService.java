@@ -47,24 +47,85 @@ public class PortalClienteService {
                 "SELECT public.sp_portal_cliente_cronograma_v1(CAST(? AS bigint))::text");
     }
 
-    private JsonNode consultarPrivado(Long actor, String consulta) {
+    /** 5.4.4: opciones propias y estado de revisión, sin rutas de Storage. */
+    @Transactional(readOnly = true)
+    public JsonNode vouchersPrivados(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_vouchers_v1(CAST(? AS bigint))::text");
+    }
+
+    /** Crea un intento de carga para una compra/cuota cuya titularidad valida SQL. */
+    @Transactional
+    public JsonNode prepararVoucherPrivado(Long actor,
+            monolithe.core_service.dto.PortalPrepararVoucherRequest req) {
+        if (req == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Debe completar la información del comprobante.");
+        }
+        return consultarPrivado(actor, """
+                SELECT public.sp_portal_cliente_preparar_voucher_v1(
+                    CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar),
+                    CAST(? AS bigint),CAST(? AS numeric),CAST(? AS integer),
+                    CAST(? AS date),CAST(? AS varchar),CAST(? AS varchar),
+                    CAST(? AS varchar),CAST(? AS bigint)
+                )::text
+                """,req.idVenta(),req.destino(),req.idCuota(),req.monto(),
+                req.idMetodoPago(),req.fechaOperacion(),req.numeroOperacion(),
+                req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Registro idempotente después de validar el objeto real de Storage. */
+    @Transactional
+    public JsonNode registrarVoucherPrivado(Long actor,java.util.UUID idCarga,String destino) {
+        if (idCarga == null || destino == null
+                || (!destino.equals("CUOTA") && !destino.equals("INICIAL"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La referencia de comprobante no es válida.");
+        }
+        return consultarPrivado(actor, """
+                SELECT public.sp_portal_cliente_registrar_voucher_v1(
+                    CAST(? AS bigint),CAST(? AS uuid),CAST(? AS varchar)
+                )::text
+                """,idCarga,destino);
+    }
+
+    private JsonNode consultarPrivado(Long actor, String consulta, Object... parametros) {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Se requiere una sesión de cliente válida.");
         }
         final String respuesta;
         try {
-            respuesta = jdbc.queryForObject(
-                    consulta,
-                    String.class, actor);
+            Object[] valores = new Object[parametros.length + 1];
+            valores[0] = actor;
+            System.arraycopy(parametros, 0, valores, 1, parametros.length);
+            respuesta = jdbc.queryForObject(consulta, String.class, valores);
         } catch (DataAccessException ex) {
             String message = String.valueOf(ex.getMostSpecificCause().getMessage());
             if (message.contains("PORTAL_ACCESO_DENEGADO|")) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                         "El usuario no tiene una cuenta de cliente activa.", ex);
             }
+            if (message.contains("PORTAL_DATOS_INVALIDOS|")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Revise los datos y el formato del comprobante.", ex);
+            }
+            if (message.contains("PORTAL_VENTA_NO_AUTORIZADA|")
+                    || message.contains("PORTAL_PLAN_NO_AUTORIZADO|")
+                    || message.contains("PORTAL_CUOTA_NO_AUTORIZADA|")
+                    || message.contains("PORTAL_CARGA_NO_AUTORIZADA|")) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Operación o comprobante no autorizado para esta cuenta.", ex);
+            }
+            if (message.contains("PORTAL_MONTO_INVALIDO|")
+                    || message.contains("PORTAL_CARGA_EXPIRADA|")
+                    || message.contains("PORTAL_ARCHIVO_NO_EXISTE|")
+                    || message.contains("PORTAL_PAGO_DUPLICADO|")) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "El comprobante no pudo registrarse. Revise el saldo, archivo o número de operación.", ex);
+            }
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "No se pudo consultar el resumen del cliente.", ex);
+                    "No fue posible procesar la solicitud privada.", ex);
         }
         if (respuesta == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
