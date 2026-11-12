@@ -198,7 +198,7 @@ export function RegistrarPagoForm({ operaciones, metodos, onRegistrado }: {
       {exito && <p role="status" className="flex gap-2 rounded-field bg-success-50 p-3 text-sm text-success-700">
         <CheckCircle2Icon className="h-4 w-4 shrink-0" />Comprobante recibido. En revisión por Finanzas; aún no reduce su saldo.
       </p>}
-      <Button type="submit" block={false} disabled={!puedeCargar || ocupado} loading={ocupado}
+      <Button type="submit" disabled={!puedeCargar || ocupado} loading={ocupado}
         icon={<ShieldCheckIcon className="h-4 w-4" />}>
         {pendiente ? 'Reintentar registro' : 'Enviar voucher'}
       </Button>
