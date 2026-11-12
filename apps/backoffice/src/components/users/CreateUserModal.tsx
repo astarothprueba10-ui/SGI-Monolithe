@@ -17,6 +17,7 @@ import {
   correoPrincipalValido,
   debeMostrarAdvertenciaCorreoFaltante,
   evaluarRolesIniciales,
+  motivoNoElegiblePersona,
   personaElegibleParaSeleccion,
   personasUnicasPorId,
   puedeAsignarRolesInternosProtegidos
@@ -453,8 +454,13 @@ export function CreateUserModal({
                         </span>
 
                         {!p.elegible && (
-                          <span className="text-[11px] text-rose-500">
-                            No elegible
+                          <span className="text-[11px] text-rose-600">
+                            No elegible: {motivoNoElegiblePersona(p)}
+                          </span>
+                        )}
+                        {p.elegible && !correoPrincipalValido(p.correo) && (
+                          <span className="text-[11px] text-amber-700">
+                            Falta correo principal activo y válido para enviar credenciales.
                           </span>
                         )}
                       </button>
@@ -472,7 +478,12 @@ export function CreateUserModal({
 
           {personaSeleccionada && !esElegible && (
             <p className="mt-1 text-xs text-rose-600">
-              Esta persona no es elegible para crear una cuenta de usuario.
+              {motivoNoElegiblePersona(personaSeleccionada)}
+            </p>
+          )}
+          {personaSeleccionada && !correoValido && (
+            <p className="mt-1 text-xs text-rose-600">
+              Antes de crear la cuenta, registre un correo principal activo y válido en el expediente.
             </p>
           )}
           {personaSeleccionada && esElegible && !relacionesValidas && (
