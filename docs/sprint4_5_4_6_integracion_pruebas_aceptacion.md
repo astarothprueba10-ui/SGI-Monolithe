@@ -42,6 +42,7 @@
 - `apps/portal-cliente/src/pages/portal/Cronograma.tsx` y `MiLote.tsx`: compatibilidad TS ES2020 y prevención de referencias a objeto nulo.
 - `apps/portal-cliente/vite.config.ts`, `apps/portal-cliente/src/lib/portalCoreApi.ts`, `docker-compose.yml`: `VITE_CORE_API_URL=/api/core`, proxy `/api/core -> http://core-service:8083`, dependencia Docker correcta. Ya no se recurre automáticamente a `http://localhost:8083` desde el navegador.
 - `apps/portal-cliente/tests/portalIntegrationWiring.test.mjs`: prueba de rutas reales, separación de demo-data, proxy Docker y referencias de seguridad sin secretos.
+- `apps/portal-cliente/src/lib/portalCoreApi.ts`: evita enviar la cabecera adicional `Cache-Control` en peticiones cross-origin, porque el CORS del Core solo admite Authorization, Content-Type y Accept; conserva `fetch(cache:'no-store')` y las respuestas `CacheControl.noStore()` del servidor.
 
 ## 3. Diagnóstico de datos de testeo (solo lectura)
 
