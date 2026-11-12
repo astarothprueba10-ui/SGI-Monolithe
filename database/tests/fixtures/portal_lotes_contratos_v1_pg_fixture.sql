@@ -96,3 +96,15 @@ INSERT INTO public.ven_contratos_archivos VALUES
  (93005,93003,false,true,now());
 INSERT INTO public.ven_contratos_anexos VALUES
  (93003,93003,true,true,NULL);
+
+-- Campos reales de pagos ausentes del esquema mínimo histórico de CI.
+-- Se incorporan únicamente a PostgreSQL 17 efímero (no a Supabase).
+ALTER TABLE public.pag_pagos ADD COLUMN IF NOT EXISTS codigo varchar;
+ALTER TABLE public.pag_pagos ADD COLUMN IF NOT EXISTS fecha_operacion timestamptz;
+ALTER TABLE public.pag_aplicaciones_pago ADD COLUMN IF NOT EXISTS fecha_aplicacion timestamptz;
+UPDATE public.pag_pagos SET codigo='PAG-CI-'||id_pago::text,
+  fecha_operacion=TIMESTAMPTZ '2026-11-01 12:00:00-05'
+  WHERE id_pago IN (1003,1004);
+UPDATE public.pag_aplicaciones_pago
+  SET fecha_aplicacion=TIMESTAMPTZ '2026-11-01 13:00:00-05'
+  WHERE id_pago IN (1003,1004);
