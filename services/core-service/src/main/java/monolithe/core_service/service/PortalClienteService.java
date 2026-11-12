@@ -89,6 +89,35 @@ public class PortalClienteService {
                 """,idCarga,destino);
     }
 
+    /** 5.4.5: solo metadatos de documentos publicados, nunca rutas o hashes. */
+    @Transactional(readOnly = true)
+    public JsonNode documentosPrivados(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_documentos_v1(CAST(? AS bigint))::text");
+    }
+
+    /** Alertas recalculadas desde cuotas y vouchers reales del actor JWT. */
+    @Transactional(readOnly = true)
+    public JsonNode alertasPrivadas(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_alertas_v1(CAST(? AS bigint))::text");
+    }
+
+    /** Entrega la ruta SOLO al servidor que firma la URL; jamás al listado público. */
+    @Transactional(readOnly = true)
+    public JsonNode autorizarDocumentoPrivado(Long actor, String tipo, Long idDocumento) {
+        if (tipo == null || (!tipo.equals("CONTRATO") && !tipo.equals("ANEXO"))
+                || idDocumento == null || idDocumento <= 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Documento no disponible para la cuenta.");
+        }
+        return consultarPrivado(actor, """
+                SELECT public.sp_portal_cliente_autorizar_documento_v1(
+                    CAST(? AS bigint),CAST(? AS varchar),CAST(? AS bigint)
+                )::text
+                """,tipo,idDocumento);
+    }
+
     private JsonNode consultarPrivado(Long actor, String consulta, Object... parametros) {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
@@ -105,6 +134,10 @@ public class PortalClienteService {
             if (message.contains("PORTAL_ACCESO_DENEGADO|")) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                         "El usuario no tiene una cuenta de cliente activa.", ex);
+            }
+            if (message.contains("PORTAL_DOCUMENTO_NO_AUTORIZADO|")) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Documento no disponible para la cuenta.", ex);
             }
             if (message.contains("PORTAL_DATOS_INVALIDOS|")) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
