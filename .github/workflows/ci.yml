@@ -36,6 +36,11 @@ jobs:
         working-directory: apps/portal-cliente
         run: npx --no-install tsc --noEmit -p tsconfig.json
 
+      - name: Verify Portal Cliente integration wiring
+        if: matrix.app == 'apps/portal-cliente'
+        working-directory: apps/portal-cliente
+        run: node --test tests/portalIntegrationWiring.test.mjs
+
       - name: Build application
         working-directory: ${{ matrix.app }}
         env:
