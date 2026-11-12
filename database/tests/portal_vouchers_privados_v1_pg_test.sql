@@ -18,7 +18,7 @@ BEGIN
      OR v_metodo IS NULL OR jsonb_array_length(a->'operaciones')<>1
      OR jsonb_array_length(b->'operaciones')<>1
      OR a::text LIKE '%clave_archivo%' OR a::text LIKE '%urlCarga%'
-  THEN RAISE EXCEPTION '544|Consulta privada no aislada o con clave Storage'; END IF;
+  THEN RAISE EXCEPTION '544|Consulta privada incompatible: venta=%, ajena=%, cuota=%, metodo=%, ops_a=%, ops_b=%, filtracion=%', v_venta,v_ajena,v_cuota,v_metodo,jsonb_array_length(a->'operaciones'),jsonb_array_length(b->'operaciones'), (a::text LIKE '%clave_archivo%' OR a::text LIKE '%urlCarga%'); END IF;
 
   BEGIN
     PERFORM public.sp_portal_cliente_vouchers_v1(5);
