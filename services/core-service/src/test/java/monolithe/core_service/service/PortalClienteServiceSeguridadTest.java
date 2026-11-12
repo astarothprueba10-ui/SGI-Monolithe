@@ -173,4 +173,45 @@ class PortalClienteServiceSeguridadTest {
                 () -> service.registrarVoucherPrivado(
                     9L, java.util.UUID.randomUUID(), "CUOTA")).getStatusCode());
     }
+
+    @Test
+    void documentosYAlertasSoloSeConsultanConIdentidadJwt() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+            ()->service.documentosPrivados(null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+            ()->service.alertasPrivadas(0L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenReturn("{\"items\":[],\"total\":0}");
+        assertEquals(0,service.documentosPrivados(9L).path("total").asInt());
+        assertEquals(0,service.alertasPrivadas(9L).path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc,times(2)).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getAllValues().get(0).contains("sp_portal_cliente_documentos_v1"));
+        assertTrue(sql.getAllValues().get(1).contains("sp_portal_cliente_alertas_v1"));
+        assertFalse(sql.getAllValues().get(0).contains("FROM storage.objects"));
+    }
+
+    @Test
+    void documentoNoPublicadoNiDeOtroCompradorNoSeAutoriza() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        assertEquals(HttpStatus.NOT_FOUND,
+            assertThrows(ResponseStatusException.class,
+              ()->service.autorizarDocumentoPrivado(9L,"OTRO",3L)).getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND,
+            assertThrows(ResponseStatusException.class,
+              ()->service.autorizarDocumentoPrivado(9L,"CONTRATO",-1L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenThrow(new DataAccessResourceFailureException(
+                "PORTAL_DOCUMENTO_NO_AUTORIZADO|Documento no publicado."));
+        assertEquals(HttpStatus.NOT_FOUND,
+            assertThrows(ResponseStatusException.class,
+              ()->service.autorizarDocumentoPrivado(9L,"CONTRATO",93003L)).getStatusCode());
+    }
 }
