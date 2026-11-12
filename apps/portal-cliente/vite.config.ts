@@ -60,6 +60,17 @@ export default defineConfig(({ mode }) => {
     process.env.AUTH_PROXY_TARGET ||
     'http://localhost:8081';
 
+  // En desarrollo se usa proxy same-origin; en Vercel se configura
+  // VITE_CORE_API_URL con la URL HTTPS real del backend.
+  const coreApiUrl =
+    process.env.VITE_CORE_API_URL ||
+    localEnv.VITE_CORE_API_URL ||
+    '/api/core';
+
+  const coreProxyTarget =
+    process.env.CORE_PROXY_TARGET ||
+    'http://localhost:8083';
+
   const supabaseUrl =
     process.env.VITE_SUPABASE_URL ||
     secretEnv.VITE_SUPABASE_URL ||
@@ -96,6 +107,15 @@ export default defineConfig(({ mode }) => {
       },
 
       proxy: {
+        '/api/core': {
+          target: coreProxyTarget,
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+            });
+          }
+        },
         '/api/auth': {
           target: authProxyTarget,
           changeOrigin: true,
@@ -112,6 +132,9 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_AUTH_API_URL':
         JSON.stringify(authApiUrl),
+
+      'import.meta.env.VITE_CORE_API_URL':
+        JSON.stringify(coreApiUrl),
 
       'import.meta.env.VITE_SUPABASE_URL':
         JSON.stringify(supabaseUrl),
