@@ -5,6 +5,7 @@ import {
   FileTextIcon,RefreshCwIcon,ShieldCheckIcon
 } from 'lucide-react';
 import {PageHeader} from '../../components/portal/PageHeader';
+import {AlertasPanel} from '../../components/portal/AlertasPanel';
 import {Card,CardHeader} from '../../components/ui/Card';
 import {portalCoreGet} from '../../lib/portalCoreApi';
 import {ApiError} from '../../lib/apiClient';
@@ -188,9 +189,12 @@ export function Inicio() {
               No se puede consultar la operación de otra persona.
             </p>
           </Card>
-        ):datos.operaciones.map(op=>
-          <VistaOperacion key={op.id_venta} operacion={op}/>
-        )}
+        ):<>
+          {datos.operaciones.map(op =>
+            <VistaOperacion key={op.id_venta} operacion={op}/>
+          )}
+          <AlertasPanel />
+        </>}
       </>
     )}
   </div>;
