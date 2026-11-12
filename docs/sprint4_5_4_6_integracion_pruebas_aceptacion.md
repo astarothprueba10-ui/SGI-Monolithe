@@ -22,7 +22,7 @@
 | AC-11 | Finanzas imputa pago confirmado: saldo y cronograma cambian exactamente lo aplicado | SQL 87, 97 y test integral | APROBADO |
 | AC-12 | Repetir aplicación con misma solicitud es idempotente | SQL 87 + test integral | APROBADO |
 | AC-13 | Rechazo motivado de voucher no modifica saldo y aparece en alertas | SQL 86, 99 + test integral | APROBADO |
-| AC-14 | Inicial adicional se registra y aplica en el circuito de Finanzas si existe saldo | SQL 92–93 + test condicional | APROBADO CONDICIONAL |
+| AC-14 | Inicial adicional se registra y aplica en el circuito de Finanzas con saldo en fixture | SQL 92–93 + test obligatorio | APROBADO |
 | AC-15 | Documento PDF publicado y existente es visible solo al propietario | SQL 99, fixture aislado | APROBADO |
 | AC-16 | Ocultar documento revoca autorización de generar NUEVOS enlaces | SQL 99 + test integral | APROBADO |
 | AC-17 | Endpoints usan JWT, ROLE_CLIENTE, no-store y URLs firmadas de duración limitada | `PortalClienteControllerSeguridadTest.java` y tests 5.4.5 | APROBADO |
