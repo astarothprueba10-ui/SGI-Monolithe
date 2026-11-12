@@ -81,6 +81,19 @@ public class CrmSeparacionStorageService {
             ventaService.prepararCargaVoucherInicial(actor,req),req.tipoMime());
     }
 
+    /** 5.4.4: reutiliza firma Storage; la preautorización privada ocurre
+     * previamente en PortalClienteService y está asociada al JWT.
+     */
+    public EnlaceCargaVoucherCuotaResponse firmarCargaPortal(
+            JsonNode preautorizacion,String tipoMime) {
+        if (preautorizacion == null || tipoMime == null
+                || !MIMES_PERMITIDOS.contains(tipoMime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Comprobante no permitido.");
+        }
+        return firmarCargaFinanciada(preautorizacion,tipoMime);
+    }
+
     private EnlaceCargaVoucherCuotaResponse firmarCargaFinanciada(
             JsonNode preautorizacion,String tipoMime) {
         String bucket=preautorizacion.path("bucket").asString("");
