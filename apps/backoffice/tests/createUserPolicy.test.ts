@@ -8,6 +8,7 @@ import {
   correoPrincipalValido,
   debeMostrarAdvertenciaCorreoFaltante,
   evaluarRolesIniciales,
+  motivoNoElegiblePersona,
   personaElegibleParaSeleccion,
   personasUnicasPorId,
   puedeAsignarRolesInternosProtegidos
@@ -196,4 +197,25 @@ test('la advertencia de correo faltante solo aparece para una persona selecciona
   assert.equal(debeMostrarAdvertenciaCorreoFaltante(true, undefined), true);
   assert.equal(debeMostrarAdvertenciaCorreoFaltante(true, ''), true);
   assert.equal(debeMostrarAdvertenciaCorreoFaltante(true, 'persona@example.test'), false);
+});
+
+
+test('explica por qué un cliente contractual sin documento no puede recibir credenciales', () => {
+  const base = {
+    idPersona: 1, nombres: 'Caso', apellidoPaterno: 'Prueba', apellidoMaterno: '',
+    nombreCompleto: 'Caso Prueba', correo: 'qa@example.test', correoVerificado: false,
+    relaciones: ['CLIENTE' as const], elegible: false, tipoDocumento: null,
+    numeroDocumento: null, documentoVerificado: false, documentoActivo: false
+  };
+  assert.match(motivoNoElegiblePersona(base) ?? '', /documento principal activo/i);
+  assert.match(motivoNoElegiblePersona({ ...base, tipoDocumento: 'DNI', numeroDocumento: '12345678', documentoActivo: true }) ?? '', /sin verificar/i);
+  assert.equal(motivoNoElegiblePersona({ ...base, elegible: true }), null);
+});
+
+test('RRHH puede ofrecer CLIENTE sin abrir roles internos protegidos', () => {
+  const politica = evaluarRolesIniciales(['CLIENTE'], [], [rol('CLIENTE', false), rol('ADMINISTRADOR', false)], false);
+  assert.equal(politica.rolClienteDisponible, true);
+  assert.equal(politica.rolesValidos, true);
+  assert.deepEqual(politica.codigosRolesEfectivos, ['CLIENTE']);
+  assert.deepEqual(politica.rolesInternosDisponibles, []);
 });
