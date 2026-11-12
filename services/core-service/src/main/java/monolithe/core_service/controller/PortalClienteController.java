@@ -2,6 +2,7 @@ package monolithe.core_service.controller;
 
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.service.PortalClienteService;
+import monolithe.core_service.service.PortalDocumentoStorageService;
 import monolithe.core_service.service.CrmSeparacionStorageService;
 import monolithe.core_service.dto.PortalPrepararVoucherRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
@@ -15,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,33 @@ import tools.jackson.databind.JsonNode;
 public class PortalClienteController {
     private final PortalClienteService service;
     private final CrmSeparacionStorageService storageService;
+    private final PortalDocumentoStorageService documentosStorage;
+
+    /** 5.4.5: lista publicada, sin claves de archivos ni enlaces firmados. */
+    @GetMapping("/documentos")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> documentos(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.documentosPrivados(obtenerActor(jwt)));
+    }
+
+    /** Solo después de revalidar titularidad, publicación y objeto en Storage. */
+    @GetMapping("/documentos/{tipo}/{idDocumento}/url-firmada")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<PortalDocumentoStorageService.EnlaceLecturaPortal> enlaceDocumento(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String tipo,@PathVariable Long idDocumento) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(documentosStorage.firmarLectura(obtenerActor(jwt),tipo,idDocumento));
+    }
+
+    /** Alertas privadas calculadas, sin notificaciones de otros módulos. */
+    @GetMapping("/alertas")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> alertas(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.alertasPrivadas(obtenerActor(jwt)));
+    }
 
     /** 5.4.4: comprobantes y cuotas propias, sin nombres ni rutas de Storage. */
     @GetMapping("/vouchers")
