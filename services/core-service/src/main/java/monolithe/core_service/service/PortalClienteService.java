@@ -37,6 +37,16 @@ public class PortalClienteService {
                 "SELECT public.sp_portal_cliente_lotes_contratos_v1(CAST(? AS bigint))::text");
     }
 
+    /**
+     * 5.4.3: actor exclusivo del JWT, sin identificadores de planes, cuotas
+     * o compradores proporcionados por el navegador.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode cronogramaPrivado(Long actor) {
+        return consultarPrivado(actor,
+                "SELECT public.sp_portal_cliente_cronograma_v1(CAST(? AS bigint))::text");
+    }
+
     private JsonNode consultarPrivado(Long actor, String consulta) {
         if (actor == null || actor <= 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
