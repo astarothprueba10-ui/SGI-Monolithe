@@ -7,6 +7,7 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Inicio } from './pages/portal/Inicio';
 import { MiLote } from './pages/portal/MiLote';
+import { Cronograma } from './pages/portal/Cronograma';
 import { NotFound } from './pages/NotFound';
 
 
@@ -53,7 +54,7 @@ export function App() {
         >
           <Route index element={<Inicio />} />
           <Route path="lote" element={<MiLote />} />
-          <Route path="cronograma" element={<PortalFeaturePending titulo="Cronograma de pagos" />} />
+          <Route path="cronograma" element={<Cronograma />} />
           <Route path="pagos" element={<PortalFeaturePending titulo="Pagos y vouchers" />} />
           <Route path="documentos" element={<PortalFeaturePending titulo="Documentos" />} />
           <Route path="asesor" element={<PortalFeaturePending titulo="Mi asesor" />} />
