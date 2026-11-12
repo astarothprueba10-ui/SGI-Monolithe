@@ -84,7 +84,7 @@ function Contrato({c}: {c:PortalContratoDetalle}) {
       </div>
       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${firmadoVigente?
         'bg-success-50 text-success-700':'bg-warn-50 text-warn-700'}`}>
-        {firmadoVigente?'Vigente y firmado':c.estado.replaceAll('_',' ')}
+        {firmadoVigente?'Vigente y firmado':c.estado.replace(/_/g,' ')}
       </span>
     </div>
     <dl className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -205,7 +205,7 @@ export function MiLote() {
             </p>
             <h2 className="mt-1 text-lg font-semibold text-ink-800">{actual.codigoVenta}</h2>
             <p className="mt-1 text-xs text-slateux-600">
-              Estado de venta: {actual.estadoVenta.replaceAll('_',' ')}
+              Estado de venta: {actual.estadoVenta.replace(/_/g,' ')}
               {' · '}{actual.esTitular?'Titular registrado':'Participante de la compra'}
             </p>
           </div>
