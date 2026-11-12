@@ -38,6 +38,22 @@ export function puedeAsignarRolesInternosProtegidos(
   ]);
 }
 
+/** Explica el bloqueo documental sin alterar la guarda segura que reside en Supabase. */
+export function motivoNoElegiblePersona(persona: AvailablePerson): string | null {
+  if (persona.elegible) return null;
+  const relaciones = persona.relaciones ?? [];
+  if (!relaciones.includes('CLIENTE') && !relaciones.includes('TRABAJADOR')) {
+    return 'No consta una relación vigente como cliente o trabajador.';
+  }
+  if (!persona.documentoActivo || !persona.tipoDocumento || !persona.numeroDocumento) {
+    return 'Falta un documento principal activo. Complete la identidad en el expediente CRM o de Trabajadores.';
+  }
+  if (relaciones.includes('CLIENTE') && !persona.documentoVerificado) {
+    return 'Documento principal sin verificar. Debe validarse la identidad antes de entregar acceso al Portal Cliente.';
+  }
+  return 'El documento o el estado de la persona no cumple los requisitos de acceso. Revise vigencia, formato y duplicados.';
+}
+
 export function personaElegibleParaSeleccion(
   persona: Pick<AvailablePerson, 'elegible' | 'relaciones'>
 ): boolean {
@@ -64,10 +80,10 @@ export function evaluarRolesIniciales(
     (puedeAsignarRolesProtegidos || rol.asignableRrhh) &&
     rol.codigo.toUpperCase() !== CODIGO_ROL_CLIENTE
   );
+  // El backend ya incluye CLIENTE en el catálogo autorizado a RRHH y Gerencia.
+  // Es una excepción al indicador asignableRrhh, reservado a roles internos.
   const rolClienteDisponible = roles.some((rol) =>
-    rol.codigo.toUpperCase() === CODIGO_ROL_CLIENTE &&
-    rol.activo &&
-    (puedeAsignarRolesProtegidos || rol.asignableRrhh)
+    rol.codigo.toUpperCase() === CODIGO_ROL_CLIENTE && rol.activo
   );
   const rolesInternosSeleccionados = seleccionados.filter((codigo) =>
     codigo.toUpperCase() !== CODIGO_ROL_CLIENTE &&
