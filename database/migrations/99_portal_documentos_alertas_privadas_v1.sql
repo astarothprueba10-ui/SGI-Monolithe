@@ -67,7 +67,7 @@ AS $function$
        AND lower(coalesce(o.metadata->>'mimetype',''))=d.tipo_mime
        AND coalesce((o.metadata->>'size')::bigint,0)=d.tamanio_bytes
    );
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.sp_portal_cliente_documentos_v1(p_actor bigint)
@@ -92,7 +92,7 @@ BEGIN
    'items',v_items,'total',jsonb_array_length(v_items),
    'advertencia','Solo se muestran PDFs publicados, vigentes y físicamente disponibles para las compras vinculadas a la cuenta.');
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.sp_portal_cliente_autorizar_documento_v1(p_actor bigint, p_tipo character varying, p_documento bigint)
@@ -119,7 +119,7 @@ BEGIN
    'claveArchivo',d.clave_archivo,'tipoMime',d.tipo_mime,
    'tamanioBytes',d.tamanio_bytes);
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.sp_portal_cliente_alertas_v1(p_actor bigint)
@@ -196,7 +196,7 @@ BEGIN
    'fechaCorte',v_crono->>'fechaCorte',
    'fuente','CRONOGRAMA_VOUCHERS_DOCUMENTOS_REALES');
 END;
-$function$
+$function$;
 
 
 REVOKE ALL ON FUNCTION public.fn_portal_documentos_publicados_v1(bigint) FROM PUBLIC,anon,authenticated;
