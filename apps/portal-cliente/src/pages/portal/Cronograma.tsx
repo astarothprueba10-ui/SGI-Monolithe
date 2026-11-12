@@ -43,7 +43,7 @@ function Indicador({ titulo, valor, detalle }: {
 }
 
 function Estado({ cuota }: { cuota: PortalCuotaReal }) {
-  const label = cuota.estadoCalculado.replaceAll('_', ' ').toLowerCase();
+  const label = cuota.estadoCalculado.replace(/_/g, ' ').toLowerCase();
   return <div className="flex flex-col items-start gap-1">
     <span className={'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ' + tonos[cuota.estadoCalculado]}>
       {label.charAt(0).toUpperCase() + label.slice(1)}
@@ -230,7 +230,7 @@ export function Cronograma() {
             Capital financiado: {formatCurrency(plan.capitalFinanciado)}
           </p>
           <p className="mt-2 text-xs leading-relaxed text-slateux-600">
-            {datos.advertenciaInicial} {datos.advertenciaPagos}
+            {datos?.advertenciaInicial} {datos?.advertenciaPagos}
           </p>
           {actual.resumenEstados.discrepanciasRegistro > 0 &&
             <p className="mt-2 text-xs text-warn-700">
