@@ -4,6 +4,7 @@ import type {
 } from '../../types/workers';
 import { CORRECTION_EVIDENCE_MAX_SIZE, CORRECTION_EVIDENCE_MIME_TYPES } from './correctionDocumentUtils';
 import { normalizeEmailAddress } from '../../lib/emailAddress';
+import { formatPersonName } from '../../lib/personName';
 
 export type WorkerDocumentType = CatalogosTrabajadorResponse['tiposDocumento'][number];
 
@@ -78,8 +79,9 @@ export function buildWorkerUpdatePayload(
   for (const [formKey, payloadKey] of fields) {
     if (!changed.has(formKey)) continue;
     const value = String(form[formKey] ?? '');
+    const text = ['nombres', 'apellidoPaterno', 'apellidoMaterno'].includes(payloadKey) ? formatPersonName(value) : value.trim();
     (personal as Record<string, unknown>)[payloadKey] =
-      formKey === 'fechaNacimiento' ? value || null : value.trim() || null;
+      formKey === 'fechaNacimiento' ? value || null : text || null;
   }
 
   if (changed.has('idCargo')) labor.idCargo = Number(form.idCargo);
@@ -159,7 +161,7 @@ export function filtrarCaracteresDocumento(valor: string, soloNumerico: boolean)
 }
 
 export function filtrarCaracteresNombre(valor: string): string {
-  return valor.replace(/[^A-Za-z\u00C0-\u024F\s-]/g, '');
+  return valor.normalize('NFC').replace(/[^A-Za-z\u00C0-\u024F\s-]/g, '');
 }
 
 export function filtrarTelefono(valor: string): string {

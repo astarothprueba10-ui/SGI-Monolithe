@@ -1,4 +1,5 @@
 import { getAccessToken } from '../lib/authSession';
+import { formatPersonName } from '../lib/personName';
 
 const BASE_URL = (
   import.meta.env.VITE_AUTH_API_URL ?? '/api/auth'
@@ -150,7 +151,7 @@ export interface CreatedUserResponse {
 
 export const securityApi = {
   listarUsuarios: () =>
-    request<SecurityUser[]>('/users'),
+    request<SecurityUser[]>('/users').then(users => users.map(user => ({ ...user, nombreCompleto: formatPersonName(user.nombreCompleto) }))),
 
   listarRoles: () =>
     request<SecurityRole[]>('/roles'),
