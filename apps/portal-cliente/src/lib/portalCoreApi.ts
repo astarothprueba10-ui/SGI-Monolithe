@@ -18,7 +18,8 @@ async function portalCoreRequest<T>(
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
-      'Cache-Control': 'no-store',
+      // Evitar cabeceras no permitidas en el preflight CORS entre dominios.
+      // La petición usa fetch(cache: 'no-store') y Core responde no-store.
       ...(body ? { 'Content-Type': 'application/json' } : {})
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
