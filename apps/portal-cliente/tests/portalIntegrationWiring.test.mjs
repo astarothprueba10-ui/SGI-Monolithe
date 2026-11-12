@@ -33,6 +33,9 @@ test('Client requests use JWT and no caching; no service_role key in browser', (
   const docs = read('../src/pages/portal/Documentos.tsx');
   assert.match(client, /Authorization: `Bearer \$\{token\}`/);
   assert.match(client, /cache: 'no-store'/);
+  assert.doesNotMatch(client, /'Cache-Control':\s*'no-store'/);
+  // La cabecera Cache-Control no se permite en el preflight del Core;
+  // fetch(cache) y CacheControl.noStore() bastan para no persistir datos.
   assert.match(upload, /uploadToSignedUrl/);
   assert.match(docs, /url-firmada/);
   for (const s of [client,upload,docs]) {
