@@ -201,6 +201,8 @@ BEGIN
         WHERE (x->>'idVoucher')::bigint=(v_reg->>'idVoucher')::bigint
           AND (x->>'montoAplicado')::numeric=10.00)
       THEN RAISE EXCEPTION '546|Portal no reflejó abono de inicial'; END IF;
+    ELSE
+      RAISE EXCEPTION '546|El fixture no tiene inicial adicional; prueba incompleta';
     END IF;
 
     -- 7. Publicación: lectura autorizada solo al comprador mientras exista PDF.
