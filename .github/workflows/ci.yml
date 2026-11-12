@@ -31,6 +31,11 @@ jobs:
         working-directory: ${{ matrix.app }}
         run: npm install
 
+      - name: TypeScript strict validation (Portal Cliente)
+        if: matrix.app == 'apps/portal-cliente'
+        working-directory: apps/portal-cliente
+        run: npx --no-install tsc --noEmit -p tsconfig.json
+
       - name: Build application
         working-directory: ${{ matrix.app }}
         env:
