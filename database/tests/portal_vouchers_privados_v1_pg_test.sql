@@ -14,11 +14,16 @@ BEGIN
   v_cuota:=(a->'operaciones'->0->'cuotas'->0->>'idCuota')::bigint;
   v_metodo:=(a->'metodos'->0->>'idMetodoPago')::integer;
   v_saldo:=public.fn_fin_saldo_cuota_confirmado_v1(v_cuota);
+  -- Las fixtures previas pueden aportar más operaciones propias a cada
+  -- actor; solo se prohíbe cruzar la venta exclusiva del otro comprador.
   IF v_venta<>1003 OR v_ajena<>1004 OR v_cuota IS NULL
-     OR v_metodo IS NULL OR jsonb_array_length(a->'operaciones')<>1
-     OR jsonb_array_length(b->'operaciones')<>1
+     OR v_metodo IS NULL
+     OR EXISTS(SELECT 1 FROM jsonb_array_elements(a->'operaciones') o
+         WHERE (o->>'idVenta')::bigint=1004)
+     OR EXISTS(SELECT 1 FROM jsonb_array_elements(b->'operaciones') o
+         WHERE (o->>'idVenta')::bigint=1003)
      OR a::text LIKE '%clave_archivo%' OR a::text LIKE '%urlCarga%'
-  THEN RAISE EXCEPTION '544|Consulta privada incompatible: venta=%, ajena=%, cuota=%, metodo=%, ops_a=%, ops_b=%, filtracion=%', v_venta,v_ajena,v_cuota,v_metodo,jsonb_array_length(a->'operaciones'),jsonb_array_length(b->'operaciones'), (a::text LIKE '%clave_archivo%' OR a::text LIKE '%urlCarga%'); END IF;
+  THEN RAISE EXCEPTION '544|Consulta privada no aislada: venta=%, ajena=%, cuota=%, metodo=%, ops_a=%, ops_b=%', v_venta,v_ajena,v_cuota,v_metodo,jsonb_array_length(a->'operaciones'),jsonb_array_length(b->'operaciones'); END IF;
 
   BEGIN
     PERFORM public.sp_portal_cliente_vouchers_v1(5);
