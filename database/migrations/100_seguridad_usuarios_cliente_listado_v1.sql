@@ -54,7 +54,7 @@ BEGIN
     );
 
 END;
-$function$
+$function$;
 
 
 -- El filtro legado es_interno=FALSE ocultaba CLIENTE, incluso de Gerencia.
@@ -115,7 +115,7 @@ BEGIN
 
     p_estado := 'OK'; p_mensaje := 'Usuarios consultados correctamente.';
 END;
-$procedure$
+$procedure$;
 
 
 -- La ejecucion de las rutinas permanece restringida al rol backend.
