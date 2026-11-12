@@ -66,6 +66,41 @@ class PortalClienteServiceSeguridadTest {
     }
 
     @Test
+    void cronogramaSoloConsultaPagosDeLaIdentidadJwt() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                ()->service.cronogramaPrivado(null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            assertThrows(ResponseStatusException.class,
+                ()->service.cronogramaPrivado(-1L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenReturn("{\"total\":0,\"items\":[],\"fuente\":\"APLICACIONES_CONFIRMADAS\"}");
+        var resultado=service.cronogramaPrivado(9L);
+        assertEquals(0,resultado.path("total").asInt());
+        assertTrue(resultado.path("items").isArray());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_portal_cliente_cronograma_v1"));
+        assertFalse(sql.getValue().contains("FROM public.pag_cuotas"));
+        verifyNoMoreInteractions(jdbc);
+    }
+
+    @Test
+    void cronogramaRechazaUsuarioSinRolCliente() {
+        JdbcTemplate jdbc=mock(JdbcTemplate.class);
+        PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenThrow(new DataAccessResourceFailureException(
+                "PORTAL_ACCESO_DENEGADO|Identidad cliente no autorizada."));
+        assertEquals(HttpStatus.FORBIDDEN,
+            assertThrows(ResponseStatusException.class,
+                ()->service.cronogramaPrivado(5L)).getStatusCode());
+    }
+
+    @Test
     void sinRolClienteNoPuedeObtenerMetadatosContractuales() {
         JdbcTemplate jdbc=mock(JdbcTemplate.class);
         PortalClienteService service=new PortalClienteService(jdbc,new JsonMapper());
