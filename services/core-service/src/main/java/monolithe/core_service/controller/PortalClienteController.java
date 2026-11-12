@@ -24,6 +24,14 @@ import tools.jackson.databind.JsonNode;
 public class PortalClienteController {
     private final PortalClienteService service;
 
+    /** 5.4.3: cuotas, saldos y aplicaciones confirmadas de compras propias. */
+    @GetMapping("/cronograma")
+    @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
+    public ResponseEntity<JsonNode> cronograma(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.cronogramaPrivado(obtenerActor(jwt)));
+    }
+
     /** Expediente inmobiliario y contratos: solo metadatos de ventas propias. */
     @GetMapping("/lotes-contratos")
     @PreAuthorize("hasAuthority('ROLE_CLIENTE')")
