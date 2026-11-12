@@ -110,7 +110,7 @@ function Contrato({c}: {c:PortalContratoDetalle}) {
       <p className="text-xs leading-relaxed text-slateux-600">
         {disponibles===0?
           'Todavía no hay documentos o anexos autorizados para publicación en el Portal Cliente.':
-          `Documentos publicados: ${c.documentosPublicados}. Anexos publicados: ${c.anexosPublicados}. La lectura privada se habilitará en la sección Documentos.`}
+          `Documentos publicados: ${c.documentosPublicados}. Anexos publicados: ${c.anexosPublicados}. Consulte la sección Documentos para verificar su disponibilidad y lectura privada.`}
       </p>
     </div>
     {!tieneFirma&&<p className="mt-3 text-xs text-warn-700">
