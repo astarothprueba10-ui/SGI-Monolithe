@@ -919,6 +919,47 @@ public class CrmVentaService {
             """,actor,idVenta);
     }
 
+    /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
+    @Transactional(readOnly = true)
+    public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
+            Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String modo = vista == null ? "PLANES" : vista.trim().toUpperCase(java.util.Locale.ROOT);
+        String texto = busqueda == null ? "" : busqueda.trim();
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("PLANES","CUOTAS").contains(modo)
+                || texto.length()>120 || page<1 || page>100000
+                || size<1 || size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de cartera inválidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_cartera_backoffice_v1(
+              CAST(? AS bigint),CAST(? AS text),CAST(? AS text),
+              CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,modo,texto,page,size);
+    }
+
+    /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
+    @Transactional(readOnly = true)
+    public JsonNode movimientosFinancierosReales(Long actor, String busqueda,
+            Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String texto = busqueda == null ? "" : busqueda.trim();
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (texto.length()>120 || page<1 || page>100000 || size<1 || size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de movimientos inválidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_movimientos_backoffice_v1(
+              CAST(? AS bigint),CAST(? AS text),
+              CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,texto,page,size);
+    }
+
     /** Alertas próximas y vencidas verificadas, limitadas a la cartera del JWT. */
     @Transactional(readOnly = true)
     public JsonNode alertasCuotas(Long actor, String tipo, Integer pagina, Integer tamano) {
