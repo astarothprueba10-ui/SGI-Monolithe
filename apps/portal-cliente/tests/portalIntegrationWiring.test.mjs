@@ -60,3 +60,41 @@ test('Backend limits portal endpoints by role and private signed PDFs', () => {
   assert.match(signing, /TTL_SECONDS = 120/);
   assert.match(signing, /contratos-firmados-private/);
 });
+
+
+test('Temporary CLIENTE credentials require password change before any portal page', () => {
+  const login = read('../src/components/LoginForm.tsx');
+  const routes = read('../src/App.tsx');
+  const screen = read('../src/pages/ChangePassword.tsx');
+  const session = read('../src/lib/portalSession.ts');
+  const coreGuard = read('../../../services/core-service/src/main/java/monolithe/core_service/config/SecurityConfig.java');
+  const authGuard = read('../../../services/auth-service/src/main/java/monolithe/auth_service/config/SecurityConfig.java');
+  assert.match(login, /data\.requiereCambioPassword \? '\/cambiar-contrasena' : '\/portal'/);
+  assert.match(login, /data\.autoridades\.includes\('ROLE_CLIENTE'\)/);
+  assert.match(routes, /path="\/cambiar-contrasena"/);
+  assert.match(routes, /RequirePasswordChange/);
+  assert.match(routes, /estado === 'password-change-required'/);
+  assert.match(routes, /<RequireAuth>/);
+  assert.match(session, /user\.autoridades\.includes\('ROLE_CLIENTE'\)/);
+  assert.match(session, /user\.requiereCambioPassword \? 'password-change-required' : 'authenticated'/);
+  assert.match(screen, /authApi\.post<void>\('\/change-password'/);
+  assert.match(screen, /Authorization: `Bearer \$\{accessToken\}`/);
+  assert.match(screen, /clearPortalSession\(\)/);
+  assert.match(coreGuard, /password_change_required/);
+  assert.match(authGuard, /password_change_required/);
+});
+
+test('Portal recovery uses client document, private registered email and OTP', () => {
+  const forgot = read('../src/pages/ForgotPassword.tsx');
+  const reset = read('../src/pages/ResetPassword.tsx');
+  const authController = read('../../../services/auth-service/src/main/java/monolithe/auth_service/controller/AuthController.java');
+  const recovery = read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/PasswordResetService.java');
+  assert.match(forgot, /PORTAL_DOCUMENTO_REGEX\[tipoDocumento\]/);
+  assert.match(forgot, /origen: 'PORTAL_CLIENTE'/);
+  assert.doesNotMatch(forgot, /correoDestino|emailDestino|destinatario|setCorreoEnmascarado/);
+  assert.match(forgot, /correo principal.*registrado|correo principal.*figura/s);
+  assert.match(authController, /"PORTAL_CLIENTE"\.equals\(solicitud\.getOrigen\(\)\)/);
+  assert.match(recovery, /passwordRecoveryProcedureRepository\s*\.solicitarRecuperacion\(/);
+  assert.match(reset, /'\/reset-password\/confirm'/);
+  assert.match(reset, /clearPortalSession\(\)/);
+});
