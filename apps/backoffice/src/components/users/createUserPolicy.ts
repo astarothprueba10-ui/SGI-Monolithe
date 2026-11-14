@@ -49,7 +49,10 @@ export function motivoNoElegiblePersona(persona: AvailablePerson): string | null
     return 'Falta un documento principal activo. Complete la identidad en el expediente CRM o de Trabajadores.';
   }
   if (relaciones.includes('CLIENTE') && !persona.documentoVerificado) {
-    return 'Documento principal sin verificar. Debe validarse la identidad antes de entregar acceso al Portal Cliente.';
+    return 'Documento principal sin verificar. El asesor debe cotejarlo al revisar la compra.';
+  }
+  if (relaciones.includes('CLIENTE') && persona.contratoAprobado === false) {
+    return 'Contrato pendiente de firma o aprobación formal por Gerencia. Aún no se puede crear usuario CLIENTE.';
   }
   return 'El documento o el estado de la persona no cumple los requisitos de acceso. Revise vigencia, formato y duplicados.';
 }
