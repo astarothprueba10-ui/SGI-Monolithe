@@ -1,4 +1,4 @@
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, type Ref, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon,
@@ -85,7 +85,7 @@ export function ChangePassword() {
   function passwordField(
     id: string, label: string, value: string,
     onChange: (value: string) => void, campo: keyof typeof mostrar,
-    ref?: React.Ref<HTMLInputElement>
+    ref?: Ref<HTMLInputElement>
   ) {
     return <TextField
       ref={ref}
