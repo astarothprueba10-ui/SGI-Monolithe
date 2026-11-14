@@ -68,6 +68,8 @@ export interface AvailablePerson {
   numeroDocumento: string | null;
   documentoVerificado: boolean;
   documentoActivo: boolean;
+  /** Firma contractual de la venta revisada y aprobada por Gerencia. */
+  contratoAprobado?: boolean | null;
 }
 
 export interface SecurityOperationResponse {
