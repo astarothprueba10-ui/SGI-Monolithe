@@ -53,6 +53,11 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/securityAccess.test.cjs
 
+      - name: Verify real financial dashboards and JWT safeguards
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/finanzasReales.test.mjs
+
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
