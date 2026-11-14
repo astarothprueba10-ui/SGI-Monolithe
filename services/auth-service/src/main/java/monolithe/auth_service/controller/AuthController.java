@@ -197,8 +197,8 @@ public class AuthController {
                         return ResponseEntity.ok(
                                         new ForgotPasswordResponse(
                                                         mensajeGenerico,
-                                                        enmascararCorreo(
-                                                                        resultado.correo())));
+                                                        "PORTAL_CLIENTE".equals(solicitud.getOrigen())
+                                                                ? null : enmascararCorreo(resultado.correo())));
                 }
 
                 return ResponseEntity.ok(
