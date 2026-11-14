@@ -15,7 +15,10 @@ import { Logo } from '../components/Logo';
 import { TextField } from '../components/TextField';
 
 
-type ForgotPasswordResponse = { mensaje: string };
+type ForgotPasswordResponse = {
+    mensaje: string;
+    correoEnmascarado: string | null;
+};
 
 type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
 const TIPOS_DOCUMENTO: TipoDocumento[] = ['DNI', 'CE', 'PASAPORTE', 'RUC'];
@@ -43,7 +46,8 @@ export function ForgotPassword() {
     const [error, setError] =
         useState<string | null>(null);
 
-    // Nunca pedimos el correo destino: Auth Service lo consulta en la ficha CRM.
+    // Se muestra solo una pista del correo consultado en el expediente; nunca se permite editar el destino.
+    const [correoReferencial, setCorreoReferencial] = useState<string | null>(null);
 
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
@@ -56,6 +60,7 @@ export function ForgotPassword() {
         }
 
         setError(null);
+        setCorreoReferencial(null);
 
         const usuarioLimpio =
             usuario.trim();
@@ -77,7 +82,7 @@ export function ForgotPassword() {
 
         try {
 
-            await authApi.post<ForgotPasswordResponse>(
+            const respuesta = await authApi.post<ForgotPasswordResponse>(
                     '/forgot-password',
                     {
                         usuario: usuarioLimpio,
@@ -86,7 +91,8 @@ export function ForgotPassword() {
                 );
 
 
-             setEnviado(true);
+            setCorreoReferencial(respuesta.correoEnmascarado ?? null);
+            setEnviado(true);
 
         } catch (error) {
 
@@ -306,11 +312,26 @@ export function ForgotPassword() {
                                     </h1>
 
 
-                                    <p className="mt-3 text-[14px] leading-relaxed text-slateux-500">
-                                        Si existe una cuenta CLIENTE asociada al documento, el enlace
-                                        se enviará al correo principal registrado en su expediente.
-                                        Por seguridad no revelamos si la cuenta existe.
-                                    </p>
+                                    {correoReferencial ? (
+                                        <div className="mt-3 space-y-2" role="status">
+                                            <p className="text-[14px] leading-relaxed text-slateux-500">
+                                                Enviamos las instrucciones al correo principal registrado
+                                                en tu expediente de cliente:
+                                            </p>
+                                            <p className="break-all text-[16px] font-semibold text-ink-800">
+                                                {correoReferencial}
+                                            </p>
+                                            <p className="text-[12px] leading-relaxed text-slateux-400">
+                                                Por seguridad, parte de la dirección está oculta.
+                                                Revisa esa bandeja de entrada y la carpeta de spam.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <p className="mt-3 text-[14px] leading-relaxed text-slateux-500">
+                                            Si existe una cuenta CLIENTE asociada al documento, el enlace
+                                            se enviará al correo principal registrado en su expediente.
+                                        </p>
+                                    )}
                                     <p className="mt-3 text-[12px] leading-relaxed text-slateux-400">
                                         Si ya no tienes acceso a ese correo, solicita actualizarlo
                                         mediante el proceso de verificación de identidad de Monolithe.
