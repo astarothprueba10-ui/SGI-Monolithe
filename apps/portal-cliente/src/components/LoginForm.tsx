@@ -105,6 +105,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [cambioObligatorio, setCambioObligatorio] = useState(false);
   const usuarioRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -186,10 +187,11 @@ export function LoginForm() {
         })
       );
 
+      setCambioObligatorio(data.requiereCambioPassword);
       setSignedIn(true);
 
       setTimeout(() => {
-        navigate('/portal');
+        navigate(data.requiereCambioPassword ? '/cambiar-contrasena' : '/portal', { replace: true });
       }, 350);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -222,7 +224,9 @@ export function LoginForm() {
         {signedIn ? (
           <div role="status" className="flex gap-3 rounded-field border border-slateux-200 bg-slateux-50 px-3.5 py-3">
             <ShieldCheckIcon className="mt-0.5 h-[18px] w-[18px] shrink-0 text-brass-500" aria-hidden="true" />
-            <p className="text-[13px] leading-relaxed text-ink-700">Sesion verificada. Seras redirigido a tu panel.</p>
+            <p className="text-[13px] leading-relaxed text-ink-700">{cambioObligatorio
+              ? 'Sesión verificada. Debes cambiar tu contraseña temporal antes de acceder al portal.'
+              : 'Sesión verificada. Serás redirigido a tu panel.'}</p>
           </div>
         ) : null}
       </div>
