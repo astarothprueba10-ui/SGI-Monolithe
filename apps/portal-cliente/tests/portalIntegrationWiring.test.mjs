@@ -92,8 +92,14 @@ test('Portal recovery uses client document, private registered email and OTP', (
   assert.match(forgot, /PORTAL_DOCUMENTO_REGEX\[tipoDocumento\]/);
   assert.match(forgot, /origen: 'PORTAL_CLIENTE'/);
   assert.doesNotMatch(forgot, /correoDestino|emailDestino|destinatario|setCorreoEnmascarado/);
+  assert.match(forgot, /correoEnmascarado: string \| null/);
+  assert.match(forgot, /setCorreoReferencial\(respuesta\.correoEnmascarado \?\? null\)/);
+  assert.match(forgot, /\{correoReferencial\}/);
+  assert.match(forgot, /correoReferencial \? \(/);
+  assert.match(forgot, /Si existe una cuenta CLIENTE asociada al documento/);
   assert.match(forgot, /correo principal.*registrado|correo principal.*figura/s);
-  assert.match(authController, /"PORTAL_CLIENTE"\.equals\(solicitud\.getOrigen\(\)\)/);
+  assert.match(authController, /enmascararCorreo\(resultado\.correo\(\)\)/);
+  assert.doesNotMatch(authController, /"PORTAL_CLIENTE"\.equals\(solicitud\.getOrigen\(\)\)\s*\? null/);
   assert.match(recovery, /passwordRecoveryProcedureRepository\s*\.solicitarRecuperacion\(/);
   assert.match(reset, /'\/reset-password\/confirm'/);
   assert.match(reset, /clearPortalSession\(\)/);
