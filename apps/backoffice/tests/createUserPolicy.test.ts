@@ -219,3 +219,16 @@ test('RRHH puede ofrecer CLIENTE sin abrir roles internos protegidos', () => {
   assert.deepEqual(politica.codigosRolesEfectivos, ['CLIENTE']);
   assert.deepEqual(politica.rolesInternosDisponibles, []);
 });
+
+
+test('un cliente con identidad verificada necesita firma aprobada por Gerencia', () => {
+  const base = {
+    idPersona: 100, nombres: 'Caso', apellidoPaterno: 'Prueba', apellidoMaterno: '',
+    nombreCompleto: 'Caso Prueba', correo: 'comprador@example.test', correoVerificado: false,
+    relaciones: ['CLIENTE' as const], elegible: false, tipoDocumento: 'DNI',
+    numeroDocumento: '12345678', documentoVerificado: true, documentoActivo: true,
+    contratoAprobado: false
+  };
+  assert.match(motivoNoElegiblePersona(base) ?? '', /Contrato pendiente de firma/i);
+  assert.equal(motivoNoElegiblePersona({ ...base, elegible: true, contratoAprobado: true }), null);
+});
