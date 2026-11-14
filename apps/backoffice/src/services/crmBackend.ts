@@ -879,6 +879,8 @@ export interface CrmDatosPagoVenta {
 
 export interface CrmDatosCompradorVenta {
   idProspecto: number;
+  /** Confirmacion expresa de cotejo documental por el asesor durante la venta. */
+  identidadVerificada: boolean;
   nombres: string;
   apellidoPaterno: string;
   apellidoMaterno: string;
