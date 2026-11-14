@@ -194,6 +194,11 @@ public class CrmVentaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Revise la ficha contractual del comprador antes de registrar.");
         }
+        if (!req.datosComprador().path("identidadVerificada").isBoolean()
+                || !req.datosComprador().path("identidadVerificada").asBoolean()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El asesor debe confirmar la verificacion del documento del comprador.");
+        }
         if (req.datosPago() == null || !req.datosPago().isObject()
                 || req.datosPago().toString().length() > 16000) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
