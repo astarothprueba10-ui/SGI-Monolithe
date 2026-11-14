@@ -472,7 +472,32 @@ public class CrmVentaController {
                 .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
         }
 
-        /** Alerta dinámica de cuotas: sin información fuera de la cartera del JWT. */
+            /** Solo JWT con financing.view y sales.view; procedimientos comprueban cartera. */
+        @GetMapping("/financiamiento/cartera")
+        @PreAuthorize("hasAuthority('financing.view') and hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> carteraFinanciera(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "PLANES") String vista,
+                @RequestParam(defaultValue = "") String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.carteraFinancieraReal(obtenerActor(jwt),vista,busqueda,pagina,tamano));
+        }
+
+        /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
+        @GetMapping("/finanzas/movimientos")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> movimientosFinanzas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "") String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.movimientosFinancierosReales(obtenerActor(jwt),busqueda,pagina,tamano));
+        }
+
+    /** Alerta dinámica de cuotas: sin información fuera de la cartera del JWT. */
         @GetMapping("/financiamiento/alertas")
         @PreAuthorize("hasAuthority('sales.view')")
         public ResponseEntity<JsonNode> alertasCuotas(
