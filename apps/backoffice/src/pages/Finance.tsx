@@ -1,244 +1,142 @@
-import { useState } from 'react';
-import { DownloadIcon, PlusIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { RefreshCwIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Select } from '../components/ui/Field';
 import { Table, TD, TH, TR } from '../components/ui/Table';
-import { StatusBadge, Badge } from '../components/ui/Badge';
+import { SearchInput } from '../components/ui/Field';
+import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Tabs } from '../components/ui/Tabs';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { TrendChart } from '../components/dashboard/TrendChart';
-import { CASHFLOW, FINANCE_ENTRIES } from '../data/finance';
-import { RECEIVABLES } from '../data/financing';
-import { currency, number } from '../utils/format';
+import { currency } from '../utils/format';
+import { crmBackend, type CrmMovimientosFinanzasReal } from '../services/crmBackend';
 import { SeparacionVouchersPanel } from '../components/finance/SeparacionVouchersPanel';
 import { VouchersCuotasPanel } from '../components/finance/VouchersCuotasPanel';
 import { AplicacionesPagosPanel } from '../components/finance/AplicacionesPagosPanel';
 import { ConciliacionIntegralPanel } from '../components/finance/ConciliacionIntegralPanel';
 import { ConciliacionesSeparacionPanel } from '../components/finance/ConciliacionesSeparacionPanel';
 
+const money=(n:number|undefined|null)=>currency(Number(n??0));
+const estadoLabel=(estado:string)=>({
+  CONFIRMADO:'Confirmado',REGISTRADO:'En revisión',ANULADO:'Anulado'
+}[estado]??estado);
+const tipoLabel=(tipo:string)=>({
+  SEPARACION:'Separación',FINANCIAMIENTO:'Financiamiento',VENTA:'Venta'
+}[tipo]??tipo);
+const fecha=(value:string|null)=>value?
+  new Date(value).toLocaleDateString('es-PE',{timeZone:'America/Lima'}):'—';
+
 export function Finance() {
-  const { can } = useAuth();
-  const [tab, setTab] = useState('movimientos');
+  const {can}=useAuth();
+  const [tab,setTab]=useState('movimientos');
+  const [buscar,setBuscar]=useState('');
+  const [consulta,setConsulta]=useState('');
+  const [pagina,setPagina]=useState(1);
+  const [revision,setRevision]=useState(0);
+  const [datos,setDatos]=useState<CrmMovimientosFinanzasReal|null>(null);
+  const [cargando,setCargando]=useState(true);
+  const [error,setError]=useState<string|null>(null);
 
-  const ingresos = FINANCE_ENTRIES.filter((e) => e.type === 'Ingreso').reduce(
-    (s, e) => s + e.amount,
-    0
-  );
-  const egresos = FINANCE_ENTRIES.filter((e) => e.type === 'Egreso').reduce(
-    (s, e) => s + e.amount,
-    0
-  );
-  const porCobrar = RECEIVABLES.reduce((s, r) => s + (r.total - r.paid), 0);
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{setPagina(1);setConsulta(buscar);},350);
+    return ()=>window.clearTimeout(timer);
+  },[buscar]);
 
-  return (
-    <div>
-      <PageHeader
-        title="Finanzas"
-        description="Ingresos, egresos, comisiones y cuentas por cobrar consolidados por proyecto y periodo."
-        actions={
-          <>
-            <Select defaultValue="ago" aria-label="Periodo" className="w-[168px]">
-              <option value="ago">Agosto 2026</option>
-              <option value="jul">Julio 2026</option>
-              <option value="q3">Trimestre III 2026</option>
-            </Select>
-            <Gate permission="finance.export">
-              <Button icon={DownloadIcon}>Exportar</Button>
-            </Gate>
-            <Gate permission="finance.create">
-              <Button icon={PlusIcon} variant="primary">
-                Nuevo movimiento
-              </Button>
-            </Gate>
-          </>
-        } />
+  useEffect(()=>{
+    if(tab!=='movimientos') return;
+    let vigente=true;
+    setCargando(true);setError(null);
+    void crmBackend.listarMovimientosFinanzasReal({busqueda:consulta,pagina,tamano:20})
+      .then(r=>{if(vigente)setDatos(r);})
+      .catch(e=>{if(vigente){setDatos(null);setError(e instanceof Error?e.message:'No se pudo cargar Finanzas.');}})
+      .finally(()=>{if(vigente)setCargando(false);});
+    return ()=>{vigente=false;};
+  },[tab,consulta,pagina,revision]);
 
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader
-            title="Ingresos vs. egresos"
-            description="Flujo mensual consolidado de todos los proyectos"
-            actions={<Badge tone="neutral">Últimos 6 meses</Badge>} />
-
-          <div className="px-3 py-4">
-            <TrendChart
-              data={CASHFLOW}
-              series={[
-                { key: 'ingresos', label: 'Ingresos', type: 'bar', color: '#C7D8E8' },
-                { key: 'egresos', label: 'Egresos', type: 'line', color: '#BE123C' }]
-              }
-              valuePrefix="S/ "
-              height={272} />
-
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-1">
-          {[
-            { label: 'Ingresos del periodo', value: currency(ingresos), tone: 'text-emerald-600' },
-            { label: 'Egresos del periodo', value: currency(egresos), tone: 'text-rose-600' },
-            { label: 'Cuentas por cobrar', value: currency(porCobrar), tone: 'text-brand-900' }].
-            map((item) =>
-              <Card key={item.label} className="p-5">
-                <p className="text-[12px] text-brand-400">{item.label}</p>
-                <p className={`mt-1.5 text-[22px] font-semibold tabular ${item.tone}`}>
-                  {item.value}
-                </p>
-              </Card>
-            )}
-        </div>
+  const resumen=datos?.resumen;
+  const items=[
+    {id:'movimientos',label:'Movimientos registrados',count:datos?.total??null},
+    ...(can('finance.view')?[
+      {id:'vouchers_cuotas',label:'Vouchers de cuotas e inicial'},
+      {id:'vouchers_separaciones',label:'Vouchers de separaciones'},
+      {id:'imputaciones',label:'Aplicación de pagos'},
+      {id:'conciliacion_integral',label:'Conciliación integral'},
+      {id:'conciliaciones_separaciones',label:'Conciliación de separaciones'}
+    ]:[])
+  ];
+  return <div>
+    <PageHeader title="Finanzas"
+      description="Movimientos y comprobantes reales, revisión financiera, aplicación de pagos y conciliación. Los saldos por cobrar se consultan en Financiamiento y pagos."/>
+    {tab==='movimientos' && <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {nombre:'Pagos confirmados',valor:resumen?money(resumen.confirmado):'—'},
+          {nombre:'Pagos en revisión',valor:resumen?money(resumen.registrado):'—'},
+          {nombre:'Pagos aplicados',valor:resumen?money(resumen.aplicado):'—'},
+          {nombre:'Confirmado sin imputar (financiamientos)',valor:resumen?money(resumen.confirmadoSinImputarFinanciamiento):'—'}
+        ].map(a=><Card key={a.nombre} className="p-4">
+          <p className="text-xs text-brand-500">{a.nombre}</p>
+          <p className="mt-2 text-xl font-semibold tabular-nums text-brand-900">{a.valor}</p>
+        </Card>)}
       </div>
-
-      <Tabs
-        className="mb-5 mt-6"
-        active={tab}
-        onChange={setTab}
-
-        items={[
-          {
-            id: 'movimientos',
-            label: 'Movimientos',
-            count: FINANCE_ENTRIES.length
-          },
-          {
-            id: 'cobrar',
-            label: 'Cuentas por cobrar',
-            count: RECEIVABLES.length
-          },
-          ...(can('finance.view')
-            ? [
-              {
-                id: 'imputaciones',
-                label: 'Aplicación de pagos'
-              },
-              {
-                id: 'conciliacion_integral',
-                label: 'Conciliación integral'
-              },
-              {
-                id: 'vouchers_cuotas',
-                label: 'Vouchers de cuotas'
-              },
-              {
-                id: 'vouchers_separaciones',
-                label: 'Vouchers de separaciones'
-              },
-              {
-                id: 'conciliaciones_separaciones',
-                label: 'Conciliación de separaciones'
-              }
-            ]
-            : [])
-
-        ]}
-
-      />
-      {tab === 'movimientos' ? (
-        <Card>
-          <Table
-            head={
-              <>
-                <TH>Concepto</TH>
-                <TH>Tipo</TH>
-                <TH>Categoría</TH>
-                <TH>Proyecto</TH>
-                <TH>Fecha</TH>
-                <TH align="right">Monto</TH>
-                <TH>Estado</TH>
-              </>
-            }>
-
-            {FINANCE_ENTRIES.map((entry) =>
-              <TR key={entry.id}>
-                <TD className="font-medium text-brand-900">{entry.concept}</TD>
-                <TD>
-                  <Badge tone={entry.type === 'Ingreso' ? 'brand' : 'neutral'}>{entry.type}</Badge>
-                </TD>
-                <TD className="text-brand-500">{entry.category}</TD>
-                <TD className="text-brand-500">{entry.project}</TD>
-                <TD className="text-brand-500">{entry.date}</TD>
-                <TD
-                  align="right"
-                  className={
-                    entry.type === 'Ingreso' ?
-                      'font-medium text-emerald-700' :
-                      'font-medium text-rose-700'
-                  }>
-
-                  {entry.type === 'Ingreso' ? '+' : '−'} {currency(entry.amount)}
-                </TD>
-                <TD>
-                  <StatusBadge status={entry.status} />
-                </TD>
-              </TR>
-            )}
-          </Table>
-        </Card>
-      ) : tab === 'cobrar' ? (
-        <Card>
-          <Table
-            head={
-              <>
-                <TH>Cliente</TH>
-                <TH>Contrato</TH>
-                <TH align="right">Total</TH>
-                <TH align="right">Pagado</TH>
-                <TH align="right">Saldo</TH>
-                <TH align="right">Días de mora</TH>
-                <TH>Estado</TH>
-              </>
-            }>
-
-            {RECEIVABLES.map((row) =>
-              <TR key={row.id}>
-                <TD className="font-medium text-brand-900">{row.buyer}</TD>
-                <TD className="text-brand-500">{row.saleCode}</TD>
-                <TD align="right">{currency(row.total)}</TD>
-                <TD align="right">{currency(row.paid)}</TD>
-                <TD align="right" className="font-medium text-brand-900">
-                  {currency(row.total - row.paid)}
-                </TD>
-                <TD align="right" className={row.overdueDays > 0 ? 'text-rose-700' : ''}>
-                  {number(row.overdueDays)}
-                </TD>
-                <TD>
-                  <StatusBadge status={row.status} />
-                </TD>
-              </TR>
-            )}
-          </Table>
-        </Card>
-
-      ) : tab === 'conciliaciones_separaciones' && can('finance.view') ? (
-        <Gate permission="finance.view">
-          <ConciliacionesSeparacionPanel />
-        </Gate>
-
-      ) : tab === 'conciliacion_integral' && can('finance.view') ? (
-        <Gate permission="finance.view">
-          <ConciliacionIntegralPanel />
-        </Gate>
-
-      ) : tab === 'imputaciones' && can('finance.view') ? (
-        <Gate permission="finance.view">
-          <AplicacionesPagosPanel />
-        </Gate>
-
-      ) : tab === 'vouchers_cuotas' && can('finance.view') ? (
-        <Gate permission="finance.view">
-          <VouchersCuotasPanel />
-        </Gate>
-
-      ) : tab === 'vouchers_separaciones' && can('finance.view') ? (
-        <Gate permission="finance.view">
-          <SeparacionVouchersPanel />
-        </Gate>
-      ) : null}
-
-    </div>);
-
+      <Card className="mt-4">
+        <CardHeader title="Pagos confirmados por mes"
+          description="Importes registrados y confirmados. No equivale al flujo de caja contable completo ni incluye egresos."
+          actions={<Button icon={RefreshCwIcon} variant="secondary" onClick={()=>setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>}/>
+        {datos?.meses?.length ? <div className="p-4">
+          <TrendChart data={datos.meses} series={[
+            {key:'confirmado',label:'Pagos confirmados',type:'bar',color:'#4cbb17'}
+          ]} height={230} valuePrefix="S/ "/>
+        </div> : <p className="p-5 text-sm text-brand-500">No hay datos mensuales disponibles.</p>}
+      </Card>
+      <Alert tone="info" title="Datos de pagos reales, no de contabilidad general" className="mt-4">
+        Esta vista solo refleja pagos registrados en el sistema. No hay un libro de egresos
+        ni métricas completas de utilidad integradas en este sprint. La aprobación de un
+        voucher no reduce cuotas hasta que se impute el pago.
+      </Alert>
+    </>}
+    <Tabs className="mb-5 mt-6" active={tab} onChange={setTab} items={items}/>
+    {tab==='movimientos' && <Card>
+      <CardHeader title="Movimientos de cobros reales"
+        description="Pagos de separaciones, ventas y financiamientos; solo operaciones existentes en Supabase."
+        actions={<SearchInput className="w-full sm:w-72" label="Buscar movimiento" value={buscar}
+          onValueChange={setBuscar} placeholder="Código de pago, venta o referencia…"/>}/>
+      {error && <div className="p-4"><Alert tone="danger" title="Error al consultar movimientos">{error}</Alert></div>}
+      {cargando && <p className="p-5 text-sm text-brand-500">Consultando movimientos…</p>}
+      {!cargando && !error && datos?.total===0 &&
+        <EmptyState title="Sin movimientos" description="No hay pagos registrados para esta búsqueda."/>}
+      {!cargando && !error && Boolean(datos?.total) && <div className="overflow-x-auto">
+        <Table head={<>
+          <TH>Pago / comprobante</TH><TH>Tipo / venta</TH><TH>Fecha</TH>
+          <TH align="right">Importe</TH><TH align="right">Aplicado</TH>
+          <TH>Estado del pago</TH><TH>Voucher</TH>
+        </>}>
+          {datos?.items.map(item=><TR key={item.idPago}>
+            <TD><span className="font-semibold text-brand-900">{item.codigo}</span>
+              <span className="block text-xs text-brand-400">{item.comprobante??'Sin voucher registrado'}</span></TD>
+            <TD>{tipoLabel(item.tipo)}<span className="block text-xs text-brand-500">{item.venta??'—'}</span></TD>
+            <TD>{fecha(item.fechaOperacion)}</TD>
+            <TD align="right" className="font-medium tabular-nums">{money(item.monto)}</TD>
+            <TD align="right" className="tabular-nums">{money(item.montoAplicado)}</TD>
+            <TD>{estadoLabel(item.estado)}</TD>
+            <TD>{item.estadoVoucher??'—'}</TD>
+          </TR>)}
+        </Table>
+      </div>}
+      {datos && datos.paginas>1 && !cargando && <div className="flex items-center justify-between border-t border-brand-100 px-5 py-4 text-xs text-brand-500">
+        <span>Página {pagina} de {datos.paginas} · {datos.total} registros</span>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" disabled={pagina<=1} onClick={()=>setPagina(p=>Math.max(1,p-1))}>Anterior</Button>
+          <Button variant="secondary" size="sm" disabled={pagina>=datos.paginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</Button>
+        </div>
+      </div>}
+    </Card>}
+    {tab==='vouchers_cuotas'&&<Gate permission="finance.view"><VouchersCuotasPanel /></Gate>}
+    {tab==='vouchers_separaciones'&&<Gate permission="finance.view"><SeparacionVouchersPanel /></Gate>}
+    {tab==='imputaciones'&&<Gate permission="finance.view"><AplicacionesPagosPanel /></Gate>}
+    {tab==='conciliacion_integral'&&<Gate permission="finance.view"><ConciliacionIntegralPanel /></Gate>}
+    {tab==='conciliaciones_separaciones'&&<Gate permission="finance.view"><ConciliacionesSeparacionPanel /></Gate>}
+  </div>;
 }
