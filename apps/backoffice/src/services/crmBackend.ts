@@ -430,6 +430,41 @@ export interface CrmConciliacionIntegral {
   planesConDiferenciasHistoricas:CrmAlertaPlanHistorico[];
   advertencia:string;
 }
+/** Cartera real: importes proceden del mismo cálculo que el Portal Cliente. */
+export interface CrmPlanCarteraReal {
+  idVenta:number; codigoVenta:string; idPlanPago:number; codigoPlan:string;
+  comprador:string; lote:string; proyecto:string; estadoVenta:string; estadoPlan:string;
+  numeroCuotas:number; precioVenta:number; capitalFinanciado:number; interesTotal:number;
+  inicialAdicional:number; reservaAplicada:number; tasaInteresPct:number;
+  cuotasExigibles:boolean; saldoFinanciamiento:number; inicialPorConciliar:number;
+  totalCuotas:number; fechaPrimeraCuota:string|null;
+}
+export interface CrmCuotaCarteraReal {
+  idVenta:number;codigoVenta:string;idPlanPago:number;comprador:string;
+  lote:string;proyecto:string;numero:number;fechaVencimiento:string;
+  montoCuota:number;capital:number;interes:number;abonadoConfirmado:number;
+  saldoCuota:number;estado:string;cuotaAtrasada:boolean;proxima7Dias:boolean;
+}
+export interface CrmCarteraReal {
+  fechaCorte:string; vista:'PLANES'|'CUOTAS';pagina:number;tamano:number;
+  total:number;paginas:number;items:(CrmPlanCarteraReal|CrmCuotaCarteraReal)[];
+  resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
+    saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
+}
+export interface CrmMovimientoFinanzasReal {
+  idPago:number;codigo:string;fechaOperacion:string;fechaConfirmacion:string|null;
+  monto:number;estado:string;tipo:'SEPARACION'|'FINANCIAMIENTO'|'VENTA'|'OTRO';
+  venta:string|null;referencia:string|null;comprobante:string|null;
+  estadoVoucher:string|null;montoAplicado:number;
+}
+export interface CrmMovimientosFinanzasReal {
+  pagina:number;tamano:number;total:number;paginas:number;
+  items:CrmMovimientoFinanzasReal[];
+  resumen:{confirmado:number;registrado:number;anulado:number;aplicado:number;
+    confirmadoSinImputarFinanciamiento:number};
+  meses:{mes:string;confirmado:number}[];
+}
+
 export interface CrmImputacionPendiente {
   id_pago:number;
   codigo_pago:string;
@@ -1541,6 +1576,26 @@ export const crmBackend = {
       `/crm/financiamiento/clausula-resolutoria/revision${qs({pagina,tamano})}`
     );
   },
+
+  /** FINANCIAMIENTO: cartera por actor; no aceptar IDs arbitrarios del frontend. */
+  listarCarteraFinancieraReal: (params: {
+    vista:'PLANES'|'CUOTAS';busqueda?:string;pagina?:number;tamano?:number;
+  }) => coreApi.get<CrmCarteraReal>(
+    `/crm/financiamiento/cartera${qs({
+      vista:params.vista,busqueda:params.busqueda?.trim(),
+      pagina:params.pagina??1,tamano:params.tamano??20
+    })}`
+  ),
+
+  /** FINANZAS: pagos realmente registrados, sin movimientos ficticios. */
+  listarMovimientosFinanzasReal: (params: {
+    busqueda?:string;pagina?:number;tamano?:number;
+  }={}) => coreApi.get<CrmMovimientosFinanzasReal>(
+    `/crm/finanzas/movimientos${qs({
+      busqueda:params.busqueda?.trim(),pagina:params.pagina??1,
+      tamano:params.tamano??20
+    })}`
+  ),
 
   /** Cartera autorizada: alertas reales, calculadas sin usar mocks ni RLS del navegador. */
   listarAlertasCuotas: (params: {
