@@ -549,7 +549,7 @@ class CrmVentaServiceSeguridadTest {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"success\":true}");
         var comprobador = tools.jackson.databind.json.JsonMapper.builder().build()
-                .readTree("{\"idProspecto\":1,\"nombres\":\"Prueba\"}");
+                .readTree("{\"idProspecto\":1,\"nombres\":\"Prueba\",\"identidadVerificada\":true}");
         var req = new FormalizarVentaCrmRequest(
                 1L, 74L, "CONTADO", new BigDecimal("29900.00"),
                 null, null, null, null, comprobador,
@@ -559,6 +559,21 @@ class CrmVentaServiceSeguridadTest {
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
         assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v14"));
+    }
+
+    @Test
+    void registroVentaSinCotejoDeDocumentoEsRechazado() throws Exception {
+        var comprador = tools.jackson.databind.json.JsonMapper.builder().build()
+                .readTree("{\"idProspecto\":1,\"identidadVerificada\":false}");
+        var req = new FormalizarVentaCrmRequest(
+                1L, 74L, "CONTADO", new BigDecimal("29900.00"),
+                null, null, null, null, comprador,
+                tools.jackson.databind.json.JsonMapper.builder().build()
+                        .readTree("{\"metodoPago\":\"EFECTIVO\",\"comprobantes\":[]}"));
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.registrarVentaPendiente(5L, req));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verifyNoInteractions(jdbc);
     }
 
     @Test
