@@ -11,31 +11,37 @@ import { Cronograma } from './pages/portal/Cronograma';
 import { Pagos } from './pages/portal/Pagos';
 import { Documentos } from './pages/portal/Documentos';
 import { NotFound } from './pages/NotFound';
+import { ChangePassword } from './pages/ChangePassword';
+import { getPortalAuthState } from './lib/portalSession';
 
-
-function tieneSesion() {
-  const token = localStorage.getItem('monolithe_access_token')
-    ?? sessionStorage.getItem('monolithe_access_token');
-  const raw = localStorage.getItem('monolithe_user')
-    ?? sessionStorage.getItem('monolithe_user');
-  if (!token || !raw) return false;
-  try {
-    const user: unknown = JSON.parse(raw);
-    return typeof user === 'object' && user !== null
-      && 'autoridades' in user && Array.isArray(user.autoridades)
-      && user.autoridades.includes('ROLE_CLIENTE');
-  } catch { return false; }
+function rutaInicialPortal() {
+  const estado = getPortalAuthState();
+  return estado === 'password-change-required'
+    ? '/cambiar-contrasena'
+    : estado === 'authenticated' ? '/portal' : '/login';
 }
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
-  return tieneSesion() ? children : <Navigate to="/login" replace />;
+  const estado = getPortalAuthState();
+  if (estado === 'unauthenticated') return <Navigate to="/login" replace />;
+  if (estado === 'password-change-required') {
+    return <Navigate to="/cambiar-contrasena" replace />;
+  }
+  return children;
+}
+
+function RequirePasswordChange({ children }: { children: React.ReactElement }) {
+  const estado = getPortalAuthState();
+  if (estado === 'unauthenticated') return <Navigate to="/login" replace />;
+  if (estado === 'authenticated') return <Navigate to="/portal" replace />;
+  return children;
 }
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to={tieneSesion() ? '/portal' : '/login'} replace />} />
+        <Route path="/" element={<Navigate to={rutaInicialPortal()} replace />} />
         <Route path="/login" element={<Login />} />
         <Route
           path="/recuperar-contrasena"
@@ -45,6 +51,10 @@ export function App() {
         <Route
           path="/restablecer-contrasena"
           element={<ResetPassword />}
+        />
+        <Route
+          path="/cambiar-contrasena"
+          element={<RequirePasswordChange><ChangePassword /></RequirePasswordChange>}
         />
         <Route
           path="/portal"
