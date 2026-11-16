@@ -198,7 +198,7 @@ export function Header({
                 onClick={()=>markSeen(notifications.map(n=>n.id))}>
                 Marcar todas como leídas
               </button>
-            </div>
+            </div>}
           </div>
         )}
       </Dropdown>
