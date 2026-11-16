@@ -65,3 +65,28 @@ Coincide con `sp_crm_saldo_venta_v1(5,30)` y `sp_crm_cronograma_venta_v4(5,30)`.
 ## Pendiente fuera del Sprint 4
 
 No hay libro contable completo con gastos, conciliación bancaria automática ni contabilidad general; **NO** inventar ingresos/egresos para llenar indicadores. Las operaciones financieras y sus procedimientos siguen siendo el alcance de 5.3. El sistema de alertas no envía SMS ni correo salvo un proceso autorizado aparte. Requiere QA de navegador y autenticación real antes de habilitar despliegue.
+
+## Ajustes UX posteriores — alertas en pestaña y campana real
+
+- Se elimina la nota azul `Cartera real · saldos provenientes de pagos aplicados` de `/financiamiento`, sin cambiar las reglas financieras del backend.
+- En `CarteraFinanciamientoPanel`, tercera pestaña **Alertas de cuotas Vencidas** junto a **Cronograma de cuotas**. Incluye tanto el panel `AlertasCuotasPanel` (vencidas y próximas a vencer en siete días) como `RevisionClausulaPanel` (revisión contractual de tres cuotas consecutivas). Las otras pestañas no muestran estas secciones repetidas.
+- Deep link a la pestaña: `/financiamiento?tab=alertas`.
+- La campana del Backoffice deja de usar **todos** los avisos estáticos de `src/data/notifications.ts` (los 7 mensajes anteriores eran demostrativos). Únicamente muestra alertas **reales** de cuotas vigentes en la cartera visible por el actor autorizado: `crmBackend.listarAlertasCuotas`, `GET /api/core/crm/financiamiento/alertas`.
+- Requisitos de usuario para la campana financiera: permisos `financing.view` y `sales.view`. La consulta Core deriva el actor del JWT y el procedimiento SQL limita las ventas; no entrega alertas de otros clientes o asesores fuera de cartera.
+- La campana consulta todas las páginas de alertas (100 por página, hasta cuatro solicitudes concurrentes), carga al iniciar, actualiza al abrirse, al recuperar el foco, con pestaña visible cada **90 segundos**, y cuando el usuario pulsa **Actualizar alertas**. **No es una suscripción push ni envía correo/SMS.**
+- Cada cuota activa es una notificación separada y se considera nueva por el par `idCuota/tipoAlerta`. Un cambio de **próxima a vencer** a **vencida** produce una nueva notificación. Al pagarse/anularse y salir del listado de alertas, desaparece de la campana; no se inventan montos ni fechas.
+- El badge rojo contabiliza las alertas **sin leer**, y el desplegable indica todas las activas. Seleccionar el aviso lo marca como leído y navega a la nueva pestaña. Permite marcar todas como leídas.
+- El estado leído se almacena localmente por ID de usuario, **no sincronizado entre dispositivos**. Solo se persisten claves de cuota/tipo, sin importes, documentos ni nombres. El servidor sigue siendo fuente de verdad para el vencimiento y el saldo.
+- Comprobación SQL en TEST al 15/11/2026: **1 próxima a vencer, 0 vencidas** en la cartera del actor Gerencia de prueba. Las cifras varían diariamente.
+
+### QA manual sugerido
+
+1. Actualizar Backoffice Docker y confirmar ausencia de nota azul, pestaña de alertas y paneles internos.
+2. Con Gerencia, abrir campana: debe aparecer un aviso real de cuota que vence en los próximos siete días (según fecha de consulta), **no** los avisos fijos sobre vouchers y Las Palmeras.
+3. Abrir aviso: navega a `/financiamiento?tab=alertas`, baja el contador de nuevas y muestra cuota y saldo reales en el panel. Verificar **Marcar todas como leídas**.
+4. Refrescar navegador: los avisos ya leídos permanecen leídos en el mismo navegador. Al abrir desde otro dispositivo o almacenamiento, la lectura puede diferir.
+5. Verificar que `ASESOR` sin `financing.view` y `CLIENTE` no obtengan alertas administrativas.
+6. Tras una aplicación de pago de **TEST**, confirmar que una cuota saldada desaparece tanto de la pestaña como de la campana en la siguiente actualización.
+7. Las restantes categorías de la campana (Marketing, CRM, separaciones, etc.) requieren integraciones reales posteriores; no se restauran números simulados.
+
+Pruebas CI: `apps/backoffice/tests/finanzasReales.test.mjs` y `apps/backoffice/tests/alertasCampana.test.mjs`.
