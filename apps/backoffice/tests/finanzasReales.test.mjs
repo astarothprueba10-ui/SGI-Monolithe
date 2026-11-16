@@ -42,7 +42,7 @@ test('API endpoints enforce JWT permissions, SQL actor guards and no public EXEC
   assert.match(controller,/GetMapping\("\/finanzas\/movimientos"\)[\s\S]*?hasAuthority\('finance\.view'\)/);
   assert.match(controller,/carteraFinancieraReal\(obtenerActor\(jwt\)/);
   assert.match(controller,/movimientosFinancierosReales\(obtenerActor\(jwt\)/);
-  assert.match(service,/sp_fin_cartera_backoffice_v2/);
+  assert.match(service,/sp_fin_cartera_backoffice_v3/);
   assert.match(service,/sp_fin_movimientos_backoffice_v1/);
   assert.match(migration,/sp_crm_saldo_venta_v1\(p_actor,v_fila\.id_venta\)/);
   assert.match(migration,/sp_crm_cronograma_venta_v4\(p_actor,v_fila\.id_venta\)/);
