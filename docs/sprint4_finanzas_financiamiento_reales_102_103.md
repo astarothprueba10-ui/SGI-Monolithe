@@ -90,3 +90,33 @@ No hay libro contable completo con gastos, conciliación bancaria automática ni
 7. Las restantes categorías de la campana (Marketing, CRM, separaciones, etc.) requieren integraciones reales posteriores; no se restauran números simulados.
 
 Pruebas CI: `apps/backoffice/tests/finanzasReales.test.mjs` y `apps/backoffice/tests/alertasCampana.test.mjs`.
+
+## Nueva experiencia de Financiamiento — migración 104 (15/11/2026)
+
+- Se reutiliza el componente de CRM `CrmPeriodoGlobal` con la función `calcularRangoCrm`: **Hoy, Semana, Mes, Año y Rango**. El módulo abre en **Mes actual según Lima (UTC-5)**.
+- El período filtra por `ven_ventas.fecha_venta` (o `fecha_creacion` si falta) y afecta tanto la lista de planes como los cinco KPI; las búsquedas de texto cambian únicamente la lista, no la suma de KPI del período.
+- Se documenta explícitamente que el **saldo representa la deuda ACTUAL de las operaciones registradas dentro del período**, no la deuda histórica que tenían al finalizarlo. Nunca se fabrican saldos a fecha pasada.
+- Las alertas de vencimiento y la revisión contractual NO se ocultan al filtrar un período de ventas, para no omitir moras de contratos anteriores.
+- Migración `104_financiamiento_cartera_filtro_periodo_v2.sql`: función `sp_fin_cartera_backoffice_v2(actor,vista,busqueda,pagina,tamano,desde,hastaExclusivo)`. Se conserva v1 para compatibilidad. Autoriza únicamente el rol servidor `sigi_app_user`; `anon/authenticated` tienen `EXECUTE` denegado. Valida actor, cartera, límites de paginación y período. No actualiza pagos ni contratos.
+- Core `GET /api/core/crm/financiamiento/cartera`: ahora requiere `desde` y `hastaExclusivo` ISO-8601 con offset, además de parámetros tradicionales; permisos JWT `financing.view` y `sales.view`, actor extraído del token y `no-store`.
+- Tabla unificada **Planes y saldos**: columnas Venta y comprador | Lote | Precio base | Inicial total | Capital financiado | Interés | Saldo | Estado | Ver cronograma. El tab de cuotas global se elimina.
+- Cada operación abre un **expediente financiero** en modal con comprador, código de venta, plan, lote, importes contractuales, inicial (reserva y adicional) y saldo contable actual. El cronograma se solicita exclusivamente para la operación seleccionada mediante `obtenerCronogramaVenta(idVenta)` y `obtenerSaldoVenta(idVenta)` autenticados.
+- El detalle muestra cuotas **con saldo pendiente** por defecto, con selector **Todas** para ver también pagadas o anuladas. Columnas: número, vencimiento, capital, interés, importe, abonado, saldo y estado. Las etiquetas de estado tienen colores accesibles. No se presentan cronogramas proyectados como deuda exigible.
+- Precisión monetaria: `formatSoles` representa céntimos sin el redondeo a enteros del `currency()` de la interfaz histórica.
+- Los cinco KPI usan `KpiCard` de la biblioteca Backoffice, con iconos y tonos de marca; tabla y modal usan `Table` (desplazamiento horizontal accesible, foco por teclado, altura adaptativa y anchos mínimos) para pantallas móviles y grandes.
+- Campanita financiera real mantiene `/financiamiento?tab=alertas`. Solo quedan pestañas Planes y saldos y Alertas de cuotas Vencidas.
+- CI: `apps/backoffice/tests/financiamientoPeriodoModal.test.mjs` (componentes compartidos, seguridad, vigencia de saldos, datos reales, interacción y scroll).
+- Pruebas SQL solo lectura: Noviembre 2026 = **3** planes registrados, **S/ 76,749.50** de saldo de cuotas exigibles y **S/ 15,500.00** inicial pendiente de conciliar; Octubre 2026 = **1** plan; Febrero 2027 = **0**. Son cifras de TEST sujetas a cambios. Rol CLIENTE y rangos invertidos rechazados.
+
+### QA manual después de actualizar Docker
+
+1. Abrir `http://localhost:5174/financiamiento`. Por defecto el filtro debe estar en **Mes**, con fecha Perú del día. Verificar KPI y registros correspondientes al mes actual.
+2. Cambiar a **Hoy, Semana, Año, Rango** y comparar tarjetas y ventas; al cambiar de período debe reiniciar paginación y dejar de mostrar el período anterior. Rango invertido debe mostrar error de validación.
+3. Verificar las nueve columnas y la barra de desplazamiento horizontal en móvil o ventana angosta.
+4. Abrir **Ver cronograma** de `VTA-PND-2026-000030`. Verificar nombre, lote MZ-D-L34, precio S/ 30,000, inicial S/ 5,000, capital S/ 25,000, intereses S/ 1,374.75, saldo de cuotas S/ 26,374.75 y las 12 cuotas detalladas.
+5. Alternar **Con saldo pendiente / Todas**, comparar importes y estados coloreados después de aplicar un voucher de TEST mediante Finanzas.
+6. Abrir un plan de venta pendiente de firma y confirmar que no muestra cuotas proyectadas como exigibles.
+7. Seleccionar **Alertas de cuotas Vencidas** y verificar que no depende del filtro de registro de ventas; la campana lleva a esta pestaña.
+8. Comprobar que usuarios sin `financing.view` o fuera de cartera no obtengan planes ni detalle de terceros.
+
+No se desplegó, creó PR, fusionó o tocó `main`. Requiere comprobación funcional local antes de aprobar Sprint 4.
