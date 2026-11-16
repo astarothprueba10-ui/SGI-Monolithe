@@ -922,7 +922,7 @@ public class CrmVentaService {
     /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
     @Transactional(readOnly = true)
     public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
-            Integer pagina, Integer tamano) {
+            Integer pagina, Integer tamano, String desde, String hastaExclusivo) {
         validarActor(actor);
         String modo = vista == null ? "PLANES" : vista.trim().toUpperCase(java.util.Locale.ROOT);
         String texto = busqueda == null ? "" : busqueda.trim();
@@ -933,12 +933,26 @@ public class CrmVentaService {
                 || size<1 || size>100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de cartera inválidos.");
         }
+        // ISO-8601 con zona horaria explícita: el filtro representa fecha de venta en Perú.
+        java.time.OffsetDateTime inicio;
+        java.time.OffsetDateTime fin;
+        try {
+            inicio = java.time.OffsetDateTime.parse(desde);
+            fin = java.time.OffsetDateTime.parse(hastaExclusivo);
+        } catch (java.time.format.DateTimeParseException | NullPointerException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El período debe incluir fechas ISO-8601 válidas.",ex);
+        }
+        if (!inicio.isBefore(fin) || fin.toInstant().isAfter(inicio.plusYears(15).toInstant())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Rango de fechas inválido.");
+        }
         return ejecutar("""
-            SELECT public.sp_fin_cartera_backoffice_v1(
+            SELECT public.sp_fin_cartera_backoffice_v2(
               CAST(? AS bigint),CAST(? AS text),CAST(? AS text),
-              CAST(? AS integer),CAST(? AS integer)
+              CAST(? AS integer),CAST(? AS integer),
+              CAST(? AS timestamptz),CAST(? AS timestamptz)
             )::text
-            """,actor,modo,texto,page,size);
+            """,actor,modo,texto,page,size,desde,hastaExclusivo);
     }
 
     /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
