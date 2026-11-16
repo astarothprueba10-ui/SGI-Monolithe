@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ALL_NAV_ITEMS } from '../../data/navigation';
-import { NOTIFICATIONS } from '../../data/notifications';
+import { useFinanceAlertsBell } from '../../hooks/useFinanceAlertsBell';
 import { useAuth } from '../../contexts/AuthContext';
 import { Dropdown, DropdownItem, DropdownLabel } from '../ui/Dropdown';
 import { Badge } from '../ui/Badge';
@@ -33,14 +33,14 @@ export function Header({
   onOpenMenu,
   mobileMenuOpen = false
 }: HeaderProps) {
-  const { user, can, hasModule } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
-  const notifications = useMemo(
-    () => NOTIFICATIONS.filter((n) => hasModule(n.module)),
-    [hasModule]
-  );
+  const {
+    autorizado, notifications, unreadCount, loading:loadingAlerts,
+    error:alertsError, refresh:refreshAlerts, markSeen, seenSet
+  } = useFinanceAlertsBell();
 
   const results = useMemo(() => {
     if (query.trim().length < 2) return [];
@@ -117,8 +117,11 @@ export function Header({
         trigger={({ toggle, open }) => (
           <button
             type="button"
-            onClick={toggle}
-            aria-label="Notificaciones"
+            onClick={() => {
+              if (!open) void refreshAlerts();
+              toggle();
+            }}
+            aria-label={unreadCount>0 ? `Notificaciones: ${unreadCount} alertas nuevas` : 'Notificaciones'}
             className={cn(
               'relative inline-flex h-9 w-9 items-center justify-center rounded-md border transition-colors duration-150 ease-smooth',
               open
@@ -128,8 +131,9 @@ export function Header({
           >
             <BellIcon className="h-[18px] w-[18px]" />
 
-            {notifications.length > 0 ? (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
+            {unreadCount > 0 ? (
+              <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white ring-2 ring-white"
+                aria-hidden="true">{unreadCount>99?'99+':unreadCount}</span>
             ) : null}
           </button>
         )}
@@ -141,52 +145,59 @@ export function Header({
                 Notificaciones
               </p>
 
-              <Badge tone="brand">{notifications.length}</Badge>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-brand-500">{notifications.length} activas</span>
+                <Badge tone="brand">{unreadCount} nuevas</Badge>
+              </div>
             </div>
 
-            <div className="max-h-80 overflow-y-auto border-t border-brand-100">
-              {notifications.length === 0 ? (
-                <p className="px-3 py-6 text-center text-[13px] text-brand-400">
-                  Sin notificaciones para tu rol.
-                </p>
-              ) : (
-                notifications.map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => {
-                      navigate(n.to);
-                      close();
-                    }}
-                    className="flex w-full gap-2.5 border-b border-brand-50 px-3 py-2.5 text-left transition-colors duration-150 ease-smooth last:border-0 hover:bg-brand-50"
-                  >
-                    <span
-                      className={cn(
-                        'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
-                        n.tone === 'danger'
-                          ? 'bg-rose-500'
-                          : n.tone === 'warning'
-                            ? 'bg-amber-500'
-                            : 'bg-sky-500'
-                      )}
-                    />
-
-                    <span className="min-w-0">
-                      <span className="block text-[13px] font-medium text-brand-800">
-                        {n.title}
-                      </span>
-
-                      <span className="block text-[12px] text-brand-400">
-                        {n.description}
-                      </span>
-
-                      <span className="mt-0.5 block text-[11px] text-brand-300">
-                        {n.time}
-                      </span>
+            <div className="max-h-80 overflow-y-auto border-t border-brand-100" aria-live="polite">
+              {!autorizado && <p className="px-3 py-5 text-center text-xs text-brand-500">
+                Sin alertas financieras disponibles para este rol.
+              </p>}
+              {autorizado && alertsError && <div role="alert" className="px-3 py-3 text-xs text-rose-700">
+                No se pudieron actualizar los avisos. {alertsError}
+                <button type="button" onClick={()=>void refreshAlerts()} className="mt-2 block font-semibold underline">
+                  Reintentar
+                </button>
+              </div>}
+              {autorizado && loadingAlerts && notifications.length===0 &&
+                <p className="px-3 py-5 text-center text-xs text-brand-500">Consultando alertas reales…</p>}
+              {autorizado && !loadingAlerts && !alertsError && notifications.length===0 &&
+                <p className="px-3 py-5 text-center text-xs text-brand-500">
+                  No tienes cuotas próximas ni vencidas con saldo pendiente.
+                </p>}
+              {notifications.slice(0,30).map(n=>(
+                <button key={n.id} type="button"
+                  onClick={()=>{markSeen([n.id]);navigate(n.to);close();}}
+                  className="flex w-full gap-2.5 border-b border-brand-50 px-3 py-2.5 text-left transition-colors duration-150 ease-smooth last:border-0 hover:bg-brand-50"
+                >
+                  <span className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                    n.tone==='danger'?'bg-rose-500':'bg-amber-500')} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-[13px] font-medium text-brand-800">
+                      {n.title}
+                      {!seenSet.has(n.id) && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                        Nueva
+                      </span>}
                     </span>
-                  </button>
-                ))
-              )}
+                    <span className="block text-[12px] text-brand-500">{n.description}</span>
+                    <span className="mt-0.5 block text-[11px] text-brand-400">{n.time}</span>
+                  </span>
+                </button>
+              ))}
+              {notifications.length>30 && <button type="button"
+                className="w-full px-3 py-3 text-center text-xs font-semibold text-brand-700 hover:bg-brand-50"
+                onClick={()=>{navigate('/financiamiento?tab=alertas');close();}}>
+                Ver todas las alertas ({notifications.length})
+              </button>}
+            </div>
+            {autorizado && notifications.length>0 && <div className="flex justify-end border-t border-brand-100 px-3 py-2">
+              <button type="button" disabled={unreadCount===0}
+                className="text-[11px] font-semibold text-brand-700 disabled:opacity-40"
+                onClick={()=>markSeen(notifications.map(n=>n.id))}>
+                Marcar todas como leídas
+              </button>
             </div>
           </div>
         )}
