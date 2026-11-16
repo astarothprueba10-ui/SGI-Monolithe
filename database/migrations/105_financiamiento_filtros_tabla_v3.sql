@@ -160,7 +160,7 @@ BEGIN
  SELECT coalesce(jsonb_agg(x.item ORDER BY x.ordinal),'[]'::jsonb) INTO v_filtrado
  FROM (SELECT value AS item, ordinality AS ordinal
        FROM jsonb_array_elements(CASE WHEN p_vista='PLANES' THEN v_planes ELSE v_cuotas END) WITH ORDINALITY
-       WHERE v_filtro='' OR lower(concat_ws(' ',value->>'codigoVenta',
+       WHERE (v_filtro='' OR lower(concat_ws(' ',value->>'codigoVenta',
           value->>'comprador',value->>'proyecto',value->>'lote',
           value->>'codigoPlan',value->>'estado',value->>'estadoPlan')) LIKE '%'||v_filtro||'%')
         AND (coalesce(p_proyecto,'')='' OR value->>'proyecto'=p_proyecto)
