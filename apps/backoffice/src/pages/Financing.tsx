@@ -8,7 +8,7 @@ import { CarteraFinanciamientoPanel } from '../components/financing/CarteraFinan
 export function Financing() {
   return <div>
     <PageHeader title="Financiamiento y pagos"
-      description="Cartera real de ventas financiadas: capital, cuotas, vencimientos y saldos confirmados."/>
+      description="Cartera de ventas financiadas: capital, cuotas, vencimientos y saldos."/>
     <CarteraFinanciamientoPanel />
   </div>;
 }

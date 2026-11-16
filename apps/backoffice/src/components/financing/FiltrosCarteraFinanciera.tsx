@@ -102,9 +102,6 @@ export function FiltrosCarteraFinanciera({
           onChange={e=>onFechaHasta(e.target.value)}/>
       </div>
       <Button size="sm" icon={RefreshCwIcon} onClick={onLimpiar}>Limpiar filtros</Button>
-      <span className="pb-1 text-[11px] text-brand-400">
-        Las fechas acotan las ventas del período global; no modifican los KPI.
-      </span>
     </div>
   </div>;
 }

@@ -124,13 +124,13 @@ export function CarteraFinanciamientoPanel() {
     {id:'planes',label:'Planes financiados',value:resumen?String(resumen.planes):'—',
       hint:'Ventas registradas en el período',icon:FileStackIcon,tone:'sky'},
     {id:'capital',label:'Capital financiado activo',value:resumen?formatSoles(resumen.capitalFinanciadoActivo):'—',
-      hint:'De los contratos exigibles de la cohorte',icon:LandmarkIcon,tone:'brand'},
+      hint:'De los contratos exigibles',icon:LandmarkIcon,tone:'brand'},
     {id:'saldo',label:'Saldo de cuotas por cobrar',value:resumen?formatSoles(resumen.saldoCuotas):'—',
-      hint:'Saldo vigente, no histórico',icon:WalletIcon,tone:'emerald'},
+      hint:'Saldo vigente',icon:WalletIcon,tone:'emerald'},
     {id:'inicial',label:'Inicial por conciliar',value:resumen?formatSoles(resumen.inicialPorConciliar):'—',
       hint:'Pendiente de aplicación confirmada',icon:CoinsIcon,tone:'amber'},
     {id:'mora',label:'Cuotas vencidas con saldo',value:resumen?formatSoles(resumen.montoVencido):'—',
-      hint:'Saldo vencido de la cohorte',icon:CalendarClockIcon,tone:'rose'}
+      hint:'Saldo vencido',icon:CalendarClockIcon,tone:'rose'}
   ];
 
   const nombrePeriodo = modo==='HOY'?'Hoy':modo==='SEMANA'?'Semana':modo==='MES'?'Mes':
@@ -139,7 +139,7 @@ export function CarteraFinanciamientoPanel() {
 
   return <section className="min-w-0 space-y-5" aria-label="Cartera financiera de ventas reales">
     <CrmPeriodoGlobal
-      descripcion="Filtra planes y tarjetas según la fecha de registro de la venta."
+      descripcion="Filtra el Resumen de Financiamiento según la fecha de registro de la venta."
       modo={modo} onModoChange={setModo}
       fechaReferencia={fechaReferencia} onFechaReferenciaChange={setFechaReferencia}
       fechaDesde={fechaDesde} onFechaDesdeChange={setFechaDesde}
@@ -167,7 +167,7 @@ export function CarteraFinanciamientoPanel() {
         title={vista==='ALERTAS'?'Alertas de cuotas Vencidas':'Planes y saldos'}
         description={vista==='ALERTAS'
           ? 'Cuotas por vencer, vencidas y revisión de mora de toda la cartera autorizada.'
-          : 'Ventas financiadas registradas en el período. Los importes corresponden al saldo vigente.'}
+          : 'Ventas financiadas registradas en el período.'}
         actions={vista==='PLANES'?
           <Button icon={RefreshCwIcon} variant="secondary" onClick={()=>setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>
           :null}
