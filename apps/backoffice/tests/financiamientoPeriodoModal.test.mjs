@@ -75,3 +75,24 @@ test('las tablas y los KPI se adaptan y representan importes sin redondeo',()=>{
   assert.match(money,/minimumFractionDigits: 2/);
   assert.match(money,/maximumFractionDigits: 2/);
 });
+
+
+test('el expediente no repite cabecera y conserva exactamente los 11 datos solicitados',()=>{
+  const modal=read('../src/components/financing/PlanFinanciamientoDetalleModal.tsx');
+  const labels=[...modal.matchAll(/<Dato etiqueta="([^"]+)"/g)].map(x=>x[1]);
+  assert.deepEqual(labels,[
+    'Código de lote','Precio base de venta','Inicial pactada','Capital financiado',
+    'Número de cuotas','Interés total','Total contractual en cuotas','Saldo actual',
+    'Separación acreditada','Monto de cuota mensual','Fecha de primera cuota'
+  ]);
+  assert.match(modal,/title=\{\`Plan financiero · \$\{plan\.codigoVenta\}\`\}/);
+  assert.doesNotMatch(modal,/description=\{\`\$\{plan\.comprador\}/);
+  assert.match(modal,/bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800/);
+  assert.match(modal,/\{plan\.comprador\}/);
+  assert.match(modal,/\{plan\.proyecto\}/);
+  assert.match(modal,/\{plan\.lote\}/);
+  assert.match(modal,/separacionAcreditada \? 'Sí' : 'No'/);
+  assert.match(modal,/cronograma\?\.items\.find\(item => item\.estadoCalculado !== 'ANULADA'\)\?\.cuota/);
+  assert.match(modal,/montoCuotaMensual != null \? soles\(montoCuotaMensual\) : '—'/);
+  assert.match(modal,/cuotasVisibles\.map/);
+});
