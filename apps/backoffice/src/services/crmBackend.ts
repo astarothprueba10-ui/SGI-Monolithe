@@ -432,7 +432,7 @@ export interface CrmConciliacionIntegral {
 }
 /** Cartera real: importes proceden del mismo cálculo que el Portal Cliente. */
 export interface CrmPlanCarteraReal {
-  idVenta:number; codigoVenta:string; idPlanPago:number; codigoPlan:string;
+  idVenta:number; codigoVenta:string; fechaVenta:string; idPlanPago:number; codigoPlan:string;
   comprador:string; lote:string; proyecto:string; estadoVenta:string; estadoPlan:string;
   numeroCuotas:number; precioVenta:number; capitalFinanciado:number; interesTotal:number;
   inicialAdicional:number; reservaAplicada:number; tasaInteresPct:number;
@@ -446,7 +446,9 @@ export interface CrmCuotaCarteraReal {
   saldoCuota:number;estado:string;cuotaAtrasada:boolean;proxima7Dias:boolean;
 }
 export interface CrmCarteraReal {
-  fechaCorte:string; vista:'PLANES'|'CUOTAS';pagina:number;tamano:number;
+  fechaCorte:string; desde:string; hastaExclusivo:string;
+  fechaBase:'FECHA_VENTA'; saldoBase:'SALDO_ACTUAL';
+  vista:'PLANES'|'CUOTAS';pagina:number;tamano:number;
   total:number;paginas:number;items:(CrmPlanCarteraReal|CrmCuotaCarteraReal)[];
   resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
     saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
@@ -1580,10 +1582,12 @@ export const crmBackend = {
   /** FINANCIAMIENTO: cartera por actor; no aceptar IDs arbitrarios del frontend. */
   listarCarteraFinancieraReal: (params: {
     vista:'PLANES'|'CUOTAS';busqueda?:string;pagina?:number;tamano?:number;
+    desde:string;hastaExclusivo:string;
   }) => coreApi.get<CrmCarteraReal>(
     `/crm/financiamiento/cartera${qs({
       vista:params.vista,busqueda:params.busqueda?.trim(),
-      pagina:params.pagina??1,tamano:params.tamano??20
+      pagina:params.pagina??1,tamano:params.tamano??20,
+      desde:params.desde,hastaExclusivo:params.hastaExclusivo
     })}`
   ),
 
