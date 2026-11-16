@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarDaysIcon, FileTextIcon, RefreshCwIcon, WalletIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { StatusBadge } from '../ui/Badge';
 import { Table, TH, TD, TR } from '../ui/Table';
 import { crmBackend, type CrmCronogramaVenta, type CrmPlanCarteraReal, type CrmSaldoVenta, type CrmCuotaCronograma } from '../../services/crmBackend';
-import { currency } from '../../utils/format';
+import { formatSoles } from '../../utils/financeMoney';
 
-const soles = (v: number | undefined | null) => currency(Number(v ?? 0));
+const soles = formatSoles;
 const fecha = (v?: string | null) => v
   ? new Intl.DateTimeFormat('es-PE', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })
       .format(new Date(`${v.slice(0, 10)}T12:00:00Z`))
@@ -43,6 +42,7 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [soloConSaldo, setSoloConSaldo] = useState(true);
 
   useEffect(() => {
     let vigente = true;
@@ -68,6 +68,10 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
   const totalInicial = plan.inicialAdicional + plan.reservaAplicada;
   const totalPendiente = cuotas.filter(c => c.estadoCalculado !== 'PAGADA' &&
     c.estadoCalculado !== 'ANULADA' && (c.saldoCuota ?? c.cuota) > 0).length;
+  const cuotasVisibles = soloConSaldo ? cuotas.filter(c =>
+    c.estadoCalculado !== 'PAGADA' && c.estadoCalculado !== 'ANULADA' &&
+    (c.saldoCuota ?? c.cuota) > 0
+  ) : cuotas;
 
   return <Modal open title={`Plan financiero · ${plan.codigoVenta}`}
     description={`${plan.comprador} · ${plan.lote}`} onClose={onClose} width="max-w-6xl">
@@ -116,8 +120,22 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
                 'Las cuotas solo son exigibles tras la formalización del contrato.'}
             </p>
           </div>
-          <Button icon={RefreshCwIcon} variant="secondary" disabled={cargando}
-            onClick={() => setRevision(x => x + 1)}>Actualizar</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {exigible&&<div className="inline-flex rounded-lg border border-brand-200 bg-white p-0.5 text-xs">
+              <button type="button" onClick={()=>setSoloConSaldo(true)}
+                aria-pressed={soloConSaldo}
+                className={`rounded-md px-3 py-2 font-semibold ${soloConSaldo?'bg-brand-900 text-white':'text-brand-500 hover:bg-brand-50'}`}>
+                Con saldo pendiente
+              </button>
+              <button type="button" onClick={()=>setSoloConSaldo(false)}
+                aria-pressed={!soloConSaldo}
+                className={`rounded-md px-3 py-2 font-semibold ${!soloConSaldo?'bg-brand-900 text-white':'text-brand-500 hover:bg-brand-50'}`}>
+                Todas
+              </button>
+            </div>}
+            <Button icon={RefreshCwIcon} variant="secondary" disabled={cargando}
+              onClick={() => setRevision(x => x + 1)}>Actualizar</Button>
+          </div>
         </div>
 
         {cargando && <p className="px-4 py-6 text-sm text-brand-500">Consultando el plan y sus pagos confirmados…</p>}
@@ -138,7 +156,7 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
             <TH align="right">Importe</TH><TH align="right">Abonado</TH>
             <TH align="right">Saldo</TH><TH>Estado</TH>
           </>}>
-            {cuotas.map(c => {
+            {cuotasVisibles.map(c => {
               const estado = estadoCuota(c);
               return <TR key={c.numero} className="hover:bg-amber-50/40">
                 <TD className="font-semibold text-brand-900">{String(c.numero).padStart(2, '0')}</TD>
