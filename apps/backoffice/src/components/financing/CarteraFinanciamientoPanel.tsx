@@ -10,7 +10,7 @@ import { KpiCard, type Kpi } from '../ui/KpiCard';
 import { Card, CardHeader } from '../ui/Card';
 import { Tabs } from '../ui/Tabs';
 import { Table, TD, TH, TR } from '../ui/Table';
-import { SearchInput } from '../ui/Field';
+import { FiltrosCarteraFinanciera, FILTROS_CARTERA_VACIOS, type FiltrosCarteraState } from './FiltrosCarteraFinanciera';
 import { Alert, EmptyState } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { AlertasCuotasPanel } from './AlertasCuotasPanel';
@@ -18,6 +18,7 @@ import { RevisionClausulaPanel } from './RevisionClausulaPanel';
 import { PlanFinanciamientoDetalleModal } from './PlanFinanciamientoDetalleModal';
 
 const estadoPlan = (p: CrmPlanCarteraReal) => {
+  if (p.estadoFiltro==='ANULADO') return { etiqueta:'Anulado', clases:'border-slate-200 bg-slate-50 text-slate-700' };
   if (!p.cuotasExigibles) return {
     etiqueta:'Pendiente de firma',
     clases:'border-amber-200 bg-amber-50 text-amber-800'
@@ -40,7 +41,7 @@ export function CarteraFinanciamientoPanel() {
   const cambiarVista = (tab: string) => {
     setSearchParams({tab:tab==='ALERTAS'?'alertas':'planes'});
   };
-  const [modo,setModo] = useState<PeriodoCrmModo>('MES');
+  const [modo,setModo] = useState<PeriodoCrmModo>('ANIO');
   const [fechaReferencia,setFechaReferencia] = useState(getPeruTodayDateString);
   const [fechaDesde,setFechaDesde] = useState(getPeruTodayDateString);
   const [fechaHasta,setFechaHasta] = useState(getPeruTodayDateString);
@@ -48,8 +49,9 @@ export function CarteraFinanciamientoPanel() {
     modo,fechaReferencia,fechaDesde,fechaHasta
   ),[modo,fechaReferencia,fechaDesde,fechaHasta]);
 
-  const [buscar,setBuscar] = useState('');
+  const [filtrosTabla,setFiltrosTabla] = useState<FiltrosCarteraState>({...FILTROS_CARTERA_VACIOS});
   const [consulta,setConsulta] = useState('');
+  const [catalogos,setCatalogos] = useState<CrmCarteraReal['filtros']>({proyectos:[],lotes:[]});
   const [pagina,setPagina] = useState(1);
   const [revision,setRevision] = useState(0);
   const [datos,setDatos] = useState<CrmCarteraReal | null>(null);
@@ -58,9 +60,24 @@ export function CarteraFinanciamientoPanel() {
   const [seleccionado,setSeleccionado] = useState<CrmPlanCarteraReal | null>(null);
 
   useEffect(() => {
-    const timer=window.setTimeout(() => {setPagina(1);setConsulta(buscar);},350);
+    const timer=window.setTimeout(() => {
+      setPagina(1);
+      setConsulta(filtrosTabla.busqueda);
+    },350);
     return () => window.clearTimeout(timer);
-  },[buscar]);
+  },[filtrosTabla.busqueda]);
+
+  const cambiarFiltroTabla = (cambios:Partial<FiltrosCarteraState>) => {
+    setFiltrosTabla(prev=>({...prev,...cambios}));
+    setPagina(1);
+  };
+  const limpiarFiltrosTabla = () => {
+    setFiltrosTabla({...FILTROS_CARTERA_VACIOS});
+    setConsulta('');
+    setPagina(1);
+  };
+  const rangoTablaInvalido = Boolean(filtrosTabla.fechaDesde && filtrosTabla.fechaHasta
+    && filtrosTabla.fechaDesde > filtrosTabla.fechaHasta);
 
   useEffect(() => {
     setPagina(1);
@@ -68,23 +85,34 @@ export function CarteraFinanciamientoPanel() {
   },[rango]);
 
   useEffect(() => {
-    if(!rango){
+    if(!rango || rangoTablaInvalido){
       setDatos(null);setCargando(false);
-      setError('Selecciona un rango de fechas válido para consultar los indicadores y planes.');
+      setError(rangoTablaInvalido
+        ? 'La fecha desde no puede ser posterior a la fecha hasta.'
+        : 'Selecciona un rango de fechas válido para consultar los indicadores y planes.');
       return;
     }
     let vigente=true;
     setCargando(true);setError(null);setDatos(null);
     void crmBackend.listarCarteraFinancieraReal({
       vista:'PLANES',busqueda:consulta,pagina,tamano:20,
-      desde:rango.desde,hastaExclusivo:rango.hastaExclusivo
+      desde:rango.desde,hastaExclusivo:rango.hastaExclusivo,
+      proyecto:filtrosTabla.proyecto,lote:filtrosTabla.lote,
+      estado:filtrosTabla.estado,
+      fechaTablaDesde:filtrosTabla.fechaDesde,
+      fechaTablaHasta:filtrosTabla.fechaHasta
     }).then(resultado => {
-      if(vigente)setDatos(resultado);
+      if(vigente) {
+        setDatos(resultado);
+        setCatalogos(resultado.filtros);
+      }
     }).catch(cause => {
       if(vigente)setError(cause instanceof Error?cause.message:'No pudimos consultar la cartera financiera.');
     }).finally(() => {if(vigente)setCargando(false);});
     return () => {vigente=false;};
-  },[rango,consulta,pagina,revision]);
+  },[rango,consulta,pagina,revision,rangoTablaInvalido,
+    filtrosTabla.proyecto,filtrosTabla.lote,filtrosTabla.estado,
+    filtrosTabla.fechaDesde,filtrosTabla.fechaHasta]);
 
   const resumen = datos?.resumen;
   const planes = (datos?.items ?? []) as CrmPlanCarteraReal[];
@@ -146,9 +174,18 @@ export function CarteraFinanciamientoPanel() {
           items={[{id:'PLANES',label:'Planes y saldos',count:resumen?.planes??null},
             {id:'ALERTAS',label:'Alertas de cuotas Vencidas'}]}/>
         {vista==='PLANES'&&<div className="flex flex-wrap items-center justify-between gap-3 py-3">
-          <SearchInput value={buscar} onValueChange={setBuscar} className="w-full sm:w-80"
-            label="Buscar venta o comprador" placeholder="Buscar comprador, lote u operación…"/>
-          {datos&&<p className="text-[11px] text-brand-500">Fecha de corte: {fechaCorta(datos.fechaCorte)} · {datos.total} registros en filtro</p>}
+          <FiltrosCarteraFinanciera filtros={filtrosTabla}
+            proyectos={catalogos.proyectos} lotes={catalogos.lotes}
+            onBusqueda={busqueda=>cambiarFiltroTabla({busqueda})}
+            onProyecto={proyecto=>cambiarFiltroTabla({proyecto,lote:''})}
+            onLote={lote=>cambiarFiltroTabla({lote})}
+            onEstado={estado=>cambiarFiltroTabla({estado})}
+            onFechaDesde={fechaDesde=>cambiarFiltroTabla({fechaDesde})}
+            onFechaHasta={fechaHasta=>cambiarFiltroTabla({fechaHasta})}
+            onLimpiar={limpiarFiltrosTabla}/>
+          {datos&&<p className="pb-2 text-[11px] text-brand-500">
+            Fecha de corte: {fechaCorta(datos.fechaCorte)} · {datos.total} registros filtrados
+          </p>}
         </div>}
       </div>
 
