@@ -482,10 +482,15 @@ public class CrmVentaController {
                 @RequestParam(defaultValue = "1") Integer pagina,
                 @RequestParam(defaultValue = "20") Integer tamano,
                 @RequestParam(required = true) String desde,
-                @RequestParam(required = true) String hastaExclusivo) {
+                @RequestParam(required = true) String hastaExclusivo,
+                @RequestParam(defaultValue = "") String proyecto,
+                @RequestParam(defaultValue = "") String lote,
+                @RequestParam(defaultValue = "") String estado,
+                @RequestParam(required = false) String fechaTablaDesde,
+                @RequestParam(required = false) String fechaTablaHasta) {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                     .body(service.carteraFinancieraReal(obtenerActor(jwt),vista,busqueda,pagina,tamano,
-                            desde,hastaExclusivo));
+                            desde,hastaExclusivo,proyecto,lote,estado,fechaTablaDesde,fechaTablaHasta));
         }
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
