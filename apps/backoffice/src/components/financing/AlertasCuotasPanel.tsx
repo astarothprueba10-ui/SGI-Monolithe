@@ -45,6 +45,11 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
     return ()=>{activo=false};
   },[tieneAcceso,tipo,pagina,revision,localRevision]);
 
+  const actualizarAlertas=()=>{
+    setLocalRevision(x=>x+1);
+    // La campana vuelve a consultar Core con el mismo JWT y cartera autorizada.
+    window.dispatchEvent(new Event('sgi:financiamiento-alertas-actualizadas'));
+  };
   const cambiarTipo=(nuevo:CrmTipoAlertaCuota)=>{
     setTipo(nuevo);setPagina(1);
   };
@@ -56,7 +61,7 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
       toast.success('Avisos internos preparados',{
         description:`${r.creados} nuevos · ${r.deduplicados} ya existentes · ${r.desactivados} desactivados. Sin correos enviados.`
       });
-      setLocalRevision(x=>x+1);
+      actualizarAlertas();
     }catch(e:unknown){
       toast.error('No se pudieron preparar los avisos',{
         description:e instanceof Error?e.message:'Operación no autorizada.'
@@ -81,7 +86,7 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={()=>setLocalRevision(x=>x+1)}
+        <button type="button" onClick={actualizarAlertas}
           disabled={cargando}
           className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
           <RefreshCw className="h-3.5 w-3.5"/>Actualizar alertas
