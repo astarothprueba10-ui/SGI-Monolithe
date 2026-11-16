@@ -8,7 +8,7 @@ test('alertas son un tercer tab; no bloques independientes ni nota azul',()=>{
   const cartera=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const financing=read('../src/pages/Financing.tsx');
   assert.match(cartera,/id:'ALERTAS',label:'Alertas de cuotas Vencidas'/);
-  assert.match(cartera,/tabUrl === 'alertas'/);
+  assert.match(cartera,/searchParams\.get\('tab'\)==='alertas'/);
   assert.match(cartera,/<AlertasCuotasPanel\s*\/>/);
   assert.match(cartera,/<RevisionClausulaPanel\s*\/>/);
   assert.doesNotMatch(cartera,/Cartera real · saldos provenientes de pagos aplicados/);
