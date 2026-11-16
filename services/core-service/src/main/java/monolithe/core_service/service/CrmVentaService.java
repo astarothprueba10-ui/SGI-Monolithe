@@ -922,7 +922,9 @@ public class CrmVentaService {
     /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
     @Transactional(readOnly = true)
     public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
-            Integer pagina, Integer tamano, String desde, String hastaExclusivo) {
+            Integer pagina, Integer tamano, String desde, String hastaExclusivo,
+            String proyecto, String lote, String estado,
+            String fechaTablaDesde, String fechaTablaHasta) {
         validarActor(actor);
         String modo = vista == null ? "PLANES" : vista.trim().toUpperCase(java.util.Locale.ROOT);
         String texto = busqueda == null ? "" : busqueda.trim();
@@ -946,13 +948,39 @@ public class CrmVentaService {
         if (!inicio.isBefore(fin) || fin.toInstant().isAfter(inicio.plusYears(15).toInstant())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Rango de fechas inválido.");
         }
+        String filtroProyecto = proyecto == null ? "" : proyecto.trim();
+        String filtroLote = lote == null ? "" : lote.trim();
+        String filtroEstado = estado == null ? "" : estado.trim().toUpperCase(java.util.Locale.ROOT);
+        if (filtroProyecto.length() > 160 || filtroLote.length() > 100
+                || !java.util.Set.of("", "ACTIVO", "COMPLETADO", "PENDIENTE_FIRMA", "ANULADO")
+                        .contains(filtroEstado)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de tabla inválidos.");
+        }
+        java.time.LocalDate tablaDesde;
+        java.time.LocalDate tablaHasta;
+        try {
+            tablaDesde = fechaTablaDesde == null || fechaTablaDesde.isBlank()
+                    ? null : java.time.LocalDate.parse(fechaTablaDesde);
+            tablaHasta = fechaTablaHasta == null || fechaTablaHasta.isBlank()
+                    ? null : java.time.LocalDate.parse(fechaTablaHasta);
+        } catch (java.time.format.DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Las fechas de la tabla deben tener formato AAAA-MM-DD.",ex);
+        }
+        if (tablaDesde != null && tablaHasta != null && tablaDesde.isAfter(tablaHasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha desde no puede ser posterior a la fecha hasta.");
+        }
         return ejecutar("""
-            SELECT public.sp_fin_cartera_backoffice_v2(
+            SELECT public.sp_fin_cartera_backoffice_v3(
               CAST(? AS bigint),CAST(? AS text),CAST(? AS text),
               CAST(? AS integer),CAST(? AS integer),
-              CAST(? AS timestamptz),CAST(? AS timestamptz)
+              CAST(? AS timestamptz),CAST(? AS timestamptz),
+              CAST(? AS text),CAST(? AS text),CAST(? AS text),
+              CAST(? AS date),CAST(? AS date)
             )::text
-            """,actor,modo,texto,page,size,desde,hastaExclusivo);
+            """,actor,modo,texto,page,size,desde,hastaExclusivo,
+                filtroProyecto,filtroLote,filtroEstado,tablaDesde,tablaHasta);
     }
 
     /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
