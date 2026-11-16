@@ -76,7 +76,7 @@ export function CarteraFinanciamientoPanel() {
     </div>
     <Card>
       <CardHeader title={vista==='ALERTAS'?'Alertas de cuotas vencidas':'Planes y cuentas por cobrar'} description={vista==='ALERTAS'?'Seguimiento de cuotas próximas y vencidas con saldos confirmados.':'Consulta de ventas financiadas autorizadas, sin registros de demostración.'}
-        actions={<Button icon={RefreshCwIcon} variant="secondary" onClick={() => setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>}/>
+        actions={vista==='ALERTAS'?null:<Button icon={RefreshCwIcon} variant="secondary" onClick={() => setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>}/>
       <div className="border-b border-brand-100 px-4 py-3">
         <Tabs active={vista} onChange={cambiarVista}
           items={[{id:'PLANES',label:'Planes y saldos',count:resumen?.planes??null},
