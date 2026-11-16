@@ -93,7 +93,7 @@ Pruebas CI: `apps/backoffice/tests/finanzasReales.test.mjs` y `apps/backoffice/t
 
 ## Nueva experiencia de Financiamiento — migración 104 (15/11/2026)
 
-- Se reutiliza el componente de CRM `CrmPeriodoGlobal` con la función `calcularRangoCrm`: **Hoy, Semana, Mes, Año y Rango**. El módulo abre en **Mes actual según Lima (UTC-5)**.
+- Se reutiliza el componente de CRM `CrmPeriodoGlobal` con la función `calcularRangoCrm`: **Hoy, Semana, Mes, Año y Rango**. El módulo abre en **Año actual según Lima (UTC-5)**.
 - El período filtra por `ven_ventas.fecha_venta` (o `fecha_creacion` si falta) y afecta tanto la lista de planes como los cinco KPI; las búsquedas de texto cambian únicamente la lista, no la suma de KPI del período.
 - Se documenta explícitamente que el **saldo representa la deuda ACTUAL de las operaciones registradas dentro del período**, no la deuda histórica que tenían al finalizarlo. Nunca se fabrican saldos a fecha pasada.
 - Las alertas de vencimiento y la revisión contractual NO se ocultan al filtrar un período de ventas, para no omitir moras de contratos anteriores.
@@ -120,3 +120,40 @@ Pruebas CI: `apps/backoffice/tests/finanzasReales.test.mjs` y `apps/backoffice/t
 8. Comprobar que usuarios sin `financing.view` o fuera de cartera no obtengan planes ni detalle de terceros.
 
 No se desplegó, creó PR, fusionó o tocó `main`. Requiere comprobación funcional local antes de aprobar Sprint 4.
+
+## Ajuste de filtros financieros — migración 105 (16/11/2026)
+
+La experiencia se alinea con los filtros de la tabla de CRM y usa **Año** como período global predeterminado, con referencia a la fecha local de Perú. Los otros modos (Hoy/Semana/Mes/Rango) siguen disponibles.
+
+### Indicadores y tabla: filtros deliberadamente separados
+- **Período global**: determina la cohorte de ventas cuya fecha de registro cae en el período. Sus cinco KPI muestran **saldos ACTUALES**, no reconstrucciones históricas. **Por defecto, Año actual**.
+- **Filtros exclusivos de la tabla**: primera fila `Buscar venta o comprador`, `Proyecto`, `Lote`, `Estado`; segunda fila `Fecha desde`, `Fecha hasta` y `Limpiar filtros`.
+- Las etiquetas de todos los campos aparecen **encima de su control**, replicando la disposición usada en CRM. En móvil, los controles pasan a varias líneas; la tabla conserva desplazamiento horizontal.
+- Los filtros de tabla son combinables y se ejecutan **en el servidor antes de paginar**; por tanto, funcionan para el conjunto completo de ventas autorizadas, no solo en las filas visibles de una página.
+- Proyecto y lote proceden de un catálogo que Core construye desde las operaciones autorizadas del período global; elegir un proyecto limita las opciones de lote a ese proyecto y borra la selección anterior de lote.
+- El estado usa el estado **visible** de la tabla (`ACTIVO`, `PENDIENTE_FIRMA`, `COMPLETADO`, `ANULADO`). Los rangos de fechas son inclusivos en hora local de Lima y **restringen**, sin sustituir, el período global.
+- **Limpiar filtros** restablece búsqueda, proyecto, lote, estado y fechas de la tabla. No cambia el período global seleccionado ni modifica las cinco tarjetas KPI.
+- Los KPI no varían al utilizar únicamente los filtros de la tabla. El contador de filas filtradas y la paginación sí varían. La sección de alertas no se filtra por fecha de registro de ventas.
+
+### Backend
+- Migración **`105_financiamiento_filtros_tabla_v3.sql`**: `sp_fin_cartera_backoffice_v3` extiende la v2 sin eliminarla. Usa la verificación habitual de actor, `fn_crm_puede_consultar_venta_v1`, `search_path` fijo, `REVOKE EXECUTE` de roles públicos y permiso exclusivo al rol servidor `sigi_app_user`.
+- El mismo endpoint `GET /api/core/crm/financiamiento/cartera` admite los parámetros `proyecto`, `lote`, `estado`, `fechaTablaDesde` y `fechaTablaHasta`; los valida en Java y en SQL. El actor se extrae del JWT; los filtros no confieren acceso a ventas ajenas.
+- La respuesta añade `filtros.proyectos` y `filtros.lotes`, con las opciones de la cartera visible antes de aplicar paginación y filtros específicos de tabla.
+- Se preservan los procedimientos oficiales de cálculo de capital, mora, cronograma, importes y pagos confirmados. No se actualiza ningún saldo ni contrato.
+
+### Pruebas realizadas
+- SQL TEST: el filtro global de 2026 devuelve **5 planes**; el lote `MZ-D-L34` devuelve **1**; el período específico 01–30/11/2026 devuelve **3**. Los KPI no cambian entre esas consultas.
+- Permisos: `anon=false`, `authenticated=false`, `sigi_app_user=true`; CLIENTE sin permisos bloqueado. Fechas invertidas rechazadas.
+- CI de la rama: compilación y typecheck de frontend, tests Java de Core y pruebas estructurales de los filtros.
+
+### QA manual en Docker local
+1. Entrar en Financiamiento y pagos y confirmar que **Año** está seleccionado por defecto; los KPI indican importes anuales.
+2. En la tabla, comprobar las dos filas y etiquetas superiores de los controles.
+3. Elegir un proyecto: la lista de lotes debe adaptarse. Elegir `MZ-D-L34`: con año 2026 debe quedar una operación.
+4. Seleccionar estado y fechas desde/hasta. Confirmar que los filtros se combinan y que el total de registros cambia sin cambiar los KPI.
+5. Buscar por nombre o código; probar cero resultados y paginación; después pulsar **Limpiar filtros**.
+6. Verificar que **Limpiar filtros** no cambie el Año global y que los planes vuelvan a mostrarse.
+7. Cambiar el período global a otro año y verificar que cambien las tarjetas y las opciones autorizadas. Las alertas continúan independientes.
+8. En una ventana estrecha comprobar que los controles se reordenan y las columnas de planes no se comprimen.
+
+No se ha fusionado con `main` ni desplegado.
