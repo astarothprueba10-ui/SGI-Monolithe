@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=(name)=>readFileSync(new URL(name,import.meta.url),'utf8');
 
-test('reutiliza el filtro global de CRM y comienza en MES',()=>{
+test('reutiliza el filtro global de CRM y comienza en AÑO',()=>{
   const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const periodo=read('../src/components/crm/CrmPeriodoGlobal.tsx');
   const utility=read('../src/utils/crmPeriodo.ts');
   assert.match(panel,/CrmPeriodoGlobal/);
   assert.match(panel,/calcularRangoCrm/);
-  assert.match(panel,/useState<PeriodoCrmModo>\('MES'\)/);
+  assert.match(panel,/useState<PeriodoCrmModo>\('ANIO'\)/);
   assert.match(panel,/getPeruTodayDateString/);
   assert.match(periodo,/Hoy/);
   assert.match(periodo,/Semana/);
@@ -38,7 +38,7 @@ test('el periodo limita los planes y los KPI son de saldos vigentes de ventas de
   assert.match(ctr,/hasAuthority\('financing\.view'\) and hasAuthority\('sales\.view'\)/);
   assert.match(ctr,/RequestParam\(required = true\) String desde/);
   assert.match(service,/OffsetDateTime\.parse\(desde\)/);
-  assert.match(service,/sp_fin_cartera_backoffice_v2/);
+  assert.match(service,/sp_fin_cartera_backoffice_v3/);
   assert.match(api,/hastaExclusivo:params\.hastaExclusivo/);
 });
 
@@ -95,4 +95,48 @@ test('el expediente no repite cabecera y conserva exactamente los 11 datos solic
   assert.match(modal,/cronograma\?\.items\.find\(item => item\.estadoCalculado !== 'ANULADA'\)\?\.cuota/);
   assert.match(modal,/montoCuotaMensual != null \? soles\(montoCuotaMensual\) : '—'/);
   assert.match(modal,/cuotasVisibles\.map/);
+});
+
+test('la tabla reutiliza el diseño CRM con filtros separados sin cambiar los KPI',()=>{
+  const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
+  const filtros=read('../src/components/financing/FiltrosCarteraFinanciera.tsx');
+  const sql=read('../../../database/migrations/105_financiamiento_filtros_tabla_v3.sql');
+  const service=read('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmVentaService.java');
+  const controller=read('../../../services/core-service/src/main/java/monolithe/core_service/controller/CrmVentaController.java');
+  const api=read('../src/services/crmBackend.ts');
+
+  assert.match(panel,/useState<PeriodoCrmModo>\('ANIO'\)/);
+  assert.match(panel,/FiltrosCarteraFinanciera/);
+  assert.match(panel,/proyectos=\{catalogos\.proyectos\}/);
+  assert.match(panel,/lotes=\{catalogos\.lotes\}/);
+  assert.match(panel,/onProyecto=\{proyecto=>cambiarFiltroTabla\(\{proyecto,lote:''\}\)\}/);
+  assert.match(panel,/onLimpiar=\{limpiarFiltrosTabla\}/);
+  assert.match(panel,/fechaTablaDesde:filtrosTabla\.fechaDesde/);
+  assert.match(panel,/fechaTablaHasta:filtrosTabla\.fechaHasta/);
+  assert.match(panel,/setCatalogos\(resultado\.filtros\)/);
+
+  for(const label of ['Buscar venta o comprador','Proyecto','Lote','Estado','Fecha desde','Fecha hasta','Limpiar filtros']){
+    assert.ok(filtros.includes(label),label);
+  }
+  assert.match(filtros,/flex flex-wrap items-end gap-3/);
+  assert.match(filtros,/fechaDesde/);
+  assert.match(filtros,/fechaHasta/);
+  assert.match(filtros,/FILTROS_CARTERA_VACIOS/);
+
+  assert.match(sql,/sp_fin_cartera_backoffice_v3/);
+  assert.match(sql,/v_catalogo_proyectos/);
+  assert.match(sql,/v_catalogo_lotes/);
+  assert.match(sql,/p_proyecto/);
+  assert.match(sql,/p_lote/);
+  assert.match(sql,/p_estado/);
+  assert.match(sql,/p_tabla_desde/);
+  assert.match(sql,/p_tabla_hasta/);
+  assert.match(sql,/v_total_planes := v_total_planes\+1/);
+  assert.match(sql,/'resumen',jsonb_build_object/);
+  assert.match(sql,/REVOKE ALL ON FUNCTION.*FROM PUBLIC,anon,authenticated/);
+  assert.match(sql,/GRANT EXECUTE ON FUNCTION.*TO sigi_app_user/);
+  assert.match(service,/sp_fin_cartera_backoffice_v3/);
+  assert.match(controller,/RequestParam\(defaultValue = ""\) String proyecto/);
+  assert.match(api,/fechaTablaDesde:params\.fechaTablaDesde/);
+  assert.match(api,/fechaTablaHasta:params\.fechaTablaHasta/);
 });
