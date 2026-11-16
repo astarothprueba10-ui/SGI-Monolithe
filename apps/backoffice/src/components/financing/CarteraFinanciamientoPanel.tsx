@@ -86,14 +86,17 @@ export function CarteraFinanciamientoPanel() {
 
   useEffect(() => {
     if(!rango || rangoTablaInvalido){
-      setDatos(null);setCargando(false);
+      if(!rango) setDatos(null);
+      setCargando(false);
       setError(rangoTablaInvalido
         ? 'La fecha desde no puede ser posterior a la fecha hasta.'
         : 'Selecciona un rango de fechas válido para consultar los indicadores y planes.');
       return;
     }
     let vigente=true;
-    setCargando(true);setError(null);setDatos(null);
+    setCargando(true);
+    setError(null);
+    // Mantener los KPI estables mientras se aplican filtros exclusivos de la tabla.
     void crmBackend.listarCarteraFinancieraReal({
       vista:'PLANES',busqueda:consulta,pagina,tamano:20,
       desde:rango.desde,hastaExclusivo:rango.hastaExclusivo,
@@ -173,7 +176,7 @@ export function CarteraFinanciamientoPanel() {
         <Tabs active={vista} onChange={cambiarVista}
           items={[{id:'PLANES',label:'Planes y saldos',count:resumen?.planes??null},
             {id:'ALERTAS',label:'Alertas de cuotas Vencidas'}]}/>
-        {vista==='PLANES'&&<div className="flex flex-wrap items-center justify-between gap-3 py-3">
+        {vista==='PLANES'&&<div className="w-full py-3">
           <FiltrosCarteraFinanciera filtros={filtrosTabla}
             proyectos={catalogos.proyectos} lotes={catalogos.lotes}
             onBusqueda={busqueda=>cambiarFiltroTabla({busqueda})}
