@@ -19,8 +19,12 @@ test('Financiamiento lists real plans, balances and installments with no duplica
   const financing=read('../src/pages/Financing.tsx');
   const cartera=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   assert.match(financing,/CarteraFinanciamientoPanel/);
-  assert.match(financing,/AlertasCuotasPanel/);
-  assert.match(financing,/RevisionClausulaPanel/);
+  assert.match(cartera,/AlertasCuotasPanel/);
+  assert.match(cartera,/RevisionClausulaPanel/);
+  assert.match(cartera,/id:'ALERTAS',label:'Alertas de cuotas Vencidas'/);
+  assert.match(cartera,/tabUrl === 'alertas' \? 'ALERTAS'/);
+  assert.doesNotMatch(cartera,/Cartera real · saldos provenientes de pagos aplicados/);
+  assert.doesNotMatch(financing,/<AlertasCuotasPanel|<RevisionClausulaPanel/);
   for(const symbol of ['FINANCING_PLANS','INSTALLMENTS','financingService','VouchersCuotasPanel','demo'])
     assert.ok(!financing.includes(symbol),symbol);
   assert.match(cartera,/listarCarteraFinancieraReal/);
