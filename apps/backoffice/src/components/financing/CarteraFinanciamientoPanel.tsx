@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCwIcon } from 'lucide-react';
-import { crmBackend, type CrmCarteraReal, type CrmPlanCarteraReal, type CrmCuotaCarteraReal } from '../../services/crmBackend';
+import { CalendarClockIcon, CoinsIcon, FileStackIcon, LandmarkIcon, RefreshCwIcon, WalletIcon, EyeIcon } from 'lucide-react';
+import { crmBackend, type CrmCarteraReal, type CrmPlanCarteraReal } from '../../services/crmBackend';
+import { CrmPeriodoGlobal, type PeriodoCrmModo } from '../crm/CrmPeriodoGlobal';
+import { calcularRangoCrm } from '../../utils/crmPeriodo';
+import { getPeruTodayDateString } from '../Workers/workerDateUtils';
+import { formatSoles } from '../../utils/financeMoney';
+import { KpiCard, type Kpi } from '../ui/KpiCard';
 import { Card, CardHeader } from '../ui/Card';
 import { Tabs } from '../ui/Tabs';
 import { Table, TD, TH, TR } from '../ui/Table';
@@ -10,24 +15,39 @@ import { Alert, EmptyState } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { AlertasCuotasPanel } from './AlertasCuotasPanel';
 import { RevisionClausulaPanel } from './RevisionClausulaPanel';
-import { currency } from '../../utils/format';
+import { PlanFinanciamientoDetalleModal } from './PlanFinanciamientoDetalleModal';
 
-const money = (v: number | null | undefined) => currency(Number(v ?? 0));
-const planLabel = (code: string) => code === 'ACTIVO' ? 'Activo' :
-  code === 'PENDIENTE' ? 'Pendiente de firma' : code === 'COMPLETADO' ? 'Completado' : code;
-const dateLabel = (v: string | null) => v
-  ? new Date(`${v}T12:00:00`).toLocaleDateString('es-PE') : '—';
+const estadoPlan = (p: CrmPlanCarteraReal) => {
+  if (!p.cuotasExigibles) return {
+    etiqueta:'Pendiente de firma',
+    clases:'border-amber-200 bg-amber-50 text-amber-800'
+  };
+  if (p.estadoPlan==='COMPLETADO') return {
+    etiqueta:'Completado',
+    clases:'border-emerald-200 bg-emerald-50 text-emerald-800'
+  };
+  return {etiqueta:'Activo',clases:'border-emerald-200 bg-emerald-50 text-emerald-800'};
+};
 
+const fechaCorta = (v: string) => new Intl.DateTimeFormat('es-PE',{
+  day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'
+}).format(new Date(`${v.slice(0,10)}T12:00:00Z`));
+
+/** Cartera de ventas del período, con saldos vigentes a la fecha de consulta. */
 export function CarteraFinanciamientoPanel() {
   const [searchParams,setSearchParams] = useSearchParams();
-  const tabUrl = searchParams.get('tab');
-  const vista: 'PLANES'|'CUOTAS'|'ALERTAS' =
-    tabUrl === 'cuotas' ? 'CUOTAS' : tabUrl === 'alertas' ? 'ALERTAS' : 'PLANES';
+  const vista = searchParams.get('tab')==='alertas'?'ALERTAS':'PLANES';
   const cambiarVista = (tab: string) => {
-    const nuevo = tab === 'CUOTAS' ? 'cuotas' : tab === 'ALERTAS' ? 'alertas' : 'planes';
-    setPagina(1);
-    setSearchParams({tab:nuevo});
+    setSearchParams({tab:tab==='ALERTAS'?'alertas':'planes'});
   };
+  const [modo,setModo] = useState<PeriodoCrmModo>('MES');
+  const [fechaReferencia,setFechaReferencia] = useState(getPeruTodayDateString);
+  const [fechaDesde,setFechaDesde] = useState(getPeruTodayDateString);
+  const [fechaHasta,setFechaHasta] = useState(getPeruTodayDateString);
+  const rango = useMemo(() => calcularRangoCrm(
+    modo,fechaReferencia,fechaDesde,fechaHasta
+  ),[modo,fechaReferencia,fechaDesde,fechaHasta]);
+
   const [buscar,setBuscar] = useState('');
   const [consulta,setConsulta] = useState('');
   const [pagina,setPagina] = useState(1);
@@ -35,6 +55,7 @@ export function CarteraFinanciamientoPanel() {
   const [datos,setDatos] = useState<CrmCarteraReal | null>(null);
   const [cargando,setCargando] = useState(true);
   const [error,setError] = useState<string | null>(null);
+  const [seleccionado,setSeleccionado] = useState<CrmPlanCarteraReal | null>(null);
 
   useEffect(() => {
     const timer=window.setTimeout(() => {setPagina(1);setConsulta(buscar);},350);
@@ -42,109 +63,157 @@ export function CarteraFinanciamientoPanel() {
   },[buscar]);
 
   useEffect(() => {
+    setPagina(1);
+    setSeleccionado(null);
+  },[rango]);
+
+  useEffect(() => {
+    if(!rango){
+      setDatos(null);setCargando(false);
+      setError('Selecciona un rango de fechas válido para consultar los indicadores y planes.');
+      return;
+    }
     let vigente=true;
-    setCargando(true);
-    setError(null);
-    // Mantener los KPIs reales visibles también cuando el usuario consulta alertas.
+    setCargando(true);setError(null);setDatos(null);
     void crmBackend.listarCarteraFinancieraReal({
-      vista:vista==='ALERTAS'?'PLANES':vista,
-      busqueda:vista==='ALERTAS'?'':consulta,
-      pagina:vista==='ALERTAS'?1:pagina,tamano:20
-    })
-      .then(r => {if(vigente) setDatos(r);})
-      .catch(e => {if(vigente) {setDatos(null);setError(e instanceof Error?e.message:'No pudimos consultar la cartera.');}})
-      .finally(() => {if(vigente)setCargando(false);});
+      vista:'PLANES',busqueda:consulta,pagina,tamano:20,
+      desde:rango.desde,hastaExclusivo:rango.hastaExclusivo
+    }).then(resultado => {
+      if(vigente)setDatos(resultado);
+    }).catch(cause => {
+      if(vigente)setError(cause instanceof Error?cause.message:'No pudimos consultar la cartera financiera.');
+    }).finally(() => {if(vigente)setCargando(false);});
     return () => {vigente=false;};
-  },[vista,consulta,pagina,revision]);
+  },[rango,consulta,pagina,revision]);
 
-  const resumen=datos?.resumen;
-  const planes=vista==='PLANES' ? (datos?.items ?? []) as CrmPlanCarteraReal[] : [];
-  const cuotas=vista==='CUOTAS' ? (datos?.items ?? []) as CrmCuotaCarteraReal[] : [];
+  const resumen = datos?.resumen;
+  const planes = (datos?.items ?? []) as CrmPlanCarteraReal[];
 
-  return <section className="space-y-4" aria-label="Cartera financiera de ventas reales">
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {[
-        {nombre:'Planes financiados',valor:String(resumen?.planes??'—')},
-        {nombre:'Capital financiado activo',valor:resumen?money(resumen.capitalFinanciadoActivo):'—'},
-        {nombre:'Saldo de cuotas por cobrar',valor:resumen?money(resumen.saldoCuotas):'—'},
-        {nombre:'Inicial por conciliar',valor:resumen?money(resumen.inicialPorConciliar):'—'},
-        {nombre:'Cuotas vencidas con saldo',valor:resumen?money(resumen.montoVencido):'—'}
-      ].map(k=><Card key={k.nombre} className="p-4">
-        <p className="text-xs text-brand-500">{k.nombre}</p>
-        <p className="mt-2 text-lg font-semibold tabular-nums text-brand-900">{k.valor}</p>
-      </Card>)}
-    </div>
-    <Card>
-      <CardHeader title={vista==='ALERTAS'?'Alertas de cuotas vencidas':'Planes y cuentas por cobrar'} description={vista==='ALERTAS'?'Seguimiento de cuotas próximas y vencidas con saldos confirmados.':'Consulta de ventas financiadas autorizadas, sin registros de demostración.'}
-        actions={vista==='ALERTAS'?null:<Button icon={RefreshCwIcon} variant="secondary" onClick={() => setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>}/>
-      <div className="border-b border-brand-100 px-4 py-3">
+  const kpis: Kpi[] = [
+    {id:'planes',label:'Planes financiados',value:resumen?String(resumen.planes):'—',
+      hint:'Ventas registradas en el período',icon:FileStackIcon,tone:'sky'},
+    {id:'capital',label:'Capital financiado activo',value:resumen?formatSoles(resumen.capitalFinanciadoActivo):'—',
+      hint:'De los contratos exigibles de la cohorte',icon:LandmarkIcon,tone:'brand'},
+    {id:'saldo',label:'Saldo de cuotas por cobrar',value:resumen?formatSoles(resumen.saldoCuotas):'—',
+      hint:'Saldo vigente, no histórico',icon:WalletIcon,tone:'emerald'},
+    {id:'inicial',label:'Inicial por conciliar',value:resumen?formatSoles(resumen.inicialPorConciliar):'—',
+      hint:'Pendiente de aplicación confirmada',icon:CoinsIcon,tone:'amber'},
+    {id:'mora',label:'Cuotas vencidas con saldo',value:resumen?formatSoles(resumen.montoVencido):'—',
+      hint:'Saldo vencido de la cohorte',icon:CalendarClockIcon,tone:'rose'}
+  ];
+
+  const nombrePeriodo = modo==='HOY'?'Hoy':modo==='SEMANA'?'Semana':modo==='MES'?'Mes':
+    modo==='ANIO'?'Año':'Rango';
+  const etiquetaPeriodo = modo==='RANGO'?`${fechaDesde || '—'} a ${fechaHasta || '—'}`:fechaReferencia;
+
+  return <section className="min-w-0 space-y-5" aria-label="Cartera financiera de ventas reales">
+    <CrmPeriodoGlobal
+      descripcion="Filtra planes y tarjetas según la fecha de registro de la venta."
+      modo={modo} onModoChange={setModo}
+      fechaReferencia={fechaReferencia} onFechaReferenciaChange={setFechaReferencia}
+      fechaDesde={fechaDesde} onFechaDesdeChange={setFechaDesde}
+      fechaHasta={fechaHasta} onFechaHastaChange={setFechaHasta}
+    />
+
+    <section aria-label="Indicadores financieros del período">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-brand-900">Resumen de financiamiento</h2>
+          <p className="mt-1 text-xs text-brand-500">Ventas del período seleccionado · importes calculados con saldos vigentes.</p>
+        </div>
+        <span className="rounded-full border border-brand-100 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm">
+          {nombrePeriodo} · {etiquetaPeriodo}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {kpis.map(kpi=><KpiCard key={kpi.id} kpi={kpi}/>)}
+      </div>
+      {cargando&&<p className="mt-2 text-[11px] text-brand-400" role="status">Actualizando indicadores del período…</p>}
+    </section>
+
+    <Card className="overflow-hidden">
+      <CardHeader
+        title={vista==='ALERTAS'?'Alertas de cuotas Vencidas':'Planes y saldos'}
+        description={vista==='ALERTAS'
+          ? 'Cuotas por vencer, vencidas y revisión de mora de toda la cartera autorizada.'
+          : 'Ventas financiadas registradas en el período. Los importes corresponden al saldo vigente.'}
+        actions={vista==='PLANES'?
+          <Button icon={RefreshCwIcon} variant="secondary" onClick={()=>setRevision(v=>v+1)} disabled={cargando}>Actualizar</Button>
+          :null}
+      />
+      <div className="border-b border-brand-100 px-4 pt-2 sm:px-5">
         <Tabs active={vista} onChange={cambiarVista}
           items={[{id:'PLANES',label:'Planes y saldos',count:resumen?.planes??null},
-            {id:'CUOTAS',label:'Cronograma de cuotas',count:resumen?.cuotasExigibles??null},
-            {id:'ALERTAS',label:'Alertas de cuotas Vencidas'}]} />
-        {vista!=='ALERTAS'&&<div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            {id:'ALERTAS',label:'Alertas de cuotas Vencidas'}]}/>
+        {vista==='PLANES'&&<div className="flex flex-wrap items-center justify-between gap-3 py-3">
           <SearchInput value={buscar} onValueChange={setBuscar} className="w-full sm:w-80"
-            label="Buscar venta o comprador" placeholder="Buscar comprador, lote o contrato…"/>
-          {datos && <p className="text-xs text-brand-400">Consulta al {dateLabel(datos.fechaCorte)} · {datos.total} registros en filtro</p>}
+            label="Buscar venta o comprador" placeholder="Buscar comprador, lote u operación…"/>
+          {datos&&<p className="text-[11px] text-brand-500">Fecha de corte: {fechaCorta(datos.fechaCorte)} · {datos.total} registros en filtro</p>}
         </div>}
       </div>
-      {vista==='ALERTAS'&&<div className="space-y-4 p-4">
-        <AlertasCuotasPanel />
-        <RevisionClausulaPanel />
+
+      {vista==='ALERTAS'&&<div className="space-y-4 p-3 sm:p-4">
+        <p className="text-xs text-brand-500">
+          Las alertas son actuales y abarcan toda tu cartera autorizada, sin depender del período de ventas seleccionado.
+        </p>
+        <AlertasCuotasPanel/>
+        <RevisionClausulaPanel/>
       </div>}
-      {vista!=='ALERTAS'&&error && <div className="m-4"><Alert title="No se pudo cargar la cartera" tone="danger">{error}</Alert></div>}
-      {vista!=='ALERTAS'&&cargando && <p className="p-5 text-sm text-brand-500">Consultando saldos oficiales…</p>}
-      {vista!=='ALERTAS'&&!cargando && !error && datos && datos.total===0 &&
-        <EmptyState title="Sin registros en la cartera" description="Prueba otra búsqueda o verifica la formalización de la venta."/>}
-      {vista!=='ALERTAS'&&!cargando && !error && datos && datos.total>0 && (vista==='PLANES' ?
-        <div className="overflow-x-auto">
+
+      {vista==='PLANES'&&<>
+        {error&&<div className="m-4"><Alert title="No se pudo consultar la cartera" tone="danger">{error}</Alert></div>}
+        {cargando&&<p className="p-5 text-sm text-brand-500">Consultando planes y pagos aplicados…</p>}
+        {!cargando&&!error&&datos?.total===0&&
+          <EmptyState title="No hay ventas financiadas en este período"
+            description="Selecciona otro mes, año o rango. Las alertas activas permanecen disponibles en su pestaña."/>}
+        {!cargando&&!error&&datos&&datos.total>0&&<>
+          <p className="px-4 pt-3 text-[11px] text-brand-500 sm:hidden">
+            Desliza horizontalmente la tabla para ver todas las columnas y acciones.
+          </p>
           <Table head={<>
-            <TH>Venta / comprador</TH><TH>Plan</TH><TH>Lote</TH>
-            <TH align="right">Capital</TH><TH align="right">Saldo cuotas</TH>
-            <TH align="right">Inicial por conciliar</TH><TH>Estado</TH>
+            <TH>Venta y comprador</TH><TH>Lote</TH>
+            <TH align="right">Precio base</TH><TH align="right">Inicial</TH>
+            <TH align="right">Capital financiado</TH><TH align="right">Interés</TH>
+            <TH align="right">Saldo</TH><TH>Estado</TH><TH>Acciones</TH>
           </>}>
-            {planes.map(p=><TR key={p.idPlanPago}>
-              <TD><span className="font-semibold text-brand-900">{p.codigoVenta}</span>
-                <span className="mt-0.5 block text-xs text-brand-500">{p.comprador}</span>
-                <span className="block text-xs text-brand-400">{p.proyecto}</span></TD>
-              <TD><span className="font-medium">{p.numeroCuotas} cuotas</span>
-                <span className="block text-xs text-brand-500">{p.codigoPlan} · interés {money(p.interesTotal)}</span></TD>
-              <TD>{p.lote}</TD>
-              <TD align="right">{money(p.capitalFinanciado)}</TD>
-              <TD align="right" className="font-semibold tabular-nums text-brand-900">{p.cuotasExigibles?money(p.saldoFinanciamiento):'No exigible'}</TD>
-              <TD align="right">{p.cuotasExigibles?money(p.inicialPorConciliar):'—'}</TD>
-              <TD><span className="text-xs font-medium">{planLabel(p.estadoPlan)}</span>
-                {!p.cuotasExigibles && <span className="block text-xs text-amber-700">Sin cuotas exigibles</span>}</TD>
-            </TR>)}
+            {planes.map(p=>{
+              const estado=estadoPlan(p);
+              return <TR key={p.idPlanPago} className="hover:bg-brand-50/60">
+                <TD><div className="min-w-[170px]">
+                    <span className="font-semibold text-brand-900">{p.codigoVenta}</span>
+                    <span className="mt-1 block text-xs font-medium text-brand-700">{p.comprador}</span>
+                    <span className="mt-0.5 block text-[11px] text-brand-400">Venta: {fechaCorta(p.fechaVenta)}</span>
+                  </div></TD>
+                <TD><span className="whitespace-nowrap font-medium text-brand-700">{p.lote}</span></TD>
+                <TD align="right">{formatSoles(p.precioVenta)}</TD>
+                <TD align="right">{formatSoles(p.inicialAdicional+p.reservaAplicada)}</TD>
+                <TD align="right" className="font-semibold text-brand-800">{formatSoles(p.capitalFinanciado)}</TD>
+                <TD align="right" className="text-amber-800">{formatSoles(p.interesTotal)}</TD>
+                <TD align="right" className="font-bold text-brand-900">
+                  {p.cuotasExigibles?formatSoles(p.saldoFinanciamiento):'No exigible'}
+                </TD>
+                <TD><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${estado.clases}`}>
+                  {estado.etiqueta}</span></TD>
+                <TD><button type="button" onClick={()=>setSeleccionado(p)}
+                    className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-800 transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500">
+                  <EyeIcon className="h-4 w-4 text-amber-600" aria-hidden="true"/>
+                  Ver cronograma
+                </button></TD>
+              </TR>;
+            })}
           </Table>
-        </div>
-      : <div className="overflow-x-auto">
-          <Table head={<>
-            <TH>Venta / comprador</TH><TH>Cuota</TH><TH>Vencimiento</TH>
-            <TH align="right">Capital</TH><TH align="right">Interés</TH>
-            <TH align="right">Importe</TH><TH align="right">Abonado</TH>
-            <TH align="right">Saldo</TH><TH>Estado</TH>
-          </>}>
-            {cuotas.map(c=><TR key={`${c.idPlanPago}-${c.numero}`}>
-              <TD><span className="font-semibold">{c.codigoVenta}</span><span className="block text-xs text-brand-500">{c.comprador}</span></TD>
-              <TD className="tabular-nums">{c.numero}</TD>
-              <TD>{dateLabel(c.fechaVencimiento)}</TD>
-              <TD align="right">{money(c.capital)}</TD><TD align="right">{money(c.interes)}</TD>
-              <TD align="right">{money(c.montoCuota)}</TD><TD align="right">{money(c.abonadoConfirmado)}</TD>
-              <TD align="right" className="font-semibold">{money(c.saldoCuota)}</TD>
-              <TD><span className="text-xs">{c.estado}</span>
-                {c.cuotaAtrasada && <span className="block text-xs text-rose-600">Atrasada</span>}</TD>
-            </TR>)}
-          </Table>
-        </div>
-      )}
-      {vista!=='ALERTAS'&&!cargando && datos && datos.paginas>1 && <div className="flex items-center justify-between border-t border-brand-100 px-5 py-4 text-xs text-brand-500">
-        <span>Página {pagina} de {datos.paginas}</span>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" disabled={pagina<=1} onClick={()=>setPagina(p=>Math.max(1,p-1))}>Anterior</Button>
-          <Button size="sm" variant="secondary" disabled={pagina>=datos.paginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</Button>
-        </div>
-      </div>}
+        </>}
+        {!cargando&&datos&&datos.paginas>1&&<div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 px-5 py-4 text-xs text-brand-500">
+          <span>Página {pagina} de {datos.paginas}</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={pagina<=1} onClick={()=>setPagina(p=>Math.max(1,p-1))}>Anterior</Button>
+            <Button size="sm" variant="secondary" disabled={pagina>=datos.paginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</Button>
+          </div>
+        </div>}
+      </>}
     </Card>
+
+    {seleccionado&&<PlanFinanciamientoDetalleModal
+      key={seleccionado.idVenta} plan={seleccionado} onClose={()=>setSeleccionado(null)}/>}
   </section>;
 }
