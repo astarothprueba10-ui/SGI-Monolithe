@@ -480,9 +480,12 @@ public class CrmVentaController {
                 @RequestParam(defaultValue = "PLANES") String vista,
                 @RequestParam(defaultValue = "") String busqueda,
                 @RequestParam(defaultValue = "1") Integer pagina,
-                @RequestParam(defaultValue = "20") Integer tamano) {
+                @RequestParam(defaultValue = "20") Integer tamano,
+                @RequestParam(required = true) String desde,
+                @RequestParam(required = true) String hastaExclusivo) {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                    .body(service.carteraFinancieraReal(obtenerActor(jwt),vista,busqueda,pagina,tamano));
+                    .body(service.carteraFinancieraReal(obtenerActor(jwt),vista,busqueda,pagina,tamano,
+                            desde,hastaExclusivo));
         }
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
