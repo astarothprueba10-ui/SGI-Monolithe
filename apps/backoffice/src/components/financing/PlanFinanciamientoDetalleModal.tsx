@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDaysIcon, FileTextIcon, RefreshCwIcon, WalletIcon } from 'lucide-react';
+import { CalendarDaysIcon, FileTextIcon, MapPinIcon, RefreshCwIcon, WalletIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Table, TH, TD, TR } from '../ui/Table';
@@ -24,12 +24,13 @@ function estadoCuota(c: CrmCuotaCronograma) {
   return { label: 'Pendiente', clase: 'border-sky-200 bg-sky-50 text-sky-700' };
 }
 
-function Dato({ etiqueta, valor, destacado = false }: {
-  etiqueta: string; valor: string | number; destacado?: boolean;
+function Dato({ etiqueta, valor, destacado = false, dorado = false }: {
+  etiqueta: string; valor: string | number; destacado?: boolean; dorado?: boolean;
 }) {
-  return <div className="min-w-0 rounded-xl border border-brand-100 bg-white p-3 sm:p-4">
-    <p className="text-[11px] font-medium text-brand-500">{etiqueta}</p>
-    <p className={`mt-1 break-words text-sm font-semibold tabular-nums ${destacado ? 'text-emerald-700' : 'text-brand-900'}`}>{valor}</p>
+  const color = destacado ? 'text-emerald-700' : dorado ? 'text-amber-800' : 'text-brand-900';
+  return <div className="min-w-0 rounded-xl border border-brand-100 bg-white px-3.5 py-3.5 shadow-card transition-colors hover:border-brand-200 sm:p-4">
+    <p className="text-[11px] font-medium leading-snug text-brand-500">{etiqueta}</p>
+    <p className={['mt-1.5 break-words text-base font-bold leading-snug tabular-nums sm:text-[17px]', color].join(' ')}>{valor}</p>
   </div>;
 }
 
@@ -66,6 +67,11 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
     cronograma?.fuenteEstados === 'APLICACIONES_CONFIRMADAS');
   const cuotas = useMemo(() => exigible ? cronograma?.items ?? [] : [], [cronograma, exigible]);
   const totalInicial = plan.inicialAdicional + plan.reservaAplicada;
+  // La cuota mensual procede exclusivamente del cronograma registrado, nunca de una simulación.
+  const montoCuotaMensual = exigible
+    ? cronograma?.items.find(item => item.estadoCalculado !== 'ANULADA')?.cuota
+    : undefined;
+  const separacionAcreditada = plan.reservaAplicada > 0;
   const totalPendiente = cuotas.filter(c => c.estadoCalculado !== 'PAGADA' &&
     c.estadoCalculado !== 'ANULADA' && (c.saldoCuota ?? c.cuota) > 0).length;
   const cuotasVisibles = soloConSaldo ? cuotas.filter(c =>
@@ -74,38 +80,60 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
   ) : cuotas;
 
   return <Modal open title={`Plan financiero · ${plan.codigoVenta}`}
-    description={`${plan.comprador} · ${plan.lote}`} onClose={onClose} width="max-w-6xl">
+    onClose={onClose} width="max-w-6xl">
     <div className="min-w-0 space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl bg-brand-900 p-4 text-white">
-        <div className="min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-accent-300">
-            Expediente financiero
-          </span>
-          <h3 className="mt-1 break-words text-lg font-bold">{plan.comprador}</h3>
-          <p className="mt-1 text-xs text-brand-200">{plan.codigoVenta} · {plan.codigoPlan}</p>
-          <p className="mt-1 text-xs text-brand-200">{plan.proyecto} · {plan.lote}</p>
-        </div>
-        <div className="rounded-lg bg-white/10 px-3 py-2">
-          <span className="block text-[11px] text-brand-200">Estado del plan</span>
-          <span className="mt-1 block text-sm font-semibold text-accent-300">
-            {exigible ? 'Contrato vigente · cuotas exigibles' : 'Pendiente de formalización'}
-          </span>
+      <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 p-4 text-white shadow-md sm:p-6">
+        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent-400" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-14 -top-24 h-60 w-60 rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-3 -top-12 h-44 w-44 rounded-full border border-accent-300/20" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-accent-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent-400" aria-hidden="true" />
+              Expediente financiero
+            </span>
+            <h3 className="mt-2 break-words text-xl font-bold leading-tight sm:text-2xl">
+              {plan.comprador}
+            </h3>
+            <p className="mt-1 text-xs text-brand-200 sm:text-sm">{plan.proyecto}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex max-w-full items-center rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/95">
+                Plan {plan.codigoPlan}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/95">
+                <MapPinIcon className="h-3.5 w-3.5 shrink-0 text-accent-300" aria-hidden="true" />
+                {plan.lote}
+              </span>
+            </div>
+          </div>
+          <div className="grid w-full grid-cols-1 gap-3 rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm sm:grid-cols-2 lg:w-[300px] lg:grid-cols-1">
+            <div>
+              <p className="text-[11px] font-medium text-brand-200">Estado del financiamiento</p>
+              <p className="mt-1.5 inline-flex items-center gap-2 text-sm font-semibold text-accent-300">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-accent-400" aria-hidden="true" />
+                {exigible ? 'Contrato vigente · cuotas exigibles' : 'Pendiente de formalización'}
+              </p>
+            </div>
+            <div className="border-t border-white/15 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0 lg:border-l-0 lg:border-t lg:pl-0 lg:pt-3">
+              <p className="text-[11px] font-medium text-brand-200">Fecha de la venta</p>
+              <p className="mt-1 text-sm font-semibold text-white">{fecha(plan.fechaVenta)}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        <Dato etiqueta="Código del lote" valor={plan.lote} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Dato etiqueta="Código de lote" valor={plan.lote} />
         <Dato etiqueta="Precio base de venta" valor={soles(plan.precioVenta)} />
-        <Dato etiqueta="Inicial total pactada" valor={soles(totalInicial)} />
+        <Dato etiqueta="Inicial pactada" valor={soles(totalInicial)} />
         <Dato etiqueta="Capital financiado" valor={soles(plan.capitalFinanciado)} />
-        <Dato etiqueta="Interés total" valor={soles(plan.interesTotal)} />
         <Dato etiqueta="Número de cuotas" valor={plan.numeroCuotas} />
+        <Dato etiqueta="Interés total" valor={soles(plan.interesTotal)} dorado />
         <Dato etiqueta="Total contractual en cuotas" valor={soles(saldo?.totalPlanCuotas ?? plan.totalCuotas)} />
-        <Dato etiqueta="Saldo actual de cuotas" valor={exigible ? soles(saldo?.saldoFinanciamiento) : 'No exigible'} destacado={exigible} />
-        <Dato etiqueta="Separación acreditada" valor={soles(plan.reservaAplicada)} />
-        <Dato etiqueta="Inicial adicional pactada" valor={soles(plan.inicialAdicional)} />
-        <Dato etiqueta="Inicial por conciliar" valor={exigible ? soles(saldo?.inicialSinAplicacionConfirmada) : '—'} />
-        <Dato etiqueta="Primera cuota" valor={fecha(cronograma?.fechaPrimeraCuota ?? plan.fechaPrimeraCuota)} />
+        <Dato etiqueta="Saldo actual" valor={exigible ? soles(saldo?.saldoFinanciamiento) : 'No exigible'} destacado={exigible} />
+        <Dato etiqueta="Separación acreditada" valor={separacionAcreditada ? 'Sí' : 'No'} destacado={separacionAcreditada} />
+        <Dato etiqueta="Monto de cuota mensual" valor={montoCuotaMensual != null ? soles(montoCuotaMensual) : '—'} dorado />
+        <Dato etiqueta="Fecha de primera cuota" valor={fecha(cronograma?.fechaPrimeraCuota ?? plan.fechaPrimeraCuota)} />
       </div>
 
       <section className="min-w-0 overflow-hidden rounded-xl border border-brand-100">
