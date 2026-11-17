@@ -215,6 +215,7 @@ export function Sales() {
   } | null>(null);
   const [consultandoPolitica, setConsultandoPolitica] = useState(false);
   const [errorPolitica, setErrorPolitica] = useState<string | null>(null);
+  const [revisionPolitica, setRevisionPolitica] = useState(0);
   const [precioLote, setPrecioLote] = useState<LotePrecioVigente | null>(null);
   const [estadoPrecio, setEstadoPrecio] = useState<
     'inicial' | 'cargando' | 'disponible' | 'sin_precio' | 'error'
@@ -584,7 +585,7 @@ export function Sales() {
       })
       .finally(() => { if (vigente) setConsultandoPolitica(false); });
     return () => { vigente = false; };
-  }, [isModalOpen, selectedProspectId, formLotId]);
+  }, [isModalOpen, selectedProspectId, formLotId, revisionPolitica]);
 
   useEffect(() => {
     setVoucherFile(null);
@@ -1001,13 +1002,21 @@ export function Sales() {
       await fetchSalesData();
     } catch (err: unknown) {
       setConfirmacionVenta(null);
-
-      toast.error('No se pudo confirmar el registro', {
-        description:
-          (err instanceof Error
-            ? err.message
-            : 'Error inesperado.') +
-          ' Revise las operaciones antes de reintentar.',
+      const cambioPolitica = err instanceof ApiError && err.status === 409
+        && err.message.includes('La política financiera cambió.');
+      if (cambioPolitica) {
+        // Invalida la cotización y exige una nueva revisión antes de intentar registrar.
+        setDatosVentaValidados(null);
+        setPoliticaOperativa(null);
+        setRevisionPolitica(revision => revision + 1);
+      }
+      toast.error(cambioPolitica
+        ? 'Las condiciones de financiamiento cambiaron'
+        : 'No se pudo confirmar el registro', {
+        description: cambioPolitica
+          ? 'Se están consultando las condiciones actualizadas. Revise la inicial, las cuotas y vuelva a validar la venta.'
+          : (err instanceof Error ? err.message : 'Error inesperado.')
+            + ' Revise las operaciones antes de reintentar.',
         duration: 10000
       });
     } finally {
