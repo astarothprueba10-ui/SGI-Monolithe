@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Segundo factor financiero exclusivamente para GERENCIA.
@@ -39,16 +40,18 @@ public class FinancingTotpService {
     private final EmailService correo;
     private final FinancingTotpCrypto crypto;
     private final RefreshTokenService sesiones;
+    private final FinancingPolicyPublicationService publicacion;
 
     public FinancingTotpService(JdbcTemplate db, UserRepository usuarios,
         PasswordEncoder passwords, EmailService correo, FinancingTotpCrypto crypto,
-        RefreshTokenService sesiones) {
+        RefreshTokenService sesiones, FinancingPolicyPublicationService publicacion) {
         this.db = db;
         this.usuarios = usuarios;
         this.passwords = passwords;
         this.correo = correo;
         this.crypto = crypto;
         this.sesiones = sesiones;
+        this.publicacion = publicacion;
     }
 
     private record Cuenta(String secreto, String pendiente, OffsetDateTime pendienteHasta,
@@ -334,20 +337,26 @@ public class FinancingTotpService {
         return paso;
     }
 
-    /** Un recibo de aprobación no publica políticas; Bloque 4 deberá consumirlo en su transacción. */
+    /** Recibo TOTP ligado a un borrador VALIDADO y hasheado por PostgreSQL, no por el navegador. */
     @Transactional(noRollbackFor=ResponseStatusException.class)
-    public Map<String,Object> autorizar(Jwt jwt,String codigo,Integer version,String hash,UUID nonce) {
+    public Map<String,Object> autorizar(Jwt jwt,String codigo,Integer version,
+                                       Map<String,Object> borrador,UUID nonce) {
         long id=actor(jwt);
-        if(version==null || version<=0 || hash==null || !hash.matches("[0-9a-f]{64}") || nonce==null) {
-            throw fallo(HttpStatus.BAD_REQUEST,"Propuesta financiera o nonce inválidos.");
+        if(version==null || version<=0 || borrador==null || nonce==null
+                || codigo==null || !codigo.matches("[0-9]{6}")) {
+            throw fallo(HttpStatus.BAD_REQUEST,"Propuesta financiera o código inválidos.");
         }
-        // Leer por la función segura; el backend no tiene SELECT a las tablas de políticas.
-        // La publicación futura revalidará de nuevo la versión bajo bloqueo transaccional.
-        Integer vigente=db.queryForObject("""
-          SELECT (public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))->>'version')::integer
-          """,Integer.class,id);
-        if(!version.equals(vigente)) throw fallo(HttpStatus.CONFLICT,
-            "La versión financiera cambió. Revalide la propuesta.");
+        if(!crypto.configurado()) throw fallo(HttpStatus.SERVICE_UNAVAILABLE,
+            "No está configurado el cifrado TOTP en este servicio.");
+        // El hash nunca proviene de un campo controlado por el cliente.
+        JsonNode vista=publicacion.previsualizar(jwt,version,borrador);
+        if(!vista.path("publicacionHabilitada").asBoolean()) {
+            throw fallo(HttpStatus.LOCKED,"La publicación está bloqueada hasta cerrar las pruebas MFA.");
+        }
+        String hash=vista.path("hashPropuesta").asText();
+        if (!hash.matches("[a-f0-9]{64}")) {
+            throw fallo(HttpStatus.SERVICE_UNAVAILABLE,"La validación de la propuesta no está disponible.");
+        }
         Integer previo=db.queryForObject("""
           SELECT count(*) FROM public.seg_fin_totp_autorizaciones
           WHERE id_usuario=? AND nonce=?
@@ -362,9 +371,9 @@ public class FinancingTotpService {
           VALUES (?,?,?,?,?,?,now()+interval '120 seconds')
           """,token,id,jwt.getId(),version,hash,nonce);
         auditar(id,"MFA_FIN_AUTORIZACION_EMITIDA",
-            "Autorización temporal emitida para propuesta financiera. Sin publicación.");
+            "Autorización por 120 s vinculada a versión, nonce y hash canónico de la propuesta.");
         return Map.of("autorizacionId",token.toString(),"expiraEnSegundos",120,
-            "publicacionHabilitada",false);
+            "hashPropuesta",hash,"publicacionHabilitada",true);
     }
 
     @Transactional(noRollbackFor=ResponseStatusException.class)
