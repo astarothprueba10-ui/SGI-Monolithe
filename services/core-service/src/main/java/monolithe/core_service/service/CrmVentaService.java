@@ -1900,6 +1900,27 @@ public class CrmVentaService {
             return errorAnulacion;
         }
 
+        // Finanzas versionadas: conflictos de aceptación no son fallas del servidor.
+        // Mantener el rechazo atómico de PostgreSQL; nunca confirmar con otra política.
+        if (mensaje.contains("POLITICA_CAMBIO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La política financiera cambió. Actualice las condiciones y confirme nuevamente.", ex);
+        }
+        if (mensaje.contains("POLITICA_REQUERIDA|")
+                || mensaje.contains("FINANCIAMIENTO_INVALIDO|")
+                || mensaje.contains("SEPARACION_MONTO_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Las condiciones financieras enviadas no coinciden con la política autorizada.", ex);
+        }
+        if (mensaje.contains("POLITICA_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo obtener la política financiera vigente para la operación.", ex);
+        }
+        if (mensaje.contains("POLITICA_INMUTABLE|") || mensaje.contains("POLITICA_INVALIDA|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La política aceptada por esta operación no admite cambios.", ex);
+        }
+
         // Imputación de dinero confirmado / reversión auditada 5.3.4.
         if(mensaje.contains("AUTOANULACION_DENEGADA|")) {
             return new ResponseStatusException(HttpStatus.FORBIDDEN,
