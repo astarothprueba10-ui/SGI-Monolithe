@@ -120,7 +120,7 @@ export function SeguridadFinancieraTotpPanel() {
     {error && <Alert tone="danger" title="No se pudo completar la verificación">{error}</Alert>}
     {aviso && <Alert tone="info" title="Verificación">{aviso}</Alert>}
 
-    {estado?.configurado && fase === 'INICIO' && <div className="max-w-xl space-y-3">
+    {estado?.configurado && estado.correoCorporativoVerificado && fase === 'INICIO' && <div className="max-w-xl space-y-3">
       <p className="text-xs leading-relaxed text-brand-600">
         Para proteger las condiciones financieras se requiere confirmar su contraseña actual y
         un código enviado a su correo corporativo verificado antes de configurar o retirar el dispositivo.
