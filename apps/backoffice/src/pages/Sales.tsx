@@ -808,6 +808,10 @@ export function Sales() {
       return;
     }
 
+    if (!condicionesVenta || consultandoPolitica) {
+      toast.error('No se pudieron cargar las condiciones contractuales de este lote. Actualiza la selección.');
+      return;
+    }
     const montoTotal = Number(precioLote.precio);
     const esFinanciada = formSaleModality === 'FINANCIADA';
     const montoInicial = Number(formSaleDownPayment);
@@ -823,12 +827,14 @@ export function Sales() {
       (
         !formSaleDownPayment.trim() ||
         !Number.isFinite(montoInicial) ||
-        montoInicial < 5000 ||
+        Boolean(validarInicialTotal(formSaleDownPayment,montoTotal,reservaAplicable,condicionesVenta)) ||
         montoInicial >= montoTotal ||
-        !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
+        !Number.isInteger(numeroCuotas) ||
+        numeroCuotas < condicionesVenta.cuotasMin ||
+        numeroCuotas > condicionesVenta.cuotasMax
       )
     ) {
-      toast.error('La inicial total mínima es S/ 5,000 y el plazo debe ser de 1 a 36 meses.');
+      toast.error('La inicial o el número de cuotas no cumple la política financiera de esta operación.');
       return;
     }
 
@@ -864,24 +870,32 @@ export function Sales() {
         validacion.modalidad !== formSaleModality ||
         Number(validacion.precioVigente) !== montoTotal ||
         Number(validacion.montoReservaAplicable) !== reservaAplicable ||
-        (esFinanciada && (
-          !validacion.planFrances ||
-          Number(validacion.planFrances.capitalFinanciado) !== resumenVenta.capitalFinanciado ||
-          Number(validacion.planFrances.cuotaMensual) !== resumenVenta.cuotaMensual ||
-          Number(validacion.planFrances.interesTotal) !== resumenVenta.interesTotal ||
-          Number(validacion.planFrances.totalCuotas) !== resumenVenta.totalCuotas ||
-          Number(validacion.planFrances.totalOperacion) !== resumenVenta.totalOperacionConIntereses
-        ))
+        validacion.idPolitica !== condicionesVenta.idPolitica ||
+        (esFinanciada && !validacion.planFrances)
       ) {
         throw new Error('La validación comercial no coincide con la operación.');
       }
 
+      // La simulación local es orientativa: el cronograma financiero que
+      // prevalece es el de Core/Supabase, con redondeo decimal exacto.
+      const plan = validacion.planFrances;
+      const resumenValidado: ResumenVentaCalculado = esFinanciada && plan ? {
+        ...resumenVenta!,
+        capitalFinanciado: Number(plan.capitalFinanciado),
+        interesTotal: Number(plan.interesTotal),
+        totalCuotas: Number(plan.totalCuotas),
+        totalOperacionConIntereses: Number(plan.totalOperacion),
+        cuotaMensual: Number(plan.cuotaMensual),
+        cuotas: plan.cuotas ?? resumenVenta!.cuotas
+      } : resumenVenta!;
       setDatosVentaValidados({
         datos,
         codigoProspecto: validacion.codigoProspecto,
         codigoLote: validacion.codigoLote,
         idAsesor: validacion.idAsesor,
-        resumen: resumenVenta!
+        tasaAnualPct: condicionesVenta.tasaNominalAnualPct,
+        idPolitica: condicionesVenta.idPolitica,
+        resumen: resumenValidado
       });
       setEditandoComprador(true);
 
@@ -950,6 +964,7 @@ export function Sales() {
       const resultado = await crmBackend.registrarVentaPendiente({
         ...solicitud.datos,
         datosPago: {
+          idPoliticaEsperada: solicitud.idPolitica,
           metodoPago: formPaymentMethod,
           numeroOperacion: formOperationNumber.trim() || null,
           comprobantes: cargados
