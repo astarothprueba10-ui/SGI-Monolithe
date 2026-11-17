@@ -146,4 +146,8 @@ test('conflictos de version aceptada tienen HTTP 409 y mensajes coherentes con e
   assert.match(panel, /Las nuevas separaciones y ventas se validan contra políticas financieras versionadas/);
   assert.doesNotMatch(panel, /el motor de ventas continúa usando/i);
   assert.match(panel, /publicación de otra versión permanece bloqueada/);
+  const sales = read('../src/pages/Sales.tsx');
+  assert.match(sales, /err instanceof ApiError && err\.status === 409/);
+  assert.match(sales, /setRevisionPolitica\(revision => revision \+ 1\)/);
+  assert.match(sales, /setDatosVentaValidados\(null\)/);
 });
