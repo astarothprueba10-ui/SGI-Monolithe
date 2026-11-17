@@ -493,6 +493,19 @@ public class CrmVentaController {
                             desde,hastaExclusivo,proyecto,lote,estado,fechaTablaDesde,fechaTablaHasta));
         }
 
+        /**
+         * Catálogo de políticas de financiamiento - lectura exclusiva de Gerencia.
+         * El SQL exige adicionalmente el rol GERENCIA activo y financing.configure.
+         * No se habilita aún ningún endpoint de edición/publicación.
+         */
+        @GetMapping("/financiamiento/configuracion/actual")
+        @PreAuthorize("hasAuthority('financing.configure')")
+        public ResponseEntity<JsonNode> consultarPoliticasFinanciamiento(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.consultarPoliticasFinanciamiento(obtenerActor(jwt)));
+        }
+
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
         @GetMapping("/finanzas/movimientos")
         @PreAuthorize("hasAuthority('finance.view')")
