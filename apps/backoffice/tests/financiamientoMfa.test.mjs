@@ -25,6 +25,8 @@ test('alta exige segundo canal verificado y contraseña sin exponer secreto ante
   assert.match(service,/u\.version_sesiones=\?/);
   assert.match(service,/passwords\.matches\(password,u\.getPasswordHash\(\)\)/);
   assert.match(service,/c\.verificado AND c\.principal/);
+  assert.match(service,/correoCorporativoVerificado/);
+  assert.match(service,/SELECT EXISTS\(/);
   assert.match(service,/@monolithe\.pe/);
   assert.match(service,/validarCorreo\(c,id,jwt,emailCodigo\)/);
   assert.match(service,/c\.emailIntentos\(\)/);
@@ -58,6 +60,9 @@ test('UI no persiste secretos ni publica políticas', () => {
   const panel=read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
   assert.match(panel,/SeguridadFinancieraTotpPanel/);
   assert.match(ui,/setRespaldo\(\[\]\)/);
+  assert.match(ui,/estado\.correoCorporativoVerificado/);
+  assert.match(ui,/Correo corporativo pendiente de verificación/);
+  assert.match(api,/correoCorporativoVerificado: boolean/);
   assert.match(ui,/setSecreto\(''\)/);
   assert.doesNotMatch(ui,/localStorage\.|sessionStorage\./);
   assert.match(api,/authSecuredApi\.post/);
