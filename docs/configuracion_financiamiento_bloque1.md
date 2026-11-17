@@ -51,9 +51,23 @@ El formulario de ventas consulta `GET /api/core/crm/financiamiento/condiciones-v
 
 **Pruebas adicionales pendientes:** registrar una operación de prueba completa en entorno aislado, recorrer firma y cronograma, verificar snapshots en las tres tablas y simular un cambio concurrente de política una vez exista publicación autorizada por TOTP. No crear ventas de prueba sobre datos de clientes existentes.
 
-## Bloques 3 y 4 — Pendientes; publicación bloqueada
+## Bloque 3 — MFA TOTP implementado en rama y SQL TEST; enrolamiento requiere habilitación segura
 
-### Bloque 3 — Autenticación reforzada TOTP para Gerencia
+La migración **112** está aplicada en Supabase TEST y el código del flujo de enrolamiento,
+verificación TOTP, códigos de recuperación de un único uso, revocación y autorización breve
+se encuentra en `services/auth-service` y Backoffice. Más detalles y requisitos:
+`docs/financiamiento_mfa_bloque3.md`.
+
+**No confundir código implementado con factor operativo:** antes de activar MFA real se requiere
+`FINANCING_MFA_ENCRYPTION_KEY_BASE64` en el gestor de secretos, SMTP operativo
+y correo corporativo de Gerencia verificado. Ningún secreto debe registrarse en Git.
+Actualmente no se habilita publicación, ni en frontend ni en SQL.
+
+## Bloque 4 — Publicación y auditoría todavía pendientes
+
+
+
+### Requisitos de seguridad satisfechos por el Bloque 3 (con activación operativa pendiente)
 
 - Activación del primer factor basada en verificación independiente de identidad y sesión reciente, **no solo contraseña o permiso JWT**. Nunca exponer QR a una sesión comprometida sin esta verificación.
 - Secreto por gerente (mínimo 160 bits aleatorios), cifrado autenticado en el servidor mediante clave en gestor de secretos / variable de entorno segura. Nunca al frontend, logs, migraciones ni auditoría.
