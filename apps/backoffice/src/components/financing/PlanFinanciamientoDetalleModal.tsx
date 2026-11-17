@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDaysIcon, FileTextIcon, MapPinIcon, RefreshCwIcon, WalletIcon } from 'lucide-react';
+import { CalendarDaysIcon, FileDownIcon, FileTextIcon, MapPinIcon, RefreshCwIcon, WalletIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import {toast} from 'sonner';
 import { Button } from '../ui/Button';
 import { Table, TH, TD, TR } from '../ui/Table';
 import { crmBackend, type CrmCronogramaVenta, type CrmPlanCarteraReal, type CrmSaldoVenta, type CrmCuotaCronograma } from '../../services/crmBackend';
@@ -44,6 +45,7 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [soloConSaldo, setSoloConSaldo] = useState(true);
+  const [exportandoPdf,setExportandoPdf] = useState(false);
 
   useEffect(() => {
     let vigente = true;
@@ -74,6 +76,25 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
   const separacionAcreditada = plan.reservaAplicada > 0;
   const totalPendiente = cuotas.filter(c => c.estadoCalculado !== 'PAGADA' &&
     c.estadoCalculado !== 'ANULADA' && (c.saldoCuota ?? c.cuota) > 0).length;
+  const exportarPdf = async () => {
+    if(cargando || error || !cronograma || !saldo || exportandoPdf)return;
+    setExportandoPdf(true);
+    try{
+      const {generarPdfExpediente}=await import('../../utils/financiamientoExportPdf');
+      const blob=await generarPdfExpediente({plan,cronograma,saldo});
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;
+      link.download=`MONOLITHE_Plan_Financiero_${plan.codigoVenta.replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
+      document.body.appendChild(link);link.click();link.remove();
+      window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast.success('Expediente financiero PDF generado');
+    }catch(e:unknown){
+      toast.error('No se pudo generar el PDF',{
+        description:e instanceof Error?e.message:'Inténtalo nuevamente.'
+      });
+    }finally{setExportandoPdf(false);}
+  };
   const cuotasVisibles = soloConSaldo ? cuotas.filter(c =>
     c.estadoCalculado !== 'PAGADA' && c.estadoCalculado !== 'ANULADA' &&
     (c.saldoCuota ?? c.cuota) > 0
@@ -211,7 +232,11 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
           </div>
         </>}
       </section>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button icon={FileDownIcon} disabled={cargando||Boolean(error)||!cronograma||!saldo||exportandoPdf}
+          onClick={()=>void exportarPdf()}>
+          {exportandoPdf?'Generando PDF…':'Exportar expediente PDF'}
+        </Button>
         <Button variant="secondary" onClick={onClose}>Cerrar expediente</Button>
       </div>
     </div>
