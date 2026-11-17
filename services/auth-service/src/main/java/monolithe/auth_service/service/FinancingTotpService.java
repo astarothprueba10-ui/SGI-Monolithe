@@ -8,6 +8,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.mail.MailException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URLEncoder;
@@ -27,6 +31,7 @@ import java.util.UUID;
  * Nunca persiste secretos en claro ni emite permisos generales de publicación.
  */
 @Service
+@Slf4j
 public class FinancingTotpService {
     private final JdbcTemplate db;
     private final UserRepository usuarios;
@@ -174,6 +179,17 @@ public class FinancingTotpService {
           """,Long.class,id,accion,Long.toString(id),descripcion);
     }
 
+    /** El correo de alerta se entrega después del COMMIT; un error SMTP no revierte el MFA. */
+    private void avisarDespuesCommit(long id, String evento) {
+        String destino=emailVerificado(id);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() {
+                try { correo.enviarAvisoMfaFinanciero(destino, evento); }
+                catch (MailException ex) { log.warn("No se pudo entregar aviso MFA financiero."); }
+            }
+        });
+    }
+
     public Map<String,Object> estado(Jwt jwt) {
         long id=actor(jwt);
         Cuenta c=fila(id,false);
@@ -273,6 +289,7 @@ public class FinancingTotpService {
               id,FinancingTotpCrypto.hash(recovery));
         }
         auditar(id,"MFA_FIN_ACTIVADO","Autenticador financiero habilitado; códigos de respaldo emitidos.");
+        avisarDespuesCommit(id,"ACTIVACIÓN DE AUTENTICADOR");
         // Nunca registrar en logs ni reenviar los códigos de recuperación.
         return Map.of("habilitado",true,"codigosRecuperacion",claves);
     }
@@ -333,6 +350,7 @@ public class FinancingTotpService {
         validarTotp(c,id,codigoTotp);
         limpiar(id);
         auditar(id,"MFA_FIN_REVOCADO","Autenticador financiero revocado mediante dos canales.");
+        avisarDespuesCommit(id,"REVOCACIÓN DE AUTENTICADOR");
         sesiones.revocarTodasLasSesiones(id,"REVOCACION_MFA_FINANCIERO");
         return Map.of("mensaje","Factor revocado. Inicie sesión nuevamente.");
     }
@@ -353,6 +371,7 @@ public class FinancingTotpService {
         limpiar(id);
         auditar(id,"MFA_FIN_RECUPERACION",
             "Factor anterior invalidado tras contraseña, correo verificado y código de recuperación.");
+        avisarDespuesCommit(id,"RECUPERACIÓN Y REVOCACIÓN DE AUTENTICADOR");
         sesiones.revocarTodasLasSesiones(id,"RECUPERACION_MFA_FINANCIERO");
         return Map.of("mensaje","Factor restablecido. Inicie sesión y registre uno nuevo.");
     }
