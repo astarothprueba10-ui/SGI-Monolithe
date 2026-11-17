@@ -2,8 +2,6 @@ package monolithe.auth_service.service;
 
 import monolithe.auth_service.entity.User;
 import monolithe.auth_service.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +14,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -67,6 +64,10 @@ public class FinancingTotpService {
         long id;
         try { id = Long.parseLong(jwt.getSubject()); }
         catch (RuntimeException e) { throw fallo(HttpStatus.FORBIDDEN, "Actor no válido."); }
+        Object versionJwt = jwt.getClaim("session_version");
+        if (!(versionJwt instanceof Number)) {
+            throw fallo(HttpStatus.FORBIDDEN, "Sesión sin versión de seguridad.");
+        }
         Boolean autorizado = db.queryForObject("""
             SELECT EXISTS(
               SELECT 1 FROM public.seg_usuarios u
@@ -78,9 +79,10 @@ public class FinancingTotpService {
                 AND (u.bloqueado_hasta IS NULL OR u.bloqueado_hasta<=now())
                 AND ur.activo AND ur.fecha_revocacion IS NULL AND r.activo
                 AND r.codigo='GERENCIA'
+                AND u.version_sesiones=?
                 AND public.fn_usuario_tiene_permiso_seguridad(u.id_usuario,'financing.configure'::varchar)
             )
-            """, Boolean.class, id);
+            """, Boolean.class, id, ((Number)versionJwt).longValue());
         if (!Boolean.TRUE.equals(autorizado)) {
             throw fallo(HttpStatus.FORBIDDEN, "Solo Gerencia activa puede gestionar el factor financiero.");
         }
@@ -204,10 +206,7 @@ public class FinancingTotpService {
            || enviados>=5) {
             throw fallo(HttpStatus.TOO_MANY_REQUESTS,"Espere antes de solicitar otro código.");
         }
-        String codigo=String.format(Locale.ROOT,"%06d",
-          java.nio.ByteBuffer.wrap(crypto.aleatorio(4)).getInt() & 0x7fffffff);
-        // Reducir a exactamente seis dígitos antes de almacenar/envíar.
-        codigo=String.format(Locale.ROOT,"%06d",Integer.parseInt(codigo.substring(codigo.length()-6)) % 1_000_000);
+        String codigo=crypto.nuevoCodigoCorreo();
         db.update("""
           UPDATE public.seg_fin_totp_cuentas
           SET email_otp_hash=?,email_otp_expira_en=now()+interval '5 minutes',
