@@ -44,7 +44,9 @@ test('tercera pestaña solo visible para Gerencia con permiso y solo permite lec
   const parent = read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const panel = read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
   const api = read('../src/services/financingConfigService.ts');
-  assert.match(parent, /can\('financing\.configure'\) && user\.roles\.includes\('Gerencia'\)/);
+  assert.match(parent, /const puedeConfigurar = user\.roles\.includes\('Gerencia'\)/);
+  assert.match(parent, /const permisoConfiguracionVigente = can\('financing\.configure'\)/);
+  assert.match(parent, /Actualiza tu sesión de Gerencia/);
   assert.match(parent, /tabUrl === 'configuracion' && puedeConfigurar/);
   assert.match(parent, /tab === 'CONFIGURACION' && !puedeConfigurar/);
   assert.match(parent, /Configuración de planes de financiamiento/);
