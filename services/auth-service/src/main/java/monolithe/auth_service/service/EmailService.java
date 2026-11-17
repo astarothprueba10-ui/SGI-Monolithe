@@ -31,6 +31,23 @@ public class EmailService {
   @Value("${security.portal.cliente-url}")
   private String portalClienteUrl;
 
+  /** Aviso de seguridad sin OTP ni datos de recuperación. */
+  public void enviarAvisoMfaFinanciero(String destinatario, String evento) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, false, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(destinatario);
+      helper.setSubject("Aviso de seguridad financiera - MONOLITHE");
+      helper.setText("MONOLITHE: Se registró el evento de seguridad financiera: "
+        + evento + ". Si usted no lo realizó, contacte inmediatamente a Seguridad."
+        + " Nunca compartimos contraseñas, claves TOTP ni códigos de recuperación.", false);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      throw new MailException("No se pudo preparar el aviso de seguridad financiera.", e) {};
+    }
+  }
+
   /** Desafío separado de la contraseña; solo a correo corporativo ya verificado. */
   public void enviarCodigoMfaFinanciero(String destinatario, String codigo) {
     try {
