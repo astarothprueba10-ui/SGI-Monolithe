@@ -140,3 +140,62 @@ test('la tabla reutiliza el diseño CRM con filtros separados sin cambiar los KP
   assert.match(api,/fechaTablaDesde:params\.fechaTablaDesde/);
   assert.match(api,/fechaTablaHasta:params\.fechaTablaHasta/);
 });
+
+
+test('paginación financiera reutiliza controles de sistema y funciona con un único registro',()=>{
+  const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
+  const pagination=read('../src/components/ui/Pagination.tsx');
+  assert.match(panel,/import \{Pagination\} from '\.\.\/ui\/Pagination'/);
+  assert.match(panel,/<Pagination page=\{pagina\} pageSize=\{20\} total=\{datos\.total\}/);
+  assert.doesNotMatch(panel,/datos\.paginas>1&&<div className="flex flex-wrap/);
+  assert.match(pagination,/Mostrando \{from\}/);
+  assert.match(pagination,/aria-label="Página siguiente"/);
+});
+
+test('Excel incluye KPI, todas las páginas, cartera y alertas de ventas en período',()=>{
+  const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
+  const excel=read('../src/utils/financiamientoExportExcel.ts');
+  assert.match(panel,/Exportar Excel/);
+  assert.match(panel,/consultarReporteFinanciero\(rango,setProgresoExportacion\)/);
+  assert.match(excel,/listarCarteraFinancieraReal/);
+  assert.match(excel,/listarAlertasCuotas/);
+  assert.match(excel,/pagina,tamano:100/);
+  assert.match(excel,/planes\.length!==primer\.total/);
+  assert.match(excel,/ventas\.has\(a\.idVenta\)/);
+  assert.match(excel,/addWorksheet\('Resumen financiero'\)/);
+  assert.match(excel,/addWorksheet\('Planes y saldos'\)/);
+  assert.match(excel,/addWorksheet\('Alertas de cuotas'\)/);
+  assert.match(excel,/numFmt=FORMATO_SOLES/);
+  assert.match(excel,/numFmt='dd\/mm\/yyyy'/);
+  assert.match(excel,/textoSeguro/);
+  assert.match(excel,/próximas|PRÓXIMA/i);
+});
+
+test('PDF por venta solo incluye cronograma exigible y datos reales del expediente',()=>{
+  const modal=read('../src/components/financing/PlanFinanciamientoDetalleModal.tsx');
+  const pdf=read('../src/utils/financiamientoExportPdf.tsx');
+  assert.match(modal,/Exportar expediente PDF/);
+  assert.match(modal,/generarPdfExpediente\(\{plan,cronograma,saldo\}\)/);
+  assert.match(modal,/disabled=\{cargando\|\|Boolean\(error\)\|\|!cronograma\|\|!saldo\|\|exportandoPdf\}/);
+  assert.match(pdf,/@react-pdf\/renderer/);
+  assert.match(pdf,/cronograma\.fuenteEstados==='APLICACIONES_CONFIRMADAS'/);
+  assert.match(pdf,/const cuotas=exigible\?cronograma\.items:\[\]/);
+  assert.match(pdf,/monto de cuota mensual/i);
+  assert.match(pdf,/Saldo actual/);
+  assert.match(pdf,/FilaCuota/);
+  assert.match(pdf,/orientation="landscape"/);
+});
+
+test('alertas y causales contractuales usan KPI modernos sin cambiar derechos',()=>{
+  const alertas=read('../src/components/financing/AlertasCuotasPanel.tsx');
+  const legal=read('../src/components/financing/RevisionClausulaPanel.tsx');
+  for(const p of [alertas,legal]){
+    assert.match(p,/KpiCard/);
+    assert.match(p,/grid grid-cols-1 gap-3 sm:grid-cols-3/);
+    assert.match(p,/formatSoles/);
+  }
+  assert.match(alertas,/can\('sales\.view'\)/);
+  assert.match(alertas,/can\('financing\.approve'\)/);
+  assert.match(legal,/can\('sales\.legal\.review'\)/);
+  assert.match(legal,/resolución|resuelve ni anula/i);
+});
