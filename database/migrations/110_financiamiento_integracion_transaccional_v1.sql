@@ -189,7 +189,7 @@ BEGIN
         'message','Separacion registrada, pago pendiente de validacion por Finanzas.'
     );
 END;
-$function$
+$function$;
 
 -- fn_crm_reserva_acreditable_v1
 CREATE OR REPLACE FUNCTION public.fn_crm_reserva_acreditable_v1(p_reserva bigint)
@@ -234,7 +234,7 @@ AS $function$
    JOIN public.cfg_estados_reserva er ON er.id_estado_reserva=r.id_estado_reserva
    WHERE r.id_reserva=p_reserva
  ),0::numeric);
-$function$
+$function$;
 
 -- sp_crm_validar_formalizacion_v10
 CREATE OR REPLACE FUNCTION public.sp_crm_validar_formalizacion_v10(p_actor bigint, p_prospecto bigint, p_lote bigint, p_modalidad character varying, p_monto_total numeric, p_monto_inicial numeric, p_numero_cuotas integer, p_tasa_mensual_pct numeric)
@@ -296,7 +296,7 @@ BEGIN
    'montoInicialAdicional',CASE WHEN p_modalidad='FINANCIADA' THEN p_monto_inicial-v_reserva_acreditable ELSE NULL END,
    'saldoContado',p_monto_total-v_reserva_acreditable,
    'planFrances',v_plan);
-END $function$
+END $function$;
 
 -- sp_crm_registrar_venta_pendiente_v10
 CREATE OR REPLACE FUNCTION public.sp_crm_registrar_venta_pendiente_v10(p_actor bigint, p_prospecto bigint, p_lote bigint, p_modalidad character varying, p_monto_total numeric, p_monto_inicial numeric, p_numero_cuotas integer, p_tasa_mensual_pct numeric, p_observaciones text DEFAULT NULL::text)
@@ -362,7 +362,7 @@ BEGIN
    'saldoContado',v_ctx->'saldoContado',
    'idPolitica',v_ctx->'idPolitica','politicaVersion',v_ctx->'politicaVersion',
    'planFrances',v_plan);
-END $function$
+END $function$;
 
 -- sp_crm_aprobar_firma_contrato_v8
 CREATE OR REPLACE FUNCTION public.sp_crm_aprobar_firma_contrato_v8(p_actor bigint, p_contrato bigint, p_archivo bigint, p_fecha_firma date, p_firma_revisada boolean, p_observaciones character varying)
@@ -814,6 +814,6 @@ BEGIN
     'mensaje','Contrato aprobado y prospecto convertido a comprador.'
   );
 END;
-$function$
+$function$;
 
 COMMIT;
