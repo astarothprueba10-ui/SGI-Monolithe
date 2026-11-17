@@ -197,10 +197,25 @@ public class FinancingTotpService {
         });
     }
 
+    /** Preflight de disponibilidad, sin revelar dirección ni estado de otros gerentes. */
+    private boolean correoCorporativoVerificado(long id) {
+        return Boolean.TRUE.equals(db.queryForObject("""
+          SELECT EXISTS(
+            SELECT 1 FROM public.seg_usuarios u
+            JOIN public.core_personas_contactos c ON c.id_persona=u.id_persona
+            JOIN public.cfg_tipos_contacto tc ON tc.id_tipo_contacto=c.id_tipo_contacto
+            WHERE u.id_usuario=? AND tc.codigo='EMAIL' AND tc.activo
+              AND c.activo AND c.verificado AND c.principal
+              AND lower(c.valor) LIKE '%@monolithe.pe'
+          )
+          """,Boolean.class,id));
+    }
+
     public Map<String,Object> estado(Jwt jwt) {
         long id=actor(jwt);
         Cuenta c=fila(id,false);
         return Map.of("configurado",crypto.configurado(),
+           "correoCorporativoVerificado",correoCorporativoVerificado(id),
            "habilitado",c!=null && c.secreto()!=null,
            "enrolamientoPendiente",c!=null && c.pendiente()!=null && vigente(c.pendienteHasta()),
            "publicacionHabilitada",false,
