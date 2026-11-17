@@ -663,7 +663,12 @@ export function Sales() {
     setComprobantesVenta(prev => [...prev, ...candidatos]);
   };
 
-()=>b
+  const validarFormularioSeparacion = (): boolean => {
+    setFormTouched(true);
+    if (!condicionesVenta || consultandoPolitica) {
+      toast.error('Las condiciones financieras no están verificadas. Selecciona nuevamente el lote.');
+      return false;
+    }
     if (!selectedProspectId) {
       toast.error('Debe seleccionar un prospecto del CRM.');
       return false;
@@ -693,7 +698,7 @@ export function Sales() {
     }
 
     if (!voucherFile) {
-      ()=>b
+      toast.error(`Debe adjuntar el comprobante de S/ ${condicionesVenta.montoSeparacion.toFixed(2)}.`);
       return false;
     }
     return true;
@@ -715,8 +720,12 @@ export function Sales() {
       if (!voucherFile) {
         throw new Error('Comprobante requerido.');
       }
+      if (!condicionesVenta) {
+        throw new Error('No se han confirmado las condiciones de separación.');
+      }
 
-()=>b
+      const prospectId = Number(selectedProspectId);
+      const lotIdNum = Number(formLotId);
 
       // 1. Subir comprobante al Storage privado.
       const carga = await crmBackend.subirComprobanteSeparacion(
@@ -733,7 +742,7 @@ export function Sales() {
         idLote: lotIdNum,
         metodoPago: formPaymentMethod,
         numeroOperacion: formOperationNumber.trim() || null,
-()=>b
+        monto: condicionesVenta.montoSeparacion,
         observaciones: formObservations.trim() || null,
         claveArchivo: carga.claveArchivo,
         nombreArchivo: carga.nombreArchivo,
@@ -751,7 +760,7 @@ export function Sales() {
       toast.success('Separación registrada exitosamente', {
         description:
           `Código: ${res.codigo_reserva || res.id_reserva}. ` +
-()=>b
+          `Monto: S/ ${condicionesVenta.montoSeparacion.toFixed(2)} PEN. ` +
           `Vence: ${vencimiento}. ` +
           'Comprobante pendiente de revisión por Finanzas.'
       });
@@ -921,7 +930,7 @@ export function Sales() {
       return;
     }
 
-()=>b
+    // Separaciones usan la política vigente, sin montos fijos del frontend.
     if (!validarFormularioSeparacion()) return;
 
     if (SEPARACION_ENVIO_DESHABILITADO) {
