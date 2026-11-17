@@ -14,7 +14,7 @@ type CampoNumero = 'montoSeparacion' | 'inicialMinima' | 'inicialMaxima' |
   'inicialFija' | 'tasaNominalAnualPct' | 'cuotasMin' | 'cuotasMax' |
   'diasVencimientoSeparacion';
 
-const MENSAJE_BLOQUEO = 'La publicación permanece bloqueada hasta superar las pruebas funcionales de TOTP, correo verificado y autorización administrativa.';
+const MENSAJE_BLOQUEO = 'Toda nueva política exige doble confirmación y autorización TOTP. Si no se completaron las pruebas funcionales del Bloque 3, la publicación permanece bloqueada desde PostgreSQL.';
 
 export function PublicarPoliticaFinancieraPanel({
   politica, onPublicada
@@ -100,7 +100,7 @@ export function PublicarPoliticaFinancieraPanel({
       setConfirmado(false);setFrase('');
       setError(e instanceof Error?e.message:'No se pudo publicar la nueva política.');
       // Un TOTP autorizado no se reintenta ni se reutiliza.
-      onPublicada(); // Refresca la versión vigente ante conflictos, sin asumir éxito.
+      // No asumimos éxito ni borramos el borrador ante un error de red.
     } finally {setOcupado(false);}
   };
 
