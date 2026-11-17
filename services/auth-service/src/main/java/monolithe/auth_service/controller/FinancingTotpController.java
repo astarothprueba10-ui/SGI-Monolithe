@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.NotNull;
 import monolithe.auth_service.service.FinancingTotpService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.UUID;
 
-/** Sin endpoints de publicación de políticas: MFA es un requisito, no una aprobación automática. */
+/** El código TOTP autoriza una propuesta específica; publicar exige un segundo endpoint transaccional. */
 @RestController
 @RequestMapping("/api/auth/financing-mfa")
 public class FinancingTotpController {
@@ -32,8 +33,8 @@ public class FinancingTotpController {
     public record Autorizacion(
         @NotBlank @Pattern(regexp="[0-9]{6}") String codigo,
         @Positive Integer versionEsperada,
-        @NotBlank @Pattern(regexp="[a-f0-9]{64}") String hashPropuesta,
-        UUID nonce
+        @NotNull Map<String,Object> borrador,
+        @NotNull UUID nonce
     ) {}
 
     @GetMapping("/status")
@@ -71,7 +72,7 @@ public class FinancingTotpController {
     public ResponseEntity<Map<String,Object>> autorizar(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody Autorizacion req) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-            .body(service.autorizar(jwt,req.codigo(),req.versionEsperada(),req.hashPropuesta(),req.nonce()));
+            .body(service.autorizar(jwt,req.codigo(),req.versionEsperada(),req.borrador(),req.nonce()));
     }
 
     @PostMapping("/revoke")
