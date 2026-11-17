@@ -68,3 +68,70 @@ test('otras pestañas, exportación y filtros anteriores se conservan', () => {
   assert.match(panel, /FiltrosCarteraFinanciera/);
   assert.match(panel, /Pagination/);
 });
+
+
+test('bloque 2 congela política por separación, venta y plan sin reescribir históricos', () => {
+  const sql = read('../../../database/migrations/107_financiamiento_snapshots_operaciones_v1.sql');
+  for (const table of ['ven_reservas', 'ven_ventas', 'pag_planes_pago']) {
+    assert.match(sql, new RegExp('ALTER TABLE public\\.' + table));
+    assert.match(sql, new RegExp('trg_fin_' + (
+      table === 'ven_reservas' ? 'reserva' : table === 'ven_ventas' ? 'venta' : 'plan'
+    ) + '_condiciones'));
+  }
+  assert.match(sql, /politica_financiera_snapshot jsonb/);
+  assert.match(sql, /POLITICA_INMUTABLE/);
+  assert.match(sql, /fn_fin_politica_para_venta_v1/);
+  assert.match(sql, /version=1/);
+  assert.match(sql, /fn_fin_politica_activa_v1/);
+  assert.match(sql, /sp_fin_terminos_operacion_v1/);
+  assert.match(sql, /fn_crm_puede_consultar_prospecto/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.sp_fin_terminos_operacion_v1/);
+});
+
+test('simulación parametrizada respeta la tasa nominal, inicial y última cuota', () => {
+  const sql = read('../../../database/migrations/108_financiamiento_simulacion_politica_v1.sql');
+  const precision = read('../../../database/migrations/109_financiamiento_precision_interes_v1.sql');
+  assert.match(sql, /fn_fin_simular_frances_politica_v1/);
+  assert.match(sql, /modo_inicial/);
+  assert.match(sql, /tasa_nominal_anual_pct/);
+  assert.match(sql, /IF v_tasa=0 THEN/);
+  assert.match(sql, /v_i=p_cuotas THEN/);
+  assert.match(sql, /fechaVencimiento/);
+  assert.match(precision, /v_saldo\*p\.tasa_nominal_anual_pct\/1200/);
+});
+
+test('registro, firma y confirmación exigen la versión de la operación, no la política nueva', () => {
+  const integration = read('../../../database/migrations/110_financiamiento_integracion_transaccional_v1.sql');
+  const acceptance = read('../../../database/migrations/111_financiamiento_confirmar_version_aceptada_v1.sql');
+  assert.match(integration, /sp_crm_registrar_separacion_v2/);
+  assert.match(integration, /dias_vencimiento_separacion/);
+  assert.match(integration, /sp_crm_validar_formalizacion_v10/);
+  assert.match(integration, /fn_fin_simular_frances_politica_v1/);
+  assert.match(integration, /sp_crm_registrar_venta_pendiente_v10/);
+  assert.match(integration, /FRANCES_POLITICA_V/);
+  assert.match(integration, /sp_crm_aprobar_firma_contrato_v8/);
+  assert.match(integration, /id_politica_financiera/);
+  assert.match(acceptance, /idPoliticaEsperada/);
+  assert.match(acceptance, /POLITICA_CAMBIO/);
+  assert.match(acceptance, /FOR SHARE/);
+});
+
+test('formulario usa términos autorizados por comprador y lote', () => {
+  const controller = read('../../../services/core-service/src/main/java/monolithe/core_service/controller/CrmVentaController.java');
+  const service = read('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmVentaService.java');
+  const api = read('../src/services/crmBackend.ts');
+  const sales = read('../src/pages/Sales.tsx');
+  const simulator = read('../src/utils/financiamientoFrances.ts');
+  assert.match(controller, /GetMapping\("\/financiamiento\/condiciones-venta"\)/);
+  assert.match(controller, /hasAuthority\('sales\.create'\)/);
+  assert.match(service, /sp_fin_terminos_operacion_v1/);
+  assert.match(api, /obtenerCondicionesVenta/);
+  assert.match(sales, /crmBackend\.obtenerCondicionesVenta/);
+  assert.match(sales, /idPoliticaEsperada: solicitud\.idPolitica/);
+  assert.match(sales, /validacion\.idPolitica !== condicionesVenta\.idPolitica/);
+  assert.match(sales, /condicionesVenta\.montoSeparacion/);
+  assert.match(sales, /confirmacionVenta\.tasaAnualPct/);
+  assert.doesNotMatch(sales, /monto: 500\.00/);
+  assert.doesNotMatch(sales, /TASA_ANUAL_FIJA_PCT/);
+  assert.match(simulator, /condiciones\.tasaNominalAnualPct/);
+});
