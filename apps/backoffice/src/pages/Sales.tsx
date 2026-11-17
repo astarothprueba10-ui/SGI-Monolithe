@@ -2270,12 +2270,18 @@ export function Sales() {
                         <Input
                           id="venta-inicial"
                           type="number"
-                          min="5000"
-                          max={precioLote
-                            ? Math.max(5000, Number(precioLote.precio) - 0.01)
-                            : undefined}
+                          min={condicionesVenta ? inicialMinimaVigente : undefined}
+                          max={precioLote && condicionesVenta ? Math.min(
+                            Number(precioLote.precio) - 0.01,
+                            condicionesVenta.modoInicial === 'RANGO' && condicionesVenta.inicialMaxima != null
+                              ? condicionesVenta.inicialMaxima : Number(precioLote.precio) - 0.01,
+                            condicionesVenta.modoInicial === 'FIJA' && condicionesVenta.inicialFija != null
+                              ? condicionesVenta.inicialFija : Number(precioLote.precio) - 0.01
+                          ) : undefined}
                           step="0.01"
-                          placeholder="Mínimo S/ 5,000"
+                          placeholder={condicionesVenta?.modoInicial === 'FIJA'
+                            ? `Inicial fija S/ ${condicionesVenta.inicialFija?.toFixed(2)}`
+                            : `Desde S/ ${inicialMinimaVigente.toFixed(2)}`}
                           value={formSaleDownPayment}
                           aria-invalid={Boolean(errorMontoInicial)}
                           aria-describedby={errorMontoInicial ? 'venta-inicial-error' : 'venta-inicial-ayuda'}
@@ -2290,32 +2296,37 @@ export function Sales() {
                           </p>
                         ) : (
                           <p id="venta-inicial-ayuda" className="mt-1.5 text-[11px] text-brand-500">
-                            Mínimo S/ 5,000 de inicial total. La separación confirmada puede cubrir S/ 500 de ese importe.
+                            {condicionesVenta?.modoInicial === 'FIJA'
+                              ? `Inicial total fija S/ ${condicionesVenta.inicialFija?.toFixed(2)}.`
+                              : condicionesVenta?.modoInicial === 'RANGO'
+                                ? `Inicial entre S/ ${condicionesVenta.inicialMinima?.toFixed(2)} y S/ ${condicionesVenta.inicialMaxima?.toFixed(2)}.`
+                                : `Inicial mínima S/ ${inicialMinimaVigente.toFixed(2)}.`}
+                            {' '}La separación confirmada se descuenta de la inicial pactada.
                           </p>
                         )}
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="venta-plazo" className="mb-1.5 block text-xs font-semibold text-brand-700">
-                          Número de cuotas (1 a 36) *
+                          Número de cuotas ({cuotasMinimas} a {cuotasMaximas}) *
                         </label>
                         <Input
                           id="venta-plazo"
                           type="text"
                           inputMode="numeric"
-                          pattern="(?:[1-9]|[12][0-9]|3[0-6])"
+                          pattern="[0-9]{1,2}"
                           maxLength={2}
-                          placeholder="1 a 36 meses"
+                          placeholder={`${cuotasMinimas} a ${cuotasMaximas} meses`}
                           value={formSaleInstallments}
                           onChange={(e) => {
                             const limpio = e.target.value.replace(/[^0-9]/g, '');
-                            if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= 36)) {
+                            if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= cuotasMaximas)) {
                               setFormSaleInstallments(limpio);
                             }
                           }}
                           className="bg-white"
                         />
                         <p className="mt-1.5 text-[11px] text-brand-500">
-                          Ingresa un plazo entero de 1 a 36 meses.
+                          Ingresa un plazo entero entre {cuotasMinimas} y {cuotasMaximas} meses.
                         </p>
                       </div>
                     </div>
@@ -2323,11 +2334,11 @@ export function Sales() {
                       <div>
                         <p className="text-xs font-semibold text-sky-900">Interés nominal anual fijo</p>
                         <p className="mt-0.5 text-[11px] text-sky-700">
-                          Equivalente mensual: {TASA_MENSUAL_NOMINAL_PCT.toFixed(4)} %. No modificable.
+                          Equivalente nominal mensual: {((condicionesVenta?.tasaNominalAnualPct ?? 0) / 12).toFixed(4)} %. No modificable por el asesor.
                         </p>
                       </div>
                       <strong className="text-xl font-bold tabular-nums text-sky-900">
-                        {TASA_ANUAL_FIJA_PCT} % anual
+                        {condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual
                       </strong>
                     </div>
                   </div>
@@ -2383,7 +2394,7 @@ export function Sales() {
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <dt className="text-brand-600">Intereses totales ({TASA_ANUAL_FIJA_PCT} % anual)</dt>
+                            <dt className="text-brand-600">Intereses totales ({condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual)</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
                               {currency(resumenVenta.interesTotal)}
                             </dd>
@@ -2427,7 +2438,7 @@ export function Sales() {
                 ) : (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
                     {formSaleModality === 'FINANCIADA'
-                      ? 'Complete una inicial válida de al menos S/ 5,000 y un plazo entre 1 y 36 meses para calcular las cuotas.'
+                      ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
                       : 'Seleccione un lote con precio oficial vigente para consultar el saldo.'}
                   </p>
                 )}
@@ -2677,7 +2688,7 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Tasa nominal anual fija</dt>
                     <dd className="font-semibold text-brand-900">
-                      {TASA_ANUAL_FIJA_PCT} % anual
+                      {confirmacionVenta.tasaAnualPct} % anual
                     </dd>
                   </div>
                   <div>
