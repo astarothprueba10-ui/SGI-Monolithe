@@ -1289,7 +1289,7 @@ export function Sales() {
       <PageHeader
         title="Separaciones y ventas"
         description={tab === 'Separación'
-          ? 'Gestiona separaciones de S/ 500, métodos de pago, comprobantes y reservas de lotes.'
+          ? 'Gestiona separaciones según la política vigente, métodos de pago y reservas de lotes.'
           : tab === 'Venta'
             ? 'Gestiona las ventas, modalidades de financiamiento y contratos asociados.'
             : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
@@ -1867,7 +1867,7 @@ export function Sales() {
         onClose={cerrarModalOperacion}
         title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
         description={opType === 'Separacion'
-          ? 'Registra la separación de S/ 500 y adjunta su comprobante para revisión por Finanzas.'
+          ? 'Registra la separación según el importe vigente y adjunta su comprobante para revisión por Finanzas.'
           : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
           <div className="flex justify-end gap-2">
@@ -1883,6 +1883,8 @@ export function Sales() {
 
               disabled={
                 submitting ||
+                consultandoPolitica ||
+                (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
                 (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
               }
@@ -2113,12 +2115,29 @@ export function Sales() {
               )}
             </div>
 
+            {formLotId && (
+              <div className="mb-3" role="status">
+                {consultandoPolitica ? (
+                  <p className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs text-brand-700">
+                    Consultando condiciones comerciales autorizadas…
+                  </p>
+                ) : errorPolitica ? (
+                  <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                    No se pudieron cargar las condiciones financieras: {errorPolitica}. Selecciona nuevamente el lote.
+                  </p>
+                ) : condicionesVenta ? (
+                  <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    Condiciones contractuales verificadas · Versión {condicionesVenta.version}
+                  </p>
+                ) : null}
+              </div>
+            )}
             {opType === 'Separacion' ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Método de pago (S/ 500.00) *
+                      Método de pago (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}) *
                     </label>
                     <Select
                       value={formPaymentMethod}
@@ -2157,7 +2176,7 @@ export function Sales() {
                         Caja / Modalidad
                       </label>
                       <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                        Pago directo en efectivo (S/ 500)
+                        Pago directo en efectivo (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'})
                       </div>
                     </div>
                   )}
@@ -2190,15 +2209,15 @@ export function Sales() {
                   </div>
                   {!voucherFile && formTouched && (
                     <p className="mt-1 text-[11px] font-medium text-rose-600">
-                      Debe adjuntar el comprobante o voucher de pago de S/ 500.00.
+                      Debe adjuntar el comprobante o voucher de S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}.
                     </p>
                   )}
                 </div>
 
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
                   <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
-                  <p>Monto reglamentario: <span className="font-bold">S/ 500.00 PEN</span></p>
-                  <p>Plazo de vigencia: <span className="font-bold">7 días calendario</span> (vence automáticamente si no se formaliza venta).</p>
+                  <p>Monto reglamentario: <span className="font-bold">S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'} PEN</span></p>
+                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (vence automáticamente si no se formaliza venta).</p>
                   <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
                   <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
                 </div>
