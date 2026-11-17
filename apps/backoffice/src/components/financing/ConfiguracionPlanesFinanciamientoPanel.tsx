@@ -7,6 +7,7 @@ import {
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Feedback';
 import { formatSoles } from '../../utils/financeMoney';
+import { SeguridadFinancieraTotpPanel } from './SeguridadFinancieraTotpPanel';
 import {
   financingConfigService,
   type PoliticaFinanciamientoActual
@@ -153,9 +154,13 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
     <Alert tone="info" title="Configuración en modo consulta · protección activa">
       Las nuevas separaciones y ventas se validan contra políticas financieras versionadas.
       Cada nueva operación conserva las condiciones aceptadas sin recalcular cronogramas históricos.
-      La publicación de otra versión permanece bloqueada: requerirá TOTP, confirmación explícita
-      y auditoría transaccional. Esta pantalla es exclusivamente de consulta.
+      El enrolamiento y la verificación TOTP de Gerencia se gestionan en esta pantalla.
+      La publicación de otra versión permanece bloqueada hasta contar con el flujo
+      transaccional de autorización y auditoría del Bloque 4. Esta pantalla financiera
+      continúa siendo exclusivamente de consulta.
     </Alert>
+
+    <SeguridadFinancieraTotpPanel />
 
     <section className="overflow-hidden rounded-2xl border border-brand-100 bg-white">
       <div className="flex items-center gap-2 border-b border-brand-100 bg-brand-50/50 px-4 py-3 sm:px-5">
