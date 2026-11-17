@@ -190,14 +190,20 @@ public class FinancingTotpService {
         long id=actor(jwt);
         if (!crypto.configurado()) throw fallo(HttpStatus.SERVICE_UNAVAILABLE,
             "La clave de cifrado TOTP no está configurada en Auth Service.");
-        User u=usuarios.findById(id).orElseThrow(() -> fallo(HttpStatus.FORBIDDEN,"Cuenta no disponible."));
-        if (password==null || !passwords.matches(password,u.getPasswordHash())) {
-            throw fallo(HttpStatus.FORBIDDEN,"No se pudo comprobar la identidad.");
-        }
-        String destino=emailVerificado(id);
         db.update("INSERT INTO public.seg_fin_totp_cuentas(id_usuario) VALUES (?) ON CONFLICT DO NOTHING",id);
         Cuenta c=fila(id,true);
         desbloqueado(c);
+        User u=usuarios.findById(id).orElseThrow(() -> fallo(HttpStatus.FORBIDDEN,"Cuenta no disponible."));
+        if (password==null || !passwords.matches(password,u.getPasswordHash())) {
+            int n=c.intentos()+1;
+            db.update("""
+              UPDATE public.seg_fin_totp_cuentas SET intentos_fallidos=?,
+                bloqueo_hasta=CASE WHEN ?>=5 THEN now()+interval '15 minutes' ELSE NULL END,
+                actualizado_en=now() WHERE id_usuario=?
+              """,n>=5?0:n,n,id);
+            throw fallo(HttpStatus.FORBIDDEN,"No se pudo comprobar la identidad.");
+        }
+        String destino=emailVerificado(id);
         Instant now=Instant.now();
         boolean ventana=c.ventanaInicio()!=null &&
             c.ventanaInicio().toInstant().isAfter(now.minusSeconds(3600));
