@@ -182,6 +182,10 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
                 Todas
               </button>
             </div>}
+            <Button icon={FileDownIcon} disabled={cargando||Boolean(error)||!cronograma||!saldo||exportandoPdf}
+              onClick={()=>void exportarPdf()}>
+              {exportandoPdf?'Generando PDF…':'Exportar expediente PDF'}
+            </Button>
             <Button icon={RefreshCwIcon} variant="secondary" disabled={cargando}
               onClick={() => setRevision(x => x + 1)}>Actualizar</Button>
           </div>
@@ -233,10 +237,6 @@ export function PlanFinanciamientoDetalleModal({ plan, onClose }: {
         </>}
       </section>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button icon={FileDownIcon} disabled={cargando||Boolean(error)||!cronograma||!saldo||exportandoPdf}
-          onClick={()=>void exportarPdf()}>
-          {exportandoPdf?'Generando PDF…':'Exportar expediente PDF'}
-        </Button>
         <Button variant="secondary" onClick={onClose}>Cerrar expediente</Button>
       </div>
     </div>
