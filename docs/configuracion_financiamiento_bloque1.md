@@ -23,7 +23,7 @@ La migración `database/migrations/106_financiamiento_politicas_versionadas_v1.s
 - `CarteraFinanciamientoPanel.tsx`: tercera pestaña `Configuración de planes de financiamiento`, visible solo si `can('financing.configure') && user.roles.includes('Gerencia')`. Enlaces manuales con `?tab=configuracion` se ignoran para usuarios no autorizados. Las pestañas previas no se modifican.
 - `configuracionFinanciamiento.test.mjs`: pruebas estructurales de permisos y compatibilidad, integradas en CI.
 
-**Importante:** tener una política registrada **NO** significa que el motor de ventas la esté utilizando. En esta fase no existe endpoint de publicación ni funcionalidad de edición. Los procedimientos antiguos mantienen sus valores fijos para evitar cambios de conducta antes de terminar el control de seguridad y snapshots contractuales. Las ventas registradas y sus cuotas son intactas.
+**Actualización posterior al Bloque 2:** el motor de nuevas operaciones ya obtiene políticas versionadas y guarda snapshots. Este párrafo del Bloque 1 documentaba un estado previo. Sigue sin existir un endpoint de edición o publicación: está bloqueado hasta completar TOTP y auditoría. Las ventas y cuotas históricas permanecen intactas.
 
 ### Validaciones realizadas en TEST
 
@@ -35,15 +35,23 @@ La migración `database/migrations/106_financiamiento_politicas_versionadas_v1.s
 - Asignación de permiso únicamente a GERENCIA; acceso de otros roles requiere rol Gerencia efectivo además del permiso.
 - Aviso `rls_enabled_no_policy` en Supabase Advisors es intencional para estas dos tablas internas: RLS cerrada por defecto y sin acceso directo.
 
-## Bloques pendientes (NO habilitados todavía)
+## Bloque 2 — Integración transaccional implementada en TEST
 
-### Bloque 2 — Integración transaccional y snapshots
+Migraciones aplicadas, versionadas en GitHub y confirmadas en Supabase TEST:
 
-- Conectar el motor francés con la **versión vigente al instante de aceptación de la operación**, en lugar de tasas fijas.
-- Crear funciones SQL **nuevas**, sin modificar ni recalcular cronogramas históricos.
-- Congelar `id_politica` y una fotografía JSON de los parámetros en separaciones y operaciones nuevas, así como su fecha de aplicación; respetar ofertas aceptadas hasta el vencimiento de separación.
-- Validar en la misma transacción la tasa y la inicial en simulación, formalización, generación de cuotas y firma. El cliente jamás podrá enviar una tasa efectiva distinta de la aprobada.
-- Ceros de interés, redondeo y cuota final: pruebas en PostgreSQL 17 con casos extremos, incluyendo concurrencia de venta mientras se publica otra versión.
+- **107:** agrega el identificador y snapshot JSON inmutables a nuevas reservas, ventas y planes. Los datos históricos quedan sin retroactividad (campos NULL).
+- **108:** motor francés que toma tasa nominal anual, inicial y número de cuotas de la política aceptada; ajusta la última cuota para cerrar el saldo.
+- **109:** conserva el orden de operaciones decimales del motor histórico al calcular intereses.
+- **110:** integra la política a la separación, validación de venta, registro pendiente y aprobación de firma.
+- **111:** comprueba de forma transaccional `idPoliticaEsperada` sobre la política correspondiente a la operación (incluida una separación vigente). Si cambió, detiene el registro con `POLITICA_CAMBIO`. El servicio traduce ese conflicto a **HTTP 409**.
+
+El formulario de ventas consulta `GET /api/core/crm/financiamiento/condiciones-venta`, presenta las condiciones del prospecto y lote y confirma usando la versión aceptada. La política de una separación vigente se respeta hasta su vencimiento; no se cambia por una versión publicada después. No se recalculan ni reescriben contratos ni cronogramas anteriores.
+
+**Control de datos en TEST (17/11/2026):** política activa versión 1 (S/ 500 de separación, inicial mínima S/ 5,000, 10% TNA, 1–36 cuotas, 7 días, francés). Permanecen 10 ventas y 5 planes históricos; ninguno recibió un snapshot retroactivo. El bloqueo TOTP para publicar nuevas versiones sigue pendiente y la pantalla es **solo lectura**.
+
+**Pruebas adicionales pendientes:** registrar una operación de prueba completa en entorno aislado, recorrer firma y cronograma, verificar snapshots en las tres tablas y simular un cambio concurrente de política una vez exista publicación autorizada por TOTP. No crear ventas de prueba sobre datos de clientes existentes.
+
+## Bloques 3 y 4 — Pendientes; publicación bloqueada
 
 ### Bloque 3 — Autenticación reforzada TOTP para Gerencia
 
