@@ -324,11 +324,11 @@ public class FinancingTotpService {
         if(version==null || version<=0 || hash==null || !hash.matches("[0-9a-f]{64}") || nonce==null) {
             throw fallo(HttpStatus.BAD_REQUEST,"Propuesta financiera o nonce inválidos.");
         }
+        // Leer por la función segura; el backend no tiene SELECT a las tablas de políticas.
+        // La publicación futura revalidará de nuevo la versión bajo bloqueo transaccional.
         Integer vigente=db.queryForObject("""
-          SELECT p.version FROM public.cfg_fin_politica_activa a
-          JOIN public.cfg_fin_politicas_versiones p ON p.id_politica=a.id_politica
-          WHERE a.id=1 FOR SHARE OF a
-          """,Integer.class);
+          SELECT (public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))->>'version')::integer
+          """,Integer.class,id);
         if(!version.equals(vigente)) throw fallo(HttpStatus.CONFLICT,
             "La versión financiera cambió. Revalide la propuesta.");
         Integer previo=db.queryForObject("""
