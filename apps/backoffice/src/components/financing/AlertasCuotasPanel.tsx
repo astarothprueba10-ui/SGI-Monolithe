@@ -85,7 +85,7 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
           Alertas reales de cuotas
         </h2>
         <p className="mt-1 text-xs text-brand-600">
-          Saldos de pagos confirmados · Vencimientos en horario de Perú ·
+          Saldos de pagos confirmados · Vencimientos ·
           Solo ventas autorizadas de tu cartera
         </p>
       </div>
@@ -190,7 +190,7 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
       <p className="mt-3 text-[11px] text-brand-500">
         No se incluyen cuotas pagadas o anuladas, planes cerrados ni proyecciones
         sin firma. Los avisos PORTAL respetan las preferencias registradas y no
-        generan correos ni SMS. La cláusula resolutoria se evalúa aparte.
+        generan correos ni SMS.
       </p>
     </>}
   </section>;
