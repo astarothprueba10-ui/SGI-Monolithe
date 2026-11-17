@@ -11,7 +11,7 @@ test('reutiliza el filtro global de CRM y comienza en AÑO',()=>{
   const utility=read('../src/utils/crmPeriodo.ts');
   assert.match(panel,/CrmPeriodoGlobal/);
   assert.match(panel,/calcularRangoCrm/);
-  assert.match(panel,/useState<PeriodoCrmModo>\('ANIO'\)/);
+  assert.match(panel,/useState<PeriodoCrmModo>\(\s*'ANIO'\s*\)/);
   assert.match(panel,/getPeruTodayDateString/);
   assert.match(periodo,/Hoy/);
   assert.match(periodo,/Semana/);
@@ -19,7 +19,7 @@ test('reutiliza el filtro global de CRM y comienza en AÑO',()=>{
   assert.match(periodo,/Año/);
   assert.match(periodo,/Rango/);
   assert.match(utility,/America|05:00/);
-  assert.match(panel,/desde:rango\.desde,hastaExclusivo:rango\.hastaExclusivo/);
+  assert.match(panel,/desde:\s*rango\.desde\s*,\s*hastaExclusivo:\s*rango\.hastaExclusivo/);
 });
 
 test('el periodo limita los planes y los KPI son de saldos vigentes de ventas del periodo',()=>{
@@ -45,9 +45,9 @@ test('el periodo limita los planes y los KPI son de saldos vigentes de ventas de
 test('planes y cronograma se unifican: tabla con nueve columnas y detalle por venta',()=>{
   const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const modal=read('../src/components/financing/PlanFinanciamientoDetalleModal.tsx');
-  assert.match(panel,/id:'PLANES',label:'Planes y saldos'/);
-  assert.match(panel,/id:'ALERTAS',label:'Alertas de cuotas Vencidas'/);
-  assert.doesNotMatch(panel,/id:'CUOTAS'/);
+  assert.match(panel,/id:\s*'PLANES'\s*,\s*label:\s*'Planes y saldos'/);
+  assert.match(panel,/id:\s*'ALERTAS'\s*,\s*label:\s*'Alertas de cuotas Vencidas'/);
+  assert.doesNotMatch(panel,/id:\s*'CUOTAS'/);
   for(const h of ['Venta y comprador','Precio base','Inicial','Capital financiado','Interés','Saldo','Estado','Ver cronograma'])assert.ok(panel.includes(h),h);
   assert.match(panel,/Table head=/);
   assert.match(panel,/PlanFinanciamientoDetalleModal/);
@@ -105,14 +105,14 @@ test('la tabla reutiliza el diseño CRM con filtros separados sin cambiar los KP
   const controller=read('../../../services/core-service/src/main/java/monolithe/core_service/controller/CrmVentaController.java');
   const api=read('../src/services/crmBackend.ts');
 
-  assert.match(panel,/useState<PeriodoCrmModo>\('ANIO'\)/);
+  assert.match(panel,/useState<PeriodoCrmModo>\(\s*'ANIO'\s*\)/);
   assert.match(panel,/FiltrosCarteraFinanciera/);
-  assert.match(panel,/proyectos=\{catalogos\.proyectos\}/);
-  assert.match(panel,/lotes=\{catalogos\.lotes\}/);
-  assert.match(panel,/onProyecto=\{proyecto=>cambiarFiltroTabla\(\{proyecto,lote:''\}\)\}/);
+  assert.match(panel,/proyectos=\{\s*catalogos\.proyectos\s*\}/);
+  assert.match(panel,/lotes=\{\s*catalogos\.lotes\s*\}/);
+  assert.match(panel,/onProyecto=\{\s*proyecto\s*=>\s*cambiarFiltroTabla\(\{\s*proyecto\s*,\s*lote:\s*''\s*\}\)\s*\}/);
   assert.match(panel,/onLimpiar=\{limpiarFiltrosTabla\}/);
-  assert.match(panel,/fechaTablaDesde:filtrosTabla\.fechaDesde/);
-  assert.match(panel,/fechaTablaHasta:filtrosTabla\.fechaHasta/);
+  assert.match(panel,/fechaTablaDesde:\s*filtrosTabla\.fechaDesde/);
+  assert.match(panel,/fechaTablaHasta:\s*filtrosTabla\.fechaHasta/);
   assert.match(panel,/setCatalogos\(resultado\.filtros\)/);
 
   for(const label of ['Buscar venta o comprador','Proyecto','Lote','Estado','Fecha desde','Fecha hasta','Limpiar filtros']){
@@ -145,8 +145,8 @@ test('la tabla reutiliza el diseño CRM con filtros separados sin cambiar los KP
 test('paginación financiera reutiliza controles de sistema y funciona con un único registro',()=>{
   const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const pagination=read('../src/components/ui/Pagination.tsx');
-  assert.match(panel,/import \{Pagination\} from '\.\.\/ui\/Pagination'/);
-  assert.match(panel,/<Pagination page=\{pagina\} pageSize=\{20\} total=\{datos\.total\}/);
+  assert.match(panel,/import\s+\{\s*Pagination\s*\}\s+from\s+'\.\.\/ui\/Pagination'/);
+  assert.match(panel,/<Pagination\s+page=\{pagina\}\s+pageSize=\{20\}\s+total=\{datos\.total\}/);
   assert.doesNotMatch(panel,/datos\.paginas>1&&<div className="flex flex-wrap/);
   assert.match(pagination,/Mostrando \{from\}/);
   assert.match(pagination,/aria-label="Página siguiente"/);
