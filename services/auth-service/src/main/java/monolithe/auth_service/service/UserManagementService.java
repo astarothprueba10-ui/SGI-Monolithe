@@ -129,6 +129,7 @@ public class UserManagementService {
                         JsonNode rol = buscarPorCodigo(rolesAutorizados, codigo);
                         if (rol == null || !rol.path("activo").asBoolean(false)
                                         || (!puedeAsignarRolesProtegidos
+                                                        && !"CLIENTE".equals(codigo)
                                                         && !rol.path("asignableRrhh").asBoolean(false))) {
                                 return new CreatedUserResult(null, "ROL_NO_AUTORIZADO",
                                                 "No está autorizado para asignar el rol " + codigo + ".");

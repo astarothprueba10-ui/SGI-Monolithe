@@ -62,12 +62,15 @@ services:
     environment:
       VITE_AUTH_API_URL: /api/auth
       AUTH_PROXY_TARGET: http://auth-service:8081
+      VITE_CORE_API_URL: /api/core
+      CORE_PROXY_TARGET: http://core-service:8083
       VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
       VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     volumes:
       - ./apps/portal-cliente/src:/app/src
     depends_on:
       - auth-service
+      - core-service
     restart: unless-stopped
 
   backoffice:

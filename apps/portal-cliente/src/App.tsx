@@ -1,36 +1,47 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PortalLayout } from './components/portal/PortalLayout';
+import { PortalFeaturePending } from './components/portal/PortalFeaturePending';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
-import { Cronograma } from './pages/portal/Cronograma';
-import { Documentos } from './pages/portal/Documentos';
 import { Inicio } from './pages/portal/Inicio';
-import { MiAsesor } from './pages/portal/MiAsesor';
 import { MiLote } from './pages/portal/MiLote';
+import { Cronograma } from './pages/portal/Cronograma';
 import { Pagos } from './pages/portal/Pagos';
-import { Perfil } from './pages/portal/Perfil';
-import { Soporte } from './pages/portal/Soporte';
+import { Documentos } from './pages/portal/Documentos';
 import { NotFound } from './pages/NotFound';
+import { ChangePassword } from './pages/ChangePassword';
+import { getPortalAuthState } from './lib/portalSession';
 
-
-function tieneSesion() {
-  return Boolean(
-    localStorage.getItem('monolithe_access_token') ||
-    sessionStorage.getItem('monolithe_access_token')
-  );
+function rutaInicialPortal() {
+  const estado = getPortalAuthState();
+  return estado === 'password-change-required'
+    ? '/cambiar-contrasena'
+    : estado === 'authenticated' ? '/portal' : '/login';
 }
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
-  return tieneSesion() ? children : <Navigate to="/login" replace />;
+  const estado = getPortalAuthState();
+  if (estado === 'unauthenticated') return <Navigate to="/login" replace />;
+  if (estado === 'password-change-required') {
+    return <Navigate to="/cambiar-contrasena" replace />;
+  }
+  return children;
+}
+
+function RequirePasswordChange({ children }: { children: React.ReactElement }) {
+  const estado = getPortalAuthState();
+  if (estado === 'unauthenticated') return <Navigate to="/login" replace />;
+  if (estado === 'authenticated') return <Navigate to="/portal" replace />;
+  return children;
 }
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to={tieneSesion() ? '/portal' : '/login'} replace />} />
+        <Route path="/" element={<Navigate to={rutaInicialPortal()} replace />} />
         <Route path="/login" element={<Login />} />
         <Route
           path="/recuperar-contrasena"
@@ -40,6 +51,10 @@ export function App() {
         <Route
           path="/restablecer-contrasena"
           element={<ResetPassword />}
+        />
+        <Route
+          path="/cambiar-contrasena"
+          element={<RequirePasswordChange><ChangePassword /></RequirePasswordChange>}
         />
         <Route
           path="/portal"
@@ -54,9 +69,9 @@ export function App() {
           <Route path="cronograma" element={<Cronograma />} />
           <Route path="pagos" element={<Pagos />} />
           <Route path="documentos" element={<Documentos />} />
-          <Route path="asesor" element={<MiAsesor />} />
-          <Route path="soporte" element={<Soporte />} />
-          <Route path="perfil" element={<Perfil />} />
+          <Route path="asesor" element={<PortalFeaturePending titulo="Mi asesor" />} />
+          <Route path="soporte" element={<PortalFeaturePending titulo="Soporte" />} />
+          <Route path="perfil" element={<PortalFeaturePending titulo="Mi perfil" />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

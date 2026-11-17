@@ -72,7 +72,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_validar_formalizacion_v9(
+                SELECT public.sp_crm_validar_formalizacion_v10(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -139,7 +139,7 @@ public class CrmVentaService {
                     "Identificador del prospecto invalido.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_reservas_vigentes_para_venta_v1(
+                SELECT public.sp_crm_reservas_vigentes_para_venta_v2(
                     CAST(? AS bigint),
                     CAST(? AS bigint)
                 )::text
@@ -194,13 +194,18 @@ public class CrmVentaService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Revise la ficha contractual del comprador antes de registrar.");
         }
+        if (!req.datosComprador().path("identidadVerificada").isBoolean()
+                || !req.datosComprador().path("identidadVerificada").asBoolean()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El asesor debe confirmar la verificacion del documento del comprador.");
+        }
         if (req.datosPago() == null || !req.datosPago().isObject()
                 || req.datosPago().toString().length() > 16000) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Indique metodo de pago y comprobantes de la venta.");
         }
         return ejecutar("""
-                SELECT public.sp_crm_registrar_venta_pendiente_v13(
+                SELECT public.sp_crm_registrar_venta_pendiente_v14(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -374,6 +379,290 @@ public class CrmVentaService {
                 )::text
                 """,
                 actor, estado, busqueda, pagina, tamano);
+    }
+
+    /** Inicial adicional de contrato ya firmado: no incluye reserva S/500. */
+    @Transactional(readOnly = true)
+    public JsonNode opcionesRegistroVoucherInicial(Long actor,String busqueda,Integer limite) {
+        validarActor(actor);
+        int cantidad=limite==null?60:limite;
+        if(cantidad<1||cantidad>100||(busqueda!=null&&busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de iniciales inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_opciones_registro_inicial_v1(
+              CAST(? AS bigint),CAST(? AS varchar),CAST(? AS integer)
+            )::text
+            """,actor,busqueda,cantidad);
+    }
+
+    /** Reserva carga documental del abono a inicial; todavía no crea un pago. */
+    @Transactional
+    public JsonNode prepararCargaVoucherInicial(Long actor,
+            monolithe.core_service.dto.PrepararCargaVoucherInicialRequest req) {
+        validarActor(actor);
+        if(req==null||req.idVenta()==null||req.idVenta()<=0
+          ||req.idPlanPago()==null||req.idPlanPago()<=0
+          ||req.monto()==null||req.monto().signum()<=0||req.monto().scale()>2
+          ||req.idMetodoPago()==null||req.idMetodoPago()<=0
+          ||req.fechaOperacion()==null
+          ||req.nombreArchivo()==null||req.nombreArchivo().isBlank()
+          ||req.nombreArchivo().length()>180||req.tipoMime()==null
+          ||req.tamanioBytes()==null||req.tamanioBytes()<1
+          ||req.tamanioBytes()>5242880L
+          ||(req.numeroOperacion()!=null&&req.numeroOperacion().length()>100))
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos del comprobante de inicial inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_preparar_carga_voucher_inicial_v1(
+              CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+              CAST(? AS numeric),CAST(? AS integer),CAST(? AS date),
+              CAST(? AS varchar),CAST(? AS varchar),CAST(? AS varchar),
+              CAST(? AS bigint)
+            )::text
+            """,actor,req.idVenta(),req.idPlanPago(),req.monto(),
+             req.idMetodoPago(),req.fechaOperacion(),req.numeroOperacion(),
+             req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Finaliza carga privada de inicial sin aplicar ni confirmar dinero. */
+    @Transactional
+    public JsonNode registrarVoucherInicialPendiente(Long actor,java.util.UUID idCarga) {
+        validarActor(actor);
+        if(idCarga==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Referencia de carga inválida.");
+        return ejecutar("""
+            SELECT public.sp_fin_registrar_voucher_inicial_pendiente_v1(
+              CAST(? AS bigint),CAST(? AS uuid)
+            )::text
+            """,actor,idCarga);
+    }
+
+    /** Cuotas disponibles y métodos de pago para registrar un comprobante. */
+    @Transactional(readOnly = true)
+    public JsonNode opcionesRegistroVoucherCuota(Long actor, String busqueda, Integer limite) {
+        validarActor(actor);
+        int cantidad=limite==null?60:limite;
+        if(cantidad<1||cantidad>100||(busqueda!=null&&busqueda.length()>120))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de cuotas inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_opciones_registro_cuota_v1(
+                CAST(? AS bigint),CAST(? AS varchar),CAST(? AS integer)
+            )::text
+            """,actor,busqueda,cantidad);
+    }
+
+    /** La preautorización no inserta pagos ni aplicaciones contables. */
+    @Transactional
+    public JsonNode prepararCargaVoucherCuota(
+            Long actor,monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest req) {
+        validarActor(actor);
+        if(req==null||req.idVenta()==null||req.idVenta()<=0
+                ||req.idCuota()==null||req.idCuota()<=0
+                ||req.monto()==null||req.monto().signum()<=0
+                ||req.monto().scale()>2
+                ||req.idMetodoPago()==null||req.idMetodoPago()<=0
+                ||req.fechaOperacion()==null
+                ||req.nombreArchivo()==null||req.nombreArchivo().isBlank()
+                ||req.nombreArchivo().length()>180
+                ||req.tipoMime()==null
+                ||req.tamanioBytes()==null||req.tamanioBytes()<1
+                ||req.tamanioBytes()>5242880L
+                ||(req.numeroOperacion()!=null&&req.numeroOperacion().length()>100)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos del comprobante de cuota inválidos.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_preparar_carga_voucher_cuota_v1(
+            CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+            CAST(? AS numeric),CAST(? AS integer),CAST(? AS date),
+            CAST(? AS varchar),CAST(? AS varchar),
+            CAST(? AS varchar),CAST(? AS bigint)
+          )::text
+          """,actor,req.idVenta(),req.idCuota(),req.monto(),
+            req.idMetodoPago(),req.fechaOperacion(),req.numeroOperacion(),
+            req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Finalización idempotente: solo REGISTRADO/PENDIENTE, sin imputar cuota. */
+    @Transactional
+    public JsonNode registrarVoucherCuotaPendiente(Long actor,java.util.UUID idCarga) {
+        validarActor(actor);
+        if(idCarga==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Identificador de carga inválido.");
+        return ejecutar("""
+          SELECT public.sp_fin_registrar_voucher_cuota_pendiente_v1(
+            CAST(? AS bigint),CAST(? AS uuid)
+          )::text
+          """,actor,idCarga);
+    }
+
+    /** Cierre 5.3.5: conciliación informativa, sin escrituras en el libro mayor. */
+    @Transactional(readOnly = true)
+    public JsonNode conciliacionFinanciera(Long actor,String estado,String busqueda,
+            Integer pagina,Integer tamano) {
+        validarActor(actor);
+        String filtro=estado==null?"TODOS":estado;
+        String buscar=busqueda==null?"":busqueda.trim();
+        int pag=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(!java.util.Set.of("TODOS","CON_ALERTA","SIN_ALERTA").contains(filtro)
+                ||buscar.length()>120||pag<1||pag>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de conciliación inválidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_conciliacion_integral_v1(
+              CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+              CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,filtro,buscar,pag,size);
+    }
+
+    /** Anotaciones con registro de eventos, no corrige ni anula pagos. */
+    @Transactional
+    public JsonNode marcarRevisionConciliacion(Long actor,Long pago,
+            monolithe.core_service.dto.MarcarConciliacionRequest req) {
+        validarActor(actor);
+        if(pago==null||pago<=0||req==null
+                ||req.codigoIncidencia()==null||req.codigoIncidencia().length()>55
+                ||req.estado()==null
+                ||!java.util.Set.of("EN_REVISION","REVISADA").contains(req.estado())
+                ||req.comentario()==null||req.comentario().trim().length()<10
+                ||req.comentario().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Incidencia o comentario inválidos.");
+        return ejecutar("""
+            SELECT public.sp_fin_marcar_revision_conciliacion_v1(
+              CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar),
+              CAST(? AS varchar),CAST(? AS varchar)
+            )::text
+            """,actor,pago,req.codigoIncidencia(),req.estado(),
+                    req.comentario().trim());
+    }
+
+    /** Finanzas: pagos confirmados disponibles y historial auditable. */
+    @Transactional(readOnly = true)
+    public JsonNode listarImputacionesFinancieras(Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int page=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(page<1||page>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de aplicaciones financieras inválida.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_imputaciones_v1(
+            CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+          )::text
+          """,actor,page,size);
+    }
+
+    /** Aplicación contable de pago ya CONFIRMADO, sin modificar cronogramas. */
+    @Transactional
+    public JsonNode aplicarPagoConfirmado(Long actor,
+            monolithe.core_service.dto.AplicarPagoConfirmadoRequest req) {
+        validarActor(actor);
+        if(req==null||req.idSolicitud()==null
+                ||req.idPago()==null||req.idPago()<=0
+                ||req.tipo()==null||!java.util.Set.of("CUOTA","INICIAL").contains(req.tipo())
+                ||req.monto()==null||req.monto().signum()<=0
+                ||req.monto().scale()>2
+                ||(req.tipo().equals("CUOTA")&&(req.idCuota()==null||req.idCuota()<=0))
+                ||(req.tipo().equals("INICIAL")&&req.idCuota()!=null)
+                ||(req.observaciones()!=null&&req.observaciones().length()>255)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Pago o destino de imputación inválidos.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_aplicar_pago_confirmado_v1(
+            CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+            CAST(? AS varchar),CAST(? AS bigint),CAST(? AS numeric),
+            CAST(? AS varchar)
+          )::text
+          """,actor,req.idSolicitud(),req.idPago(),req.tipo(),
+             req.idCuota(),req.monto(),req.observaciones());
+    }
+
+    /** Reversión de aplicación propia del 5.3.4, por una segunda persona. */
+    @Transactional
+    public JsonNode revertirAplicacionPago(Long actor, Long idAplicacion,
+            monolithe.core_service.dto.RevertirAplicacionPagoRequest req) {
+        validarActor(actor);
+        if(idAplicacion==null||idAplicacion<=0||req==null
+            ||req.motivo()==null||req.motivo().trim().length()<5
+            ||req.motivo().length()>255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El identificador y motivo de reversión son obligatorios.");
+        }
+        return ejecutar("""
+          SELECT public.sp_fin_revertir_aplicacion_v1(
+            CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar)
+          )::text
+          """,actor,idAplicacion,req.motivo().trim());
+    }
+
+    /** Revisión segregada de voucher de cuota. Aprobación confirma el pago
+     * pero NO aplica abonos ni cambia pag_cuotas. Rechazo exige motivo.
+     */
+    @Transactional
+    public JsonNode revisarVoucherCuota(Long actor, Long idVoucher,
+            monolithe.core_service.dto.RevisarVoucherCuotaRequest req) {
+        validarActor(actor);
+        if(idVoucher==null||idVoucher<=0||req==null||req.aprobar()==null
+                ||(req.observaciones()!=null&&req.observaciones().length()>500)
+                ||(req.motivo()!=null&&req.motivo().length()>255)
+                ||(!req.aprobar()&&(req.motivo()==null
+                   ||req.motivo().trim().length()<5))
+                ||(req.aprobar()&&req.motivo()!=null&&!req.motivo().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La decisión o motivo de rechazo no es válido.");
+        }
+        return ejecutar("""
+            SELECT public.sp_finanzas_revisar_voucher_financiamiento_v2(
+              CAST(? AS bigint),CAST(? AS bigint),CAST(? AS boolean),
+              CAST(? AS varchar),CAST(? AS varchar)
+            )::text
+            """,actor,idVoucher,req.aprobar(),req.motivo(),req.observaciones());
+    }
+
+    /** Bandeja de comprobantes de cuotas: datos reales y archivos verificados. */
+    @Transactional(readOnly = true)
+    public JsonNode listarVouchersCuotas(Long actor, String estado,
+            String busqueda, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String filtro = (estado == null || estado.isBlank()) ? "TODOS" : estado;
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("TODOS", "PENDIENTE", "APROBADO", "RECHAZADO").contains(filtro)
+                || page < 1 || page > 10000 || size < 1 || size > 100
+                || (busqueda != null && busqueda.length() > 120)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de comprobantes inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_finanzas_listar_vouchers_financiamiento_v2(
+                  CAST(? AS bigint), CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """, actor, filtro, busqueda, page, size);
+    }
+
+    /** Ruta para un comprobante de CUOTAS, jamás de separaciones. */
+    @Transactional(readOnly = true)
+    public JsonNode obtenerRutaVoucherCuota(Long actor, Long idVoucher) {
+        validarActor(actor);
+        if (idVoucher == null || idVoucher <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de comprobante inválido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_finanzas_obtener_ruta_voucher_cuota_v1(
+                  CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVoucher);
     }
 
     /** Ruta validada de un comprobante, segun el alcance comercial de la reserva. */
@@ -585,6 +874,38 @@ public class CrmVentaService {
                 """, actor, idVenta);
     }
 
+    /** Saldo financiero por venta, basado en aplicaciones CUOTA confirmadas.
+     * No confunde inicial, reserva, pagos pendientes ni vouchers no conciliados.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode saldoVenta(Long actor, Long idVenta) {
+        validarActor(actor);
+        if (idVenta == null || idVenta <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de venta invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_saldo_venta_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idVenta);
+    }
+
+    /** Agregado del saldo de un cliente titular, limitado a la cartera del JWT. */
+    @Transactional(readOnly = true)
+    public JsonNode saldoCliente(Long actor, Long idCliente) {
+        validarActor(actor);
+        if (idCliente == null || idCliente <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Identificador de cliente invalido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_crm_saldo_cliente_v1(
+                    CAST(? AS bigint), CAST(? AS bigint)
+                )::text
+                """, actor, idCliente);
+    }
+
     /** Cronograma financiero: cuotas reales o proyección expresamente identificada. */
     @Transactional(readOnly = true)
     public JsonNode cronogramaVenta(Long actor, Long idVenta) {
@@ -592,10 +913,150 @@ public class CrmVentaService {
         if (idVenta==null || idVenta<=0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Venta inválida.");
         return ejecutar("""
-            SELECT public.sp_crm_cronograma_venta_v1(
+            SELECT public.sp_crm_cronograma_venta_v4(
               CAST(? AS bigint),CAST(? AS bigint)
             )::text
             """,actor,idVenta);
+    }
+
+    /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
+    @Transactional(readOnly = true)
+    public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
+            Integer pagina, Integer tamano, String desde, String hastaExclusivo,
+            String proyecto, String lote, String estado,
+            String fechaTablaDesde, String fechaTablaHasta) {
+        validarActor(actor);
+        String modo = vista == null ? "PLANES" : vista.trim().toUpperCase(java.util.Locale.ROOT);
+        String texto = busqueda == null ? "" : busqueda.trim();
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("PLANES","CUOTAS").contains(modo)
+                || texto.length()>120 || page<1 || page>100000
+                || size<1 || size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de cartera inválidos.");
+        }
+        // ISO-8601 con zona horaria explícita: el filtro representa fecha de venta en Perú.
+        java.time.OffsetDateTime inicio;
+        java.time.OffsetDateTime fin;
+        try {
+            inicio = java.time.OffsetDateTime.parse(desde);
+            fin = java.time.OffsetDateTime.parse(hastaExclusivo);
+        } catch (java.time.format.DateTimeParseException | NullPointerException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El período debe incluir fechas ISO-8601 válidas.",ex);
+        }
+        if (!inicio.isBefore(fin) || fin.toInstant().isAfter(inicio.plusYears(15).toInstant())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Rango de fechas inválido.");
+        }
+        String filtroProyecto = proyecto == null ? "" : proyecto.trim();
+        String filtroLote = lote == null ? "" : lote.trim();
+        String filtroEstado = estado == null ? "" : estado.trim().toUpperCase(java.util.Locale.ROOT);
+        if (filtroProyecto.length() > 160 || filtroLote.length() > 100
+                || !java.util.Set.of("", "ACTIVO", "COMPLETADO", "PENDIENTE_FIRMA", "ANULADO")
+                        .contains(filtroEstado)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de tabla inválidos.");
+        }
+        java.time.LocalDate tablaDesde;
+        java.time.LocalDate tablaHasta;
+        try {
+            tablaDesde = fechaTablaDesde == null || fechaTablaDesde.isBlank()
+                    ? null : java.time.LocalDate.parse(fechaTablaDesde);
+            tablaHasta = fechaTablaHasta == null || fechaTablaHasta.isBlank()
+                    ? null : java.time.LocalDate.parse(fechaTablaHasta);
+        } catch (java.time.format.DateTimeParseException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Las fechas de la tabla deben tener formato AAAA-MM-DD.",ex);
+        }
+        if (tablaDesde != null && tablaHasta != null && tablaDesde.isAfter(tablaHasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha desde no puede ser posterior a la fecha hasta.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_cartera_backoffice_v3(
+              CAST(? AS bigint),CAST(? AS text),CAST(? AS text),
+              CAST(? AS integer),CAST(? AS integer),
+              CAST(? AS timestamptz),CAST(? AS timestamptz),
+              CAST(? AS text),CAST(? AS text),CAST(? AS text),
+              CAST(? AS date),CAST(? AS date)
+            )::text
+            """,actor,modo,texto,page,size,desde,hastaExclusivo,
+                filtroProyecto,filtroLote,filtroEstado,tablaDesde,tablaHasta);
+    }
+
+    /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
+    @Transactional(readOnly = true)
+    public JsonNode movimientosFinancierosReales(Long actor, String busqueda,
+            Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String texto = busqueda == null ? "" : busqueda.trim();
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (texto.length()>120 || page<1 || page>100000 || size<1 || size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Filtros de movimientos inválidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_movimientos_backoffice_v1(
+              CAST(? AS bigint),CAST(? AS text),
+              CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,texto,page,size);
+    }
+
+    /** Alertas próximas y vencidas verificadas, limitadas a la cartera del JWT. */
+    @Transactional(readOnly = true)
+    public JsonNode alertasCuotas(Long actor, String tipo, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        String filtro = tipo == null || tipo.isBlank() ? "TODAS" : tipo;
+        int page = pagina == null ? 1 : pagina;
+        int size = tamano == null ? 20 : tamano;
+        if (!java.util.Set.of("TODAS", "CUOTA_PROXIMA", "CUOTA_VENCIDA").contains(filtro)
+                || page < 1 || page > 10000 || size < 1 || size > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de alertas o paginacion invalidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_alertas_cuotas_v1(
+              CAST(? AS bigint), CAST(? AS varchar),
+              CAST(? AS integer), CAST(? AS integer)
+            )::text
+            """, actor, filtro, page, size);
+    }
+
+    /** Posible causal resolutoria: sólo consulta y revisión jurídica.
+     * Tres cuotas numeradas consecutivamente, vencidas y con saldo confirmado.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode revisarTresCuotasConsecutivas(Long actor, Integer pagina, Integer tamano) {
+        validarActor(actor);
+        int page=pagina==null?1:pagina;
+        int size=tamano==null?20:tamano;
+        if(page<1||page>10000||size<1||size>100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginacion de revision contractual invalida.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_alertas_resolutoria_v1(
+                CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer)
+            )::text
+            """,actor,page,size);
+    }
+
+    /** Solo preparación de notificaciones internas PORTAL, nunca email/SMS.
+     * Se invoca explícitamente con autoridad de aprobación financiera.
+     */
+    @Transactional
+    public JsonNode prepararAvisosCuotasPortal(Long actor, Integer limite) {
+        validarActor(actor);
+        int cantidad = limite == null ? 100 : limite;
+        if (cantidad < 1 || cantidad > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Limite de avisos invalido.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_preparar_avisos_portal_v1(
+              CAST(? AS bigint), CAST(? AS integer)
+            )::text
+            """, actor, cantidad);
     }
 
     /** Metadatos de Storage: nunca devuelve una ruta sin comprobar la venta y el archivo. */
@@ -1016,7 +1477,7 @@ public class CrmVentaService {
         }
 
         return ejecutar("""
-                SELECT public.sp_crm_aprobar_firma_contrato_v6(
+                SELECT public.sp_crm_aprobar_firma_contrato_v8(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -1413,6 +1874,61 @@ public class CrmVentaService {
         ResponseStatusException errorAnulacion = mapearErrorAnulacion(mensaje, ex);
         if (errorAnulacion != null) {
             return errorAnulacion;
+        }
+
+        // Imputación de dinero confirmado / reversión auditada 5.3.4.
+        if(mensaje.contains("AUTOANULACION_DENEGADA|")) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "La aplicación debe ser revertida por otra persona autorizada.",ex);
+        }
+        if(mensaje.contains("APLICACION_NO_DISPONIBLE|")
+                ||mensaje.contains("PAGO_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "El pago o la aplicación no está disponible para esta operación.",ex);
+        }
+        if(mensaje.contains("APLICACION_CERRADA|")
+                ||mensaje.contains("SOLICITUD_DUPLICADA|")
+                ||mensaje.contains("DESTINO_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La aplicación cambió de estado o el destino no corresponde al pago.",ex);
+        }
+        if(mensaje.contains("MONTO_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El importe supera el saldo disponible del pago o del destino.",ex);
+        }
+
+        // Revisión independiente 5.3.3: no revelar vouchers de terceros.
+        if(mensaje.contains("AUTOAPROBACION_DENEGADA|")) {
+            return new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Quien registró el comprobante no puede revisarlo.",ex);
+        }
+        if(mensaje.contains("VOUCHER_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "El comprobante no está disponible para revisión de cuotas.",ex);
+        }
+        if(mensaje.contains("REVISION_CERRADA|")
+                ||mensaje.contains("MONTO_NO_DISPONIBLE|")
+                ||mensaje.contains("CUOTA_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El comprobante ya fue revisado o la cuota cambió de estado. Actualice la bandeja.",ex);
+        }
+
+        // Errores funcionales del registro de cuotas (5.3.2).
+        // Los identificadores ajenos y los archivos inexistentes no se revelan.
+        if (mensaje.contains("CARGA_NO_DISPONIBLE|")
+                || mensaje.contains("ARCHIVO_NO_EXISTE|")) {
+            return new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No se encontró una carga o comprobante disponible para su usuario.", ex);
+        }
+        if (mensaje.contains("CARGA_EXPIRADA|")
+                || mensaje.contains("CUOTA_NO_DISPONIBLE|")
+                || mensaje.contains("PAGO_DUPLICADO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El comprobante no puede registrarse con su estado actual. Revise la cuota, fecha o número de operación.", ex);
+        }
+        if (mensaje.contains("IMPORTE_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El importe declarado supera el saldo real pendiente de la cuota.", ex);
         }
 
         if (mensaje.contains("VENTA_NO_DISPONIBLE|")

@@ -31,6 +31,16 @@ jobs:
         working-directory: ${{ matrix.app }}
         run: npm install
 
+      - name: TypeScript strict validation (Portal Cliente)
+        if: matrix.app == 'apps/portal-cliente'
+        working-directory: apps/portal-cliente
+        run: npx --no-install tsc --noEmit -p tsconfig.json
+
+      - name: Verify Portal Cliente integration wiring
+        if: matrix.app == 'apps/portal-cliente'
+        working-directory: apps/portal-cliente
+        run: node --test tests/portalIntegrationWiring.test.mjs
+
       - name: Build application
         working-directory: ${{ matrix.app }}
         env:
@@ -43,10 +53,30 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/securityAccess.test.cjs
 
+      - name: Verify real financial dashboards and JWT safeguards
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/finanzasReales.test.mjs
+
+      - name: Verify financial notification bell and alerts tab
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/alertasCampana.test.mjs
+
+      - name: Verify financial period and per-sale installment modal
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoPeriodoModal.test.mjs
+
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
         run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs
+
+      - name: Validate French financing and down-payment rules
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: npm run test:financing
 
   crm-frontend-tests:
     name: CRM frontend tests
@@ -114,6 +144,122 @@ jobs:
           test -d database/migrations || exit 1
           ls -la database/migrations/*.sql
           echo "All migrations found and valid."
+
+  financing-postgres-validation:
+    name: French Financing V3 - PostgreSQL 17
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: financiamiento_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: financiamiento_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d financiamiento_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract financing function from migration 73
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("database/migrations/73_financiamiento_inicial_total_frances_v2.sql").read_text()
+          start = src.index("CREATE OR REPLACE FUNCTION public.fn_crm_simular_frances_v3(")
+          end = src.index("\n-- Conserva validacion", start)
+          content = src[start:end].strip()
+          if not content.endswith("END $fn$;"):
+              raise SystemExit("La funcion de financiamiento no finaliza correctamente")
+          Path("/tmp/financiamiento_v3.sql").write_text(content + "\n")
+          PY
+
+      - name: Execute pure SQL financial tests on isolated Postgres
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: financiamiento_ci
+          PGDATABASE: financiamiento_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -f /tmp/financiamiento_v3.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_frances_v3_pg_test.sql
+
+      - name: Compile complete migration 73 against legacy procedure fixtures
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: financiamiento_ci
+          PGDATABASE: financiamiento_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/financiamiento_v1_procedures_smoke.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/73_financiamiento_inicial_total_frances_v2.sql
+          psql -v ON_ERROR_STOP=1 -f database/verification/73_financiamiento_inicial_total_v2_readonly.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_reserva_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/cronograma_v3_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/74_cronograma_cuotas_frances_v2.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/75_cronograma_guardas_integridad_v3.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/cronograma_frances_v2_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/saldo_cliente_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/76_financiamiento_saldo_cliente_confirmado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/78_saldo_validar_sobreaplicacion_pago_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/saldo_cliente_confirmado_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -c "GRANT SELECT,INSERT,UPDATE,DELETE ON public.pag_planes_pago,public.pag_cuotas TO anon,authenticated"
+          psql -v ON_ERROR_STOP=1 -c "GRANT SELECT ON public.pag_planes_pago,public.pag_cuotas TO sigi_app_user"
+          psql -v ON_ERROR_STOP=1 -c "CREATE POLICY \"Cliente lee sus propios planes de pago\" ON public.pag_planes_pago FOR SELECT USING (true)"
+          psql -v ON_ERROR_STOP=1 -c "CREATE POLICY \"Cliente lee sus propias cuotas\" ON public.pag_cuotas FOR SELECT USING (true)"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/77_financiamiento_bloqueo_acceso_directo_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/financiamiento_bloqueo_rls_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/79_financiamiento_estados_cuotas_confirmadas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/80_financiamiento_cronograma_planes_cerrados_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/estados_cuotas_confirmadas_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/alertas_cuotas_portal_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/81_financiamiento_alertas_cuotas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/82_financiamiento_alertas_titular_deduplicacion_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/alertas_cuotas_portal_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/rachas_resolutorias_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/83_financiamiento_revision_tres_cuotas_consecutivas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/rachas_resolutorias_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/vouchers_cuotas_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/84_vouchers_cuotas_bandeja_segura_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/vouchers_cuotas_bandeja_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/vouchers_cuotas_carga_v2_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/85_registro_voucher_cuotas_pendientes_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/vouchers_cuotas_carga_v2_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/vouchers_cuotas_revision_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/86_finanzas_revision_voucher_cuota_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/vouchers_cuotas_revision_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/imputaciones_confirmadas_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/87_finanzas_aplicacion_y_reversion_confirmados_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/88_finanzas_imputaciones_identity_auto_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/89_fin_aplicaciones_evidencia_privada_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/imputaciones_confirmadas_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/90_fin_conciliacion_integral_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/91_fin_conciliacion_revision_auditada_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/conciliacion_integral_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/92_fin_voucher_inicial_carga_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/93_fin_voucher_inicial_revision_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/inicial_financiada_integral_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/94_fin_vouchers_verificacion_mime_tamano_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/voucher_privado_consistencia_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/portal_lotes_contratos_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/95_portal_cliente_resumen_privado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/96_portal_cliente_lotes_contratos_privados_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_lotes_contratos_privados_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/97_portal_cliente_cronograma_privado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_cronograma_privado_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/98_portal_cliente_vouchers_privados_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_vouchers_privados_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/portal_documentos_alertas_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/99_portal_documentos_alertas_privadas_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_documentos_alertas_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/portal_integracion_end_to_end_546_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud

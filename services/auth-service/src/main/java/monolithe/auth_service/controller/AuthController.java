@@ -197,8 +197,7 @@ public class AuthController {
                         return ResponseEntity.ok(
                                         new ForgotPasswordResponse(
                                                         mensajeGenerico,
-                                                        enmascararCorreo(
-                                                                        resultado.correo())));
+                                                        enmascararCorreo(resultado.correo())));
                 }
 
                 return ResponseEntity.ok(

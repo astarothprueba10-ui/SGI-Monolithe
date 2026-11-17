@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { ApiError, authApi } from '../lib/apiClient';
+import { clearPortalSession } from '../lib/portalSession';
 import { BrandPanel } from '../components/BrandPanel';
 import { Logo } from '../components/Logo';
 import { TextField } from '../components/TextField';
@@ -366,6 +367,8 @@ export function ResetPassword() {
                 'Su contraseña ha sido cambiada con exito'
             );
 
+            // La recuperación revoca las sesiones; descartar también cualquier token local.
+            clearPortalSession();
             setStep('success');
 
         } catch (error) {

@@ -197,7 +197,7 @@ export function UsersAndRoles() {
     <div>
       <PageHeader
         title="Usuarios, roles y permisos"
-        description="Administra las cuentas de los trabajadores, asigna roles y define qué módulos y acciones puede usar cada rol."
+        description="Administra cuentas de trabajadores y clientes, asigna roles y controla los permisos de acceso."
         actions={
           tab === 'usuarios' ? (
             <AccountAdminGate permissions={['users.create', 'users.assign_role']}>

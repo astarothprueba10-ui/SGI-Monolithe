@@ -9,6 +9,7 @@ export type PeriodoCrmModo =
   | 'RANGO';
 
 interface Props {
+  descripcion?: string;
   modo: PeriodoCrmModo;
   onModoChange: (modo: PeriodoCrmModo) => void;
   fechaReferencia: string;
@@ -28,6 +29,7 @@ const MODOS: { valor: PeriodoCrmModo; nombre: string }[] = [
 ];
 
 export function CrmPeriodoGlobal({
+  descripcion = 'Actualiza tarjetas, tablas y gráficos.',
   modo,
   onModoChange,
   fechaReferencia,
@@ -50,7 +52,7 @@ export function CrmPeriodoGlobal({
               Período global
             </h3>
             <p className="text-xs text-brand-400">
-              Actualiza tarjetas, tablas y gráficos.
+              {descripcion}
             </p>
           </div>
         </div>

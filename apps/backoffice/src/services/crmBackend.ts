@@ -307,6 +307,278 @@ export interface CrmSeparacionVoucherItem {
   observaciones_validacion?: string | null;
 }
 
+export interface CrmPlanInicialDisponible {
+  id_venta:number;
+  codigo_venta:string;
+  id_plan_pago:number;
+  inicial_adicional_pactada:number;
+  reserva_ya_acreditada:number;
+  inicial_abonada:number;
+  saldo_pendiente:number;
+}
+export interface CrmOpcionesRegistroInicial {
+  items:CrmPlanInicialDisponible[];
+  metodos:CrmMetodoPagoDisponible[];
+}
+export interface CrmPrepararCargaInicialInput {
+  idVenta:number;
+  idPlanPago:number;
+  monto:number;
+  idMetodoPago:number;
+  fechaOperacion:string;
+  numeroOperacion:string|null;
+  nombreArchivo:string;
+  tipoMime:string;
+  tamanioBytes:number;
+}
+
+export interface CrmCuotaDisponibleParaPago {
+  id_venta:number;
+  codigo_venta:string;
+  id_plan_pago:number;
+  id_cuota:number;
+  numero_cuota:number;
+  fecha_vencimiento:string;
+  monto_cuota:number;
+  saldo_pendiente:number;
+}
+export interface CrmMetodoPagoDisponible {
+  idMetodoPago:number;
+  codigo:string;
+  nombre:string;
+}
+export interface CrmOpcionesRegistroCuota {
+  items:CrmCuotaDisponibleParaPago[];
+  metodos:CrmMetodoPagoDisponible[];
+}
+export interface CrmPrepararCargaCuotaInput {
+  idVenta:number;
+  idCuota:number;
+  monto:number;
+  idMetodoPago:number;
+  fechaOperacion:string;
+  numeroOperacion:string|null;
+  nombreArchivo:string;
+  tipoMime:string;
+  tamanioBytes:number;
+}
+export interface CrmCargaVoucherCuota {
+  idCarga:string;
+  bucket:'vouchers-ventas-private';
+  claveArchivo:string;
+  urlCarga:string;
+  tipoMime:string;
+  maxBytes:number;
+  expiresInSeconds:number;
+}
+export interface CrmRegistroVoucherCuota {
+  idPago:number;
+  idVoucher:number;
+  idCuota:number;
+  estadoPago:'REGISTRADO';
+  estadoVoucher:'PENDIENTE';
+  reutilizado:boolean;
+  saldoAplicado:0;
+}
+export type CrmEstadoConciliacion='TODOS'|'CON_ALERTA'|'SIN_ALERTA';
+export type CrmIncidenciaFinanciera=
+  'SOBREAPLICACION'|'APLICACION_NO_CONFIRMADA'
+  |'CONFIRMADO_SIN_VOUCHER_APROBADO'|'PENDIENTE_DE_REVISION'
+  |'PAGO_SIN_VOUCHER'|'EVIDENCIA_HISTORICA_NO_VERIFICABLE'
+  |'PAGO_CONFIRMADO_SIN_IMPUTAR'|'SIN_ALERTA';
+export interface CrmPagoConciliado {
+  id_pago:number;
+  codigo_pago:string;
+  id_venta:number|null;
+  id_plan_pago:number|null;
+  id_reserva:number|null;
+  monto:number;
+  aplicado:number;
+  saldo_no_aplicado:number;
+  concepto:'SEPARACION'|'CUOTA'|'INICIAL'|'SIN_DESTINO';
+  estado_pago:string;
+  estado_voucher:string|null;
+  codigo_voucher:string|null;
+  archivo_disponible:boolean;
+  tiene_alerta:boolean;
+  codigo_incidencia:CrmIncidenciaFinanciera;
+  estado_revision:'EN_REVISION'|'REVISADA'|null;
+  comentario_revision:string|null;
+  revisor:number|null;
+}
+export interface CrmAlertaPlanHistorico {
+  idPlanPago:number;
+  idVenta:number;
+  estadoPlan:string;
+  numeroCuotas:number;
+  numeroCuotasPactadas:number;
+  importeCuotas:number;
+  totalFinanciado:number;
+  diferencia:number;
+}
+export interface CrmConciliacionIntegral {
+  items:CrmPagoConciliado[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+  alertasPagina:number;
+  alertasFiltradas:number;
+  montoConfirmado:number;
+  confirmadoSinAplicar:number;
+  cargasHuerfanasSinArchivoCandidatas:number;
+  planesConDiferenciasHistoricas:CrmAlertaPlanHistorico[];
+  advertencia:string;
+}
+/** Cartera real: importes proceden del mismo cálculo que el Portal Cliente. */
+export interface CrmPlanCarteraReal {
+  idVenta:number; codigoVenta:string; fechaVenta:string; estadoFiltro:'ACTIVO'|'COMPLETADO'|'PENDIENTE_FIRMA'|'ANULADO'; idPlanPago:number; codigoPlan:string;
+  comprador:string; lote:string; proyecto:string; estadoVenta:string; estadoPlan:string;
+  numeroCuotas:number; precioVenta:number; capitalFinanciado:number; interesTotal:number;
+  inicialAdicional:number; reservaAplicada:number; tasaInteresPct:number;
+  cuotasExigibles:boolean; saldoFinanciamiento:number; inicialPorConciliar:number;
+  totalCuotas:number; fechaPrimeraCuota:string|null;
+}
+export interface CrmCuotaCarteraReal {
+  idVenta:number;codigoVenta:string;idPlanPago:number;comprador:string;
+  lote:string;proyecto:string;numero:number;fechaVencimiento:string;
+  montoCuota:number;capital:number;interes:number;abonadoConfirmado:number;
+  saldoCuota:number;estado:string;cuotaAtrasada:boolean;proxima7Dias:boolean;
+}
+export interface CrmCarteraReal {
+  fechaCorte:string; desde:string; hastaExclusivo:string;
+  fechaBase:'FECHA_VENTA'; saldoBase:'SALDO_ACTUAL';
+  vista:'PLANES'|'CUOTAS';pagina:number;tamano:number;
+  total:number;paginas:number;items:(CrmPlanCarteraReal|CrmCuotaCarteraReal)[];
+  filtros:{proyectos:string[];lotes:{codigo:string;proyecto:string}[]};
+  resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
+    saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
+}
+export interface CrmMovimientoFinanzasReal {
+  idPago:number;codigo:string;fechaOperacion:string;fechaConfirmacion:string|null;
+  monto:number;estado:string;tipo:'SEPARACION'|'FINANCIAMIENTO'|'VENTA'|'OTRO';
+  venta:string|null;referencia:string|null;comprobante:string|null;
+  estadoVoucher:string|null;montoAplicado:number;
+}
+export interface CrmMovimientosFinanzasReal {
+  pagina:number;tamano:number;total:number;paginas:number;
+  items:CrmMovimientoFinanzasReal[];
+  resumen:{confirmado:number;registrado:number;anulado:number;aplicado:number;
+    confirmadoSinImputarFinanciamiento:number};
+  meses:{mes:string;confirmado:number}[];
+}
+
+export interface CrmImputacionPendiente {
+  id_pago:number;
+  codigo_pago:string;
+  id_venta:number;
+  id_plan_pago:number;
+  codigo_venta:string;
+  monto_pago:number;
+  fecha_confirmacion:string;
+  cuota_preautorizada:number|null;
+  numero_cuota:number|null;
+  tipo_destino:'CUOTA'|'INICIAL';
+  saldo_pago:number;
+  saldo_destino:number;
+}
+export interface CrmImputacionHistorica {
+  id_aplicacion_pago:number;
+  id_pago:number;
+  codigo_pago:string;
+  id_plan_pago:number;
+  id_cuota:number|null;
+  tipo:'CUOTA'|'INICIAL';
+  monto:number;
+  id_actor:number;
+  fecha_registro:string;
+  observaciones:string|null;
+  activo:boolean;
+  fecha_anulacion:string|null;
+  id_usuario_anulacion:number|null;
+  motivo_anulacion:string|null;
+}
+export interface CrmImputacionesRespuesta {
+  items:CrmImputacionPendiente[];
+  historial:CrmImputacionHistorica[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+}
+export interface CrmImputacionResultado {
+  idAplicacion:number;
+  idPago:number;
+  tipo:'CUOTA'|'INICIAL';
+  idCuota?:number|null;
+  montoAplicado:number;
+  saldoPagoRestante?:number;
+  saldoDestinoRestante?:number;
+  reutilizado:boolean;
+  activo:boolean;
+}
+export interface CrmReversionAplicacionResultado {
+  idAplicacion:number;
+  idPago:number;
+  tipo:'CUOTA'|'INICIAL';
+  montoRevertido:number;
+  reutilizado:boolean;
+  activo:false;
+}
+
+export interface CrmRevisionVoucherCuotaInput {
+  aprobar:boolean;
+  motivo?:string|null;
+  observaciones?:string|null;
+}
+export interface CrmRevisionVoucherCuotaResultado {
+  idRevision:number;
+  idVoucher:number;
+  idPago:number;
+  idCuota:number;
+  estadoVoucher:'APROBADO'|'RECHAZADO';
+  estadoPago:'CONFIRMADO'|'ANULADO';
+  accion:'APROBAR'|'RECHAZAR';
+  reutilizado:boolean;
+  saldoAplicado:0;
+  resolucionAutomatica:false;
+}
+
+export interface CrmVoucherCuotaItem {
+  tipo_destino?:'CUOTA'|'INICIAL'|'HISTORICO';
+  id_voucher: number;
+  codigo_voucher: string;
+  estado_voucher: 'PENDIENTE'|'APROBADO'|'RECHAZADO';
+  nombre_estado_voucher: string;
+  id_pago: number;
+  codigo_pago: string;
+  id_venta: number;
+  id_plan_pago: number;
+  codigo_venta: string;
+  monto_pago: number;
+  estado_pago: 'REGISTRADO'|'CONFIRMADO'|'ANULADO';
+  metodo_pago: string;
+  numero_operacion?:string|null;
+  numero_version:number;
+  nombre_archivo:string;
+  tipo_mime?:string|null;
+  tamanio_bytes?:number|null;
+  fecha_carga:string;
+  fecha_validacion?:string|null;
+  motivo_rechazo?:string|null;
+  observaciones_validacion?:string|null;
+  nombre_cliente:string;
+  archivo_disponible:boolean;
+}
+
+export interface CrmVouchersCuotasResponse {
+  items:CrmVoucherCuotaItem[];
+  total:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+}
+
 export interface CrmSeparacionVouchersResponse {
   items: CrmSeparacionVoucherItem[];
   total: number;
@@ -366,6 +638,14 @@ export interface CrmCuotaCronograma {
   interes:number;
   cuota:number;
   estado:string;
+  estadoCalculado?:'PENDIENTE'|'PARCIAL'|'VENCIDA'|'PAGADA'|'ANULADA';
+  estadoRegistrado?:string;
+  estadoDifiereRegistro?:boolean;
+  abonadoConfirmado?:number;
+  saldoCuota?:number;
+  cuotaAtrasada?:boolean;
+  diasMora?:number;
+  proxima7Dias?:boolean;
   fechaPagoCompleto?:string|null;
 }
 export interface CrmCronogramaVenta {
@@ -375,11 +655,167 @@ export interface CrmCronogramaVenta {
   tipoCronograma:'REGISTRADO'|'PROYECTADO'|'SIN_PLAN'|'SIN_CUOTAS';
   numeroCuotas?:number;
   capitalFinanciado?:number;
+  interesTotal?:number;
+  totalCuotas?:number;
   fechaPrimeraCuota?:string|null;
   tasaAnualNominal?:number;
   advertencia?:string;
+  fechaCorte?:string;
+  fuenteEstados?:'APLICACIONES_CONFIRMADAS'|'SIN_CUOTAS_EXIGIBLES'|'HISTORICO_NO_EXIGIBLE';
+  cuotasPendientes?:number;
+  cuotasParciales?:number;
+  cuotasVencidas?:number;
+  cuotasPagadas?:number;
+  cuotasAnuladas?:number;
+  cuotasProximas?:number;
+  cuotasAtrasadas?:number;
+  montoVencido?:number;
+  montoProximo?:number;
+  estadosDiferentesRegistro?:number;
+  advertenciaEstados?:string|null;
   items:CrmCuotaCronograma[];
 }
+/** Señal administrativa de posibles tres cuotas consecutivas con deuda,
+ * no una declaración de resolución contractual. */
+export interface CrmCuotaRevisionLegal {
+  idCuota:number;
+  numeroCuota:number;
+  fechaVencimiento:string;
+  importeCuota:number;
+  abonadoConfirmado:number;
+  saldoPendiente:number;
+  estadoCuota:string;
+  diasMora:number;
+}
+
+export interface CrmRevisionResolutoria {
+  idVenta:number;
+  idPlanPago:number;
+  codigoVenta:string;
+  idCliente:number|null;
+  comprador:string|null;
+  desdeCuota:number;
+  hastaCuota:number;
+  cuotasConsecutivas:number;
+  saldoRacha:number;
+  fechaPrimerVencimiento:string;
+  fechaUltimoVencimiento:string;
+  cuotas:CrmCuotaRevisionLegal[];
+  requiereRevision:true;
+  resolucionAutomatica:false;
+  criterio:'TRES_CUOTAS_CONSECUTIVAS_VENCIDAS_CON_SALDO';
+}
+
+export interface CrmRevisionesResolutorias {
+  fechaCorte:string;
+  pagina:number;
+  tamano:number;
+  total:number;
+  paginas:number;
+  montoEnRevision:number;
+  items:CrmRevisionResolutoria[];
+  resolucionAutomatica:false;
+  advertencia:string;
+}
+
+export type CrmTipoAlertaCuota = 'TODAS'|'CUOTA_PROXIMA'|'CUOTA_VENCIDA';
+
+export interface CrmAlertaCuota {
+  idCuota:number;
+  idPlanPago:number;
+  idVenta:number;
+  codigoVenta:string;
+  idCliente:number|null;
+  comprador:string|null;
+  numeroCuota:number;
+  fechaVencimiento:string;
+  montoCuota:number;
+  abonadoConfirmado:number;
+  saldoCuota:number;
+  estadoCuota:'PENDIENTE'|'PARCIAL'|'VENCIDA';
+  tipoAlerta:Exclude<CrmTipoAlertaCuota,'TODAS'>;
+  diasMora:number;
+  diasParaVencer:number;
+}
+
+export interface CrmAlertasCuotas {
+  fechaCorte:string;
+  tipo:CrmTipoAlertaCuota;
+  pagina:number;
+  tamano:number;
+  total:number;
+  paginas:number;
+  proximas:number;
+  vencidas:number;
+  montoProximo:number;
+  montoVencido:number;
+  items:CrmAlertaCuota[];
+}
+
+export interface CrmAvisosPortalPreparados {
+  fechaCorte:string;
+  procesados:number;
+  creados:number;
+  deduplicados:number;
+  desactivados:number;
+  canal:'PORTAL';
+  enviosExternos:false;
+}
+
+export interface CrmSaldoCuota {
+  idCuota: number;
+  numero: number;
+  fechaVencimiento: string;
+  capital: number;
+  interes: number;
+  montoCuota: number;
+  abonadoConfirmado: number;
+  saldoCuota: number;
+  estadoRegistrado: string;
+}
+
+/** Cifras contables de venta, construidas solo desde aplicaciones confirmadas. */
+export interface CrmSaldoVenta {
+  idVenta: number;
+  codigoVenta: string;
+  idCliente: number | null;
+  modalidad: 'FINANCIADA' | 'CONTADO';
+  tipoSaldo: 'FINANCIADA' | 'NO_FINANCIADA' | 'SIN_PLAN';
+  estadoPlan?: 'ACTIVO' | 'PENDIENTE' | 'ANULADO' | 'COMPLETADO' | string;
+  numeroVersion?: number;
+  idPlanPago?: number;
+  cuotasExigibles?: boolean;
+  inicialAdicionalPactada?: number;
+  reservaAplicada?: number;
+  inicialTotalPactada?: number;
+  inicialAbonadaConfirmada?: number;
+  inicialSinAplicacionConfirmada?: number;
+  capitalFinanciado?: number;
+  interesTotal?: number;
+  totalPlanCuotas?: number;
+  abonadoCuotasConfirmado?: number;
+  saldoFinanciamiento?: number;
+  montoCuotasRegistradas?: number;
+  saldoCuotasRegistradas?: number;
+  diferenciaCronograma?: number;
+  pagosConfirmadosSinAplicar?: number;
+  numeroCuotasRegistradas?: number;
+  numeroCuotasPactadas?: number;
+  alertasConciliacion?: string[];
+  cuotas: CrmSaldoCuota[];
+}
+
+export interface CrmSaldoCliente {
+  idCliente: number;
+  numeroVentas: number;
+  saldoFinanciamientoActivo: number;
+  saldoFinanciamientoPendienteFirma: number;
+  inicialSinAplicacionConfirmada: number;
+  abonadoCuotasConfirmado: number;
+  advertencia: string;
+  ventas: CrmSaldoVenta[];
+}
+
 export interface CrmDetalleVenta {
   idVenta: number;
   codigoVenta: string;
@@ -447,6 +883,8 @@ export interface CrmReservaVigenteVenta {
   idProyecto: number;
   idEtapa: number;
   montoReserva: number;
+  /** Crédito financiero confirmado y aprobado; puede ser cero si la reserva está pendiente. */
+  montoReservaAplicable?: number;
   fechaVencimiento: string;
 }
 
@@ -479,6 +917,8 @@ export interface CrmDatosPagoVenta {
 
 export interface CrmDatosCompradorVenta {
   idProspecto: number;
+  /** Confirmacion expresa de cotejo documental por el asesor durante la venta. */
+  identidadVerificada: boolean;
   nombres: string;
   apellidoPaterno: string;
   apellidoMaterno: string;
@@ -526,6 +966,9 @@ export interface CrmSaleValidationResult {
   modalidad: 'CONTADO' | 'FINANCIADA';
   precioVigente: number;
   montoReservaAplicable: number;
+  montoReservaNominal?: number;
+  montoInicialTotal?: number | null;
+  montoInicialAdicional?: number | null;
   saldoContado: number;
   planFrances: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number; cuotaMensual: number } | null;
   idMoneda: number;
@@ -1125,10 +1568,87 @@ export const crmBackend = {
       })}`
     ),
 
+  /** Consulta de posibles causales, requiere permiso legal/financiero y cartera. */
+  listarRevisionesResolutorias: (params:{pagina?:number;tamano?:number}={}) => {
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    if(!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+      ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Paginación de revisión contractual inválida.');
+    return coreApi.get<CrmRevisionesResolutorias>(
+      `/crm/financiamiento/clausula-resolutoria/revision${qs({pagina,tamano})}`
+    );
+  },
+
+  /** FINANCIAMIENTO: cartera por actor; no aceptar IDs arbitrarios del frontend. */
+  listarCarteraFinancieraReal: (params: {
+    vista:'PLANES'|'CUOTAS';busqueda?:string;pagina?:number;tamano?:number;
+    desde:string;hastaExclusivo:string;
+    proyecto?:string;lote?:string;estado?:string;
+    fechaTablaDesde?:string;fechaTablaHasta?:string;
+  }) => coreApi.get<CrmCarteraReal>(
+    `/crm/financiamiento/cartera${qs({
+      vista:params.vista,busqueda:params.busqueda?.trim(),
+      pagina:params.pagina??1,tamano:params.tamano??20,
+      desde:params.desde,hastaExclusivo:params.hastaExclusivo,
+      proyecto:params.proyecto,lote:params.lote,estado:params.estado,
+      fechaTablaDesde:params.fechaTablaDesde,fechaTablaHasta:params.fechaTablaHasta
+    })}`
+  ),
+
+  /** FINANZAS: pagos realmente registrados, sin movimientos ficticios. */
+  listarMovimientosFinanzasReal: (params: {
+    busqueda?:string;pagina?:number;tamano?:number;
+  }={}) => coreApi.get<CrmMovimientosFinanzasReal>(
+    `/crm/finanzas/movimientos${qs({
+      busqueda:params.busqueda?.trim(),pagina:params.pagina??1,
+      tamano:params.tamano??20
+    })}`
+  ),
+
+  /** Cartera autorizada: alertas reales, calculadas sin usar mocks ni RLS del navegador. */
+  listarAlertasCuotas: (params: {
+    tipo?:CrmTipoAlertaCuota;pagina?:number;tamano?:number;
+  }={}) => {
+    const tipo=params.tipo??'TODAS';
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    if (!['TODAS','CUOTA_PROXIMA','CUOTA_VENCIDA'].includes(tipo)
+      || !Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+      || !Number.isSafeInteger(tamano)||tamano<1||tamano>100) {
+      throw new Error('Parámetros de alerta inválidos.');
+    }
+    return coreApi.get<CrmAlertasCuotas>(
+      `/crm/financiamiento/alertas${qs({tipo,pagina,tamano})}`
+    );
+  },
+
+  /** Requiere financing.approve en Core y SQL; no crea not_envios ni emails. */
+  prepararAvisosPortal: (limite=100) => {
+    if(!Number.isSafeInteger(limite)||limite<1||limite>500)
+      throw new Error('Límite de avisos inválido.');
+    return coreApi.post<CrmAvisosPortalPreparados>(
+      `/crm/financiamiento/alertas/portal/preparar${qs({limite})}`,
+      {}
+    );
+  },
+
   obtenerCronogramaVenta: (idVenta:number) => {
     if (!Number.isSafeInteger(idVenta) || idVenta<=0)
       throw new Error('Identificador de venta inválido.');
     return coreApi.get<CrmCronogramaVenta>(`/crm/ventas/${idVenta}/cronograma`);
+  },
+
+  obtenerSaldoVenta: (idVenta: number) => {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0)
+      throw new Error('Identificador de venta inválido.');
+    return coreApi.get<CrmSaldoVenta>(`/crm/ventas/${idVenta}/saldo`);
+  },
+
+  obtenerSaldoCliente: (idCliente: number) => {
+    if (!Number.isSafeInteger(idCliente) || idCliente <= 0)
+      throw new Error('Identificador de cliente inválido.');
+    return coreApi.get<CrmSaldoCliente>(`/crm/clientes/${idCliente}/saldo`);
   },
 
   obtenerDetalleVenta: (idVenta: number) => {
@@ -1213,6 +1733,193 @@ export const crmBackend = {
         tamano: params?.tamano ?? 20
       })}`
     ),
+
+  /** Inicial adicional de un plan ya firmado (reserva informativa separada). */
+  opcionesRegistroVoucherInicial:(busqueda='',limite=60)=>{
+    if(busqueda.trim().length>120||!Number.isSafeInteger(limite)
+      ||limite<1||limite>100)throw new Error('Filtro de iniciales inválido.');
+    return coreApi.get<CrmOpcionesRegistroInicial>(
+      `/crm/finanzas/vouchers/inicial/opciones${qs({busqueda:busqueda.trim(),limite})}`);
+  },
+
+  prepararCargaVoucherInicial:(datos:CrmPrepararCargaInicialInput)=>
+    coreApi.post<CrmCargaVoucherCuota>(
+      '/crm/finanzas/vouchers/inicial/preparar-carga',datos),
+
+  registrarVoucherInicialPendiente:(idCarga:string)=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
+      throw new Error('Referencia de carga de inicial inválida.');
+    return coreApi.post<CrmRegistroVoucherCuota>(
+      '/crm/finanzas/vouchers/inicial/registrar',{idCarga});
+  },
+
+  /** Retorna únicamente cuotas exigibles de contratos firmados y medios activos. */
+  opcionesRegistroVoucherCuota: (busqueda='',limite=60) => {
+    if(busqueda.trim().length>120
+        ||!Number.isSafeInteger(limite)||limite<1||limite>100)
+      throw new Error('Búsqueda de cuotas inválida.');
+    return coreApi.get<CrmOpcionesRegistroCuota>(
+      `/crm/finanzas/vouchers/cuotas/opciones${qs({busqueda:busqueda.trim(),limite})}`
+    );
+  },
+
+  /** Preautorización vinculada por el servidor al actor y la cuota. */
+  prepararCargaVoucherCuota: (datos:CrmPrepararCargaCuotaInput) =>
+    coreApi.post<CrmCargaVoucherCuota>(
+      '/crm/finanzas/vouchers/cuotas/preparar-carga',datos
+    ),
+
+  /** Carga un único archivo de la preparación anterior en Storage privado. */
+  subirArchivoVoucherCuota: async(carga:CrmCargaVoucherCuota,archivo:File) => {
+    if(!archivo||archivo.size<1||archivo.size>5242880
+        ||archivo.name.trim().length<1||archivo.name.length>180
+        ||!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)
+        ||carga.bucket!=='vouchers-ventas-private'
+        ||carga.tipoMime!==archivo.type
+        ||carga.maxBytes<archivo.size) {
+      throw new Error('Archivo no válido: PDF, JPG, PNG o WebP hasta 5 MiB.');
+    }
+    const enlace=new URL(carga.urlCarga);
+    if(enlace.protocol!=='https:') throw new Error('Enlace de carga no seguro.');
+    const token=enlace.searchParams.get('token');
+    if(!token)throw new Error('No se recibió token de carga válido.');
+    const {error}=await supabase.storage.from(carga.bucket)
+      .uploadToSignedUrl(carga.claveArchivo,token,archivo,{
+        contentType:carga.tipoMime,upsert:false
+      });
+    if(error)throw new Error('No se pudo subir el comprobante: '+error.message);
+  },
+
+  /** Reintento seguro: el mismo idCarga devuelve el mismo pago pendiente. */
+  registrarVoucherCuotaPendiente:(idCarga:string)=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
+      throw new Error('Identificador de carga incorrecto.');
+    return coreApi.post<CrmRegistroVoucherCuota>(
+      '/crm/finanzas/vouchers/cuotas/registrar',{idCarga}
+    );
+  },
+
+  /** Conciliación sin efectos contables, filtrada y paginada en PostgreSQL. */
+  conciliacionIntegral:(params?:{
+    estado?:CrmEstadoConciliacion;busqueda?:string;pagina?:number;tamano?:number;
+  })=>{
+    const estado=params?.estado??'TODOS';
+    const busqueda=(params?.busqueda??'').trim();
+    const pagina=params?.pagina??1;
+    const tamano=params?.tamano??20;
+    if(!['TODOS','CON_ALERTA','SIN_ALERTA'].includes(estado)
+       ||busqueda.length>120||!Number.isSafeInteger(pagina)||pagina<1
+       ||pagina>10000||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Filtros de conciliación inválidos.');
+    return coreApi.get<CrmConciliacionIntegral>(
+      `/crm/finanzas/conciliacion-integral${qs({estado,busqueda,pagina,tamano})}`
+    );
+  },
+
+  /** Seguimiento humano auditable; REVISADA nunca supone RESUELTA. */
+  marcarRevisionConciliacion:(pago:number,req:{
+    codigoIncidencia:CrmIncidenciaFinanciera;
+    estado:'EN_REVISION'|'REVISADA';
+    comentario:string;
+  })=>{
+    if(!Number.isSafeInteger(pago)||pago<=0
+       ||req.codigoIncidencia==='SIN_ALERTA'
+       ||!['EN_REVISION','REVISADA'].includes(req.estado)
+       ||req.comentario.trim().length<10||req.comentario.trim().length>500)
+      throw new Error('Comentario, incidencia o estado de revisión inválidos.');
+    return coreApi.put<{
+      idRevision:number;idPago:number;codigo:string;estado:string;
+      requiereVerificacion:boolean;
+    }>(
+      `/crm/finanzas/conciliacion-integral/pagos/${pago}/revision`,
+      {...req,comentario:req.comentario.trim()}
+    );
+  },
+
+  /** Solo dinero confirmado y aprobaciones bancarias; sin saldos de prueba. */
+  listarImputaciones:(pagina=1,tamano=20)=>{
+    if(!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+       ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100)
+      throw new Error('Paginación de imputaciones inválida.');
+    return coreApi.get<CrmImputacionesRespuesta>(
+      `/crm/finanzas/imputaciones${qs({pagina,tamano})}`
+    );
+  },
+
+  aplicarPagoConfirmado:(req:{
+    idSolicitud:string;idPago:number;tipo:'CUOTA'|'INICIAL';
+    idCuota:number|null;monto:number;observaciones:string|null;
+  })=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.idSolicitud)
+      ||!Number.isSafeInteger(req.idPago)||req.idPago<=0
+      ||!['CUOTA','INICIAL'].includes(req.tipo)
+      ||(req.tipo==='CUOTA'&&(!Number.isSafeInteger(req.idCuota)||Number(req.idCuota)<=0))
+      ||(req.tipo==='INICIAL'&&req.idCuota!==null)
+      ||!Number.isFinite(req.monto)||req.monto<=0
+      ||Math.abs(req.monto*100-Math.round(req.monto*100))>1e-7
+      ||(req.observaciones?.length??0)>255)
+      throw new Error('Importe, cuota o solicitud de aplicación inválidos.');
+    return coreApi.post<CrmImputacionResultado>(
+      '/crm/finanzas/imputaciones',req);
+  },
+
+  revertirAplicacion:(idAplicacion:number,motivo:string)=>{
+    if(!Number.isSafeInteger(idAplicacion)||idAplicacion<=0
+      ||motivo.trim().length<5||motivo.trim().length>255)
+      throw new Error('Debe justificar la reversión con al menos 5 caracteres.');
+    return coreApi.put<CrmReversionAplicacionResultado>(
+      `/crm/finanzas/imputaciones/${idAplicacion}/reversion`,
+      {motivo:motivo.trim()}
+    );
+  },
+
+  /** Revisión humana independiente: NO aplica abonos a las cuotas. */
+  revisarVoucherCuota:(
+    idVoucher:number,decision:CrmRevisionVoucherCuotaInput
+  )=>{
+    if(!Number.isSafeInteger(idVoucher)||idVoucher<=0||typeof decision.aprobar!=='boolean')
+      throw new Error('Comprobante o decisión inválidos.');
+    if(decision.aprobar&&decision.motivo?.trim())
+      throw new Error('La aprobación no puede incluir motivo de rechazo.');
+    if(!decision.aprobar&&(decision.motivo?.trim().length??0)<5)
+      throw new Error('Indique un motivo de rechazo de al menos 5 caracteres.');
+    if((decision.motivo?.length??0)>255||(decision.observaciones?.length??0)>500)
+      throw new Error('La longitud del motivo u observaciones excede el límite.');
+    return coreApi.put<CrmRevisionVoucherCuotaResultado>(
+      `/crm/finanzas/vouchers/cuotas/${idVoucher}/decision`,{
+        aprobar:decision.aprobar,
+        motivo:decision.aprobar?null:decision.motivo?.trim()??null,
+        observaciones:decision.observaciones?.trim()||null
+      }
+    );
+  },
+
+  /** Solo Finanzas: comprobantes de cuotas, nunca separaciones ni mocks. */
+  listarVouchersCuotas: (params:{
+    estado?:'TODOS'|'PENDIENTE'|'APROBADO'|'RECHAZADO';
+    busqueda?:string; pagina?:number; tamano?:number;
+  }={}) => {
+    const estado=params.estado??'TODOS';
+    const pagina=params.pagina??1;
+    const tamano=params.tamano??20;
+    const busqueda=params.busqueda?.trim()??'';
+    if(!['TODOS','PENDIENTE','APROBADO','RECHAZADO'].includes(estado)
+       ||!Number.isSafeInteger(pagina)||pagina<1||pagina>10000
+       ||!Number.isSafeInteger(tamano)||tamano<1||tamano>100
+       ||busqueda.length>120) throw new Error('Filtros de vouchers inválidos.');
+    return coreApi.get<CrmVouchersCuotasResponse>(
+      `/crm/finanzas/vouchers/cuotas${qs({estado,busqueda,pagina,tamano})}`
+    );
+  },
+
+  /** URL firmada, únicamente si el archivo está presente en Storage privado. */
+  prepararLecturaVoucherCuota:(idVoucher:number)=>{
+    if(!Number.isSafeInteger(idVoucher)||idVoucher<=0)
+      throw new Error('Identificador de voucher inválido.');
+    return coreApi.get<CrmVoucherReadUrl>(
+      `/crm/finanzas/vouchers/cuotas/${idVoucher}/url-firmada`
+    );
+  },
 
   listarVouchersSeparacion: (params?: {
     estado?: string;

@@ -143,15 +143,32 @@ class UserManagementServiceCreateUserTest {
     }
 
     @Test
-    void rechazaRolProtegidoAntesDeCrearCuenta() throws Exception {
+    void rolClientePuedeSerAsignadoAunqueNoSeaRolInternoDelegable() throws Exception {
         autenticar("ROLE_ADMINISTRADOR", "users.create", "users.assign_role");
         contextoPersona("[\"CLIENTE\"]", true, true);
         contextoRoles("[{\"codigo\":\"CLIENTE\",\"activo\":true,\"asignableRrhh\":false}]");
+        when(repository.asignarRol(ACTOR_ID, USER_ID, "CLIENTE"))
+                .thenReturn(new SecurityOperationResult("ASIGNADO", "Asignado"));
 
         CreatedUserResult resultado = service.crearUsuario(ACTOR_ID, PERSONA_ID, "123456", List.of("CLIENTE"));
 
-        assertEquals("ROL_NO_AUTORIZADO", resultado.estado());
-        verify(repository, never()).crearUsuario(any(), any(), any(), any());
+        assertEquals("CREADO", resultado.estado());
+        verify(repository).crearUsuario(any(), any(), any(), any());
+        verify(repository).asignarRol(ACTOR_ID, USER_ID, "CLIENTE");
+    }
+
+    @Test
+    void rrhhPuedeCrearCuentaClienteSinAccederARolesInternosProtegidos() throws Exception {
+        autenticar("ROLE_RRHH");
+        contextoPersona("[\"CLIENTE\"]", true, false);
+        contextoRoles("[{\"codigo\":\"CLIENTE\",\"activo\":true,\"asignableRrhh\":false}]");
+        when(repository.asignarRol(ACTOR_ID, USER_ID, "CLIENTE"))
+                .thenReturn(new SecurityOperationResult("ASIGNADO", "Asignado"));
+
+        CreatedUserResult resultado = service.crearUsuario(ACTOR_ID, PERSONA_ID, "123456", List.of("CLIENTE"));
+
+        assertEquals("CREADO", resultado.estado());
+        verify(repository).asignarRol(ACTOR_ID, USER_ID, "CLIENTE");
     }
 
     @Test

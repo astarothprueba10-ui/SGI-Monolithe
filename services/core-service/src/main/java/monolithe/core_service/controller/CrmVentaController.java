@@ -13,6 +13,10 @@ import monolithe.core_service.dto.ConfirmarFirmaContratoRequest;
 import monolithe.core_service.dto.RegistrarSeparacionCrmRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherSeparacionRequest;
 import monolithe.core_service.dto.PrepararCargaVoucherVentaRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest;
+import monolithe.core_service.dto.PrepararCargaVoucherInicialRequest;
+import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
+import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
@@ -173,6 +177,178 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        /** Inicial adicional: no reutiliza ni vuelve a acreditar reserva S/500. */
+        @GetMapping("/finanzas/vouchers/inicial/opciones")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> opcionesRegistroVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required=false) String busqueda,
+            @RequestParam(defaultValue="60") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.opcionesRegistroVoucherInicial(
+                    obtenerActor(jwt),busqueda,limite));
+        }
+
+        /** Prepara objeto Storage para la inicial, aún sin pago confirmado. */
+        @PostMapping("/finanzas/vouchers/inicial/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody PrepararCargaVoucherInicialRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(separacionStorageService.prepararCargaInicial(
+                    obtenerActor(jwt),request));
+        }
+
+        /** Voucher PENDIENTE de inicial; el revisor sigue siendo otra persona. */
+        @PostMapping("/finanzas/vouchers/inicial/registrar")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> registrarVoucherInicial(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody RegistrarVoucherCuotaPendienteRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.registrarVoucherInicialPendiente(
+                    obtenerActor(jwt),request.idCarga()));
+        }
+
+        /** Búsqueda controlada de cuotas y métodos de pago, sólo Finanzas. */
+        @GetMapping("/finanzas/vouchers/cuotas/opciones")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> opcionesRegistroVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required=false) String busqueda,
+                @RequestParam(defaultValue="60") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.opcionesRegistroVoucherCuota(
+                            obtenerActor(jwt),busqueda,limite));
+        }
+
+        /** Emite URL de carga firmada para venta/cuota/monto validados.
+         * No registra un pago ni afecta saldos en este paso.
+         */
+        @PostMapping("/finanzas/vouchers/cuotas/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararCargaVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody PrepararCargaVoucherCuotaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(separacionStorageService.prepararCargaCuota(
+                            obtenerActor(jwt),request));
+        }
+
+        /** Finaliza carga real y registra pago REGISTRADO/voucher PENDIENTE.
+         * La cuota no se abona antes de la confirmación por Finanzas.
+         */
+        @PostMapping("/finanzas/vouchers/cuotas/registrar")
+        @PreAuthorize("hasAuthority('finance.create')")
+        public ResponseEntity<JsonNode> registrarVoucherCuotaPendiente(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody RegistrarVoucherCuotaPendienteRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.registrarVoucherCuotaPendiente(
+                            obtenerActor(jwt),request.idCarga()));
+        }
+
+        /** Solo Finanzas: no mezclar comprobantes de cuotas con separaciones. */
+        @GetMapping("/finanzas/vouchers/cuotas")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarVouchersCuotas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="TODOS") String estado,
+                @RequestParam(required=false) String busqueda,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarVouchersCuotas(
+                            obtenerActor(jwt),estado,busqueda,pagina,tamano));
+        }
+
+        /** Conciliación integral: los indicadores no alteran la contabilidad. */
+        @GetMapping("/finanzas/conciliacion-integral")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> conciliacionIntegral(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue="TODOS") String estado,
+            @RequestParam(required=false) String busqueda,
+            @RequestParam(defaultValue="1") Integer pagina,
+            @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.conciliacionFinanciera(
+                    obtenerActor(jwt),estado,busqueda,pagina,tamano));
+        }
+
+        /** Seguimiento auditado de incidencias. No declara un pago conciliado. */
+        @PutMapping("/finanzas/conciliacion-integral/pagos/{idPago}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> marcarConciliacion(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long idPago,
+            @Valid @RequestBody monolithe.core_service.dto.MarcarConciliacionRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.marcarRevisionConciliacion(obtenerActor(jwt),idPago,request));
+        }
+
+        /** Lista pagos CONFIRMADOS pendientes de imputar y auditados.
+         * No da acceso a otras carteras desde el navegador.
+         */
+        @GetMapping("/finanzas/imputaciones")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarImputacionesFinancieras(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarImputacionesFinancieras(
+                            obtenerActor(jwt),pagina,tamano));
+        }
+
+        /** Abono a la cuota o inicial pactada, solo si el pago fue confirmado. */
+        @PostMapping("/finanzas/imputaciones")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> aplicarPagoConfirmado(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.AplicarPagoConfirmadoRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.aplicarPagoConfirmado(obtenerActor(jwt),request));
+        }
+
+        /** Anulación lógica, con motivo, sin eliminar el asiento original. */
+        @PutMapping("/finanzas/imputaciones/{idAplicacion}/reversion")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revertirAplicacionPago(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idAplicacion,
+                @Valid @RequestBody monolithe.core_service.dto.RevertirAplicacionPagoRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revertirAplicacionPago(
+                            obtenerActor(jwt),idAplicacion,request));
+        }
+
+        /** Solo Finanzas: revisión humana independiente, auditada y sin
+         * imputación de saldos; el registrador nunca se autoaprueba.
+         */
+        @PutMapping("/finanzas/vouchers/cuotas/{idVoucher}/decision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idVoucher,
+                @Valid @RequestBody monolithe.core_service.dto.RevisarVoucherCuotaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarVoucherCuota(
+                            obtenerActor(jwt),idVoucher,request));
+        }
+
+        /** Solo URLs temporales verificadas en Storage privado; sin rutas públicas. */
+        @GetMapping("/finanzas/vouchers/cuotas/{idVoucher}/url-firmada")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerVoucherCuota(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idVoucher) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(separacionStorageService.prepararLecturaVoucherCuota(
+                            obtenerActor(jwt),idVoucher));
+        }
+
         @GetMapping("/separaciones/vouchers")
         @PreAuthorize("hasAuthority('finance.view')")
         public JsonNode listarVouchersSeparacion(
@@ -294,6 +470,94 @@ public class CrmVentaController {
                 @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta) {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(service.cronogramaVenta(obtenerActor(jwt),idVenta));
+        }
+
+            /** Solo JWT con financing.view y sales.view; procedimientos comprueban cartera. */
+        @GetMapping("/financiamiento/cartera")
+        @PreAuthorize("hasAuthority('financing.view') and hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> carteraFinanciera(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "PLANES") String vista,
+                @RequestParam(defaultValue = "") String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano,
+                @RequestParam(required = true) String desde,
+                @RequestParam(required = true) String hastaExclusivo,
+                @RequestParam(defaultValue = "") String proyecto,
+                @RequestParam(defaultValue = "") String lote,
+                @RequestParam(defaultValue = "") String estado,
+                @RequestParam(required = false) String fechaTablaDesde,
+                @RequestParam(required = false) String fechaTablaHasta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.carteraFinancieraReal(obtenerActor(jwt),vista,busqueda,pagina,tamano,
+                            desde,hastaExclusivo,proyecto,lote,estado,fechaTablaDesde,fechaTablaHasta));
+        }
+
+        /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
+        @GetMapping("/finanzas/movimientos")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> movimientosFinanzas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "") String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.movimientosFinancierosReales(obtenerActor(jwt),busqueda,pagina,tamano));
+        }
+
+    /** Alerta dinámica de cuotas: sin información fuera de la cartera del JWT. */
+        @GetMapping("/financiamiento/alertas")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> alertasCuotas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "TODAS") String tipo,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.alertasCuotas(obtenerActor(jwt), tipo, pagina, tamano));
+        }
+
+        /** Posible causal de tres cuotas consecutivas; solo revisión sin resolver contrato. */
+        @GetMapping("/financiamiento/clausula-resolutoria/revision")
+        @PreAuthorize("hasAuthority('sales.view') and ("
+                + "hasAuthority('sales.legal.review') or "
+                + "hasAuthority('sales.annul') or "
+                + "hasAuthority('financing.approve'))")
+        public ResponseEntity<JsonNode> revisarTresCuotasConsecutivas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarTresCuotasConsecutivas(
+                            obtenerActor(jwt),pagina,tamano));
+        }
+
+        /** Operación explícita para avisos internos; NO envía correo. */
+        @PostMapping("/financiamiento/alertas/portal/preparar")
+        @PreAuthorize("hasAuthority('financing.approve')")
+        public ResponseEntity<JsonNode> prepararAvisosCuotasPortal(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue = "100") Integer limite) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.prepararAvisosCuotasPortal(obtenerActor(jwt), limite));
+        }
+
+        /** Saldo registrado por venta: aplicaciones confirmadas, no comprobantes pendientes. */
+        @GetMapping("/ventas/{idVenta}/saldo")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> saldoVenta(
+                @AuthenticationPrincipal Jwt jwt, @PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.saldoVenta(obtenerActor(jwt), idVenta));
+        }
+
+        /** Consolidado por cliente titular, únicamente de ventas visibles al usuario. */
+        @GetMapping("/clientes/{idCliente}/saldo")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> saldoCliente(
+                @AuthenticationPrincipal Jwt jwt, @PathVariable Long idCliente) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.saldoCliente(obtenerActor(jwt), idCliente));
         }
 
         @GetMapping("/ventas/{idVenta}/detalle")

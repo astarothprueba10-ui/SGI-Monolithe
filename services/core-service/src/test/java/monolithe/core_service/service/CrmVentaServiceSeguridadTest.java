@@ -59,6 +59,292 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void preautorizacionYRegistroCuotaSoloLlamanAlSqlProtegido() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+          2016L,120161L,new BigDecimal("40.00"),1,
+          java.time.LocalDate.of(2026,11,11),"OP-CI-1","voucher.pdf",
+          "application/pdf",1200L);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idCarga\":\"11111111-2222-3333-4444-555555555555\"}");
+        var r=service.prepararCargaVoucherCuota(5L,req);
+        assertEquals("11111111-2222-3333-4444-555555555555",
+          r.path("idCarga").asString());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_carga_voucher_cuota_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("UPDATE PUBLIC.PAG_CUOTAS"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idPago\":123,\"idVoucher\":124,\"saldoAplicado\":0,\"reutilizado\":false}");
+        var pagado=service.registrarVoucherCuotaPendiente(5L,
+          java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"));
+        assertEquals(0,pagado.path("saldoAplicado").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_registrar_voucher_cuota_pendiente_v1"));
+    }
+
+    @Test
+    void registroCuotaValidaActorImportesYReferenciasAntesDeSql() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+          2L,37L,new BigDecimal("150.00"),6,
+          java.time.LocalDate.of(2026,11,11),null,"abono.pdf",
+          "application/pdf",800L);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(null,req)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+              2L,37L,new BigDecimal("150.00"),6,req.fechaOperacion(),
+              null,"abono.pdf","application/pdf",5242881L))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherCuota(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherCuotaRequest(
+              2L,37L,new BigDecimal("0.001"),6,req.fechaOperacion(),
+              null,"abono.pdf","application/pdf",800L))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherCuotaPendiente(5L,null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherCuotaPendiente(null,
+              java.util.UUID.randomUUID())).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void revisionVoucherCuotaConfirmaPagoSinImputarYUsaSqlProtegido() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idRevision\":1,\"estadoVoucher\":\"APROBADO\","
+                + "\"estadoPago\":\"CONFIRMADO\",\"saldoAplicado\":0,"
+                + "\"reutilizado\":false}");
+        var solicitud=new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+          true,null,"Operación bancaria verificada");
+        var resultado=service.revisarVoucherCuota(15L,105L,solicitud);
+        assertEquals("CONFIRMADO",resultado.path("estadoPago").asString());
+        assertEquals("APROBADO",resultado.path("estadoVoucher").asString());
+        assertEquals(0,resultado.path("saldoAplicado").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_revisar_voucher_financiamiento_v2"));
+        assertFalse(sql.getValue().contains("UPDATE public.pag_cuotas"));
+    }
+
+    @Test
+    void revisionVoucherCuotaExigeMotivoYActorAntesDeAccederABase() {
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(null,3L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              false,"Motivo suficiente",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,0L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              true,null,null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              false,"No",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              true,"No es necesario",null))).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarVoucherCuota(15L,2L,
+            new monolithe.core_service.dto.RevisarVoucherCuotaRequest(
+              null,null,null))).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void pagosImputablesSeConsultanConActorYProcedimientoProtegido() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"items\":[],\"historial\":[],\"total\":0}");
+        var out=service.listarImputacionesFinancieras(5L,1,20);
+        assertEquals(0,out.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_imputaciones_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.listarImputacionesFinancieras(null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.listarImputacionesFinancieras(5L,0,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void aplicaAbonoSoloConIdempotenciaYDestinoCorrecto() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idAplicacion\":45,\"montoAplicado\":40,\"reutilizado\":false}");
+        var req=new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+          java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"),
+          17L,"CUOTA",73L,new BigDecimal("40.00"),"Abono verificado");
+        var out=service.aplicarPagoConfirmado(5L,req);
+        assertEquals(40,out.path("montoAplicado").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_aplicar_pago_confirmado_v1"));
+    }
+
+    @Test
+    void imputacionYReversionRechazanOperacionesInsegurasAntesDeSql() {
+        var id=java.util.UUID.randomUUID();
+        var ok=new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+          id,17L,"INICIAL",null,new BigDecimal("10.00"),null);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(null,ok)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"INICIAL",73L,new BigDecimal("10.00"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"CUOTA",73L,new BigDecimal("10.001"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.aplicarPagoConfirmado(5L,
+             new monolithe.core_service.dto.AplicarPagoConfirmadoRequest(
+               id,17L,"OTRO",null,new BigDecimal("10.00"),null))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revertirAplicacionPago(5L,1L,
+            new monolithe.core_service.dto.RevertirAplicacionPagoRequest("No"))
+          ).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revertirAplicacionPago(null,1L,
+            new monolithe.core_service.dto.RevertirAplicacionPagoRequest("Motivo válido"))
+          ).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void reversionUsaProcedimientoSQLSinBorrarAplicaciones() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idAplicacion\":8,\"activo\":false,\"reutilizado\":false}");
+        var out=service.revertirAplicacionPago(15L,8L,
+          new monolithe.core_service.dto.RevertirAplicacionPagoRequest(
+            "Conciliación de operación incorrecta"));
+        assertFalse(out.path("activo").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_revertir_aplicacion_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("DELETE"));
+    }
+
+    @Test
+    void conciliacionIntegralConsultaRPCRestringidaSinMutarPagos() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"items\":[],\"total\":0,\"alertasPagina\":0}");
+        var resultado=service.conciliacionFinanciera(5L,"CON_ALERTA","PAG-",1,20);
+        assertTrue(resultado.path("items").isArray());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_conciliacion_integral_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.conciliacionFinanciera(5L,"FALSO","",1,20)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.conciliacionFinanciera(null,"TODOS","",1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void anotacionConciliacionExigeMotivoSinEditarAsientos() {
+        var req=new monolithe.core_service.dto.MarcarConciliacionRequest(
+          "PAGO_CONFIRMADO_SIN_IMPUTAR","EN_REVISION",
+          "Pendiente verificar cuenta bancaria y fecha.");
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"idRevision\":1,\"requiereVerificacion\":true}");
+        var respuesta=service.marcarRevisionConciliacion(5L,7L,req);
+        assertTrue(respuesta.path("requiereVerificacion").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_marcar_revision_conciliacion_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.marcarRevisionConciliacion(5L,7L,
+            new monolithe.core_service.dto.MarcarConciliacionRequest(
+              "PAGO_SIN_VOUCHER","REVISADA","Corto"))).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.marcarRevisionConciliacion(null,7L,req)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void inicialAdicionalNoAceptaDocumentosInvalidosNiActoresAnonimos() {
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+          4L,3L,new BigDecimal("100.00"),6,
+          java.time.LocalDate.of(2026,11,11),"OP-TEST","voucher.pdf",
+          "application/pdf",1200L);
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherInicial(null,req)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.prepararCargaVoucherInicial(5L,
+            new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+              4L,3L,new BigDecimal("100.001"),6,req.fechaOperacion(),
+              req.numeroOperacion(),req.nombreArchivo(),req.tipoMime(),1200L))
+          ).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.registrarVoucherInicialPendiente(5L,null)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void registrarVoucherInicialPorProcedimientoSinCrearCuotas() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+          .thenReturn("{\"destino\":\"INICIAL\",\"idPago\":100}");
+        var req=new monolithe.core_service.dto.PrepararCargaVoucherInicialRequest(
+          4L,3L,new BigDecimal("100.00"),6,
+          java.time.LocalDate.of(2026,11,11),null,"voucher.pdf",
+          "application/pdf",1200L);
+        var pre=service.prepararCargaVoucherInicial(5L,req);
+        assertEquals("INICIAL",pre.path("destino").asString());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_carga_voucher_inicial_v1"));
+        clearInvocations(jdbc);
+        var reg=service.registrarVoucherInicialPendiente(
+          5L,java.util.UUID.fromString("11111111-2222-3333-4444-555555555555"));
+        assertEquals(100,reg.path("idPago").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_registrar_voucher_inicial_pendiente_v1"));
+    }
+
+    @Test
+    void bandejaVouchersCuotasRequierePermisosFinancierosEnSql() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":20,\"paginas\":1}");
+        var resultado=service.listarVouchersCuotas(5L,"TODOS",null,1,20);
+        assertEquals(0,resultado.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_listar_vouchers_financiamiento_v2"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"bucket\":\"vouchers-ventas-private\",\"clave_archivo\":\"ventas/p-3/l-1/11111111-2222-3333-4444-555555555555.pdf\"}");
+        var ruta=service.obtenerRutaVoucherCuota(5L,103L);
+        assertEquals("vouchers-ventas-private",ruta.path("bucket").asText());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_finanzas_obtener_ruta_voucher_cuota_v1"));
+    }
+
+    @Test
+    void vouchersCuotasRechazanFiltrosInvalidosSinAccederALaBase() {
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(null,"TODOS",null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"OTRO",null,1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"TODOS",null,1,101)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.listarVouchersCuotas(5L,"TODOS",null,0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                ()->service.obtenerRutaVoucherCuota(5L,-1L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                ()->service.obtenerRutaVoucherCuota(null,1L)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void exportacionSeparacionesUtilizaProcedimientoAutorizado() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"items\":[],\"total\":0,\"pagina\":1,\"tamano\":100,\"paginas\":0}");
@@ -145,6 +431,71 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void revisionTresCuotasConsecutivasConsultaSinModificarContratos() {
+        when(jdbc.queryForObject(anyString(),eq(String.class),any(Object[].class)))
+            .thenReturn("{\"total\":1,\"montoEnRevision\":260,"
+              + "\"resolucionAutomatica\":false,\"items\":[{\"cuotasConsecutivas\":3}]}");
+        var resultado=service.revisarTresCuotasConsecutivas(5L,1,20);
+        assertEquals(1,resultado.path("total").asInt());
+        assertFalse(resultado.path("resolucionAutomatica").asBoolean());
+        assertEquals(3,resultado.path("items").get(0).path("cuotasConsecutivas").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_alertas_resolutoria_v1"));
+        assertFalse(sql.getValue().toUpperCase().contains("UPDATE "));
+        assertFalse(sql.getValue().toUpperCase().contains("DELETE "));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(5L,0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(5L,1,101)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+          ()->service.revisarTresCuotasConsecutivas(null,1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void alertasCuotasRestringeParametrosYConsultaProcedimientoSeguro() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"total\":2,\"vencidas\":1,\"proximas\":1,\"items\":[]}");
+        var resultado=service.alertasCuotas(5L,"CUOTA_VENCIDA",1,20);
+        assertEquals(2,resultado.path("total").asInt());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_alertas_cuotas_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"MORA_FICTICIA",1,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"TODAS",0,20)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(5L,"TODAS",1,500)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+            ()->service.alertasCuotas(null,"TODAS",1,20)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void prepararAvisosSoloInvocaProcedimientoDePortalYSinEnviarCorreo() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"creados\":1,\"deduplicados\":0,\"enviosExternos\":false}");
+        var respuesta=service.prepararAvisosCuotasPortal(5L,100);
+        assertEquals(1,respuesta.path("creados").asInt());
+        assertFalse(respuesta.path("enviosExternos").asBoolean());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_fin_preparar_avisos_portal_v1"));
+        clearInvocations(jdbc);
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(5L,0)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(5L,501)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+            ()->service.prepararAvisosCuotasPortal(null,100)).getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void cronogramaVentaUsaProcedimientoYRechazaVentaInvalida() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
             .thenReturn("{\"tipoCronograma\":\"REGISTRADO\",\"items\":[]}");
@@ -152,7 +503,7 @@ class CrmVentaServiceSeguridadTest {
         assertEquals("REGISTRADO",cronograma.path("tipoCronograma").asString());
         var sql=ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v1"));
+        assertTrue(sql.getValue().contains("sp_crm_cronograma_venta_v4"));
         assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
             ()->service.cronogramaVenta(5L,-1L)).getStatusCode());
     }
@@ -179,7 +530,7 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
-    void validacionVentaUsaSimuladorFrancesV9() {
+    void validacionVentaUsaSimuladorFrancesV10() {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"elegible\":true,\"planFrances\":{\"sistema\":\"FRANCES\"}}");
         var req = new FormalizarVentaCrmRequest(
@@ -190,7 +541,7 @@ class CrmVentaServiceSeguridadTest {
                 respuesta.path("planFrances").path("sistema").asString());
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v9"));
+        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v10"));
     }
 
     @Test
@@ -198,7 +549,7 @@ class CrmVentaServiceSeguridadTest {
         when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
                 .thenReturn("{\"success\":true}");
         var comprobador = tools.jackson.databind.json.JsonMapper.builder().build()
-                .readTree("{\"idProspecto\":1,\"nombres\":\"Prueba\"}");
+                .readTree("{\"idProspecto\":1,\"nombres\":\"Prueba\",\"identidadVerificada\":true}");
         var req = new FormalizarVentaCrmRequest(
                 1L, 74L, "CONTADO", new BigDecimal("29900.00"),
                 null, null, null, null, comprobador,
@@ -207,7 +558,22 @@ class CrmVentaServiceSeguridadTest {
         assertTrue(resultado.path("success").asBoolean(false));
         var sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v13"));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_venta_pendiente_v14"));
+    }
+
+    @Test
+    void registroVentaSinCotejoDeDocumentoEsRechazado() throws Exception {
+        var comprador = tools.jackson.databind.json.JsonMapper.builder().build()
+                .readTree("{\"idProspecto\":1,\"identidadVerificada\":false}");
+        var req = new FormalizarVentaCrmRequest(
+                1L, 74L, "CONTADO", new BigDecimal("29900.00"),
+                null, null, null, null, comprador,
+                tools.jackson.databind.json.JsonMapper.builder().build()
+                        .readTree("{\"metodoPago\":\"EFECTIVO\",\"comprobantes\":[]}"));
+        var error = assertThrows(ResponseStatusException.class,
+                () -> service.registrarVentaPendiente(5L, req));
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verifyNoInteractions(jdbc);
     }
 
     @Test
@@ -242,6 +608,37 @@ class CrmVentaServiceSeguridadTest {
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.registrarVentaPendiente(5L, req));
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void saldoVentaYClienteConsultanProcedimientosProtegidos() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idVenta\":2,\"tipoSaldo\":\"FINANCIADA\",\"saldoFinanciamiento\":84000}");
+        var venta = service.saldoVenta(5L,2L);
+        assertEquals(84000,venta.path("saldoFinanciamiento").asInt());
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_saldo_venta_v1"));
+        clearInvocations(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"idCliente\":2,\"numeroVentas\":1,\"saldoFinanciamientoActivo\":84000}");
+        var cliente = service.saldoCliente(5L,2L);
+        assertEquals(1,cliente.path("numeroVentas").asInt());
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_saldo_cliente_v1"));
+    }
+
+    @Test
+    void saldosRechazanActorOIdsInvalidosSinAccederALaBase() {
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                () -> service.saldoVenta(5L,0L)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST,assertThrows(ResponseStatusException.class,
+                () -> service.saldoCliente(5L,-1L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                () -> service.saldoVenta(null,2L)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED,assertThrows(ResponseStatusException.class,
+                () -> service.saldoCliente(null,2L)).getStatusCode());
         verifyNoInteractions(jdbc);
     }
 

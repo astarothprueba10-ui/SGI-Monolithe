@@ -20,17 +20,22 @@ type ForgotPasswordResponse = {
     correoEnmascarado: string | null;
 };
 
-
-const PORTAL_USUARIO_REGEX =
-    /^(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{8}|[a-zA-Z0-9._-]{3,50})$/;
+type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
+const TIPOS_DOCUMENTO: TipoDocumento[] = ['DNI', 'CE', 'PASAPORTE', 'RUC'];
+const PORTAL_DOCUMENTO_REGEX: Record<TipoDocumento, RegExp> = {
+    DNI: /^\d{8}$/,
+    CE: /^[a-zA-Z0-9]{8,12}$/,
+    PASAPORTE: /^[a-zA-Z0-9]{6,20}$/,
+    RUC: /^\d{11}$/
+};
 
 
 export function ForgotPassword() {
 
     const navigate = useNavigate();
 
-    const [usuario, setUsuario] =
-        useState('');
+    const [usuario, setUsuario] = useState('');
+    const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('DNI');
 
     const [loading, setLoading] =
         useState(false);
@@ -41,11 +46,8 @@ export function ForgotPassword() {
     const [error, setError] =
         useState<string | null>(null);
 
-    const [
-        correoEnmascarado,
-        setCorreoEnmascarado
-    ] = useState<string | null>(null);
-
+    // Se muestra solo una pista del correo consultado en el expediente; nunca se permite editar el destino.
+    const [correoReferencial, setCorreoReferencial] = useState<string | null>(null);
 
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
@@ -58,20 +60,18 @@ export function ForgotPassword() {
         }
 
         setError(null);
-        setCorreoEnmascarado(null);
+        setCorreoReferencial(null);
 
         const usuarioLimpio =
             usuario.trim();
 
 
         if (
-            !usuarioLimpio ||
-            usuarioLimpio.length > 120 ||
-            !PORTAL_USUARIO_REGEX.test(usuarioLimpio)
+            !PORTAL_DOCUMENTO_REGEX[tipoDocumento].test(usuarioLimpio)
         ) {
 
             setError(
-                'Ingresa un DNI, usuario o correo válido.'
+                `Ingresa un número de ${tipoDocumento} válido.`
             );
 
             return;
@@ -82,8 +82,7 @@ export function ForgotPassword() {
 
         try {
 
-            const data =
-                await authApi.post<ForgotPasswordResponse>(
+            const respuesta = await authApi.post<ForgotPasswordResponse>(
                     '/forgot-password',
                     {
                         usuario: usuarioLimpio,
@@ -92,10 +91,7 @@ export function ForgotPassword() {
                 );
 
 
-            setCorreoEnmascarado(
-                data.correoEnmascarado
-            );
-
+            setCorreoReferencial(respuesta.correoEnmascarado ?? null);
             setEnviado(true);
 
         } catch (error) {
@@ -193,9 +189,10 @@ export function ForgotPassword() {
 
                                     <p className="mt-2 text-[14px] leading-relaxed text-slateux-500">
 
-                                        Ingresa tuusuario Monolithe y te
-                                        enviaremos un enlace de recuperación al
-                                        correo electrónico asociado a tu cuenta.
+                                        Identifícate con tu número de documento. Enviaremos las
+                                        instrucciones únicamente al correo principal que figura
+                                        en tus datos de cliente registrados en Monolithe.
+                                        No se puede indicar otro correo desde este formulario.
 
                                     </p>
 
@@ -233,21 +230,32 @@ export function ForgotPassword() {
                                     >
 
 
+                                        <div>
+                                            <label htmlFor="tipoDocumentoRecuperacion" className="mb-1.5 block text-[13px] font-medium text-ink-700">
+                                                Tipo de documento
+                                            </label>
+                                            <select id="tipoDocumentoRecuperacion" value={tipoDocumento} disabled={loading}
+                                                onChange={event => {
+                                                    setTipoDocumento(event.target.value as TipoDocumento);
+                                                    setUsuario('');
+                                                    setError(null);
+                                                }}
+                                                className="h-11 w-full rounded-field border border-slateux-200 bg-white px-3 text-[14px] text-ink-700">
+                                                {TIPOS_DOCUMENTO.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                                            </select>
+                                        </div>
                                         <TextField
                                             id="usuarioRecuperacion"
-                                            label="Nombre de Usuario"
+                                            label="Número de documento"
                                             type="text"
                                             autoComplete="username"
-                                            placeholder="Ingresa tus datos de acceso"
+                                            placeholder={`Número de ${tipoDocumento}`}
                                             value={usuario}
-                                            maxLength={120}
+                                            maxLength={tipoDocumento === 'DNI' ? 8 : tipoDocumento === 'RUC' ? 11 : tipoDocumento === 'CE' ? 12 : 20}
+                                            inputMode={tipoDocumento === 'DNI' || tipoDocumento === 'RUC' ? 'numeric' : 'text'}
                                             invalid={Boolean(error)}
                                             disabled={loading}
-                                            onChange={(event) =>
-                                                setUsuario(
-                                                    event.target.value
-                                                )
-                                            }
+                                            onChange={(event) => setUsuario(event.target.value)}
                                         />
 
 
@@ -304,36 +312,30 @@ export function ForgotPassword() {
                                     </h1>
 
 
-                                    {correoEnmascarado ? (
-
-                                        <p className="mt-3 text-[14px] leading-relaxed text-slateux-500">
-
-                                            Hemos enviado las instrucciones para
-                                            restablecer tu contraseña a{' '}
-
-                                            <span className="font-semibold text-ink-700">
-
-                                                {correoEnmascarado}
-
-                                            </span>
-
-                                            .
-
-                                        </p>
-
+                                    {correoReferencial ? (
+                                        <div className="mt-3 space-y-2" role="status">
+                                            <p className="text-[14px] leading-relaxed text-slateux-500">
+                                                Enviamos las instrucciones al correo principal registrado
+                                                en tu expediente de cliente:
+                                            </p>
+                                            <p className="break-all text-[16px] font-semibold text-ink-800">
+                                                {correoReferencial}
+                                            </p>
+                                            <p className="text-[12px] leading-relaxed text-slateux-400">
+                                                Por seguridad, parte de la dirección está oculta.
+                                                Revisa esa bandeja de entrada y la carpeta de spam.
+                                            </p>
+                                        </div>
                                     ) : (
-
                                         <p className="mt-3 text-[14px] leading-relaxed text-slateux-500">
-
-                                            Si existe una cuenta asociada a los
-                                            datos ingresados, recibirás un correo
-                                            con las instrucciones para restablecer
-                                            tu contraseña.
-
+                                            Si existe una cuenta CLIENTE asociada al documento, el enlace
+                                            se enviará al correo principal registrado en su expediente.
                                         </p>
-
                                     )}
-
+                                    <p className="mt-3 text-[12px] leading-relaxed text-slateux-400">
+                                        Si ya no tienes acceso a ese correo, solicita actualizarlo
+                                        mediante el proceso de verificación de identidad de Monolithe.
+                                    </p>
 
                                     <button
                                         type="button"

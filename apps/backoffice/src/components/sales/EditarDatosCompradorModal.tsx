@@ -51,6 +51,7 @@ export function EditarDatosCompradorModal({
   const [catalogos, setCatalogos] = useState<CrmCatalogs | null>(null);
   const [asesores, setAsesores] = useState<CrmAdvisor[]>([]);
   const [original, setOriginal] = useState<CrmDatosCompradorVenta | null>(null);
+  const [identidadVerificada, setIdentidadVerificada] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
@@ -72,6 +73,9 @@ export function EditarDatosCompradorModal({
     ...form, motivoContacto: 'Revisión de datos contractuales'
   }), [form]);
   const actualizar = (campo: LeadField, valor: string) => {
+    if (['names','paternalSurname','maternalSurname','tipoDocumento','numeroDocumento'].includes(campo)) {
+      setIdentidadVerificada(false);
+    }
     setForm(previo => ({
       ...previo,
       [campo]: sanitizarLead(campo, valor, previo.tipoDocumento)
@@ -92,6 +96,7 @@ export function EditarDatosCompradorModal({
     setEnviado(false);
     setTocados({});
     setOriginal(null);
+    setIdentidadVerificada(false);
     setEstadoCivil('');
     setConyuge(CONYUGE_VACIO);
     setConyugeErroresVisibles(false);
@@ -178,6 +183,10 @@ export function EditarDatosCompradorModal({
       toast.error('Corrige los campos marcados en rojo antes de continuar.');
       return;
     }
+    if (!identidadVerificada) {
+      toast.error('Marque Verificar identidad luego de cotejar el documento del comprador.');
+      return;
+    }
     if (!estadoCivil) {
       toast.error('Seleccione el estado civil del comprador.');
       return;
@@ -209,6 +218,7 @@ export function EditarDatosCompradorModal({
     }
     onGuardar({
       idProspecto,
+      identidadVerificada,
       nombres: form.names.trim(),
       apellidoPaterno: form.paternalSurname.trim(),
       apellidoMaterno: form.maternalSurname.trim(),
@@ -261,7 +271,7 @@ export function EditarDatosCompradorModal({
         <>
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button variant="primary" disabled={!original || cargando || !!errorCarga} onClick={guardar}>
-            Guardar cambios
+            Guardar datos verificados
           </Button>
         </>
       }>
@@ -307,7 +317,10 @@ export function EditarDatosCompradorModal({
               {catalogos?.origenes.map(o => <option value={o.codigo} key={o.codigo}>{o.nombre}</option>)}
             </Select>)}
             {campo('tipoDocumento', 'Tipo de documento *', <Select value={form.tipoDocumento}
-              onChange={e => setForm(p => ({ ...p, tipoDocumento:e.target.value, numeroDocumento:'' }))}>
+              onChange={e => {
+                setIdentidadVerificada(false);
+                setForm(p => ({ ...p, tipoDocumento:e.target.value, numeroDocumento:'' }));
+              }}>
               <option value="DNI">DNI</option><option value="CE">Carné de extranjería</option>
               <option value="RUC">RUC</option><option value="PASAPORTE">Pasaporte</option>
             </Select>)}
@@ -316,6 +329,20 @@ export function EditarDatosCompradorModal({
               maxLength={form.tipoDocumento === 'DNI' ? 8 : form.tipoDocumento === 'RUC' ? 11 : form.tipoDocumento === 'CE' ? 12 : 20}
               value={form.numeroDocumento} onChange={e => actualizar('numeroDocumento',e.target.value)}
               {...propsError('numeroDocumento')} />)}
+            <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <label className="flex cursor-pointer items-start gap-3 text-xs font-medium text-amber-950">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={identidadVerificada}
+                  onChange={e => setIdentidadVerificada(e.target.checked)} />
+                <span><strong>Verificar identidad del comprador.</strong> He cotejado el documento de identidad con los nombres,
+                  apellidos y número registrados. Confirmo que los datos corresponden a la misma persona.</span>
+              </label>
+              <p className="mt-2 text-[11px] text-amber-900">
+                Al confirmar la venta pendiente, se registrará la verificación del documento con trazabilidad del operador.
+                El usuario CLIENTE solo se habilitará después de que Gerencia apruebe la firma del contrato.
+              </p>
+              {enviado && !identidadVerificada &&
+                <p role="alert" className="mt-1 text-xs text-red-600">Debes verificar la identidad antes de continuar.</p>}
+            </div>
             <div className="min-w-0 sm:col-span-2">
               <label className="mb-1.5 block text-xs font-semibold text-brand-700">
                 Estado civil (según DNI) *

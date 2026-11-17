@@ -1,324 +1,210 @@
-import React, { useRef, useState } from 'react';
-import {
-  CheckCircle2Icon,
-  CircleAlertIcon,
-  PaperclipIcon,
-  UploadCloudIcon,
-  XIcon } from
-'lucide-react';
-import { Button } from '../ui/Button';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { CheckCircle2Icon, FileUpIcon, ShieldCheckIcon } from 'lucide-react';
 import { Card, CardHeader } from '../ui/Card';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { cuotas } from '../../data/portal';
-import { formatCurrency, formatDate } from '../../utils/format';
+import { Button } from '../ui/Button';
+import { portalCorePost } from '../../lib/portalCoreApi';
 import { supabase } from '../../lib/supabase';
+import type {
+  DestinoVoucher, PortalCargaVoucher, PortalMetodoPago,
+  PortalOpcionOperacion, PortalPrepararVoucherInput, PortalRegistroVoucher
+} from '../../types/portal-vouchers';
+import { formatCurrency } from '../../utils/format';
 
-const medios = [
-'Transferencia BCP',
-'Transferencia Interbank',
-'Depósito en agencia',
-'Yape / Plin'];
+const MAX_BYTES = 5 * 1024 * 1024;
+const MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+function fechaHoyPeru(): string {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? '';
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
 
-
-const pendientes = cuotas.filter(
-  (c) => c.estado === 'vencida' || c.estado === 'pendiente'
-);
-
-export function RegistrarPagoForm() {
-  const [cuota, setCuota] = useState(String(pendientes[0].numero));
-  const [fecha, setFecha] = useState('2026-08-27');
-  const [medio, setMedio] = useState(medios[0]);
-  const [operacion, setOperacion] = useState('');
-  const [archivo, setArchivo] = useState<string | null>(null);
+export function RegistrarPagoForm({ operaciones, metodos, onRegistrado }: {
+  operaciones: PortalOpcionOperacion[];
+  metodos: PortalMetodoPago[];
+  onRegistrado: () => void;
+}) {
+  const [ventaElegida, setVentaElegida] = useState('');
+  const [destino, setDestino] = useState<DestinoVoucher>('CUOTA');
+  const [cuotaElegida, setCuotaElegida] = useState('');
+  const [monto, setMonto] = useState('');
+  const [metodo, setMetodo] = useState('');
+  const [fecha, setFecha] = useState(fechaHoyPeru());
+  const [numero, setNumero] = useState('');
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmando, setConfirmando] = useState(false);
-  const [enviando, setEnviando] = useState(false);
   const [exito, setExito] = useState(false);
-  const inputArchivo = useRef<HTMLInputElement>(null);
+  const [pendiente, setPendiente] = useState<{ idCarga: string; destino: DestinoVoucher } | null>(null);
 
-  const cuotaSel = cuotas.find((c) => String(c.numero) === cuota)!;
+  const elegibles = operaciones.filter(o =>
+    o.planActivo && (o.cuotas.length > 0 || o.saldoInicial > 0));
+  const operacion = elegibles.find(o => String(o.idVenta) === ventaElegida)
+    ?? elegibles[0] ?? null;
+  const cuota = operacion?.cuotas.find(c => String(c.idCuota) === cuotaElegida)
+    ?? operacion?.cuotas[0] ?? null;
+  const saldo = destino === 'CUOTA' ? (cuota?.saldo ?? 0) : (operacion?.saldoInicial ?? 0);
+  const puedeCargar = !!operacion && saldo > 0 && metodos.length > 0;
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setExito(false);
-    if (operacion.trim().length < 4) {
-      setError(
-        'Ingresa el número de operación del voucher (al menos 4 dígitos).'
-      );
-      return;
-    }
-    if (!archivo) {
-      setError('Adjunta la imagen o el PDF de tu comprobante.');
-      return;
-    }
+  async function registrar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (ocupado || !operacion) return;
     setError(null);
-    setConfirmando(true);
-  }
-
-  async function confirmar() {
-    setEnviando(true);
+    setExito(false);
+    setOcupado(true);
     try {
-      await supabase.rpc('sp_registrar_pago_voucher', {
-        p_id_venta: 2,
-        p_id_cuota: 37,
-        p_monto: cuotaSel?.monto || 2400.0,
-        p_id_metodo_pago: medio.includes('BCP') || medio.includes('Interbank') ? 6 : medio.includes('Yape') ? 8 : 7,
-        p_numero_operacion: operacion,
-        p_nombre_archivo: archivo || 'voucher.pdf',
-        p_clave_archivo: `vouchers/2026/${Date.now()}_${archivo || 'voucher.pdf'}`,
-        p_hash_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        p_id_usuario: 3
-      });
-      setExito(true);
-      setOperacion('');
+      let cargaPendiente = pendiente;
+      if (!cargaPendiente) {
+        const cantidad = Number(monto);
+        if (!Number.isFinite(cantidad) || !/^\d+(\.\d{1,2})?$/.test(monto)
+            || cantidad <= 0 || cantidad > saldo) {
+          throw new Error('Ingrese un importe válido, hasta ' + formatCurrency(saldo) + '.');
+        }
+        if (!metodos.some(m => String(m.idMetodoPago) === metodo)) {
+          throw new Error('Seleccione el medio de pago utilizado.');
+        }
+        if (!fecha || fecha > fechaHoyPeru()) {
+          throw new Error('Seleccione la fecha real de la operación.');
+        }
+        if (!archivo || !MIMES.includes(archivo.type)
+            || archivo.size < 1 || archivo.size > MAX_BYTES
+            || !archivo.name.trim() || archivo.name.length > 180) {
+          throw new Error('Seleccione un PDF, JPG, PNG o WebP de máximo 5 MiB.');
+        }
+        if (numero.trim().length > 100) {
+          throw new Error('El número de operación no puede superar 100 caracteres.');
+        }
+
+        const solicitud: PortalPrepararVoucherInput = {
+          idVenta: operacion.idVenta, destino,
+          idCuota: destino === 'CUOTA' ? cuota?.idCuota ?? null : null,
+          monto: cantidad, idMetodoPago: Number(metodo),
+          fechaOperacion: fecha, numeroOperacion: numero.trim() || null,
+          nombreArchivo: archivo.name, tipoMime: archivo.type,
+          tamanioBytes: archivo.size
+        };
+        const carga = await portalCorePost<PortalCargaVoucher>(
+          '/portal-cliente/vouchers/preparar-carga', { ...solicitud });
+        if (carga.bucket !== 'vouchers-ventas-private'
+            || carga.tipoMime !== archivo.type || carga.maxBytes < archivo.size) {
+          throw new Error('La autorización de carga no corresponde al archivo.');
+        }
+        const url = new URL(carga.urlCarga);
+        if (url.protocol !== 'https:' || !url.hostname.endsWith('.supabase.co')
+            || !url.pathname.endsWith('/' + carga.claveArchivo)) {
+          throw new Error('La URL de carga del comprobante no es segura.');
+        }
+        const token = url.searchParams.get('token');
+        if (!token) throw new Error('No se recibió la autorización de carga.');
+        const { error: errorSubida } = await supabase.storage
+          .from(carga.bucket)
+          .uploadToSignedUrl(carga.claveArchivo, token, archivo, {
+            contentType: archivo.type, upsert: false
+          });
+        if (errorSubida) throw new Error('No se pudo subir el archivo: ' + errorSubida.message);
+        cargaPendiente = { idCarga: carga.idCarga, destino };
+        setPendiente(cargaPendiente);
+      }
+      const resultado = await portalCorePost<PortalRegistroVoucher>(
+        '/portal-cliente/vouchers/registrar?destino=' + encodeURIComponent(cargaPendiente.destino),
+        { idCarga: cargaPendiente.idCarga });
+      if (resultado.estadoVoucher !== 'PENDIENTE' && !resultado.reutilizado) {
+        throw new Error('Respuesta de registro inesperada.');
+      }
+      setPendiente(null);
       setArchivo(null);
-    } catch (err: any) {
-      setError('Error al registrar voucher: ' + err.message);
+      setMonto('');
+      setNumero('');
+      setExito(true);
+      onRegistrado();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo presentar el comprobante.');
     } finally {
-      setEnviando(false);
-      setConfirmando(false);
+      setOcupado(false);
     }
   }
 
-  return (
-    <>
-      <Card as="section">
-        <CardHeader
-          title="Registrar un pago"
-          description="Adjunta el comprobante para que cobranzas valide tu cuota."
-          icon={<UploadCloudIcon className="h-[18px] w-[18px]" />} />
-        
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-5 p-5">
-          <div aria-live="polite">
-            {exito ?
-            <div
-              role="status"
-              className="flex gap-3 rounded-field border border-success-200 bg-success-50 px-3.5 py-3">
-              
-                <CheckCircle2Icon
-                className="mt-0.5 h-[18px] w-[18px] shrink-0 text-success-500"
-                aria-hidden="true" />
-              
-                <div>
-                  <p className="text-[13px] font-semibold text-success-700">
-                    Comprobante enviado
-                  </p>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-success-700/85">
-                    Tu pago quedó registrado como “En revisión”. Te avisaremos
-                    cuando cobranzas lo valide (máx. 48 horas hábiles).
-                  </p>
-                </div>
-              </div> :
-            null}
-            {error ?
-            <div
-              role="alert"
-              className="flex gap-3 rounded-field border border-danger-200 bg-danger-50 px-3.5 py-3">
-              
-                <CircleAlertIcon
-                className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger-500"
-                aria-hidden="true" />
-              
-                <p className="text-[13px] leading-relaxed text-danger-700">
-                  {error}
-                </p>
-              </div> :
-            null}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Cuota a pagar" id="cuota">
-              <select
-                id="cuota"
-                value={cuota}
-                onChange={(e) => setCuota(e.target.value)}
-                className="h-11 w-full appearance-none rounded-field border border-slateux-200 bg-white px-3.5 text-[14.5px] text-ink-800 shadow-field outline-none transition-[border-color,box-shadow] duration-150 ease-out hover:border-slateux-300 focus:border-ink-700 focus:ring-4 focus:ring-ink-700/10">
-                
-                {pendientes.slice(0, 6).map((c) =>
-                <option key={c.numero} value={c.numero}>
-                    Cuota {String(c.numero).padStart(2, '0')} — vence{' '}
-                    {formatDate(c.vencimiento)}
-                  </option>
-                )}
-              </select>
-            </Field>
-
-            <Field label="Monto a registrar" id="monto">
-              <input
-                id="monto"
-                readOnly
-                value={formatCurrency(cuotaSel.monto)}
-                className="h-11 w-full rounded-field border border-slateux-200 bg-slateux-50 px-3.5 text-[14.5px] font-medium tabular-nums text-ink-700 outline-none" />
-              
-            </Field>
-
-            <Field label="Fecha del pago" id="fecha">
-              <input
-                id="fecha"
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="h-11 w-full rounded-field border border-slateux-200 bg-white px-3.5 text-[14.5px] text-ink-800 shadow-field outline-none transition-[border-color,box-shadow] duration-150 ease-out hover:border-slateux-300 focus:border-ink-700 focus:ring-4 focus:ring-ink-700/10" />
-              
-            </Field>
-
-            <Field label="Medio de pago" id="medio">
-              <select
-                id="medio"
-                value={medio}
-                onChange={(e) => setMedio(e.target.value)}
-                className="h-11 w-full appearance-none rounded-field border border-slateux-200 bg-white px-3.5 text-[14.5px] text-ink-800 shadow-field outline-none transition-[border-color,box-shadow] duration-150 ease-out hover:border-slateux-300 focus:border-ink-700 focus:ring-4 focus:ring-ink-700/10">
-                
-                {medios.map((m) =>
-                <option key={m} value={m}>
-                    {m}
-                  </option>
-                )}
-              </select>
-            </Field>
-
-            <div className="sm:col-span-2">
-              <Field label="Número de operación" id="operacion">
-                <input
-                  id="operacion"
-                  inputMode="numeric"
-                  value={operacion}
-                  onChange={(e) => setOperacion(e.target.value)}
-                  placeholder="Ej. 00871245"
-                  aria-invalid={Boolean(error) && operacion.length < 4}
-                  className="h-11 w-full rounded-field border border-slateux-200 bg-white px-3.5 text-[14.5px] text-ink-800 shadow-field outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-slateux-400 hover:border-slateux-300 focus:border-ink-700 focus:ring-4 focus:ring-ink-700/10" />
-                
-              </Field>
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1.5 text-[13px] font-medium text-ink-700">
-              Comprobante o voucher
-            </p>
-            {archivo ?
-            <div className="flex items-center gap-3 rounded-field border border-slateux-200 bg-slateux-50 px-3.5 py-3">
-                <PaperclipIcon
-                className="h-4 w-4 shrink-0 text-slateux-400"
-                aria-hidden="true" />
-              
-                <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-700">
-                  {archivo}
-                </p>
-                <button
-                type="button"
-                onClick={() => setArchivo(null)}
-                aria-label="Quitar archivo adjunto"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-slateux-400 outline-none transition-colors duration-150 ease-out hover:bg-white hover:text-ink-700 focus-visible:ring-2 focus-visible:ring-ink-700/25">
-                
-                  <XIcon className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div> :
-
-            <button
-              type="button"
-              onClick={() => inputArchivo.current?.click()}
-              className="flex w-full flex-col items-center gap-1.5 rounded-field border border-dashed border-slateux-300 bg-slateux-50 px-4 py-7 outline-none transition-colors duration-150 ease-out hover:border-ink-600 hover:bg-slateux-100 focus-visible:ring-4 focus-visible:ring-ink-700/15">
-              
-                <UploadCloudIcon
-                className="h-5 w-5 text-slateux-400"
-                aria-hidden="true" />
-              
-                <span className="text-[13.5px] font-semibold text-ink-700">
-                  Adjuntar voucher
-                </span>
-                <span className="text-[12.5px] text-slateux-500">
-                  JPG, PNG o PDF · hasta 5 MB
-                </span>
-              </button>
-            }
-            <input
-              ref={inputArchivo}
-              type="file"
-              accept="image/*,.pdf"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setArchivo(file.name);
-                  setError(null);
-                }
-              }} />
-            
-          </div>
-
-          <div className="flex flex-col-reverse gap-2 border-t border-slateux-200 pt-5 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setOperacion('');
-                setArchivo(null);
-                setError(null);
-                setExito(false);
-              }}>
-              
-              Limpiar
-            </Button>
-            <Button type="submit">Enviar comprobante</Button>
-          </div>
-        </form>
-      </Card>
-
-      <ConfirmDialog
-        open={confirmando}
-        title="¿Confirmas el envío del comprobante?"
-        description="Una vez enviado, el pago pasa a revisión de cobranzas y no podrás editarlo. Si hay un error, deberás registrar un nuevo voucher."
-        confirmLabel="Sí, enviar comprobante"
-        loading={enviando}
-        onConfirm={confirmar}
-        onCancel={() => setConfirmando(false)}>
-        
-        <dl className="divide-y divide-slateux-200 rounded-field border border-slateux-200 bg-slateux-50 px-3.5">
-          <Resumen
-            label="Cuota"
-            value={`Cuota ${String(cuotaSel.numero).padStart(2, '0')}`} />
-          
-          <Resumen label="Monto" value={formatCurrency(cuotaSel.monto)} />
-          <Resumen label="Medio" value={medio} />
-          <Resumen label="Operación" value={operacion || '—'} />
-          <Resumen label="Adjunto" value={archivo ?? '—'} />
-        </dl>
-      </ConfirmDialog>
-    </>);
-
-}
-
-function Field({
-  label,
-  id,
-  children
-
-
-
-
-}: {label: string;id: string;children: React.ReactNode;}) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-[13px] font-medium text-ink-700">
-        
-        {label}
-      </label>
-      {children}
-    </div>);
-
-}
-
-function Resumen({ label, value }: {label: string;value: string;}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <dt className="text-[12.5px] text-slateux-500">{label}</dt>
-      <dd className="min-w-0 truncate text-[12.5px] font-medium text-ink-800">
-        {value}
-      </dd>
-    </div>);
-
+  return <Card as="section">
+    <CardHeader title="Presentar comprobante"
+      icon={<FileUpIcon className="h-[18px] w-[18px]" />}
+      description="Solo compras propias y archivos privados · máximo 5 MiB" />
+    <form onSubmit={e => void registrar(e)} className="space-y-4 p-5">
+      {!puedeCargar && <p className="rounded-field bg-slateux-50 p-3 text-sm text-slateux-600">
+        No hay cuotas o inicial adicional pendientes con contrato vigente, o no existen métodos de pago habilitados.
+      </p>}
+      <fieldset disabled={!puedeCargar || ocupado || !!pendiente} className="space-y-4 disabled:opacity-70">
+        <label className="block text-xs font-semibold text-slateux-600">Mi compra
+          <select value={operacion?.idVenta ?? ''} onChange={e => {
+            setVentaElegida(e.target.value); setCuotaElegida(''); setMonto('');
+          }} className="mt-1 block w-full rounded-field border border-slateux-300 bg-white p-2.5 text-sm">
+            {elegibles.map(o => <option key={o.idVenta} value={o.idVenta}>
+              {o.codigoVenta} · {o.proyecto} · Lote {o.numeroLote}
+            </option>)}
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-slateux-600">Destino del pago
+          <select value={destino} onChange={e => {
+            setDestino(e.target.value as DestinoVoucher); setMonto('');
+          }} className="mt-1 block w-full rounded-field border border-slateux-300 bg-white p-2.5 text-sm">
+            <option value="CUOTA">Cuota de financiamiento</option>
+            <option value="INICIAL">Inicial adicional</option>
+          </select>
+        </label>
+        {destino === 'CUOTA' && <label className="block text-xs font-semibold text-slateux-600">
+          Cuota
+          <select value={cuota?.idCuota ?? ''} onChange={e => {
+            setCuotaElegida(e.target.value); setMonto('');
+          }} className="mt-1 block w-full rounded-field border border-slateux-300 bg-white p-2.5 text-sm">
+            {(operacion?.cuotas ?? []).map(c => <option key={c.idCuota} value={c.idCuota}>
+              Cuota {c.numero} · vence {c.fechaVencimiento} · saldo {formatCurrency(c.saldo)}
+            </option>)}
+          </select>
+        </label>}
+        <p className="text-xs text-slateux-600">Saldo disponible para documentar: <strong>{formatCurrency(saldo)}</strong></p>
+        <label className="block text-xs font-semibold text-slateux-600">Importe presentado (S/)
+          <input type="number" min="0.01" max={saldo} step="0.01" required
+            value={monto} onChange={e => setMonto(e.target.value)}
+            className="mt-1 block w-full rounded-field border border-slateux-300 p-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-semibold text-slateux-600">Medio de pago
+          <select value={metodo} onChange={e => setMetodo(e.target.value)} required
+            className="mt-1 block w-full rounded-field border border-slateux-300 bg-white p-2.5 text-sm">
+            <option value="">Seleccione un medio</option>
+            {metodos.map(m => <option value={m.idMetodoPago} key={m.idMetodoPago}>{m.nombre}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-slateux-600">Fecha de operación
+          <input type="date" required value={fecha} max={fechaHoyPeru()}
+            onChange={e => setFecha(e.target.value)}
+            className="mt-1 block w-full rounded-field border border-slateux-300 p-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-semibold text-slateux-600">Número de operación (si corresponde)
+          <input type="text" maxLength={100} value={numero}
+            onChange={e => setNumero(e.target.value)}
+            className="mt-1 block w-full rounded-field border border-slateux-300 p-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-semibold text-slateux-600">Archivo del voucher
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" required={!pendiente}
+            onChange={e => setArchivo(e.currentTarget.files?.[0] ?? null)}
+            className="mt-1 block w-full text-sm text-slateux-600" />
+        </label>
+      </fieldset>
+      {pendiente && <p className="rounded-field border border-warn-200 bg-warn-50 p-3 text-xs text-warn-700">
+        El archivo se subió correctamente, pero falta completar el registro. Reintente con el mismo comprobante.
+      </p>}
+      {error && <p role="alert" className="rounded-field bg-danger-50 p-3 text-sm text-danger-700">{error}</p>}
+      {exito && <p role="status" className="flex gap-2 rounded-field bg-success-50 p-3 text-sm text-success-700">
+        <CheckCircle2Icon className="h-4 w-4 shrink-0" />Comprobante recibido. En revisión por Finanzas; aún no reduce su saldo.
+      </p>}
+      <Button type="submit" disabled={!puedeCargar || ocupado} loading={ocupado}
+        icon={<ShieldCheckIcon className="h-4 w-4" />}>
+        {pendiente ? 'Reintentar registro' : 'Enviar voucher'}
+      </Button>
+      <p className="text-xs leading-relaxed text-slateux-500">
+        El voucher se guarda en Storage privado. Solo un pago confirmado y aplicado por Finanzas se reflejará en su cronograma.
+      </p>
+    </form>
+  </Card>;
 }

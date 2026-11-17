@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:financing": "node --require ./tests/register-types.cjs --test tests/financiamientoFrances.test.cjs",
     "test:projects": "node --test tests/projectForm.test.mjs",
     "test:workers": "node --require ./tests/register-types.cjs --test tests/workers.test.cjs tests/newWorkerPolicy.test.cjs tests/editWorkerPolicy.test.cjs",
     "test:users": "node --require ./tests/register-types.cjs --test tests/editUserEmail.test.cjs",
