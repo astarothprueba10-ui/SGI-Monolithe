@@ -1,10 +1,11 @@
 import {useEffect,useState} from 'react';
-import {AlertTriangle,FileSearch,RefreshCw,ShieldCheck} from 'lucide-react';
+import {AlertTriangle,FileSearch,RefreshCw,ShieldCheck,Wallet,CalendarDays} from 'lucide-react';
 import {useAuth} from '../../contexts/AuthContext';
 import {
   crmBackend,type CrmRevisionesResolutorias
 } from '../../services/crmBackend';
-import {currency} from '../../utils/format';
+import {formatSoles} from '../../utils/financeMoney';
+import {KpiCard,type Kpi} from '../ui/KpiCard';
 
 const fecha=(valor:string)=>{
   const date=new Date(valor.slice(0,10)+'T12:00:00Z');
@@ -43,12 +44,14 @@ export function RevisionClausulaPanel({revision=0}:{revision?:number}){
 
   // No se revela la existencia de expedientes legales a perfiles sin autorización.
   if(!autorizado)return null;
-  return <section className="mb-5 rounded-xl border border-amber-200 bg-white p-4 sm:p-5"
+  return <section className="mb-5 overflow-hidden rounded-2xl border border-brand-100 bg-white p-4 shadow-card sm:p-5"
     aria-label="Revisión contractual por cuotas consecutivas">
-    <header className="flex flex-wrap items-start justify-between gap-3">
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-brand-100 pb-4">
       <div>
         <h2 className="flex items-center gap-2 text-base font-bold text-brand-900">
-          <FileSearch className="h-5 w-5 text-amber-800"/>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+            <FileSearch className="h-5 w-5"/>
+          </span>
           Posibles causales de revisión contractual
         </h2>
         <p className="mt-1 text-xs text-brand-600">
@@ -69,35 +72,31 @@ export function RevisionClausulaPanel({revision=0}:{revision?:number}){
       {error}
     </p>:null}
     {datos&&!error&&<>
-      <div className="mt-4 flex flex-wrap items-center gap-5 rounded-lg bg-slate-50 p-3">
-        <div><span className="block text-[11px] text-brand-600">
-          Expedientes para evaluar</span>
-          <strong className="text-lg tabular-nums text-brand-900">{datos.total}</strong>
-        </div>
-        <div><span className="block text-[11px] text-brand-600">
-          Saldo de las rachas detectadas</span>
-          <strong className="text-lg tabular-nums text-brand-900">
-            {currency(datos.montoEnRevision)}
-          </strong>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-brand-600">
-          <ShieldCheck className="h-4 w-4"/>Corte Lima: {fecha(datos.fechaCorte)}
-        </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Indicadores de revisión contractual">
+        {([
+          {id:'expedientes',label:'Expedientes para evaluar',value:String(datos.total),
+            hint:'Rachas sujetas a revisión',icon:FileSearch,tone:'amber'},
+          {id:'saldo',label:'Saldo de rachas detectadas',value:formatSoles(datos.montoEnRevision),
+            hint:'Monto pendiente confirmado',icon:Wallet,tone:'rose'},
+          {id:'corte',label:'Fecha de corte · Lima',value:fecha(datos.fechaCorte),
+            hint:'Revisión administrativa',icon:CalendarDays,tone:'brand'}
+        ] satisfies Kpi[]).map(kpi=><KpiCard key={kpi.id} kpi={kpi}/>)}
       </div>
-      <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-900">
+
+      <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-900">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/>
         Solo indicios para revisar cláusulas, pagos y requisitos legales.
         Ninguna alerta resuelve ni anula automáticamente un contrato.
       </p>
       {datos.items.length===0?
-        <div className="mt-3 rounded-lg border border-brand-100 p-4 text-xs text-brand-600">
+        <div className="mt-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4 text-xs text-brand-600">
           No se identificaron rachas de tres cuotas vencidas consecutivas
           en los expedientes que puedes consultar. Esto no significa que
           no existan otros pagos pendientes.
         </div>
       :<div className="mt-3 space-y-3">
         {datos.items.map(a=><article key={a.idPlanPago}
-          className="rounded-lg border border-amber-200 p-3">
+          className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-brand-900">{a.codigoVenta}</p>
@@ -112,10 +111,10 @@ export function RevisionClausulaPanel({revision=0}:{revision?:number}){
             </div>
             <div className="text-right">
               <span className="block text-[11px] text-brand-600">Saldo de la secuencia</span>
-              <strong className="text-base tabular-nums text-rose-800">{currency(a.saldoRacha)}</strong>
+              <strong className="text-base tabular-nums text-rose-800">{formatSoles(a.saldoRacha)}</strong>
             </div>
           </div>
-          <details className="mt-3 rounded-lg bg-slate-50 p-2.5">
+          <details className="mt-3 rounded-lg bg-brand-50/50 p-2.5">
             <summary className="cursor-pointer text-xs font-semibold text-brand-700">
               Ver cuotas y evidencias contables ({a.cuotas.length})
             </summary>
@@ -128,9 +127,9 @@ export function RevisionClausulaPanel({revision=0}:{revision?:number}){
                 <tbody>{a.cuotas.map(c=><tr key={c.idCuota} className="border-t border-brand-100">
                   <td className="px-2 py-2">{c.numeroCuota}</td>
                   <td className="px-2 py-2">{fecha(c.fechaVencimiento)}</td>
-                  <td className="px-2 py-2 tabular-nums">{currency(c.importeCuota)}</td>
-                  <td className="px-2 py-2 tabular-nums">{currency(c.abonadoConfirmado)}</td>
-                  <td className="px-2 py-2 font-semibold tabular-nums">{currency(c.saldoPendiente)}</td>
+                  <td className="px-2 py-2 tabular-nums">{formatSoles(c.importeCuota)}</td>
+                  <td className="px-2 py-2 tabular-nums">{formatSoles(c.abonadoConfirmado)}</td>
+                  <td className="px-2 py-2 font-semibold tabular-nums">{formatSoles(c.saldoPendiente)}</td>
                 </tr>)}</tbody>
               </table>
             </div>
