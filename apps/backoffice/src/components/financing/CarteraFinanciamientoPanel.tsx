@@ -124,6 +124,8 @@ export function CarteraFinanciamientoPanel() {
 
   const resumen = datos?.resumen;
   const planes = (datos?.items ?? []) as CrmPlanCarteraReal[];
+  const filtrosTablaActivos=Boolean(consulta||filtrosTabla.proyecto||filtrosTabla.lote
+    ||filtrosTabla.estado||filtrosTabla.fechaDesde||filtrosTabla.fechaHasta);
 
   const kpis: Kpi[] = [
     {id:'planes',label:'Planes financiados',value:resumen?String(resumen.planes):'—',
@@ -211,7 +213,7 @@ export function CarteraFinanciamientoPanel() {
       />
       <div className="border-b border-brand-100 px-4 pt-2 sm:px-5">
         <Tabs active={vista} onChange={cambiarVista}
-          items={[{id:'PLANES',label:'Planes y saldos',count:resumen?.planes??null},
+          items={[{id:'PLANES',label:'Planes y saldos',count:datos?.total??null},
             {id:'ALERTAS',label:'Alertas de cuotas Vencidas'}]}/>
         {vista==='PLANES'&&<div className="w-full py-3">
           <FiltrosCarteraFinanciera filtros={filtrosTabla}
@@ -241,8 +243,11 @@ export function CarteraFinanciamientoPanel() {
         {error&&<div className="m-4"><Alert title="No se pudo consultar la cartera" tone="danger">{error}</Alert></div>}
         {cargando&&<p className="p-5 text-sm text-brand-500">Consultando planes y pagos aplicados…</p>}
         {!cargando&&!error&&datos?.total===0&&
-          <EmptyState title="No hay ventas financiadas en este período"
-            description="Selecciona otro mes, año o rango. Las alertas activas permanecen disponibles en su pestaña."/>}
+          <EmptyState
+            title={filtrosTablaActivos?'No hay planes que coincidan con los filtros':'No hay ventas financiadas en este período'}
+            description={filtrosTablaActivos
+              ?'Modifica el proyecto, lote, estado, fechas o búsqueda; también puedes limpiar los filtros.'
+              :'Selecciona otro mes, año o rango. Las alertas activas permanecen disponibles en su pestaña.'}/>}
         {!cargando&&!error&&datos&&datos.total>0&&<>
           <p className="px-4 pt-3 text-[11px] text-brand-500 sm:hidden">
             Desliza horizontalmente la tabla para ver todas las columnas y acciones.
