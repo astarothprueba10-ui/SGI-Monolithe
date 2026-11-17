@@ -31,6 +31,23 @@ public class EmailService {
   @Value("${security.portal.cliente-url}")
   private String portalClienteUrl;
 
+  /** Desafío separado de la contraseña; solo a correo corporativo ya verificado. */
+  public void enviarCodigoMfaFinanciero(String destinatario, String codigo) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, false, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(destinatario);
+      helper.setSubject("Verificación de seguridad financiera - MONOLITHE");
+      helper.setText("MONOLITHE: Código para gestionar el autenticador de Gerencia: "
+          + codigo + ". Válido por 5 minutos. Nunca comparta este código."
+          + " Si no inició esta solicitud, contacte a Seguridad.", false);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      throw new MailException("No se pudo preparar el desafío de seguridad financiera.", e) {};
+    }
+  }
+
   public void enviarRecuperacionContrasena(
       String destinatario,
       String urlRecuperacion,
