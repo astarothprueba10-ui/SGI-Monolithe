@@ -22,7 +22,8 @@ test('Financiamiento lists real plans, balances and installments with no duplica
   assert.match(cartera,/AlertasCuotasPanel/);
   assert.match(cartera,/RevisionClausulaPanel/);
   assert.match(cartera,/id:\s*'ALERTAS'\s*,\s*label:\s*'Alertas de cuotas Vencidas'/);
-  assert.match(cartera,/searchParams\.get\(\s*'tab'\s*\)\s*===\s*'alertas'/);
+  assert.match(cartera,/const tabUrl = searchParams\.get\('tab'\)/);
+  assert.match(cartera,/tabUrl === 'alertas'/);
   assert.doesNotMatch(cartera,/Cartera real · saldos provenientes de pagos aplicados/);
   assert.doesNotMatch(financing,/<AlertasCuotasPanel|<RevisionClausulaPanel/);
   for(const symbol of ['FINANCING_PLANS','INSTALLMENTS','financingService','VouchersCuotasPanel','demo'])
