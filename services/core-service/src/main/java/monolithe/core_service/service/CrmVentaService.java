@@ -928,6 +928,21 @@ public class CrmVentaService {
             """, actor);
     }
 
+    /** Condiciones contractuales vigentes o congeladas por reserva del comprador. */
+    @Transactional(readOnly = true)
+    public JsonNode condicionesVentaFinanciada(Long actor,Long idProspecto,Long idLote) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0 || idLote==null || idLote<=0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Seleccione prospecto y lote válidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_terminos_operacion_v1(
+                CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idProspecto,idLote);
+    }
+
     /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
     @Transactional(readOnly = true)
     public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
