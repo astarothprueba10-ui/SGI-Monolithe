@@ -5,7 +5,7 @@ export interface EstadoMfaFinanciero {
   correoCorporativoVerificado: boolean;
   habilitado: boolean;
   enrolamientoPendiente: boolean;
-  publicacionHabilitada: false;
+  publicacionHabilitada: boolean;
   requiereTotp: true;
 }
 export interface InicioMfa { mensaje: string }
