@@ -911,6 +911,8 @@ export interface CrmVoucherVenta {
   tamanioBytes: number;
 }
 export interface CrmDatosPagoVenta {
+  /** Versión aceptada, revalidada atómicamente en PostgreSQL antes de registrar. */
+  idPoliticaEsperada?: number;
   metodoPago: 'TRANSFERENCIA' | 'DEPOSITO' | 'YAPE_PLIN' | 'EFECTIVO' | 'OTRO';
   numeroOperacion: string | null;
   comprobantes: CrmVoucherVenta[];
