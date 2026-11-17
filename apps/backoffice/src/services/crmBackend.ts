@@ -1,4 +1,5 @@
 import { coreApi } from '../lib/apiClient';
+import type { CondicionesFrancesas } from '../utils/financiamientoFrances';
 import { supabase } from '../lib/supabase';
 
 export type CrmCategory = 'TODOS' | 'LEAD' | 'POTENCIAL' | 'COMPRADOR' | 'CERRADO';
@@ -970,7 +971,14 @@ export interface CrmSaleValidationResult {
   montoInicialTotal?: number | null;
   montoInicialAdicional?: number | null;
   saldoContado: number;
-  planFrances: { capitalFinanciado: number; interesTotal: number; totalCuotas: number; totalOperacion: number; cuotaMensual: number } | null;
+  idPolitica?: number;
+  politicaVersion?: number;
+  politicaFinanciera?: CondicionesFrancesas;
+  planFrances: {
+    capitalFinanciado: number; interesTotal: number;
+    totalCuotas: number; totalOperacion: number; cuotaMensual: number;
+    cuotas?: Array<{numero:number;capital:number;interes:number;cuota:number;saldo:number}>;
+  } | null;
   idMoneda: number;
   mensaje: string;
 }
@@ -1579,6 +1587,12 @@ export const crmBackend = {
       `/crm/financiamiento/clausula-resolutoria/revision${qs({pagina,tamano})}`
     );
   },
+
+  /** Política inmutable para esta venta: conserva la versión de una separación vigente. */
+  obtenerCondicionesVenta: (idProspecto:number,idLote:number) =>
+    coreApi.get<CondicionesFrancesas>(
+      `/crm/financiamiento/condiciones-venta${qs({idProspecto,idLote})}`
+    ),
 
   /** FINANCIAMIENTO: cartera por actor; no aceptar IDs arbitrarios del frontend. */
   listarCarteraFinancieraReal: (params: {
