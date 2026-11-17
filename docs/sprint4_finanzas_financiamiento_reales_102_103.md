@@ -157,3 +157,33 @@ La experiencia se alinea con los filtros de la tabla de CRM y usa **Año** como 
 8. En una ventana estrecha comprobar que los controles se reordenan y las columnas de planes no se comprimen.
 
 No se ha fusionado con `main` ni desplegado.
+
+
+## Sprint 4 — Exportaciones y presentación de alertas (17/11/2026)
+
+### 1. Paginación
+`CarteraFinanciamientoPanel.tsx` reutiliza `components/ui/Pagination.tsx`, con recuento `Mostrando X–Y de Z registros`, números de página y controles anterior/siguiente, incluso cuando solo hay una página. Se mantienen paginación real en servidor y filtros combinados.
+
+### 2. Excel financiero por período global
+- Botón `Exportar Excel` al lado del período global. Exporta las **ventas de la cohorte del período global** (sin limitarse a la página visible ni a los filtros de búsqueda exclusivos de tabla).
+- `utils/financiamientoExportExcel.ts` consulta todas las páginas autorizadas del endpoint de cartera (`tamano=100`), protege contra exportación parcial y detecta cambios de total durante la consulta. No lee Supabase directamente ni contiene datos ficticios.
+- Consulta también las alertas financieras actuales y retiene **solo las relativas a las ventas del período seleccionado**, vinculándolas por `idVenta`. Las alertas se reconocen como situación al corte (no reconstrucción histórica).
+- 3 hojas: `Resumen financiero` (indicadores y advertencia sobre saldos actuales), `Planes y saldos` (cartera completa), `Alertas de cuotas` (vencidas y próximas, por tipo).
+- Numeración financiera con dos decimales y celdas numéricas reales; fechas de Excel `dd/mm/yyyy`; texto Unicode en castellano; cabeceras, franjas y títulos azul marino/dorado/verde; filtros y encabezados congelados. Cadenas externas protegidas contra interpretación como fórmulas.
+- No incluye movimientos de Finanzas, vouchers, libros mayores ni información no autorizada: es un reporte de **financiamiento**, no un asiento contable ni un estado financiero histórico.
+
+### 3. PDF individual del comprador
+- En `PlanFinanciamientoDetalleModal.tsx` se agrega `Exportar expediente PDF` únicamente cuando el cronograma y el saldo oficial se han cargado sin errores. No altera el expediente ni aplica pagos.
+- `utils/financiamientoExportPdf.tsx` genera un documento A4 apaisado con cabecera MONOLITHE, comprador, proyecto, lote, códigos de venta y plan, fecha de operación, estado, 11 indicadores financieros, importes confirmados y cronograma completo (capital, interés, cuota, abono, saldo, estado, fechas). Contiene pie con páginas y advertencia de uso informativo.
+- Para operaciones sin formalización, no exporta cuotas proyectadas como obligaciones exigibles. Carga diferida de la librería de PDF; no se generan ni transfieren archivos a servidores ajenos.
+
+### 4. Alertas y revisión contractual
+- `AlertasCuotasPanel.tsx` y `RevisionClausulaPanel.tsx` reutilizan `KpiCard` para tres indicadores por sección, con iconos, tonos y formato monetario a dos decimales. Se modernizan cabeceras, bordes y fondos, preservando controles, permisos, reglas de mora y prevención de resolución contractual automática.
+- La pestaña conserva alertas actuales **sin depender** del período global (se evita ocultar moras de ventas antiguas). Solo la **exportación Excel** recorta alertas a las ventas de la cohorte que se está informando.
+
+### QA local pendiente
+1. Año 2026 en `/financiamiento`: paginador con `Mostrando 1–5 de 5 registros` y página 1, controles inactivos si no hay más páginas.
+2. `Exportar Excel`: validar las tres hojas, KPI, todos los planes, alertas del mismo universo de ventas y celdas de fecha/moneda; probar un período vacío y nombres con tildes.
+3. En `Ver cronograma` de `VTA-PND-2026-000030`, exportar PDF y revisar que incluya las 12 cuotas en una segunda página, importes y fechas legibles. Probar también una operación pendiente de formalización, sin proyectar deuda exigible.
+4. Verificar KPI y estética de `Alertas de cuotas Vencidas` y `Posibles causales de revisión contractual` en escritorio y móvil.
+5. Confirmar que los accesos a reportes siguen limitados por el JWT/roles y la cartera; ni exportación ni visualización registran pagos.
