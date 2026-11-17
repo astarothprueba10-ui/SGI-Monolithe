@@ -1032,31 +1032,34 @@ export function Sales() {
 
   const resumenVenta = useMemo(() => {
     if (opType !== 'Venta' || !precioLote || estadoPrecio !== 'disponible'
-        || precioLote.idLote !== Number(formLotId)) return null;
+        || precioLote.idLote !== Number(formLotId) || !condicionesVenta) return null;
     try {
       if (formSaleModality === 'CONTADO')
-        return calcularVenta(Number(precioLote.precio), reservaAplicable);
+        return calcularVenta(Number(precioLote.precio), reservaAplicable, 0, 0, condicionesVenta);
       if (!formSaleDownPayment.trim() || !formSaleInstallments.trim()
-          || Number(formSaleDownPayment) < 5000) return null;
+          || Number(formSaleDownPayment) < inicialMinimaVigente) return null;
       return calcularVenta(
         Number(precioLote.precio), reservaAplicable,
-        Number(formSaleDownPayment), Number(formSaleInstallments));
+        Number(formSaleDownPayment), Number(formSaleInstallments), condicionesVenta);
     } catch {
       return null;
     }
   }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
-      formSaleDownPayment, formSaleInstallments, reservaAplicable]);
+      formSaleDownPayment, formSaleInstallments, reservaAplicable, condicionesVenta, inicialMinimaVigente]);
 
   const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
     ? validarInicialTotal(
         formSaleDownPayment,
         precioLote ? Number(precioLote.precio) : null,
-        reservaAplicable
+        reservaAplicable,
+        condicionesVenta ?? undefined
       )
     : null;
   const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
-    && (!formSaleDownPayment.trim() || Boolean(errorMontoInicial)
-      || !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments));
+    && (!condicionesVenta || !formSaleDownPayment.trim() || Boolean(errorMontoInicial)
+      || !/^[0-9]{1,2}$/.test(formSaleInstallments)
+      || Number(formSaleInstallments) < cuotasMinimas
+      || Number(formSaleInstallments) > cuotasMaximas);
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
