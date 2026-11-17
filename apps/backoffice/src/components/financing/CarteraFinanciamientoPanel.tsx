@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarClockIcon, CoinsIcon, FileStackIcon, LandmarkIcon, RefreshCwIcon, WalletIcon, EyeIcon } from 'lucide-react';
+import {toast} from 'sonner';
+import { CalendarClockIcon, CoinsIcon, FileStackIcon, LandmarkIcon, RefreshCwIcon, WalletIcon, EyeIcon, FileSpreadsheetIcon } from 'lucide-react';
 import { crmBackend, type CrmCarteraReal, type CrmPlanCarteraReal } from '../../services/crmBackend';
 import { CrmPeriodoGlobal, type PeriodoCrmModo } from '../crm/CrmPeriodoGlobal';
 import { calcularRangoCrm } from '../../utils/crmPeriodo';
@@ -13,6 +14,8 @@ import { Table, TD, TH, TR } from '../ui/Table';
 import { FiltrosCarteraFinanciera, FILTROS_CARTERA_VACIOS, type FiltrosCarteraState } from './FiltrosCarteraFinanciera';
 import { Alert, EmptyState } from '../ui/Feedback';
 import { Button } from '../ui/Button';
+import {Pagination} from '../ui/Pagination';
+import {consultarReporteFinanciero,generarExcelFinanciamiento,descargarReporte} from '../../utils/financiamientoExportExcel';
 import { AlertasCuotasPanel } from './AlertasCuotasPanel';
 import { RevisionClausulaPanel } from './RevisionClausulaPanel';
 import { PlanFinanciamientoDetalleModal } from './PlanFinanciamientoDetalleModal';
@@ -58,6 +61,8 @@ export function CarteraFinanciamientoPanel() {
   const [cargando,setCargando] = useState(true);
   const [error,setError] = useState<string | null>(null);
   const [seleccionado,setSeleccionado] = useState<CrmPlanCarteraReal | null>(null);
+  const [exportando,setExportando] = useState(false);
+  const [progresoExportacion,setProgresoExportacion] = useState('');
 
   useEffect(() => {
     const timer=window.setTimeout(() => {
@@ -133,18 +138,50 @@ export function CarteraFinanciamientoPanel() {
       hint:'Saldo vencido',icon:CalendarClockIcon,tone:'rose'}
   ];
 
-  const nombrePeriodo = modo==='HOY'?'Hoy':modo==='SEMANA'?'Semana':modo==='MES'?'Mes':
+  const exportarExcel = async () => {
+    if(!rango || exportando)return;
+    setExportando(true);
+    setProgresoExportacion('Preparando reporte…');
+    try{
+      const reporte=await consultarReporteFinanciero(rango,setProgresoExportacion);
+      setProgresoExportacion('Generando archivo Excel…');
+      const archivo=await generarExcelFinanciamiento(reporte);
+      const inicio=rango.desde.slice(0,10);
+      const fin=new Date(new Date(rango.hastaExclusivo).getTime()-86400000).toISOString().slice(0,10);
+      descargarReporte(archivo,`MONOLITHE_Financiamiento_${inicio}_${fin}.xlsx`);
+      toast.success('Reporte Excel generado',{
+        description:`${reporte.planes.length} planes y ${reporte.alertas.length} alertas de las ventas del período.`
+      });
+    }catch(e:unknown){
+      toast.error('No se pudo exportar el financiamiento',{
+        description:e instanceof Error?e.message:'Verifica tu conexión e inténtalo nuevamente.'
+      });
+    }finally{setExportando(false);setProgresoExportacion('');}
+  };
+  const nombrePeriodo = modo='HOY'?'Hoy':modo==='SEMANA'?'Semana':modo==='MES'?'Mes':
     modo==='ANIO'?'Año':'Rango';
   const etiquetaPeriodo = modo==='RANGO'?`${fechaDesde || '—'} a ${fechaHasta || '—'}`:fechaReferencia;
 
   return <section className="min-w-0 space-y-5" aria-label="Cartera financiera de ventas reales">
-    <CrmPeriodoGlobal
-      descripcion="Filtra el Resumen de Financiamiento según la fecha de registro de la venta."
-      modo={modo} onModoChange={setModo}
-      fechaReferencia={fechaReferencia} onFechaReferenciaChange={setFechaReferencia}
-      fechaDesde={fechaDesde} onFechaDesdeChange={setFechaDesde}
-      fechaHasta={fechaHasta} onFechaHastaChange={setFechaHasta}
-    />
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="min-w-0 flex-1 [&>section]:mb-0">
+        <CrmPeriodoGlobal
+          descripcion="Filtra el Resumen de Financiamiento según la fecha de registro de la venta."
+          modo={modo} onModoChange={setModo}
+          fechaReferencia={fechaReferencia} onFechaReferenciaChange={setFechaReferencia}
+          fechaDesde={fechaDesde} onFechaDesdeChange={setFechaDesde}
+          fechaHasta={fechaHasta} onFechaHastaChange={setFechaHasta}
+        />
+      </div>
+      <div className="flex shrink-0 flex-col items-start gap-1 lg:items-end">
+        <Button icon={FileSpreadsheetIcon} onClick={()=>void exportarExcel()} disabled={exportando||!rango}>
+          {exportando?'Exportando…':'Exportar Excel'}
+        </Button>
+        {exportando&&<span role="status" className="max-w-56 text-[11px] text-brand-500">
+          {progresoExportacion}
+        </span>}
+      </div>
+    </div>
 
     <section aria-label="Indicadores financieros del período">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -243,13 +280,10 @@ export function CarteraFinanciamientoPanel() {
             })}
           </Table>
         </>}
-        {!cargando&&datos&&datos.paginas>1&&<div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 px-5 py-4 text-xs text-brand-500">
-          <span>Página {pagina} de {datos.paginas}</span>
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" disabled={pagina<=1} onClick={()=>setPagina(p=>Math.max(1,p-1))}>Anterior</Button>
-            <Button size="sm" variant="secondary" disabled={pagina>=datos.paginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</Button>
-          </div>
-        </div>}
+        {!cargando&&!error&&datos&&
+          <Pagination page={pagina} pageSize={20} total={datos.total}
+            onPageChange={setPagina}/>}
+
       </>}
     </Card>
 
