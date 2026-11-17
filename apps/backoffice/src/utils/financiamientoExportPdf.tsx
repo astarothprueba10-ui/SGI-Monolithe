@@ -77,6 +77,10 @@ export interface ExpedientePdf {
   saldo:CrmSaldoVenta;
 }
 export function DocumentoFinanciamiento({plan,cronograma,saldo}:ExpedientePdf){
+  const fechaEmision=new Intl.DateTimeFormat('es-PE',{
+    timeZone:'America/Lima',day:'2-digit',month:'2-digit',year:'numeric',
+    hour:'2-digit',minute:'2-digit'
+  }).format(new Date());
   const exigible=Boolean(plan.cuotasExigibles&&saldo.cuotasExigibles
     &&cronograma.tipoCronograma==='REGISTRADO'
     &&cronograma.fuenteEstados==='APLICACIONES_CONFIRMADAS');
@@ -104,6 +108,9 @@ export function DocumentoFinanciamiento({plan,cronograma,saldo}:ExpedientePdf){
         <Text style={styles.marca}>MONOLITHE   /   EXPEDIENTE FINANCIERO</Text>
         <Text style={styles.titulo}>{plan.comprador}</Text>
         <Text style={styles.subtitulo}>{plan.proyecto}  ·  Lote {plan.lote}</Text>
+        <Text style={[styles.subtitulo,{marginTop:6,fontSize:8}]}>
+          Emitido: {fechaEmision} (hora de Perú) · Saldos informativos actualizados
+        </Text>
       </View>
       <View style={styles.grid}>
         <View style={[styles.chip,{width:'32%'}]}>
