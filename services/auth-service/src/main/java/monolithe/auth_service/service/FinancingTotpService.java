@@ -153,7 +153,8 @@ public class FinancingTotpService {
     private void validarCorreo(Cuenta c,long id,Jwt jwt,String codigo) {
         desbloqueado(c);
         if (c.emailHash()==null || !vigente(c.emailHasta())
-           || !jwt.getId().equals(c.emailJti()) || c.emailIntentos()>=5
+           || !FinancingTotpCrypto.hash(jwt.getId()+"|"+emailVerificado(id)).equals(c.emailJti())
+           || c.emailIntentos()>=5
            || codigo==null || !codigo.matches("[0-9]{6}")
            || !passwords.matches(codigo,c.emailHash())) {
             fallaCorreo(id,c);
@@ -244,7 +245,8 @@ public class FinancingTotpService {
             email_otp_jti=?,email_otp_intentos=0,email_envios_ventana=?,
             email_ventana_inicio=CASE WHEN ? THEN email_ventana_inicio ELSE now() END,
             email_ultimo_envio=now(),actualizado_en=now() WHERE id_usuario=?
-          """,passwords.encode(codigo),jwt.getId(),enviados+1,ventana,id);
+          """,passwords.encode(codigo),FinancingTotpCrypto.hash(jwt.getId()+"|"+destino),
+          enviados+1,ventana,id);
         correo.enviarCodigoMfaFinanciero(destino,codigo);
         auditar(id,"MFA_FIN_EMAIL_ENVIADO","Envío de desafío de correo para protección financiera.");
         return Map.of("mensaje","Código enviado al correo corporativo verificado.");
