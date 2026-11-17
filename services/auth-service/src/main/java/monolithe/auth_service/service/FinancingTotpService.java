@@ -217,11 +217,15 @@ public class FinancingTotpService {
     public Map<String,Object> estado(Jwt jwt) {
         long id=actor(jwt);
         Cuenta c=fila(id,false);
+        Boolean habilitada=db.queryForObject("""
+          SELECT (public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))
+            ->>'publicacionHabilitada')::boolean
+          """,Boolean.class,id);
         return Map.of("configurado",crypto.configurado(),
            "correoCorporativoVerificado",correoCorporativoVerificado(id),
            "habilitado",c!=null && c.secreto()!=null,
            "enrolamientoPendiente",c!=null && c.pendiente()!=null && vigente(c.pendienteHasta()),
-           "publicacionHabilitada",false,
+           "publicacionHabilitada",Boolean.TRUE.equals(habilitada),
            "requiereTotp",true);
     }
 
