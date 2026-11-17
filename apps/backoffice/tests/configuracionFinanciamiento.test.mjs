@@ -135,3 +135,15 @@ test('formulario usa términos autorizados por comprador y lote', () => {
   assert.doesNotMatch(sales, /TASA_ANUAL_FIJA_PCT/);
   assert.match(simulator, /condiciones\.tasaNominalAnualPct/);
 });
+
+test('conflictos de version aceptada tienen HTTP 409 y mensajes coherentes con el Bloque 2', () => {
+  const service = read('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmVentaService.java');
+  const panel = read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
+  assert.match(service, /mensaje\.contains\("POLITICA_CAMBIO\|"\)\)\s*\{\s*return new ResponseStatusException\(HttpStatus\.CONFLICT/);
+  assert.match(service, /mensaje\.contains\("POLITICA_REQUERIDA\|"\)/);
+  assert.match(service, /mensaje\.contains\("FINANCIAMIENTO_INVALIDO\|"\)/);
+  assert.match(service, /mensaje\.contains\("SEPARACION_MONTO_INVALIDO\|"\)/);
+  assert.match(panel, /Las nuevas separaciones y ventas se validan contra políticas financieras versionadas/);
+  assert.doesNotMatch(panel, /el motor de ventas continúa usando/i);
+  assert.match(panel, /publicación de otra versión permanece bloqueada/);
+});
