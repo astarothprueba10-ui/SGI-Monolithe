@@ -151,10 +151,10 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
     </div>
 
     <Alert tone="info" title="Configuración en modo consulta · protección activa">
-      Esta versión reproduce las condiciones actuales. El motor de ventas continúa usando
-      sus validaciones existentes hasta completar la integración de versiones y contratos.
-      Para publicar cambios será obligatorio activar TOTP, confirmar cada modificación
-      y registrar su auditoría. No se admiten cambios desde esta pantalla todavía.
+      Las nuevas separaciones y ventas se validan contra políticas financieras versionadas.
+      Cada nueva operación conserva las condiciones aceptadas sin recalcular cronogramas históricos.
+      La publicación de otra versión permanece bloqueada: requerirá TOTP, confirmación explícita
+      y auditoría transaccional. Esta pantalla es exclusivamente de consulta.
     </Alert>
 
     <section className="overflow-hidden rounded-2xl border border-brand-100 bg-white">
