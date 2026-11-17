@@ -27,7 +27,7 @@ export interface PoliticaFinanciamientoActual {
   sistemaAmortizacion: 'FRANCES';
   moneda: 'PEN';
   historial: PoliticaFinanciamientoVersion[];
-  publicacionHabilitada: false;
+  publicacionHabilitada: boolean;
   requiereTotp: true;
 }
 
