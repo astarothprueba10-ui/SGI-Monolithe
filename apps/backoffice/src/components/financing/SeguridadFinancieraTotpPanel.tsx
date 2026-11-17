@@ -111,6 +111,12 @@ export function SeguridadFinancieraTotpPanel() {
       Seguridad debe configurar la clave de cifrado TOTP en Auth Service para habilitar el alta.
       No se puede continuar mientras falte.
     </Alert>}
+    {estado && !estado.correoCorporativoVerificado && <Alert tone="warning"
+      title="Correo corporativo pendiente de verificación">
+      Esta cuenta todavía no tiene un correo principal @monolithe.pe verificado.
+      Registre y confirme su correo corporativo mediante el proceso oficial de RR. HH.
+      El sistema no permitirá activar ni recuperar el autenticador hasta completar ese paso.
+    </Alert>}
     {error && <Alert tone="danger" title="No se pudo completar la verificación">{error}</Alert>}
     {aviso && <Alert tone="info" title="Verificación">{aviso}</Alert>}
 
