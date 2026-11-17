@@ -102,7 +102,7 @@ export function SeguridadFinancieraTotpPanel() {
         <h4 className="text-sm font-bold text-brand-900">Autenticación reforzada de Gerencia</h4>
         <p className="text-xs text-brand-600">
           {estado?.habilitado ? 'Autenticador activado' : 'Autenticador aún no activado'}
-          {' · '}La publicación de políticas continúa bloqueada
+          {' · '}{estado?.publicacionHabilitada ? 'Publicación protegida por TOTP' : 'Publicación bloqueada'}
         </p>
       </div>
     </div>
