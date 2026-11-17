@@ -55,11 +55,12 @@ BEGIN
  END;
  v_modo := p_json->>'modoInicial';
  v_motivo := btrim(coalesce(p_json->>'motivoPublicacion',''));
- IF v_sep IS NULL OR v_sep<=0 OR v_sep>999999999999.99 OR v_sep<>round(v_sep,2)
-    OR v_tasa IS NULL OR v_tasa<0 OR v_tasa>100 OR v_tasa<>round(v_tasa,4)
+ IF v_sep IS NULL OR v_sep::text IN ('NaN','Infinity','-Infinity') OR v_sep<=0 OR v_sep>999999999999.99 OR v_sep<>round(v_sep,2)
+    OR v_tasa IS NULL OR v_tasa::text IN ('NaN','Infinity','-Infinity') OR v_tasa<0 OR v_tasa>100 OR v_tasa<>round(v_tasa,4)
+    OR v_cuotas_min IS NULL OR v_cuotas_max IS NULL
     OR v_cuotas_min NOT BETWEEN 1 AND 120 OR v_cuotas_max NOT BETWEEN v_cuotas_min AND 120
-    OR v_dias NOT BETWEEN 1 AND 90
-    OR v_modo NOT IN ('MINIMA','RANGO','FIJA')
+    OR v_dias IS NULL OR v_dias NOT BETWEEN 1 AND 90
+    OR v_modo IS NULL OR v_modo NOT IN ('MINIMA','RANGO','FIJA')
     OR p_json->>'sistemaAmortizacion' IS DISTINCT FROM 'FRANCES'
     OR p_json->>'moneda' IS DISTINCT FROM 'PEN'
     OR length(v_motivo) NOT BETWEEN 12 AND 500 THEN
