@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {AlertCircle,CalendarClock,CheckCircle2,RefreshCw,ShieldCheck} from 'lucide-react';
+import {AlertCircle,CalendarClock,CalendarDays,CheckCircle2,RefreshCw,ShieldCheck} from 'lucide-react';
 import {toast} from 'sonner';
 import {useAuth} from '../../contexts/AuthContext';
 import {
@@ -7,7 +7,8 @@ import {
   type CrmAlertasCuotas,
   type CrmTipoAlertaCuota
 } from '../../services/crmBackend';
-import {currency} from '../../utils/format';
+import {formatSoles} from '../../utils/financeMoney';
+import {KpiCard,type Kpi} from '../ui/KpiCard';
 
 const fecha=(v:string)=>{
   const date=new Date(v.slice(0,10)+'T12:00:00Z');
@@ -73,12 +74,15 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
     <p className="text-xs text-brand-600">Las alertas financieras requieren el permiso de consulta de ventas.</p>
   </section>;
 
-  return <section className="mb-5 rounded-xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5"
+  return <section className="mb-5 overflow-hidden rounded-2xl border border-brand-100 bg-white p-4 shadow-card sm:p-5"
     aria-label="Alertas reales de cuotas">
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brand-100 pb-4">
       <div>
         <h2 className="flex items-center gap-2 text-base font-bold text-brand-900">
-          <CalendarClock className="h-5 w-5 text-blue-700"/>Alertas reales de cuotas
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-900 text-accent-300">
+            <CalendarClock className="h-5 w-5"/>
+          </span>
+          Alertas reales de cuotas
         </h2>
         <p className="mt-1 text-xs text-brand-600">
           Saldos de pagos confirmados · Vencimientos en horario de Perú ·
@@ -108,22 +112,15 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
       {error}
     </div>:null}
     {datos&&!error&&<>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-amber-50 p-3">
-          <span className="block text-xs text-amber-800">Próximas a vencer (7 días)</span>
-          <strong className="mt-1 block text-lg tabular-nums text-amber-950">{datos.proximas}</strong>
-          <span className="text-xs tabular-nums text-amber-800">{currency(datos.montoProximo)}</span>
-        </div>
-        <div className="rounded-lg bg-rose-50 p-3">
-          <span className="block text-xs text-rose-800">Vencidas y parcialmente atrasadas</span>
-          <strong className="mt-1 block text-lg tabular-nums text-rose-950">{datos.vencidas}</strong>
-          <span className="text-xs tabular-nums text-rose-800">{currency(datos.montoVencido)}</span>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3">
-          <span className="block text-xs text-brand-600">Fecha de corte · Lima</span>
-          <strong className="mt-1 block text-base text-brand-900">{fecha(datos.fechaCorte)}</strong>
-          <span className="text-xs text-brand-500">Actualización bajo demanda, sin alertas ficticias</span>
-        </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Indicadores de alertas">
+        {([
+          {id:'proximas',label:'Próximas a vencer (7 días)',value:String(datos.proximas),
+            hint:`Saldo próximo: ${formatSoles(datos.montoProximo)}`,icon:CalendarClock,tone:'amber'},
+          {id:'vencidas',label:'Vencidas y parcialmente atrasadas',value:String(datos.vencidas),
+            hint:`Saldo vencido: ${formatSoles(datos.montoVencido)}`,icon:AlertCircle,tone:'rose'},
+          {id:'corte',label:'Fecha de corte · Lima',value:fecha(datos.fechaCorte),
+            hint:'Consulta actual, sin avisos ficticios',icon:CalendarDays,tone:'brand'}
+        ] satisfies Kpi[]).map(kpi=><KpiCard key={kpi.id} kpi={kpi}/>)}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Filtrar alertas">
@@ -139,12 +136,12 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
           }`}>{label}</button>)}
       </div>
 
-      {datos.items.length===0?<div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 p-4 text-xs text-green-800">
+      {datos.items.length===0?<div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs text-emerald-800">
         <CheckCircle2 className="h-4 w-4 shrink-0"/>
         No hay cuotas con alerta activa para este filtro y cartera.
-      </div>:<div className="mt-3 max-w-full overflow-auto rounded-lg border border-brand-100">
+      </div>:<div className="mt-3 max-w-full overflow-auto rounded-xl border border-brand-100">
         <table className="w-full min-w-[760px] text-left text-xs">
-          <thead className="bg-slate-100 text-brand-700">
+          <thead className="bg-brand-50 text-brand-800">
             <tr>{['Contrato / comprador','Cuota','Vencimiento','Situación','Abonado','Saldo pendiente'].map(h=>
               <th key={h} className="whitespace-nowrap px-3 py-2.5 font-bold">{h}</th>)}</tr>
           </thead>
@@ -167,9 +164,9 @@ export function AlertasCuotasPanel({revision=0}:{revision?:number}) {
                     Vence {a.diasParaVencer===0?'hoy':`en ${a.diasParaVencer} días`}
                   </span>}
               </td>
-              <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{currency(a.abonadoConfirmado)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{formatSoles(a.abonadoConfirmado)}</td>
               <td className="whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums text-brand-900">
-                {currency(a.saldoCuota)}
+                {formatSoles(a.saldoCuota)}
               </td>
             </tr>)}
           </tbody>
