@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -47,6 +46,9 @@ public class FinancingTotpCrypto {
     }
 
     public String nuevoSecreto() { return base32(aleatorio(20)); }
+    public String nuevoCodigoCorreo() {
+        return String.format(java.util.Locale.ROOT, "%06d", random.nextInt(1_000_000));
+    }
 
     public String cifrar(String secreto, long usuario) {
         try {
