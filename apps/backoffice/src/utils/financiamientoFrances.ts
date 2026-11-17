@@ -34,6 +34,32 @@ export const TASA_ANUAL_FIJA_PCT = 10;
 export const TASA_MENSUAL_NOMINAL_PCT = TASA_ANUAL_FIJA_PCT / 12;
 export const MINIMO_INICIAL_TOTAL = 5000;
 
+/** Solo vista previa: la política real proviene de Core Service por comprador/lote. */
+export interface CondicionesFrancesas {
+  idPolitica: number;
+  version: number;
+  montoSeparacion: number;
+  modoInicial: 'MINIMA' | 'RANGO' | 'FIJA';
+  inicialMinima: number | null;
+  inicialMaxima: number | null;
+  inicialFija: number | null;
+  tasaNominalAnualPct: number;
+  cuotasMin: number;
+  cuotasMax: number;
+  diasVencimientoSeparacion: number;
+}
+
+export const CONDICIONES_LEGACY_10: CondicionesFrancesas = {
+  idPolitica: 1, version: 1, montoSeparacion: 500,
+  modoInicial: 'MINIMA', inicialMinima: MINIMO_INICIAL_TOTAL,
+  inicialMaxima: null, inicialFija: null,
+  tasaNominalAnualPct: TASA_ANUAL_FIJA_PCT,
+  cuotasMin: 1, cuotasMax: 36, diasVencimientoSeparacion: 7
+};
+
+const inicialRequerida = (c: CondicionesFrancesas) =>
+  c.modoInicial === 'FIJA' ? Number(c.inicialFija) : Number(c.inicialMinima);
+
 const monedaValida = (valor: number) =>
   Number.isFinite(valor) && valor >= 0
   && Math.abs(valor * 100 - Math.round(valor * 100)) < 0.000001
@@ -44,12 +70,19 @@ const soles = (valor: number) => valor / 100;
 export function validarInicialTotal(
   valor: string,
   precioOficial: number | null,
-  abonoReserva = 0
+  abonoReserva = 0,
+  condiciones: CondicionesFrancesas = CONDICIONES_LEGACY_10
 ): string | null {
   if (!valor.trim()) return null;
   const monto = Number(valor);
   if (!monedaValida(monto)) return 'Ingrese una inicial válida con máximo dos decimales.';
-  if (monto < MINIMO_INICIAL_TOTAL) return 'La inicial total mínima es de S/ 5,000.';
+  if (monto < inicialRequerida(condiciones))
+    return 'La inicial debe cumplir el mínimo vigente de S/ ' + inicialRequerida(condiciones).toFixed(2) + '.';
+  if (condiciones.modoInicial === 'RANGO' && condiciones.inicialMaxima != null
+      && monto > condiciones.inicialMaxima)
+    return 'La inicial supera el máximo permitido de S/ ' + condiciones.inicialMaxima.toFixed(2) + '.';
+  if (condiciones.modoInicial === 'FIJA' && monto !== condiciones.inicialFija)
+    return 'La inicial debe ser exactamente S/ ' + Number(condiciones.inicialFija).toFixed(2) + '.';
   if (!monedaValida(abonoReserva) || abonoReserva > monto)
     return 'La separación aplicada no puede superar la inicial total.';
   if (precioOficial !== null && (!monedaValida(precioOficial) || monto >= precioOficial))
@@ -61,14 +94,20 @@ export function calcularVenta(
   precioOficial: number,
   abonoReserva = 0,
   inicialTotal = 0,
-  numeroCuotas = 0
+  numeroCuotas = 0,
+  condiciones: CondicionesFrancesas = CONDICIONES_LEGACY_10
 ): ResumenVentaCalculado {
   if (![precioOficial, abonoReserva, inicialTotal].every(monedaValida)
       || precioOficial <= 0 || abonoReserva > precioOficial
-      || !Number.isInteger(numeroCuotas) || numeroCuotas < 0 || numeroCuotas > 36
+      || !Number.isInteger(numeroCuotas) || numeroCuotas < 0
+      || numeroCuotas > condiciones.cuotasMax
+      || (numeroCuotas > 0 && numeroCuotas < condiciones.cuotasMin)
       || (numeroCuotas === 0 && inicialTotal !== 0)
       || (numeroCuotas > 0 && (
-        inicialTotal < MINIMO_INICIAL_TOTAL ||
+        inicialTotal < inicialRequerida(condiciones) ||
+        (condiciones.modoInicial === 'RANGO' && condiciones.inicialMaxima != null
+          && inicialTotal > condiciones.inicialMaxima) ||
+        (condiciones.modoInicial === 'FIJA' && inicialTotal !== condiciones.inicialFija) ||
         inicialTotal >= precioOficial ||
         abonoReserva > inicialTotal
       ))) {
@@ -81,17 +120,19 @@ export function calcularVenta(
   const adicional = numeroCuotas > 0 ? inicial - reserva : 0;
   const principal = numeroCuotas > 0 ? precio - inicial : 0;
 
-  const tasa = TASA_ANUAL_FIJA_PCT / 1200;
+  const tasa = condiciones.tasaNominalAnualPct / 1200;
   const potencia = Math.pow(1 + tasa, numeroCuotas);
   const cuotaBase = numeroCuotas > 0
-    ? Math.round(principal * (tasa * potencia) / (potencia - 1))
+    ? tasa === 0
+      ? Math.round(principal / numeroCuotas)
+      : Math.round(principal * (tasa * potencia) / (potencia - 1))
     : 0;
   let saldo = principal;
   let interesTotal = 0;
   const cuotas: CuotaFrancesa[] = [];
 
   for (let numero = 1; numero <= numeroCuotas; numero++) {
-    const interes = Math.round(saldo * tasa);
+    const interes = Math.round(saldo * condiciones.tasaNominalAnualPct / 1200);
     const capital = numero === numeroCuotas ? saldo : cuotaBase - interes;
     const cuota = numero === numeroCuotas ? saldo + interes : cuotaBase;
     if (capital <= 0 || capital > saldo || cuota <= 0)
