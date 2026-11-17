@@ -156,7 +156,7 @@ test('Excel incluye KPI, todas las p√°ginas, cartera y alertas de ventas en per√
   const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const excel=read('../src/utils/financiamientoExportExcel.ts');
   assert.match(panel,/Exportar Excel/);
-  assert.match(panel,/consultarReporteFinanciero\(rango,setProgresoExportacion\)/);
+  assert.match(panel,/consultarReporteFinanciero\(\s*rango\s*,\s*setProgresoExportacion\s*\)/);
   assert.match(excel,/listarCarteraFinancieraReal/);
   assert.match(excel,/listarAlertasCuotas/);
   assert.match(excel,/pagina,tamano:100/);
