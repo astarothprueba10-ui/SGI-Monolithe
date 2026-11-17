@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=(path)=>readFileSync(new URL(path,import.meta.url),'utf8');
 
-test('alertas son un tercer tab; no bloques independientes ni nota azul',()=>{
+test('alertas mantienen su pestaña propia sin bloques independientes ni nota azul',()=>{
   const cartera=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const financing=read('../src/pages/Financing.tsx');
-  assert.match(cartera,/id:'ALERTAS',label:'Alertas de cuotas Vencidas'/);
-  assert.match(cartera,/searchParams\.get\('tab'\)==='alertas'/);
+  assert.match(cartera,/id:\s*'ALERTAS'\s*,\s*label:\s*'Alertas de cuotas Vencidas'/);
+  assert.match(cartera,/searchParams\.get\(\s*'tab'\s*\)\s*===\s*'alertas'/);
   assert.match(cartera,/<AlertasCuotasPanel\s*\/>/);
   assert.match(cartera,/<RevisionClausulaPanel\s*\/>/);
   assert.doesNotMatch(cartera,/Cartera real · saldos provenientes de pagos aplicados/);
