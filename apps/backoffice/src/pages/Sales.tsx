@@ -48,7 +48,7 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
-import { calcularVenta, validarInicialTotal, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
+import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -210,6 +210,11 @@ export function Sales() {
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [formLotId, setFormLotId] = useState('');
+  const [politicaOperativa, setPoliticaOperativa] = useState<{
+    idProspecto: number; idLote: number; condiciones: CondicionesFrancesas;
+  } | null>(null);
+  const [consultandoPolitica, setConsultandoPolitica] = useState(false);
+  const [errorPolitica, setErrorPolitica] = useState<string | null>(null);
   const [precioLote, setPrecioLote] = useState<LotePrecioVigente | null>(null);
   const [estadoPrecio, setEstadoPrecio] = useState<
     'inicial' | 'cargando' | 'disponible' | 'sin_precio' | 'error'
@@ -238,6 +243,8 @@ export function Sales() {
     codigoLote: string;
     idAsesor?: number | null;
     resumen: ResumenVentaCalculado;
+    tasaAnualPct: number;
+    idPolitica: number;
   } | null>(null);
 
   const [datosVentaValidados, setDatosVentaValidados] = useState<{
@@ -246,6 +253,8 @@ export function Sales() {
     codigoLote: string;
     idAsesor?: number | null;
     resumen: ResumenVentaCalculado;
+    tasaAnualPct: number;
+    idPolitica: number;
   } | null>(null);
   const [editandoComprador, setEditandoComprador] = useState(false);
   const [loadingFormData, setLoadingFormData] = useState(false);
@@ -553,6 +562,29 @@ export function Sales() {
     setFormLotId(lotIdStr);
     setComprobantesVenta([]);
   };
+
+  useEffect(() => {
+    setPoliticaOperativa(null);
+    setErrorPolitica(null);
+    if (!isModalOpen || !selectedProspectId || !formLotId) {
+      setConsultandoPolitica(false);
+      return;
+    }
+    let vigente = true;
+    const idProspecto = Number(selectedProspectId);
+    const idLote = Number(formLotId);
+    setConsultandoPolitica(true);
+    void crmBackend.obtenerCondicionesVenta(idProspecto, idLote)
+      .then(condiciones => {
+        if (vigente) setPoliticaOperativa({ idProspecto, idLote, condiciones });
+      })
+      .catch(err => {
+        if (vigente) setErrorPolitica(err instanceof Error ? err.message
+          : 'No se pudo consultar la política financiera.');
+      })
+      .finally(() => { if (vigente) setConsultandoPolitica(false); });
+    return () => { vigente = false; };
+  }, [isModalOpen, selectedProspectId, formLotId]);
 
   useEffect(() => {
     setVoucherFile(null);
@@ -988,6 +1020,15 @@ export function Sales() {
   const reservaAplicable = opType === 'Venta' && formLotId
     ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReservaAplicable ?? 0
     : 0;
+  const condicionesVenta = politicaOperativa
+    && politicaOperativa.idProspecto === Number(selectedProspectId)
+    && politicaOperativa.idLote === Number(formLotId)
+    ? politicaOperativa.condiciones : null;
+  const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
+    ? Number(condicionesVenta.inicialFija)
+    : Number(condicionesVenta?.inicialMinima ?? 0);
+  const cuotasMinimas = condicionesVenta?.cuotasMin ?? 1;
+  const cuotasMaximas = condicionesVenta?.cuotasMax ?? 36;
 
   const resumenVenta = useMemo(() => {
     if (opType !== 'Venta' || !precioLote || estadoPrecio !== 'disponible'
