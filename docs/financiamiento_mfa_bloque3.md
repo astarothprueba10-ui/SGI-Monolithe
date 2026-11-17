@@ -46,6 +46,13 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 - Tras revocar o recuperar se revocan refresh sessions y aumenta `version_sesiones` para invalidar JWT antiguos dentro del verificador MFA. La interfaz también borra sesión local.
 - Las tablas tienen RLS y privilegios revocados para `anon`, `authenticated` y `service_role`. Solo el rol backend `sigi_app_user` puede manipular filas. No se abrió RPC de publicación.
 
+## Diagnóstico de activación confirmado (17/11/2026)
+
+- Supabase TEST: **5 usuarios con rol Gerencia**, 5 con algún correo principal, **0 con correo corporativo principal @monolithe.pe**, y por tanto 0 con correo corporativo principal verificado. No se debe cambiar `verificado` manualmente.
+- Railway: solo se observó entorno `production`; el servicio `auth-service` consume `main`. **No se ha modificado ni desplegado ese entorno**. La variable `FINANCING_MFA_ENCRYPTION_KEY_BASE64` no figura entre las variables del servicio de producción. Antes de realizar una prueba funcional, usar un despliegue aislado que consuma la rama y Supabase TEST; no sustituir el código de producción.
+- El endpoint `GET /status` devuelve `correoCorporativoVerificado` como booleano para la cuenta autenticada y `configurado` para la clave. Backoffice muestra ambos impedimentos sin filtrar direcciones ni secretos.
+- Hasta poder verificar correo real en el flujo oficial, la prueba de enrolamiento y recuperación debe permanecer **pendiente**, aunque las funciones, SQL y UI estén implementadas.
+
 ## Pruebas y activación segura
 
 - Hay pruebas unitarias en `FinancingTotpCryptoTest.java` con vector RFC 6238, replay, AES-GCM/AAD e IV distintos.
