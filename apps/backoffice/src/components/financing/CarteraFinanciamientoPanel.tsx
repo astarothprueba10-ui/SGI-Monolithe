@@ -304,7 +304,7 @@ export function CarteraFinanciamientoPanel() {
                 el nuevo permiso de configuración financiera. Cierra sesión y vuelve a
                 ingresar para actualizarlo. Ningún cambio financiero está habilitado.
               </Alert>
-            </div>)}}
+            </div>)}
 
       {vista === 'PLANES' && <>
         {error && <div className="m-4"><Alert title="No se pudo consultar la cartera" tone="danger">{error}</Alert></div>}
