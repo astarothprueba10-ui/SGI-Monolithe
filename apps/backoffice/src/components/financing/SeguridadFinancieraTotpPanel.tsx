@@ -52,8 +52,9 @@ export function SeguridadFinancieraTotpPanel() {
   }
 
   const iniciar = () => void ejecutar(async () => {
-    await financingMfaService.iniciar(password);
-    setPassword('');
+    const contrasenaActual = password;
+    setPassword(''); // No retener credencial ante error de red o de validación.
+    await financingMfaService.iniciar(contrasenaActual);
     setEmailCode('');
     setTotpCode('');
     setRecoveryCode('');
