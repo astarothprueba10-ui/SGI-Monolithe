@@ -129,6 +129,9 @@ public class FinancingTotpService {
             bloqueo_hasta=CASE WHEN ?>=5 THEN now()+interval '15 minutes' ELSE NULL END,
             actualizado_en=now() WHERE id_usuario=?
           """, n>=5?0:n, n, id);
+        auditar(id,n>=5?"MFA_FIN_BLOQUEO":"MFA_FIN_CODIGO_INVALIDO",
+            n>=5?"Intentos fallidos: bloqueo temporal TOTP.":"Intento TOTP fallido.");
+        if(n>=5) avisarDespuesCommit(id,"BLOQUEO DE AUTENTICADOR POR INTENTOS FALLIDOS");
         throw fallo(HttpStatus.BAD_REQUEST, "Código de autenticación inválido, caducado o reutilizado.");
     }
 
@@ -141,6 +144,9 @@ public class FinancingTotpService {
               bloqueo_hasta=CASE WHEN ?>=5 THEN now()+interval '15 minutes' ELSE bloqueo_hasta END,
               actualizado_en=now() WHERE id_usuario=?
           """, n>=5?0:n, n, n, id);
+        auditar(id,n>=5?"MFA_FIN_BLOQUEO":"MFA_FIN_EMAIL_INVALIDO",
+            n>=5?"Intentos fallidos: bloqueo temporal de correo.":"Desafío de correo rechazado.");
+        if(n>=5) avisarDespuesCommit(id,"BLOQUEO DE VERIFICACIÓN DE CORREO");
         throw fallo(HttpStatus.BAD_REQUEST,"Código de correo inválido o expirado.");
     }
 
@@ -217,6 +223,9 @@ public class FinancingTotpService {
                 bloqueo_hasta=CASE WHEN ?>=5 THEN now()+interval '15 minutes' ELSE NULL END,
                 actualizado_en=now() WHERE id_usuario=?
               """,n>=5?0:n,n,id);
+            auditar(id,n>=5?"MFA_FIN_BLOQUEO":"MFA_FIN_PASSWORD_INVALIDO",
+                n>=5?"Bloqueo temporal de verificación de contraseña.":"Contraseña de seguridad incorrecta.");
+            if(n>=5) avisarDespuesCommit(id,"BLOQUEO POR INTENTOS DE CONTRASEÑA");
             throw fallo(HttpStatus.FORBIDDEN,"No se pudo comprobar la identidad.");
         }
         String destino=emailVerificado(id);
@@ -318,7 +327,7 @@ public class FinancingTotpService {
         Integer vigente=db.queryForObject("""
           SELECT p.version FROM public.cfg_fin_politica_activa a
           JOIN public.cfg_fin_politicas_versiones p ON p.id_politica=a.id_politica
-          WHERE a.id=1
+          WHERE a.id=1 FOR SHARE OF a
           """,Integer.class);
         if(!version.equals(vigente)) throw fallo(HttpStatus.CONFLICT,
             "La versión financiera cambió. Revalide la propuesta.");
