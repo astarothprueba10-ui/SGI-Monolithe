@@ -77,7 +77,7 @@ export function validarInicialTotal(
   const monto = Number(valor);
   if (!monedaValida(monto)) return 'Ingrese una inicial válida con máximo dos decimales.';
   if (monto < inicialRequerida(condiciones))
-    return 'La inicial debe cumplir el mínimo vigente de S/ ' + inicialRequerida(condiciones).toFixed(2) + '.';
+    return 'La inicial total mínima es S/ ' + inicialRequerida(condiciones).toFixed(2) + ' según la política financiera.';
   if (condiciones.modoInicial === 'RANGO' && condiciones.inicialMaxima != null
       && monto > condiciones.inicialMaxima)
     return 'La inicial supera el máximo permitido de S/ ' + condiciones.inicialMaxima.toFixed(2) + '.';
