@@ -44,8 +44,10 @@ const fechaCorta = (v: string) => new Intl.DateTimeFormat('es-PE', {
 export function CarteraFinanciamientoPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { can, user } = useAuth();
-  // La pestaña solo aparece con permiso Y rol GERENCIA; la API y SQL vuelven a comprobarlo.
-  const puedeConfigurar = can('financing.configure') && user.roles.includes('Gerencia');
+  // La visibilidad depende del rol Gerencia; el acceso real exige permiso vigente
+  // en JWT y además permiso + rol activo comprobados otra vez por la base de datos.
+  const puedeConfigurar = user.roles.includes('Gerencia');
+  const permisoConfiguracionVigente = can('financing.configure');
   const tabUrl = searchParams.get('tab');
   const vista = tabUrl === 'configuracion' && puedeConfigurar ? 'CONFIGURACION'
     : tabUrl === 'alertas' ? 'ALERTAS' : 'PLANES';
@@ -294,7 +296,15 @@ export function CarteraFinanciamientoPanel() {
       </div>}
 
       {vista === 'CONFIGURACION' && puedeConfigurar &&
-        <ConfiguracionPlanesFinanciamientoPanel />}
+        (permisoConfiguracionVigente
+          ? <ConfiguracionPlanesFinanciamientoPanel />
+          : <div className="p-4 sm:p-5">
+              <Alert tone="warning" title="Actualiza tu sesión de Gerencia">
+                Tu cuenta tiene el rol Gerencia, pero la sesión actual todavía no incluye
+                el nuevo permiso de configuración financiera. Cierra sesión y vuelve a
+                ingresar para actualizarlo. Ningún cambio financiero está habilitado.
+              </Alert>
+            </div>)}}
 
       {vista === 'PLANES' && <>
         {error && <div className="m-4"><Alert title="No se pudo consultar la cartera" tone="danger">{error}</Alert></div>}
