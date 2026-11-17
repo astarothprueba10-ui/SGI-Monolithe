@@ -919,6 +919,15 @@ public class CrmVentaService {
             """,actor,idVenta);
     }
 
+    /** Políticas financieras versionadas: acceso de lectura exclusivamente para Gerencia. */
+    @Transactional(readOnly = true)
+    public JsonNode consultarPoliticasFinanciamiento(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+            SELECT public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))::text
+            """, actor);
+    }
+
     /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
     @Transactional(readOnly = true)
     public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
