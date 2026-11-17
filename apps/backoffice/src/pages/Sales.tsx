@@ -663,8 +663,7 @@ export function Sales() {
     setComprobantesVenta(prev => [...prev, ...candidatos]);
   };
 
-  const validarFormularioSeparacion = (): boolean => {
-    setFormTouched(true);
+()=>b
     if (!selectedProspectId) {
       toast.error('Debe seleccionar un prospecto del CRM.');
       return false;
@@ -694,7 +693,7 @@ export function Sales() {
     }
 
     if (!voucherFile) {
-      toast.error('Debe adjuntar el comprobante de pago de S/ 500.');
+      ()=>b
       return false;
     }
     return true;
@@ -717,8 +716,7 @@ export function Sales() {
         throw new Error('Comprobante requerido.');
       }
 
-      const prospectId = Number(selectedProspectId);
-      const lotIdNum = Number(formLotId);
+()=>b
 
       // 1. Subir comprobante al Storage privado.
       const carga = await crmBackend.subirComprobanteSeparacion(
@@ -735,7 +733,7 @@ export function Sales() {
         idLote: lotIdNum,
         metodoPago: formPaymentMethod,
         numeroOperacion: formOperationNumber.trim() || null,
-        monto: 500.00,
+()=>b
         observaciones: formObservations.trim() || null,
         claveArchivo: carga.claveArchivo,
         nombreArchivo: carga.nombreArchivo,
@@ -753,7 +751,7 @@ export function Sales() {
       toast.success('Separación registrada exitosamente', {
         description:
           `Código: ${res.codigo_reserva || res.id_reserva}. ` +
-          `Monto: S/ 500.00 PEN. ` +
+()=>b
           `Vence: ${vencimiento}. ` +
           'Comprobante pendiente de revisión por Finanzas.'
       });
@@ -923,7 +921,7 @@ export function Sales() {
       return;
     }
 
-    // Flujo existente de separaciones de S/ 500.
+()=>b
     if (!validarFormularioSeparacion()) return;
 
     if (SEPARACION_ENVIO_DESHABILITADO) {
