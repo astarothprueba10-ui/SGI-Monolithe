@@ -26,6 +26,12 @@ export interface VistaPreviaPolitica {
   publicacionHabilitada: boolean;
   mensaje: string;
 }
+export interface ResultadoEnsayoTotp {
+  ensayoValidado: true;
+  publicacionRealizada: false;
+  versionEsperada: number;
+  hashPropuesta: string;
+}
 export interface AutorizacionPolitica {
   autorizacionId: string;
   expiraEnSegundos: number;
@@ -60,6 +66,9 @@ export const financingPolicyPublicationService = {
   previsualizar: (versionEsperada: number, borrador: BorradorFinanciero) =>
     authSecuredApi.post<VistaPreviaPolitica>('/financing-policies/preview',
       { versionEsperada, borrador }),
+  ensayarTotp: (versionEsperada: number, borrador: BorradorFinanciero, codigo: string) =>
+    authSecuredApi.post<ResultadoEnsayoTotp>('/financing-mfa/rehearse',
+      { versionEsperada, borrador, codigo }),
   autorizar: (versionEsperada: number, borrador: BorradorFinanciero, codigo: string, nonce: string) =>
     authSecuredApi.post<AutorizacionPolitica>('/financing-mfa/authorize',
       { versionEsperada, borrador, codigo, nonce }),
