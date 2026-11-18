@@ -366,6 +366,49 @@ public class FinancingTotpService {
         return paso;
     }
 
+    /**
+     * Ensayo de firma financiera SIN publicación ni emisión de recibos.
+     * Sólo habilitado mientras el guard transaccional siga CERRADO.
+     * Reutiliza validaciones de Gerencia, sesión, propuesta, código y antirreplay.
+     */
+    @Transactional(noRollbackFor=ResponseStatusException.class)
+    public Map<String,Object> ensayarAutorizacion(Jwt jwt,String codigo,Integer version,
+                                                    Map<String,Object> borrador) {
+        long id=actor(jwt);
+        if (codigo==null || !codigo.matches("[0-9]{6}")
+                || version==null || version<1 || borrador==null) {
+            throw fallo(HttpStatus.BAD_REQUEST,"Datos de ensayo financiero inválidos.");
+        }
+        if (!crypto.configurado()) {
+            throw fallo(HttpStatus.SERVICE_UNAVAILABLE,"El cifrado TOTP no está configurado.");
+        }
+        // Hash y versión SIEMPRE calculados y autorizados por PostgreSQL.
+        JsonNode vista=publicacion.previsualizar(jwt,version,borrador);
+        if (vista.path("publicacionHabilitada").asBoolean()) {
+            throw fallo(HttpStatus.CONFLICT,
+                "Ensayo deshabilitado mientras está permitida la publicación real.");
+        }
+        String hash=vista.path("hashPropuesta").asText();
+        if (!hash.matches("[a-f0-9]{64}")) {
+            throw fallo(HttpStatus.SERVICE_UNAVAILABLE,"No se pudo verificar el hash financiero.");
+        }
+        Cuenta c=fila(id,true);
+        validarTotp(c,id,codigo); // consume el paso TOTP y registra intentos fallidos.
+        db.queryForObject("""
+          SELECT public.sp_registrar_auditoria(
+            CAST(? AS bigint),'FINANCIAMIENTO'::varchar,
+            'MFA_FIN_ENSAYO_AUTORIZACION'::varchar,
+            'POLITICA_FINANCIERA'::varchar,
+            CAST(? AS varchar),'EXITOSO'::varchar,
+            'Ensayo de firma TOTP; no se publica ninguna política.'::varchar,
+            jsonb_build_object(
+              'origen','MFA_FINANCIERO','version_esperada',CAST(? AS integer),
+              'hash_propuesta',CAST(? AS text),'publicacion_realizada',false))
+          """,Long.class,id,version.toString(),version,hash);
+        return Map.of("ensayoValidado",true,"versionEsperada",version,
+            "hashPropuesta",hash,"publicacionRealizada",false);
+    }
+
     /** Recibo TOTP ligado a un borrador VALIDADO y hasheado por PostgreSQL, no por el navegador. */
     @Transactional(noRollbackFor=ResponseStatusException.class)
     public Map<String,Object> autorizar(Jwt jwt,String codigo,Integer version,
