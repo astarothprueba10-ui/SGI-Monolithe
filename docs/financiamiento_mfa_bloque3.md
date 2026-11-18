@@ -9,7 +9,7 @@
 
 1. Configurar **solo en Auth Service** la variable `FINANCING_MFA_ENCRYPTION_KEY_BASE64` con 32 bytes aleatorios codificados en Base64. Guardarla en el gestor de secretos del entorno correspondiente, con acceso restringido. No introducirla en `.env` versionado, Pull Requests, migraciones, notas, capturas ni chat. No modificar el valor sin planificar una recodificación autenticada de todos los secretos activos.
 2. Mantener `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` y TLS operativos. Un desafío que no llega bloquea el alta.
-3. Cada gerente debe tener **correo principal de tipo EMAIL, activo, verificado y del dominio @monolithe.pe** en `core_personas_contactos`, mediante el procedimiento existente de comprobación de identidad/cambio de correo. No poner `verificado=true` manualmente para facilitar las pruebas.
+3. Cada gerente debe tener **correo principal de tipo EMAIL, activo y verificado, sea personal o corporativo** en `core_personas_contactos`, mediante el procedimiento existente de comprobación de identidad/cambio de correo. No poner `verificado=true` manualmente para facilitar las pruebas.
 4. El JWT debe incorporar `financing.configure`, `session_version` y `jti`, y el usuario debe mantener el rol `GERENCIA` activo. El cambio de contraseña pendiente, el usuario bloqueado o el rol revocado deniegan el factor.
 
 Para generar la clave en PowerShell **local**, sin copiarla al chat:
@@ -48,10 +48,10 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 
 ## Diagnóstico de activación confirmado (17/11/2026)
 
-- Supabase TEST: **5 usuarios con rol Gerencia**, 5 con algún correo principal, **0 con correo corporativo principal @monolithe.pe**, y por tanto 0 con correo corporativo principal verificado. No se debe cambiar `verificado` manualmente.
+- Supabase TEST: **5 cuentas con rol Gerencia**; las 5 tienen correo principal activo, **3 están verificados y 2 pendientes**. El dominio ya no es criterio de elegibilidad. No se debe cambiar `verificado` manualmente.
 - Railway: solo se observó entorno `production`; el servicio `auth-service` consume `main`. **No se ha modificado ni desplegado ese entorno**. La variable `FINANCING_MFA_ENCRYPTION_KEY_BASE64` no figura entre las variables del servicio de producción. Antes de realizar una prueba funcional, usar un despliegue aislado que consuma la rama y Supabase TEST; no sustituir el código de producción.
-- El endpoint `GET /status` devuelve `correoCorporativoVerificado` como booleano para la cuenta autenticada y `configurado` para la clave. Backoffice muestra ambos impedimentos sin filtrar direcciones ni secretos.
-- Hasta poder verificar correo real en el flujo oficial, la prueba de enrolamiento y recuperación debe permanecer **pendiente**, aunque las funciones, SQL y UI estén implementadas.
+- El endpoint `GET /status` devuelve `correoPrincipalVerificado` como booleano para la cuenta autenticada y `configurado` para la clave. Backoffice muestra ambos impedimentos sin filtrar direcciones ni secretos.
+- Con un correo principal ya verificado puede iniciarse la prueba funcional de enrolamiento tras configurar la clave AES-GCM y SMTP en un entorno aislado. Las cuentas sin correo verificado mantienen MFA bloqueado.
 
 ## Pruebas y activación segura
 
@@ -61,6 +61,10 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 - Al configurar MFA en TEST, comprobar antes y después que `ven_ventas` y `pag_planes_pago` siguen intactas. **No registrar ventas reales para probar MFA**.
 - Sin correo verificado, sin la clave AES-GCM o sin SMTP, el enrolamiento debe permanecer bloqueado y **no se deben alterar datos oficiales para desbloquearlo**.
 - Si no se conserva ningún código de recuperación y se pierde el dispositivo, **no existe bypass automático**. Se requiere un procedimiento administrativo documentado, revisión presencial o por canal independiente y aprobación segregada; no se debe reactivar solo con contraseña ni con el correo de una cuenta comprometida.
+
+## Ajuste de correo — migración 116
+
+El flujo ya usa exclusivamente el **correo principal activo y verificado existente** en `core_personas_contactos`, sin exigir `@monolithe.pe`. El Auth Service lo obtiene del usuario autenticado: nunca acepta una dirección que envíe el navegador. El OTP queda ligado al correo y al JWT; si el correo cambia durante el desafío, el código anterior se invalida. La migración 116 actualiza la misma condición de correo de la función SQL de publicación; no altera contactos ni sus estados de verificación. Las tres cuentas verificadas existentes pueden utilizarse como candidatas de prueba, sujetas a permisos, cifrado, SMTP y entorno de pruebas. No se ha activado la publicación.
 
 ## Límite del Bloque 3
 
