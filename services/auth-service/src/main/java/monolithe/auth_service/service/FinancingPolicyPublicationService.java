@@ -63,6 +63,21 @@ public class FinancingPolicyPublicationService {
         catch (JacksonException ex) { throw new IllegalStateException("Respuesta SQL inválida.",ex); }
     }
 
+    /** Alternativa de consulta para staging con solo Auth Service y Backoffice.
+     * Usa el mismo SP que Core, con autorización de Gerencia validada por PostgreSQL.
+     */
+    @Transactional(readOnly = true)
+    public JsonNode consultarActual(Jwt jwt) {
+        long id = actor(jwt);
+        versionSesion(jwt);
+        try {
+            String resultado = db.queryForObject("""
+                SELECT public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))::text
+                """, String.class, id);
+            return parsear(resultado);
+        } catch (DataAccessException ex) { throw traducir(ex); }
+    }
+
     /** No se transfiere el hash del cliente: el motor canónico está centralizado en SQL. */
     @Transactional(readOnly=true)
     public JsonNode previsualizar(Jwt jwt, Integer version, Map<String,Object> borrador) {
