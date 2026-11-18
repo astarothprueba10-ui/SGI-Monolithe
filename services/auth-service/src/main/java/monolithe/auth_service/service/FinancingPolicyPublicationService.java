@@ -117,7 +117,7 @@ public class FinancingPolicyPublicationService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
                 try { emailService.enviarAvisoMfaFinanciero(destino,evento); }
-                catch (MailException ex) { log.warn("Aviso de publicación financiera no entregado."); }
+                catch (RuntimeException ex) { log.warn("Aviso de publicación financiera no entregado."); }
             }
         });
     }
