@@ -57,3 +57,21 @@ En el **proyecto Railway staging**, abrir servicio **auth-service → Variables*
 - Al finalizar, eliminar los recursos de staging que ya no se usen y revocar claves de prueba; las credenciales enviadas a Railway nunca deben registrarse en repositorios.
 
 **ESTADO:** proyecto y servicios configurados; despliegue detenido por `DB_PASSWORD` y SMTP aún no cargados. No hay una nueva base de datos ni se generó cargo de rama Supabase.
+
+
+## Despliegue realizado en Railway staging — 18/11/2026
+
+**Este apartado reemplaza el estado preliminar de preparación anterior.**
+
+- Se confirmaron `DB_PASSWORD` y `MAIL_PASSWORD` como variables cifradas *staged* en Railway y se aplicaron al aceptar el despliegue. No se imprimieron los valores ni se añadieron a GitHub. `INTERNAL_MAIL_KEY` no está configurada porque no es necesaria para el envío SMTP directo del desafío MFA.
+- Auth Service: deployment `8b9d5426-f234-4873-91ca-9675e83e6625`, estado **SUCCESS**. JVM Java 21, servidor puerto 8081, HikariPool conectado a Supabase TEST por TLS y healthcheck satisfactorio.
+- Backoffice: primer despliegue falló en el proxy Nginx al resolver `auth-service.railway.internal` durante el arranque. Corregido con resolución diferida y DNS interno Railway en `apps/backoffice/nginx.staging.conf` (commit `c217ba65a97e734b1f07f4fb579c7a14c0442808`). Nuevo deployment `c2c2ae05-f9d5-4406-b723-3bf9845a8e65`, estado **SUCCESS**, Nginx puerto 5174 y healthcheck `/healthz` satisfactorio.
+- Ambos servicios aparecen **Online** en `staging`, una réplica cada uno, sin alertas activas al verificarlo.
+- URL de Backoffice generada por Railway: `https://backoffice-staging-fff8322e.up.railway.app` (puerto 5174). No se generó un dominio público para Auth Service, que permanece accesible por red interna desde el proxy de Backoffice.
+- **No hay una prueba SMTP end-to-end todavía.** La conexión al servicio SMTP y la recepción de un código deben validarse iniciando la activación MFA con una cuenta Gerencia con correo principal verificado. No se deben probar códigos de terceros sin su autorización.
+- No se ha habilitado `cfg_fin_publicacion_control`: permanece `false`. No se publicaron versiones de política ni se ejecutaron cambios sobre ventas o planes históricos.
+- La verificación externa de la URL pública no pudo efectuarse desde este ejecutor (DNS externo restringido); Railway sí confirmó dominio emitido, contenedores desplegados y healthchecks exitosos.
+
+**Paso operativo siguiente:** entrar mediante la URL de Backoffice, iniciar sesión en la cuenta Gerencia controlada y abrir `/financiamiento?tab=configuracion` para verificar `GET /api/auth/financing-mfa/status` y realizar el proceso de registro TOTP. Solo después hacer pruebas de recuperación, expiración y antirreplay. No activar publicación de políticas financieras mientras falten esas pruebas.
+
+**Nota:** la sección anterior que decía que faltaban `DB_PASSWORD` y SMTP representa el estado antes del despliegue; esas variables ya se configuraron. La clave interna `INTERNAL_MAIL_KEY` sigue omitida deliberadamente.
