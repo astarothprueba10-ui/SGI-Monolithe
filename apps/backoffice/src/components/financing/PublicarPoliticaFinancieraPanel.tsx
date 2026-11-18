@@ -16,8 +16,6 @@ type CampoNumero = 'montoSeparacion' | 'inicialMinima' | 'inicialMaxima' |
   'inicialFija' | 'tasaNominalAnualPct' | 'cuotasMin' | 'cuotasMax' |
   'diasVencimientoSeparacion';
 
-const MENSAJE_BLOQUEO = 'La publicación de nuevas versiones requiere autorización administrativa y verificación TOTP.';
-
 export function PublicarPoliticaFinancieraPanel({
   politica, onPublicada
 }: {
