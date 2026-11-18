@@ -33,11 +33,11 @@ function TarjetaCondicion({
   destacado?: boolean;
 }) {
   return (
-    <div className={\`min-w-0 rounded-xl border px-3 py-3.5 transition-colors sm:p-4 \${
+    <div className={`min-w-0 rounded-xl border px-3 py-3.5 transition-colors sm:p-4 ${
       destacado ? 'border-amber-200 bg-amber-50/60' : 'border-brand-100 bg-brand-50/35'
-    }\`}>
+    }`}>
       <div className="flex min-w-0 items-center gap-2">
-        <Icon className={\`h-4 w-4 shrink-0 \${destacado ? 'text-amber-700' : 'text-brand-500'}\`}
+        <Icon className={`h-4 w-4 shrink-0 ${destacado ? 'text-amber-700' : 'text-brand-500'}`}
           aria-hidden="true" />
         <p className="min-w-0 text-xs font-medium text-brand-600">{etiqueta}</p>
       </div>
