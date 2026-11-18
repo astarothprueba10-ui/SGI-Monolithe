@@ -37,3 +37,19 @@ En Supabase TEST se ejecutaron las migraciones 113-115, se validó la vista prev
 Antes de habilitar el control faltan: completar el enrolamiento real de Gerencia en un entorno aislado con correo principal registrado y verificado (personal o corporativo), clave de cifrado y SMTP; aprobar CI completo; probar publicación v2, replay, actor distinto, nonce/hash manipulado, versión obsoleta, concurrencia y rollback de auditoría en fixture aislado sin operaciones reales; verificar un nuevo snapshot de venta/reserva y un contrato de prueba fuera de datos de clientes existentes; aprobación de Seguridad y Gerencia con evidencia. El cambio de habilitación corresponde únicamente a un administrador de BD mediante procedimiento auditado.
 
 No modificar main, no crear PR, no desplegar producción mientras no exista aceptación formal.
+
+
+## Ensayo seguro de autorización TOTP (sin publicación)
+
+Se añadió una prueba de firma en `feature/configuracion-financiamiento` para validar el factor con una **propuesta real previsualizada** sin habilitar el interruptor de publicación.
+
+- `POST /api/auth/financing-mfa/rehearse`, protegido por JWT y `financing.configure`, recibe exclusivamente `{codigo, versionEsperada, borrador}`; no acepta actores ni hashes elegidos por el cliente.
+- Revalida Gerencia, sesión vigente, política versión 1 y hash canónico del borrador mediante `sp_fin_previsualizar_borrador_v1`.
+- **Exige que `cfg_fin_publicacion_control.habilitado=false`**; si está habilitada la publicación real, rechaza el ensayo.
+- Utiliza el mismo verificador de TOTP con bloqueo por intentos y antirreplay (`ultimo_paso_totp`). No puede reutilizarse el código de la activación ni otro código previamente consumido.
+- Genera el evento de auditoría `MFA_FIN_ENSAYO_AUTORIZACION` con identificador del usuario, versión, hash y bandera `publicacion_realizada=false`. No registra el código recibido.
+- **No genera ningún recibo de publicación**, no inserta en `seg_fin_totp_autorizaciones`, no cambia `cfg_fin_politicas_versiones` ni el puntero activo, y no modifica ventas, contratos o cronogramas.
+- En Backoffice, tras «Validar borrador y ver vista previa», si el control está apagado se muestra «Probar firma TOTP sin publicar». El código se borra del formulario después de enviarlo y muestra el resultado sin revelar el secreto.
+- Prueba automatizada `node --test tests/financiamientoEnsayoTotp.test.mjs` ejecutada desde `apps/backoffice` y añadida a CI.
+
+**Prueba manual pendiente de la persona titular del autenticador:** pull de la rama, reconstrucción local de `auth-service` y `backoffice`, nueva vista previa, introducir un código nuevo del autenticador, pulsar «Probar firma TOTP sin publicar» y constatar éxito. Nunca pedir códigos TOTP o recuperación en chats, imágenes o registros. La publicación financiera seguirá bloqueada mientras no se complete la validación operativa.
