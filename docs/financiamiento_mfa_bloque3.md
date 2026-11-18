@@ -66,6 +66,18 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 
 El flujo ya usa exclusivamente el **correo principal activo y verificado existente** en `core_personas_contactos`, sin exigir `@monolithe.pe`. El Auth Service lo obtiene del usuario autenticado: nunca acepta una dirección que envíe el navegador. El OTP queda ligado al correo y al JWT; si el correo cambia durante el desafío, el código anterior se invalida. La migración 116 actualiza la misma condición de correo de la función SQL de publicación; no altera contactos ni sus estados de verificación. Las tres cuentas verificadas existentes pueden utilizarse como candidatas de prueba, sujetas a permisos, cifrado, SMTP y entorno de pruebas. No se ha activado la publicación.
 
+## Escaneo QR para enrolamiento (18/11/2026)
+
+La interfaz `SeguridadFinancieraTotpPanel` ahora muestra por defecto un código QR que representa el `otpauthUri` devuelto por `POST /api/auth/financing-mfa/enroll`. Se genera íntegramente en Backoffice con código JavaScript empaquetado (motor QR de Kazuhiko Arase, licencia MIT), como SVG con zona blanca de cuatro módulos. **El secreto nunca se envía a una API de generación QR ni se guarda en localStorage, sessionStorage o logs**.
+
+El gerente puede abrir Google Authenticator o Microsoft Authenticator, pulsar **+ → Escanear código QR** y luego escribir los seis dígitos para confirmar el factor. La clave Base32 permanece disponible mediante **«No puedo escanear: usar clave manual»**, oculta inicialmente.
+
+Si un QR o una clave queda expuesto, pulsar **«Descartar QR y comenzar de nuevo»**: `POST /api/auth/financing-mfa/cancel-enrollment` exige JWT y permiso financiero de Gerencia, bloquea la fila de MFA, borra el secreto pendiente y su desafío por correo y registra auditoría. **Nunca cancela un autenticador activo**. Para iniciar otra vez se exige contraseña y código de correo verificado. Los límites de envíos se mantienen.
+
+La clave que se veía en la captura del 18/11/2026 fue invalidada directamente en Supabase con auditoría, sin habilitar TOTP ni políticas de publicación. Debe completarse un nuevo enrolamiento; no utilizar el QR anterior ni incluir nuevos QR en capturas. Al activar el factor, los diez códigos de recuperación se muestran una sola vez y deben guardarse fuera del dispositivo.
+
+Prueba automatizada: `node --test apps/backoffice/tests/financiamientoTotpQr.test.mjs` (desde la carpeta backoffice: `node --test tests/financiamientoTotpQr.test.mjs`). El motor QR y su licencia se incluyen en `apps/backoffice/src/vendor`, sin instalar dependencias adicionales.
+
 ## Límite del Bloque 3
 
 Este bloque aporta la autenticación reforzada. El **Bloque 4** implementó el formulario, hash canónico, doble confirmación, consumo atómico de recibo, nueva versión inmutable, auditoría y avisos; consulte docs/financiamiento_publicacion_bloque4.md. La publicación sigue bloqueada: falta probar enrolamiento TOTP real y autorizar el despliegue en entorno aislado.
