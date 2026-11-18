@@ -36,3 +36,15 @@ test('la imagen de staging sirve build estático y no Vite dev', () => {
   assert.match(nginx, /location \^~ \/cms-api\/ \{ return 503; \}/);
   assert.doesNotMatch(nginx,/production-|portal-administrativo-delta/);
 });
+
+
+test('login documental invoca procedimiento PostgreSQL por CALL, no por escape JDBC de función', () => {
+  const repo=read('../../../services/auth-service/src/main/java/monolithe/auth_service/repository/DocumentLoginProcedureRepository.java');
+  assert.match(repo, /CALL public\.sp_resolver_login_documento\(/);
+  assert.match(repo, /CAST\(\? AS varchar\)/);
+  assert.match(repo, /NULL::varchar/);
+  assert.match(repo, /ps\.setString\(1, tipoDocumento\)/);
+  assert.match(repo, /ps\.setString\(2, numeroDocumento\)/);
+  assert.match(repo, /rs\.getString\("p_usuario_login"\)/);
+  assert.doesNotMatch(repo, /new SimpleJdbcCall|\.withProcedureName/);
+});
