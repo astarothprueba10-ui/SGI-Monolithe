@@ -61,7 +61,7 @@ export function SeguridadFinancieraTotpPanel() {
     setSecreto('');
     setRespaldo([]);
     setFase('EMAIL');
-    setAviso('Se envió un código al correo corporativo verificado. Caduca en 5 minutos.');
+    setAviso('Se envió un código al correo principal verificado de Gerencia. Caduca en 5 minutos.');
   });
 
   const validarEmail = () => void ejecutar(async () => {
@@ -111,19 +111,19 @@ export function SeguridadFinancieraTotpPanel() {
       Seguridad debe configurar la clave de cifrado TOTP en Auth Service para habilitar el alta.
       No se puede continuar mientras falte.
     </Alert>}
-    {estado && !estado.correoCorporativoVerificado && <Alert tone="warning"
-      title="Correo corporativo pendiente de verificación">
-      Esta cuenta todavía no tiene un correo principal @monolithe.pe verificado.
-      Registre y confirme su correo corporativo mediante el proceso oficial de RR. HH.
+    {estado && !estado.correoPrincipalVerificado && <Alert tone="warning"
+      title="Correo principal pendiente de verificación">
+      Esta cuenta todavía no tiene su correo principal registrado y verificado.
+      Verifique el correo principal que ya figura en su cuenta; puede ser personal o corporativo.
       El sistema no permitirá activar ni recuperar el autenticador hasta completar ese paso.
     </Alert>}
     {error && <Alert tone="danger" title="No se pudo completar la verificación">{error}</Alert>}
     {aviso && <Alert tone="info" title="Verificación">{aviso}</Alert>}
 
-    {estado?.configurado && estado.correoCorporativoVerificado && fase === 'INICIO' && <div className="max-w-xl space-y-3">
+    {estado?.configurado && estado.correoPrincipalVerificado && fase === 'INICIO' && <div className="max-w-xl space-y-3">
       <p className="text-xs leading-relaxed text-brand-600">
         Para proteger las condiciones financieras se requiere confirmar su contraseña actual y
-        un código enviado a su correo corporativo verificado antes de configurar o retirar el dispositivo.
+        un código enviado a su correo principal verificado antes de configurar o retirar el dispositivo.
       </p>
       {estado.habilitado && <fieldset className="space-y-2 text-sm text-brand-800">
         <legend className="mb-1 font-semibold">Acción de seguridad</legend>
