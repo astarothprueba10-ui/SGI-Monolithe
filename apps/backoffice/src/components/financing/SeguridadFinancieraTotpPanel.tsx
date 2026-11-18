@@ -199,7 +199,7 @@ export function SeguridadFinancieraTotpPanel() {
           Cancelar gestión
         </Button>}
       </div>
-    </div>
+    </div>}
 
     {estado?.configurado && fase === 'EMAIL' && <div className="max-w-xl space-y-3">
       <label htmlFor="mfa-email-code" className="block text-xs font-medium text-brand-700">
