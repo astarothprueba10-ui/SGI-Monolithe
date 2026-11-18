@@ -1,37 +1,59 @@
-# SGI MONOLITHE — entorno independiente para pruebas MFA y publicación
+# SGI MONOLITHE — staging de MFA con Supabase TEST compartida
 
-## Recursos preparados (18/11/2026)
+## Decisión vigente del proyecto
 
-- Repositorio: `astarothprueba10-ui/SGI-Monolithe`, rama **feature/configuracion-financiamiento**. No tocar `main`.
-- Railway: proyecto **sgi-monolithe-mfa-staging** (ID `cba443f6-0346-41ef-a5a6-5c277238dd3d`), entorno **staging** (ID `a5851d25-4851-482e-b8cc-f30e0704c506`), privado. Ningún cambio aplicado al proyecto Railway `helpful-ambition` / `production`.
-- Auth Service: servicio ID `0a90d10c-c109-4095-9a1e-5a85c9896c55`, raíz `/services/auth-service`, Dockerfile `/services/auth-service/Dockerfile.vercel`, healthcheck `/actuator/health`, puerto 8081.
-- Backoffice: servicio ID `037b749b-100e-40ba-a2e6-9f11fdd035e9`, raíz `/apps/backoffice`, Dockerfile `/apps/backoffice/Dockerfile`, healthcheck `/`, puerto 5174.
-- Fuentes GitHub **preparadas como cambios staged**, NO desplegadas. No aceptar/aplicar esos cambios hasta configurar DB, correo y conectividad.
-- En Auth Service se configuraron en las variables de Railway **FINANCING_MFA_ENCRYPTION_KEY_BASE64**, `JWT_PRIVATE_KEY_B64`, `JWT_PUBLIC_KEY_B64` y `PORT`. Clave de AES y firma JWT **exclusivas de pruebas**, nunca en Git.
-- Backoffice: rutas proxy relativas `/api/auth` y `/api/core`; `AUTH_PROXY_TARGET=http://auth-service.railway.internal:8081`; opciones de publicación CMS deshabilitadas. `CORE_PROXY_TARGET` tiene destino nominal de staging y NO debe apuntar a producción.
+**Usar la misma base de datos** Supabase TEST `cjwnnroqjltoaqzpxlmh`. No crear proyecto ni rama Supabase adicional, ni generar el costo por hora que se había evaluado. El aislamiento es de aplicaciones Railway y claves JWT/TOTP, **no de los datos**.
 
-## Bloqueos externos antes del primer despliegue
+Precaución: las pruebas de MFA sobre usuarios existentes podrían cambiar las filas MFA y sus sesiones compartidas con otros servicios que usan TEST. Realizar las pruebas con una cuenta Gerencia controlada, bajo supervisión y sin modificar ventas, separaciones, contratos ni cronogramas.
 
-1. **Base de datos realmente independiente**. Se intentó crear la rama Supabase `financing-mfa-isolated-test` bajo `cjwnnroqjltoaqzpxlmh`. Supabase exige confirmación previa del costo: **USD 0.01344/h**, más consumo aplicable. Se consultó la tarifa, **pero la rama NO fue creada**. Obtener aprobación explícita y usar el flujo Supabase `confirm_cost` → `create_branch`. Tras crearla, verificar que contiene el esquema completo, migraciones 106–116 y controles MFA; las ramas nuevas no copian los datos de usuarios existentes. **No utilizar ni clonar datos comerciales reales**.
-2. **Credenciales de base de datos**. Auth Service necesita `DB_URL` (JDBC PostgreSQL de la nueva rama), `DB_USERNAME` y `DB_PASSWORD`. Configurarlas SOLO en el proyecto staging mediante el gestor de variables de Railway. No copiar valores desde producción ni registrarlos en Git, tickets o chat.
-3. **Correo SMTP de pruebas**. Auth Service necesita `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_FROM` con TLS apropiado; usar casilla/proveedor sandbox o una cuenta emisora controlada. Las credenciales de production son ilegibles desde la integración OAuth y deliberadamente **NO se han copiado**.
-4. **Core Service necesario para la pantalla financiera**. Backoffice consulta política actual en Core Service: `GET /api/core/crm/financiamiento/configuracion/actual`. El plan gratuito de Railway rechazó crear el tercer servicio debido al límite de recursos. El proyecto staging conserva los **dos** servicios solicitados (Auth y Backoffice); la integración completa requiere ampliar el límite o desplegar Core aislado en otra plataforma, conectado a la MISMA rama Supabase y verificador de JWT TEST. `CORE_PROXY_TARGET` no debe apuntar a producción.
-5. **Usuario Gerencia de pruebas**. Los datos de usuarios y contraseñas no se copian a nuevas ramas Supabase. Crear una identidad de prueba con rol y permiso `financing.configure`; verificar por el flujo oficial su correo principal, sea Gmail, Outlook o corporativo. No marcar `verificado=true` manualmente.
+## Infraestructura preparada
 
-## Flujo de activación, SOLO después de resolver bloqueos
+- Railway **proyecto separado**: `sgi-monolithe-mfa-staging` (ID `cba443f6-0346-41ef-a5a6-5c277238dd3d`), entorno `staging` (ID `a5851d25-4851-482e-b8cc-f30e0704c506`). **NO** se ha modificado el proyecto `helpful-ambition` ni su entorno `production`.
+- GitHub: `astarothprueba10-ui/SGI-Monolithe`, rama `feature/configuracion-financiamiento`; sin cambios en `main`.
+- Auth Service: ID Railway `0a90d10c-c109-4095-9a1e-5a85c9896c55`; raíz `/services/auth-service`, Dockerfile `/services/auth-service/Dockerfile.vercel`, puerto `8081`, salud `/actuator/health`, salida IPv6 habilitada para PostgreSQL directo.
+- Backoffice: ID Railway `037b749b-100e-40ba-a2e6-9f11fdd035e9`; raíz `/apps/backoffice`, Dockerfile `/apps/backoffice/Dockerfile.staging`, puerto `5174`, salud `/healthz`. La imagen compila Vite y sirve archivos estáticos por Nginx, sin servidor de desarrollo.
+- Fuentes de ambos servicios vinculadas a la rama mediante **cambios staged** que no se han aplicado. **No hay despliegue ni dominio público**.
+- Los controles de publicación financiera en Supabase TEST permanecen deshabilitados: `cfg_fin_publicacion_control.habilitado=false`. La versión vigente debe continuar siendo la 1.
+- El plan gratuito de Railway no permitió crear un tercer servicio. Por ello, exclusivamente para staging, `GET /api/auth/financing-policies/current` permite consultar la política mediante Auth Service con permiso `financing.configure` y la misma función SQL protegida que Core. La variable `VITE_FINANCING_STAGING_AUTH_CURRENT=true` activa esa ruta **solo en staging**. Core y CMS no se redirigen a producción; Nginx devuelve HTTP 503 para sus rutas. Esta prueba se limita a MFA y editor financiero, no al Backoffice completo.
 
-1. Confirmar el esquema TEST aislado y la política GENERAL v1, y comprobar `cfg_fin_publicacion_control.habilitado=false`.
-2. Configurar variables privadas de la nueva rama y SMTP de pruebas; configurar `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` publicable de ESA rama para el navegador, sin usar una clave `service_role`.
-3. Verificar conectividad privada de Core↔Auth y de Backoffice↔Auth/Core; publicar URL(s) de staging. La ruta /api/auth en la UI deberá permanecer proxy mismo origen.
-4. Desplegar desde `feature/configuracion-financiamiento` y comprobar healthchecks, logs y autorización de JWT TEST, sin exponer secretos.
-5. Ejecutar enrolamiento MFA contraseña → email OTP → app TOTP → confirm, replay, intentos y recuperación. Luego ensayar la publicación completa contra **datos ficticios**, con aprobación y ventana temporal controlada.
-6. Verificar auditoría, versionado, antirreplay y persistencia de snapshots; retornar el control de publicación a false tras el ejercicio.
+## Configuración ya realizada (valores confidenciales no registrados aquí)
 
-## Seguridad
+Auth Service:
+- `FINANCING_MFA_ENCRYPTION_KEY_BASE64`: creada y guardada exclusivamente en Railway staging.
+- `JWT_PRIVATE_KEY_B64`, `JWT_PUBLIC_KEY_B64`: par exclusivo de pruebas en Railway staging.
+- `DB_URL`: JDBC con TLS contra el Postgres **existente** del proyecto TEST.
+- `DB_USERNAME=sigi_app_user`: usuario de backend existente. **No se ha creado un usuario PostgreSQL adicional ni se ha cambiado una contraseña**.
+- `PORT=8081`; `JPA_SHOW_SQL=false`; `HIBERNATE_FORMAT_SQL=false`.
 
-- El entorno `staging` aún no tiene fuentes desplegadas ni dominios públicos. La publicación en Supabase existente sigue deshabilitada.
-- Nunca usar claves JWT de producción para staging; no compartir secretos AES, contraseña de BD ni SMTP entre ambientes.
-- Antes de habilitar cualquier publicación exigir pruebas funcionales y autorización de Gerencia/Seguridad.
-- Tras completar las pruebas, eliminar recursos de staging no necesarios para evitar costos recurrentes.
+Backoffice:
+- `VITE_AUTH_API_URL=/api/auth` para proxy mismo origen a Auth Service de staging.
+- `VITE_FINANCING_STAGING_AUTH_CURRENT=true` para política consultada en Auth sin un Core adicional.
+- `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` del mismo proyecto Supabase TEST. La clave anon es pública; ninguna clave `service_role` se coloca en el navegador.
+- Funciones CMS de publicación deshabilitadas.
 
-**ESTADO: preparado y seguro; despliegue BLOQUEADO hasta aprobación de costo Supabase y configuración de dependencias externas.**
+## Datos que faltan para iniciar el despliegue
+
+La conexión OAuth a Railway entrega **los nombres** de las variables de `production`, pero **no sus valores**. Por ello no fue posible ni sería seguro copiar contraseñas de ese entorno.
+
+En el **proyecto Railway staging**, abrir servicio **auth-service → Variables** y completar directamente mediante su gestor de secretos:
+
+1. `DB_PASSWORD`: contraseña vigente del usuario PostgreSQL `sigi_app_user` utilizado por la base Supabase TEST. Nunca introducirla en Git, la URL pública ni el chat.
+2. `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`: credenciales SMTP de una cuenta emisora controlada, por ejemplo un buzón de pruebas. Configurar STARTTLS 587 o SSL 465 según el proveedor, usando `MAIL_SSL_ENABLE`, `MAIL_STARTTLS_ENABLE`, `MAIL_STARTTLS_REQUIRED` cuando proceda. El **destinatario** de MFA será el correo principal verificado registrado en la cuenta Gerencia; no tiene por qué coincidir con el emisor SMTP.
+
+**No sustituir las variables anteriores por secretos de ejemplo.** Sin contraseña de BD o SMTP válido, Auth Service puede fallar al iniciar o no entregar códigos.
+
+## Después de configurar ambos secretos
+
+1. Confirmar de nuevo que `DB_URL` apunta a TEST y que el candado de publicación sigue **false**.
+2. Aceptar cambios staged en el entorno `staging` (NO producción), desplegando primero Auth Service y verificando `/actuator/health`, luego Backoffice. Generar un dominio exclusivo de staging solo tras asegurar el acceso.
+3. Iniciar sesión con una cuenta Gerencia controlada cuyo correo principal esté verificado, sin compartir la contraseña. Supabase TEST tiene tres cuentas Gerencia con correo principal activo/verificado (y otras dos sin verificar).
+4. Probar OTP correo, enrolamiento TOTP, replay, límites, revocación y recuperación. No activar la publicación hasta cerrar todas las pruebas y autorización formal.
+5. Revisar auditoría y sesiones, y comparar que ventas (10), planes (5) y política activa (v1) no hayan cambiado durante las pruebas de MFA.
+
+## Riesgos asumidos por compartir la base
+
+- Al utilizar la misma base, **las credenciales de usuario, estados de MFA y sesiones no están aislados por ambiente**; una revocación o bloqueo de seguridad puede impactar un inicio de sesión en cualquier otro servicio que use TEST.
+- No hacer publicaciones financieras de ensayo ni registrar separaciones o ventas ficticias en la base con operaciones existentes. Para la futura prueba transaccional completa, usar una ventana controlada o datos de ensayo autorizados sin tocar clientes reales.
+- Al finalizar, eliminar los recursos de staging que ya no se usen y revocar claves de prueba; las credenciales enviadas a Railway nunca deben registrarse en repositorios.
+
+**ESTADO:** proyecto y servicios configurados; despliegue detenido por `DB_PASSWORD` y SMTP aún no cargados. No hay una nueva base de datos ni se generó cargo de rama Supabase.
