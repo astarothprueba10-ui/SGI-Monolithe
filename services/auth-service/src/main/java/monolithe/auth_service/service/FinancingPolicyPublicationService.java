@@ -109,7 +109,7 @@ public class FinancingPolicyPublicationService {
           JOIN public.core_personas_contactos c ON c.id_persona=u.id_persona
           JOIN public.cfg_tipos_contacto t ON t.id_tipo_contacto=c.id_tipo_contacto
           WHERE u.id_usuario=? AND t.codigo='EMAIL' AND t.activo AND c.principal
-            AND c.verificado AND c.activo AND lower(c.valor) LIKE '%@monolithe.pe'
+            AND c.verificado AND c.activo AND nullif(btrim(c.valor),'') IS NOT NULL
           LIMIT 1
           """,(rs,n)->rs.getString(1),id);
         if (emails.isEmpty()) throw error(HttpStatus.CONFLICT,"Falta el correo verificado.");
@@ -137,7 +137,7 @@ public class FinancingPolicyPublicationService {
         if(msg.contains("AUTORIZACION_INVALIDA|"))
             return error(HttpStatus.CONFLICT,"La autorización TOTP expiró, se utilizó o no corresponde al borrador.");
         if(msg.contains("MFA_REQUERIDA|"))
-            return error(HttpStatus.FORBIDDEN,"Active TOTP y verifique el correo corporativo.");
+            return error(HttpStatus.FORBIDDEN,"Active TOTP y verifique el correo principal registrado.");
         if(msg.contains("ACCESO_DENEGADO|"))
             return error(HttpStatus.FORBIDDEN,"No tiene permisos vigentes de Gerencia.");
         if(msg.contains("POLITICA_NO_DISPONIBLE|"))
