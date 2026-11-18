@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
-  CalendarClockIcon, CoinsIcon, HistoryIcon, LandmarkIcon,
-  ListOrderedIcon, LockKeyholeIcon, PercentIcon, RefreshCwIcon,
-  ShieldCheckIcon, WalletIcon
+  CalendarClockIcon, CoinsIcon, LandmarkIcon, ListOrderedIcon,
+  LockKeyholeIcon, PercentIcon, RefreshCwIcon, ShieldCheckIcon, WalletIcon
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Feedback';
 import { formatSoles } from '../../utils/financeMoney';
 import { SeguridadFinancieraTotpPanel } from './SeguridadFinancieraTotpPanel';
 import { PublicarPoliticaFinancieraPanel } from './PublicarPoliticaFinancieraPanel';
+import { HistorialPoliticasFinancierasPanel } from './HistorialPoliticasFinancierasPanel';
 import {
   financingConfigService,
   type PoliticaFinanciamientoActual
@@ -33,19 +33,18 @@ function TarjetaCondicion({
   destacado?: boolean;
 }) {
   return (
-    <div className={`relative min-w-0 overflow-hidden rounded-2xl border p-4 shadow-sm transition-colors sm:p-5 ${
-      destacado ? 'border-accent-300/50 bg-amber-50/40' : 'border-brand-100 bg-white hover:border-brand-200'
-    }`}>
-      <div className="flex items-start justify-between gap-3">
-        <span className="text-[12px] font-medium text-brand-500">{etiqueta}</span>
-        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-          destacado ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-800'
-        }`}>
-          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
-        </span>
+    <div className={\`min-w-0 rounded-xl border px-3 py-3.5 transition-colors sm:p-4 \${
+      destacado ? 'border-amber-200 bg-amber-50/60' : 'border-brand-100 bg-brand-50/35'
+    }\`}>
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon className={\`h-4 w-4 shrink-0 \${destacado ? 'text-amber-700' : 'text-brand-500'}\`}
+          aria-hidden="true" />
+        <p className="min-w-0 text-xs font-medium text-brand-600">{etiqueta}</p>
       </div>
-      <p className="mt-2 break-words text-xl font-bold tabular-nums text-brand-950 sm:text-2xl">{valor}</p>
-      <p className="mt-2 text-[11px] leading-relaxed text-brand-500">{detalle}</p>
+      <p className="mt-2 break-words text-lg font-bold tabular-nums text-brand-950 sm:text-xl">
+        {valor}
+      </p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-brand-500">{detalle}</p>
     </div>
   );
 }
@@ -116,75 +115,72 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
       detalle: 'Cuotas periódicas con intereses sobre saldo', icono: LandmarkIcon }
   ];
 
-  return <div className="space-y-5 p-4 sm:p-5">
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-sm sm:p-6">
-      <div className="absolute -right-10 -top-16 h-40 w-40 rounded-full border border-white/10" aria-hidden="true"/>
-      <div className="relative flex flex-wrap items-start justify-between gap-4">
+  return <div className="space-y-6 p-3 sm:p-5 lg:p-6">
+    <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 px-5 py-6 text-white shadow-sm sm:px-7">
+      <div className="pointer-events-none absolute -right-10 -top-20 h-48 w-48 rounded-full border border-white/10" aria-hidden="true"/>
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-300">
-            <ShieldCheckIcon className="h-4 w-4" /> Política comercial protegida
-          </span>
-          <h3 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">
-            Configuración financiera · Versión {datos.version}
-          </h3>
-          <p className="mt-2 text-xs leading-relaxed text-brand-100">
-            Condiciones generales de referencia para separaciones y ventas financiadas.
+          <p className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-300">
+            <ShieldCheckIcon className="h-4 w-4" aria-hidden="true"/>
+            Política comercial protegida
           </p>
-          <p className="mt-2 text-xs text-brand-200">
-            Registrada: {fechaLima(datos.vigenteDesde)} (Perú)
+          <h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">
+            Configuración financiera
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-brand-100 sm:text-sm">
+            Consulte las condiciones vigentes y prepare la siguiente versión con revisión y autorización segura.
           </p>
         </div>
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <span className="inline-flex items-center gap-2 rounded-full border border-accent-300/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-accent-300">
-            <LockKeyholeIcon className="h-3.5 w-3.5" /> Publicación protegida
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white">
+            <LockKeyholeIcon className="h-3.5 w-3.5" aria-hidden="true"/>
+            {datos.publicacionHabilitada ? 'Publicación con doble verificación' : 'Publicación no habilitada'}
           </span>
           <Button icon={RefreshCwIcon} variant="secondary" disabled={cargando}
-            onClick={() => setRevision(r => r + 1)}>Actualizar</Button>
+            onClick={() => setRevision(r => r + 1)}>
+            Actualizar datos
+          </Button>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {condiciones.map((x, i) => <TarjetaCondicion
-        key={x.etiqueta} icono={x.icono}
-        etiqueta={x.etiqueta} valor={x.valor}
-        detalle={x.detalle} destacado={i === 2}
-      />)}
-    </div>
-
-    <Alert tone="info" title="Configuración en modo consulta · protección activa">
-      Las nuevas separaciones y ventas se validan contra políticas financieras versionadas.
-      Cada nueva operación conserva las condiciones aceptadas sin recalcular cronogramas históricos.
-      El enrolamiento y la verificación TOTP de Gerencia se gestionan en esta pantalla.
-      La publicación de otra versión permanece bloqueada mientras esté desactivado
-      el interruptor de seguridad de TEST. Ya puede preparar y revisar propuestas
-      con validación de PostgreSQL, pero ninguna versión se publicará hasta completar
-      la activación funcional de TOTP y la aprobación operativa.
-    </Alert>
-
-    <SeguridadFinancieraTotpPanel />
-    <PublicarPoliticaFinancieraPanel politica={datos} onPublicada={() => setRevision(r => r + 1)} />
-
-    <section className="overflow-hidden rounded-2xl border border-brand-100 bg-white">
-      <div className="flex items-center gap-2 border-b border-brand-100 bg-brand-50/50 px-4 py-3 sm:px-5">
-        <HistoryIcon className="h-4 w-4 text-brand-700" aria-hidden="true" />
-        <h4 className="text-sm font-semibold text-brand-900">Historial de versiones</h4>
-      </div>
-      <div className="divide-y divide-brand-100">
-        {datos.historial.map(v => (
-          <div key={v.idPolitica} className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2 xl:gap-6">
+      <section aria-labelledby="version-financiera-actual"
+        className="min-w-0 overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-sm">
+        <div className="border-b border-brand-100 px-4 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-brand-900">
-                Versión {v.version} {v.version === datos.version ? '· Referencia vigente' : '· Histórica'}
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-500">Versión actual</p>
+              <h3 id="version-financiera-actual" className="mt-1 text-xl font-bold text-brand-950">
+                Versión {datos.version}
+              </h3>
+              <p className="mt-1 text-xs text-brand-500">Condiciones vigentes · Solo lectura</p>
+              <p className="mt-1.5 text-xs text-brand-500">
+                Vigente desde {fechaLima(datos.vigenteDesde)} (Perú)
               </p>
-              <p className="mt-1 text-xs text-brand-500">{v.motivo}</p>
             </div>
-            <span className="text-xs tabular-nums text-brand-500">
-              {fechaLima(v.vigenteDesde)}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true"/> Vigente
             </span>
           </div>
-        ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-5">
+          {condiciones.map((x, i) => <TarjetaCondicion key={x.etiqueta}
+            icono={x.icono} etiqueta={x.etiqueta} valor={x.valor}
+            detalle={x.detalle} destacado={i === 2}/>)}
+        </div>
+        <div className="border-t border-brand-100 bg-brand-50/50 px-4 py-3 text-xs leading-relaxed text-brand-600 sm:px-5">
+          Las operaciones anteriores conservan las condiciones aceptadas y sus cronogramas originales.
+        </div>
+      </section>
+
+      <div className="min-w-0">
+        <PublicarPoliticaFinancieraPanel politica={datos}
+          onPublicada={() => setRevision(r => r + 1)} />
       </div>
-    </section>
+    </div>
+
+    <SeguridadFinancieraTotpPanel />
+    <HistorialPoliticasFinancierasPanel politica={datos} />
   </div>;
 }
