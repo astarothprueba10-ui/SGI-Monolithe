@@ -83,7 +83,7 @@ test('Backoffice obliga vista previa, doble confirmaci√≥n y TOTP; no almacena c√
   assert.match(estado,/cfg_fin_publicacion_control/);
   assert.match(ui,/!vista\.publicacionHabilitada/);
   assert.match(ui,/const \[confirmado, setConfirmado\]/);
-  assert.match(ui,/PUBLICAR V\$\{vista\.versionNueva\}/);
+  assert.match(ui,/frase!==\x27PUBLICAR V\x27\+vista\.versionNueva/);
   assert.match(ui,/crypto\.randomUUID\(\)/);
   assert.match(ui,/recibo\.hashPropuesta!==comprobacion\.hashPropuesta/);
   assert.match(ui,/resultado\.hashPropuesta!==comprobacion\.hashPropuesta/);
