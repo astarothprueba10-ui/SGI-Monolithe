@@ -28,7 +28,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Segundo factor financiero exclusivamente para GERENCIA.
- * Enrolamiento = JWT + password actual + código por correo corporativo verificado.
+ * Enrolamiento = JWT + password actual + código por correo principal verificado.
  * Nunca persiste secretos en claro ni emite permisos generales de publicación.
  */
 @Service
@@ -172,11 +172,11 @@ public class FinancingTotpService {
           JOIN public.cfg_tipos_contacto tc ON tc.id_tipo_contacto=c.id_tipo_contacto
           WHERE u.id_usuario=? AND tc.codigo='EMAIL' AND tc.activo
             AND c.activo AND c.verificado AND c.principal
-            AND lower(c.valor) LIKE '%@monolithe.pe'
+            AND nullif(btrim(c.valor),'') IS NOT NULL
           ORDER BY c.id_persona_contacto LIMIT 1
           """,(rs,n)->rs.getString(1),id);
         if (emails.isEmpty()) throw fallo(HttpStatus.CONFLICT,
-            "Verifique primero su correo corporativo principal con RR. HH.");
+            "Verifique primero el correo principal registrado en su cuenta.");
         return emails.getFirst();
     }
 
@@ -201,7 +201,7 @@ public class FinancingTotpService {
     }
 
     /** Preflight de disponibilidad, sin revelar dirección ni estado de otros gerentes. */
-    private boolean correoCorporativoVerificado(long id) {
+    private boolean correoPrincipalVerificado(long id) {
         return Boolean.TRUE.equals(db.queryForObject("""
           SELECT EXISTS(
             SELECT 1 FROM public.seg_usuarios u
@@ -209,7 +209,7 @@ public class FinancingTotpService {
             JOIN public.cfg_tipos_contacto tc ON tc.id_tipo_contacto=c.id_tipo_contacto
             WHERE u.id_usuario=? AND tc.codigo='EMAIL' AND tc.activo
               AND c.activo AND c.verificado AND c.principal
-              AND lower(c.valor) LIKE '%@monolithe.pe'
+              AND nullif(btrim(c.valor),'') IS NOT NULL
           )
           """,Boolean.class,id));
     }
@@ -222,7 +222,7 @@ public class FinancingTotpService {
             ->>'publicacionHabilitada')::boolean
           """,Boolean.class,id);
         return Map.of("configurado",crypto.configurado(),
-           "correoCorporativoVerificado",correoCorporativoVerificado(id),
+           "correoPrincipalVerificado",correoPrincipalVerificado(id),
            "habilitado",c!=null && c.secreto()!=null,
            "enrolamientoPendiente",c!=null && c.pendiente()!=null && vigente(c.pendienteHasta()),
            "publicacionHabilitada",Boolean.TRUE.equals(habilitada),
@@ -271,7 +271,7 @@ public class FinancingTotpService {
           enviados+1,ventana,id);
         correo.enviarCodigoMfaFinanciero(destino,codigo);
         auditar(id,"MFA_FIN_EMAIL_ENVIADO","Envío de desafío de correo para protección financiera.");
-        return Map.of("mensaje","Código enviado al correo corporativo verificado.");
+        return Map.of("mensaje","Código enviado al correo principal verificado de su cuenta.");
     }
 
     @Transactional(noRollbackFor=ResponseStatusException.class)
