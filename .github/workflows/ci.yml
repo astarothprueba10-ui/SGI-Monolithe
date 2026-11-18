@@ -78,6 +78,11 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/financiamientoMfa.test.mjs
 
+      - name: Verify audited versioned financial publication safeguards
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoPublicacion.test.mjs
+
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
