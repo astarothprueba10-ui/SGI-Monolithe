@@ -8,6 +8,7 @@ test('staging lee política por Auth con permisos de Gerencia y conserva Core pa
   const authService=read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/FinancingPolicyPublicationService.java');
   const controller=read('../../../services/auth-service/src/main/java/monolithe/auth_service/controller/FinancingPolicyController.java');
   const frontend=read('../src/services/financingConfigService.ts');
+  const panel=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   assert.match(controller, /@GetMapping\("\/current"\)/);
   assert.match(controller, /@PreAuthorize\("hasAuthority\('financing\.configure'\)"\)/);
   assert.match(controller, /CacheControl\.noStore\(\)/);
@@ -16,6 +17,8 @@ test('staging lee política por Auth con permisos de Gerencia y conserva Core pa
   assert.match(frontend, /VITE_FINANCING_STAGING_AUTH_CURRENT === 'true'/);
   assert.match(frontend, /authSecuredApi\.get<PoliticaFinanciamientoActual>/);
   assert.match(frontend, /coreApi\.get<PoliticaFinanciamientoActual>/);
+  assert.match(panel, /vista === 'CONFIGURACION'/);
+  assert.match(panel, /VITE_FINANCING_STAGING_AUTH_CURRENT === 'true'/);
   assert.doesNotMatch(frontend, /coreApi\.post|coreApi\.put|coreApi\.patch|coreApi\.delete/);
 });
 
