@@ -27,7 +27,8 @@ test('alta exige segundo canal verificado y contraseña sin exponer secreto ante
   assert.match(service,/c\.verificado AND c\.principal/);
   assert.match(service,/correoPrincipalVerificado/);
   assert.match(service,/SELECT EXISTS\(/);
-  assert.doesNotMatch(service, /@monolithe\\.pe/);\n  assert.match(service, /c\\.activo AND c\\.verificado AND c\\.principal/);
+  assert.doesNotMatch(service, /@monolithe\.pe/);
+  assert.match(service, /c\.activo AND c\.verificado AND c\.principal/);
   assert.match(service,/validarCorreo\(c,id,jwt,emailCodigo\)/);
   assert.match(service,/c\.emailIntentos\(\)/);
   assert.match(service,/interval '15 minutes'/);
