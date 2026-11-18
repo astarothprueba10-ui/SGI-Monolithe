@@ -32,7 +32,7 @@ test('Backoffice muestra prueba sin publicar solo con preview protegido y nunca 
   const api=read('../src/services/financingPolicyPublicationService.ts');
   assert.match(ui,/!vista\.publicacionHabilitada \? <div/);
   assert.match(ui,/ensayarTotp\(\)/);
-  assert.match(ui,/Probar firma TOTP sin publicar/);
+  assert.match(ui,/Verificar firma TOTP/);
   assert.match(ui,/setCodigo\(''\)/);
   assert.match(ui,/resultado\.hashPropuesta!==vista\.hashPropuesta/);
   assert.match(ui,/resultado\.publicacionRealizada!==false/);
