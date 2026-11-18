@@ -60,12 +60,12 @@ se encuentra en `services/auth-service` y Backoffice. Más detalles y requisitos
 
 **No confundir código implementado con factor operativo:** antes de activar MFA real se requiere
 `FINANCING_MFA_ENCRYPTION_KEY_BASE64` en el gestor de secretos, SMTP operativo
-y correo corporativo de Gerencia verificado. Ningún secreto debe registrarse en Git.
+y correo principal registrado de Gerencia verificado, personal o corporativo. Ningún secreto debe registrarse en Git.
 Actualmente no se habilita publicación, ni en frontend ni en SQL.
 
 ## Bloque 4 — Implementado en rama y TEST, publicación todavía bloqueada
 
-Las migraciones **113, 114 y 115** permiten preparar borradores canónicos, obtener hash SHA-256, aprobar con TOTP de 120 segundos y publicar una nueva versión en una transacción con auditoría. El control cfg_fin_publicacion_control permanece **false** y no se abrirá hasta completar la prueba funcional del Bloque 3 y aprobación de Seguridad. Ver detalles en docs/financiamiento_publicacion_bloque4.md.
+Las migraciones **113, 114, 115 y 116** permiten preparar borradores canónicos, obtener hash SHA-256, aprobar con TOTP de 120 segundos y publicar una nueva versión en una transacción con auditoría. El control cfg_fin_publicacion_control permanece **false** y no se abrirá hasta completar la prueba funcional del Bloque 3 y aprobación de Seguridad. Ver detalles en docs/financiamiento_publicacion_bloque4.md.
 
 
 
@@ -99,4 +99,4 @@ docker compose up -d --build core-service backoffice
 
 Iniciar sesión **nuevamente** como Gerencia para renovar los permisos incluidos en el JWT. Abrir `http://localhost:5174/financiamiento?tab=configuracion`: aparecen la política real y el editor de borradores. La vista previa no altera datos; el botón de publicación sigue bloqueado desde PostgreSQL. Para Asesor/Finanzas/Admin sin rol Gerencia, la pestaña debe estar oculta y el endpoint debe responder 403.
 
-Para probar y habilitar publicación sí se requiere TOTP funcional, correo corporativo verificado y clave de cifrado en Auth Service, en un entorno aislado. No activar el control de publicación ni tocar Railway production hasta completar los criterios de aceptación.
+Para probar y habilitar publicación sí se requiere TOTP funcional, correo principal registrado y verificado y clave de cifrado en Auth Service, en un entorno aislado. No activar el control de publicación ni tocar Railway production hasta completar los criterios de aceptación.
