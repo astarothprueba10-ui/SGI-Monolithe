@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheckIcon, LockKeyholeIcon } from 'lucide-react';
+import { ShieldCheckIcon, LockKeyholeIcon, Settings2Icon } from 'lucide-react';
 import { Alert } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
@@ -28,6 +28,7 @@ export function SeguridadFinancieraTotpPanel() {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  const [mostrarGestion, setMostrarGestion] = useState(false);
 
   const recargar = async () => {
     const res = await financingMfaService.estado();
@@ -115,18 +116,28 @@ export function SeguridadFinancieraTotpPanel() {
 
   if (!estado && !error) return <p className="p-4 text-sm text-brand-500">Consultando seguridad TOTP…</p>;
 
-  return <section className="rounded-2xl border border-brand-100 bg-white p-4 sm:p-5 space-y-4">
-    <div className="flex items-center gap-3">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-800">
-        <ShieldCheckIcon className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <div>
-        <h4 className="text-sm font-bold text-brand-900">Autenticación reforzada de Gerencia</h4>
-        <p className="text-xs text-brand-600">
-          {estado?.habilitado ? 'Autenticador activado' : 'Autenticador aún no activado'}
-          {' · '}{estado?.publicacionHabilitada ? 'Publicación protegida por TOTP' : 'Publicación bloqueada'}
-        </p>
+  return <section aria-labelledby="seguridad-financiera-titulo"
+    className="space-y-4 rounded-2xl border border-brand-100 bg-white p-4 shadow-sm sm:p-6">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-800">
+          <ShieldCheckIcon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h3 id="seguridad-financiera-titulo" className="text-base font-bold text-brand-950">
+            Autenticación reforzada de Gerencia
+          </h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-brand-500">
+            Protección de los cambios financieros mediante un segundo factor.
+          </p>
+        </div>
       </div>
+      <span className={'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ' +
+        (estado?.habilitado
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : 'border-amber-200 bg-amber-50 text-amber-800')}>
+        {estado?.habilitado ? 'Autenticador activo' : 'Pendiente de activación'}
+      </span>
     </div>
 
     {!estado?.configurado && <Alert tone="warning" title="Configuración del servidor pendiente">
@@ -142,7 +153,21 @@ export function SeguridadFinancieraTotpPanel() {
     {error && <Alert tone="danger" title="No se pudo completar la verificación">{error}</Alert>}
     {aviso && <Alert tone="info" title="Verificación">{aviso}</Alert>}
 
-    {estado?.configurado && estado.correoPrincipalVerificado && fase === 'INICIO' && <div className="max-w-xl space-y-3">
+    {estado?.habilitado && fase === 'INICIO' && !mostrarGestion && <div
+      className="flex flex-col gap-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-brand-900">Seguridad de la cuenta configurada</p>
+        <p className="mt-1 text-xs leading-relaxed text-brand-600">
+          El autenticador está listo para confirmar operaciones que requieran verificación adicional.
+        </p>
+      </div>
+      <Button variant="secondary" icon={Settings2Icon} onClick={()=>setMostrarGestion(true)}>
+        Administrar autenticador
+      </Button>
+    </div>}
+
+    {estado?.configurado && estado.correoPrincipalVerificado && fase === 'INICIO' &&
+      (!estado.habilitado || mostrarGestion) && <div className="max-w-xl space-y-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
       <p className="text-xs leading-relaxed text-brand-600">
         Para proteger las condiciones financieras se requiere confirmar su contraseña actual y
         un código enviado a su correo principal verificado antes de configurar o retirar el dispositivo.
@@ -165,10 +190,16 @@ export function SeguridadFinancieraTotpPanel() {
       </label>
       <Input id="mfa-password" type="password" autoComplete="current-password"
         value={password} onChange={e=>setPassword(e.target.value)} maxLength={128} />
-      <Button variant="primary" onClick={iniciar} disabled={ocupado || !password}>
-        <LockKeyholeIcon className="h-4 w-4" /> Verificar identidad
-      </Button>
-    </div>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={iniciar} disabled={ocupado || !password}>
+          <LockKeyholeIcon className="h-4 w-4" /> Verificar identidad
+        </Button>
+        {estado.habilitado && <Button variant="secondary" disabled={ocupado}
+          onClick={()=>{ setMostrarGestion(false); setPassword(''); setError(''); }}>
+          Cancelar gestión
+        </Button>}
+      </div>
+    </div>
 
     {estado?.configurado && fase === 'EMAIL' && <div className="max-w-xl space-y-3">
       <label htmlFor="mfa-email-code" className="block text-xs font-medium text-brand-700">
