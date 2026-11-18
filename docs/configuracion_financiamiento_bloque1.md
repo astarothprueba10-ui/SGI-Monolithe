@@ -47,7 +47,7 @@ Migraciones aplicadas, versionadas en GitHub y confirmadas en Supabase TEST:
 
 El formulario de ventas consulta `GET /api/core/crm/financiamiento/condiciones-venta`, presenta las condiciones del prospecto y lote y confirma usando la versión aceptada. La política de una separación vigente se respeta hasta su vencimiento; no se cambia por una versión publicada después. No se recalculan ni reescriben contratos ni cronogramas anteriores.
 
-**Control de datos en TEST (17/11/2026):** política activa versión 1 (S/ 500 de separación, inicial mínima S/ 5,000, 10% TNA, 1–36 cuotas, 7 días, francés). Permanecen 10 ventas y 5 planes históricos; ninguno recibió un snapshot retroactivo. El bloqueo TOTP para publicar nuevas versiones sigue pendiente y la pantalla es **solo lectura**.
+**Control de datos en TEST (17/11/2026):** política activa versión 1 (S/ 500 de separación, inicial mínima S/ 5,000, 10% TNA, 1–36 cuotas, 7 días, francés). Permanecen 10 ventas y 5 planes históricos; ninguno recibió un snapshot retroactivo. La política vigente sigue en solo lectura; el Bloque 4 permite preparar borradores, pero el control SQL mantiene bloqueada la publicación hasta completar el enrolamiento TOTP de Gerencia.
 
 **Pruebas adicionales pendientes:** registrar una operación de prueba completa en entorno aislado, recorrer firma y cronograma, verificar snapshots en las tres tablas y simular un cambio concurrente de política una vez exista publicación autorizada por TOTP. No crear ventas de prueba sobre datos de clientes existentes.
 
@@ -63,7 +63,9 @@ se encuentra en `services/auth-service` y Backoffice. Más detalles y requisitos
 y correo corporativo de Gerencia verificado. Ningún secreto debe registrarse en Git.
 Actualmente no se habilita publicación, ni en frontend ni en SQL.
 
-## Bloque 4 — Publicación y auditoría todavía pendientes
+## Bloque 4 — Implementado en rama y TEST, publicación todavía bloqueada
+
+Las migraciones **113, 114 y 115** permiten preparar borradores canónicos, obtener hash SHA-256, aprobar con TOTP de 120 segundos y publicar una nueva versión en una transacción con auditoría. El control cfg_fin_publicacion_control permanece **false** y no se abrirá hasta completar la prueba funcional del Bloque 3 y aprobación de Seguridad. Ver detalles en docs/financiamiento_publicacion_bloque4.md.
 
 
 
@@ -95,6 +97,6 @@ git switch --track origin/feature/configuracion-financiamiento
 docker compose up -d --build core-service backoffice
 ```
 
-Iniciar sesión **nuevamente** como Gerencia para renovar los permisos incluidos en el JWT. Abrir `http://localhost:5174/financiamiento?tab=configuracion`: aparecen política y 6 parámetros reales, y no existe opción para modificar. Para Asesor/Finanzas/Admin sin rol Gerencia, la pestaña debe estar oculta y el endpoint debe responder 403.
+Iniciar sesión **nuevamente** como Gerencia para renovar los permisos incluidos en el JWT. Abrir `http://localhost:5174/financiamiento?tab=configuracion`: aparecen la política real y el editor de borradores. La vista previa no altera datos; el botón de publicación sigue bloqueado desde PostgreSQL. Para Asesor/Finanzas/Admin sin rol Gerencia, la pestaña debe estar oculta y el endpoint debe responder 403.
 
-No se requiere instalar Google Authenticator ni configurar secretos todavía; el factor se activará únicamente al implementar el Bloque 3.
+Para probar y habilitar publicación sí se requiere TOTP funcional, correo corporativo verificado y clave de cifrado en Auth Service, en un entorno aislado. No activar el control de publicación ni tocar Railway production hasta completar los criterios de aceptación.
