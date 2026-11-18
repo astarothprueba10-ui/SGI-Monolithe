@@ -83,6 +83,11 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/financiamientoPublicacion.test.mjs
 
+      - name: Verify staging Auth-only financing panel and safe static proxy
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoStaging.test.mjs
+
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
