@@ -49,7 +49,9 @@ test('factor de seis dígitos protege contra replay y mantiene recuperación un 
   assert.match(service,/FinancingTotpCrypto\.hash\(recovery\)/);
   assert.match(service,/sesiones\.revocarTodasLasSesiones/);
   assert.match(service,/TransactionSynchronizationManager\.registerSynchronization/);
-  assert.match(service,/publicacionHabilitada",false/);
+  assert.match(service,/publicacionHabilitada",Boolean\.TRUE\.equals\(habilitada\)/);
+  assert.match(service,/publicacion\.previsualizar\(jwt,version,borrador\)/);
+  assert.match(service,/hashPropuesta/);
   assert.match(service,/hash_propuesta,nonce,expira_en/);
   assert.match(service,/120 seconds/);
 });
