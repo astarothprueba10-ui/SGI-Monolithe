@@ -3,6 +3,7 @@ import { ShieldCheckIcon, LockKeyholeIcon } from 'lucide-react';
 import { Alert } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
+import { CodigoQrTotp } from './CodigoQrTotp';
 import { clearStoredSession } from '../../lib/authSession';
 import {
   financingMfaService, type EstadoMfaFinanciero
@@ -21,6 +22,8 @@ export function SeguridadFinancieraTotpPanel() {
   const [totpCode, setTotpCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [secreto, setSecreto] = useState('');
+  const [otpauthUri, setOtpauthUri] = useState('');
+  const [mostrarClaveManual, setMostrarClaveManual] = useState(false);
   const [respaldo, setRespaldo] = useState<string[]>([]);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
@@ -59,6 +62,8 @@ export function SeguridadFinancieraTotpPanel() {
     setTotpCode('');
     setRecoveryCode('');
     setSecreto('');
+    setOtpauthUri('');
+    setMostrarClaveManual(false);
     setRespaldo([]);
     setFase('EMAIL');
     setAviso('Se envió un código al correo principal verificado de Gerencia. Caduca en 5 minutos.');
@@ -68,9 +73,11 @@ export function SeguridadFinancieraTotpPanel() {
     if (operacion === 'ENROLAR') {
       const datos = await financingMfaService.enrolar(emailCode);
       setSecreto(datos.secreto);
+      setOtpauthUri(datos.otpauthUri);
+      setMostrarClaveManual(false);
       setEmailCode('');
       setFase('CONFIGURAR');
-      setAviso('Agregue la clave a una aplicación autenticadora y confirme con sus 6 dígitos.');
+      setAviso('Escanee el código QR desde su aplicación autenticadora y confirme con sus 6 dígitos.');
     } else if (operacion === 'REVOCAR') {
       await financingMfaService.revocar(emailCode, totpCode);
       clearStoredSession();
@@ -86,9 +93,24 @@ export function SeguridadFinancieraTotpPanel() {
     const resultado = await financingMfaService.confirmar(totpCode);
     setTotpCode('');
     setSecreto('');
+    setOtpauthUri('');
+    setMostrarClaveManual(false);
     setRespaldo(resultado.codigosRecuperacion);
     setFase('RESPALDO');
     setEstado(prev => prev ? {...prev, habilitado:true,enrolamientoPendiente:false} : null);
+  });
+
+  /** Descarta un secreto aún no confirmado; el siguiente intento crea otro nuevo. */
+  const descartarEnrolamiento = () => void ejecutar(async () => {
+    await financingMfaService.descartarEnrolamiento();
+    setSecreto('');
+    setOtpauthUri('');
+    setMostrarClaveManual(false);
+    setTotpCode('');
+    setEmailCode('');
+    setFase('INICIO');
+    await recargar();
+    setAviso('Se descartó la configuración anterior. Inicie una nueva verificación de identidad.');
   });
 
   if (!estado && !error) return <p className="p-4 text-sm text-brand-500">Consultando seguridad TOTP…</p>;
@@ -180,23 +202,44 @@ export function SeguridadFinancieraTotpPanel() {
       </div>
     </div>}
 
-    {fase==='CONFIGURAR' && <div className="max-w-xl space-y-3">
-      <Alert tone="warning" title="Clave mostrada una sola vez">
-        Agréguela manualmente a Google Authenticator, Microsoft Authenticator u otra aplicación TOTP.
-        No la comparta ni la almacene en el navegador.
+    {fase==='CONFIGURAR' && <div className="max-w-xl space-y-4">
+      <Alert tone="warning" title="QR confidencial de un solo enrolamiento">
+        Escanéelo únicamente con su teléfono. No comparta capturas de esta pantalla:
+        el QR contiene la clave privada de su autenticador.
       </Alert>
-      <p className="break-all rounded-md bg-brand-50 p-3 font-mono text-sm tracking-widest text-brand-900 select-all">
-        {secreto}
-      </p>
+      <div className="flex justify-center rounded-xl border border-brand-100 bg-white p-4">
+        <CodigoQrTotp otpauthUri={otpauthUri} />
+      </div>
+      <ol className="list-decimal space-y-1 pl-5 text-xs text-brand-700">
+        <li>Abra Google Authenticator o Microsoft Authenticator en su celular.</li>
+        <li>Pulse el símbolo + y seleccione Escanear código QR.</li>
+        <li>Escanee la imagen y escriba abajo los seis dígitos de MONOLITHE.</li>
+      </ol>
+      <div>
+        <Button variant="secondary" onClick={()=>setMostrarClaveManual(v=>!v)}>
+          {mostrarClaveManual ? 'Ocultar clave manual' : 'No puedo escanear: usar clave manual'}
+        </Button>
+        {mostrarClaveManual && <div className="mt-2 space-y-2 rounded-md border border-brand-100 bg-brand-50 p-3">
+          <p className="text-xs text-brand-700">Clave alternativa de configuración (no compartir):</p>
+          <p className="break-all font-mono text-sm tracking-widest text-brand-900 select-all">
+            {secreto}
+          </p>
+        </div>}
+      </div>
       <p className="text-xs text-brand-500">Emisor: MONOLITHE · 6 dígitos · 30 segundos · SHA-1</p>
       <label htmlFor="mfa-totp-confirm" className="block text-xs font-medium text-brand-700">
         Introduzca los 6 dígitos de la aplicación
       </label>
       <Input id="mfa-totp-confirm" inputMode="numeric" maxLength={6}
         value={totpCode} onChange={e=>setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))}/>
-      <Button variant="primary" onClick={confirmar} disabled={ocupado||totpCode.length!==6}>
-        Confirmar y activar TOTP
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" onClick={confirmar} disabled={ocupado||totpCode.length!==6}>
+          Confirmar y activar TOTP
+        </Button>
+        <Button variant="secondary" onClick={descartarEnrolamiento} disabled={ocupado}>
+          Descartar QR y comenzar de nuevo
+        </Button>
+      </div>
     </div>}
 
     {fase==='RESPALDO' && <div className="max-w-xl space-y-3">
