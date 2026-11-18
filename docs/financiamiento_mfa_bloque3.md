@@ -30,11 +30,11 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 | POST | `/api/auth/financing-mfa/start` | Reautenticación con contraseña actual y desafío al correo verificado |
 | POST | `/api/auth/financing-mfa/enroll` | Consumo del OTP del correo, emisión **una única vez** de secreto y URI `otpauth://` |
 | POST | `/api/auth/financing-mfa/confirm` | Validación del primer TOTP y activación; devuelve **10 códigos de recuperación una sola vez** |
-| POST | `/api/auth/financing-mfa/authorize` | TOTP y emisión de recibo no publicador para versión, hash SHA-256, JWT `jti`, nonce y 120 s |
+| POST | `/api/auth/financing-mfa/authorize` | TOTP y emisión de recibo para versión, borrador validado y hash SHA-256 calculado en SQL, JWT `jti`, nonce y 120 s |
 | POST | `/api/auth/financing-mfa/revoke` | Requiere contraseña de `start`, OTP de correo y TOTP; invalida el factor y todas las sesiones |
 | POST | `/api/auth/financing-mfa/recover` | Requiere contraseña de `start`, OTP de correo y código de respaldo; reinicia el enrolamiento, invalida sesiones |
 
-**El endpoint `authorize` NO publica cambios.** En Bloque 4 la operación SQL de publicación deberá calcular el hash canónico del borrador aprobado y comparar versión actual, actor, `jti`, hash, nonce y recibo sin usar, todo bajo bloqueo y en la **misma transacción** que inserta la política inmutable, cambia el puntero y registra auditoría; deberá marcar `consumido_en` atómicamente. Un recibo caduca en 120 s y no se intercambia por otro cambio. Los códigos de recuperación jamás autorizan publicaciones de políticas.
+**El endpoint `authorize` NO publica cambios.** El Bloque 4 ya incorporó la operación SQL que recalcula el hash del borrador aprobado y compara actor, JTI, versión, hash, nonce y recibo sin usar; inserción inmutable, cambio de puntero y auditoría comparten una transacción. El interruptor SQL permanece DESHABILITADO hasta validar TOTP funcional. El recibo caduca a los 120 segundos. Los códigos de recuperación jamás autorizan publicaciones.
 
 ## Reglas implementadas
 
@@ -44,7 +44,7 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 - Intentos de contraseña, correo y TOTP limitados a 5 antes de bloqueo de 15 minutos. Hay auditoría de intentos, bloqueos y cambios, más aviso al correo verificado **después del commit**. No se registran códigos ni secretos.
 - Los 10 códigos de respaldo contienen 128 bits aleatorios cada uno y se conservan como hashes SHA-256. La operación de recuperación consume uno bajo bloqueo de fila, revoca el factor y elimina los restantes; no lo usa para autorizar una política.
 - Tras revocar o recuperar se revocan refresh sessions y aumenta `version_sesiones` para invalidar JWT antiguos dentro del verificador MFA. La interfaz también borra sesión local.
-- Las tablas tienen RLS y privilegios revocados para `anon`, `authenticated` y `service_role`. Solo el rol backend `sigi_app_user` puede manipular filas. No se abrió RPC de publicación.
+- Las tablas tienen RLS y privilegios revocados para `anon`, `authenticated` y `service_role`. Solo el rol backend `sigi_app_user` puede manipular filas. El Bloque 4 incorpora una función de publicación exclusiva del backend, condicionada al interruptor de seguridad y al recibo MFA.
 
 ## Diagnóstico de activación confirmado (17/11/2026)
 
@@ -64,4 +64,4 @@ Todos requieren autenticación JWT, permiso `financing.configure` y revalidació
 
 ## Límite del Bloque 3
 
-Este bloque aporta la autenticación reforzada. El **Bloque 4** deberá implementar formulario de borrador, normalización/hash canónico de parámetros, doble confirmación, consumo atómico de autorización, publicación inmutable, auditoría financiera transaccional y avisos de publicación. Hasta entonces la UI financiera y el API de configuración siguen siendo **solo lectura**.
+Este bloque aporta la autenticación reforzada. El **Bloque 4** implementó el formulario, hash canónico, doble confirmación, consumo atómico de recibo, nueva versión inmutable, auditoría y avisos; consulte docs/financiamiento_publicacion_bloque4.md. La publicación sigue bloqueada: falta probar enrolamiento TOTP real y autorizar el despliegue en entorno aislado.
