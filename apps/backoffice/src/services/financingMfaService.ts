@@ -22,6 +22,8 @@ export const financingMfaService = {
     authSecuredApi.post<SecretoMfa>(base + '/enroll', { codigo }),
   confirmar: (codigo: string) =>
     authSecuredApi.post<ConfirmacionMfa>(base + '/confirm', { codigo }),
+  descartarEnrolamiento: () =>
+    authSecuredApi.post<InicioMfa>(base + '/cancel-enrollment'),
   revocar: (codigoEmail: string, codigoTotp: string) =>
     authSecuredApi.post<InicioMfa>(base + '/revoke', { codigoEmail, codigoTotp }),
   recuperar: (codigoEmail: string, codigoRecuperacion: string) =>
