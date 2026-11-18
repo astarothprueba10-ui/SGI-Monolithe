@@ -2,7 +2,7 @@ import { authSecuredApi } from '../lib/apiClient';
 
 export interface EstadoMfaFinanciero {
   configurado: boolean;
-  correoCorporativoVerificado: boolean;
+  correoPrincipalVerificado: boolean;
   habilitado: boolean;
   enrolamientoPendiente: boolean;
   publicacionHabilitada: boolean;
