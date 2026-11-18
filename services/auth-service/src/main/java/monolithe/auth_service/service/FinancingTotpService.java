@@ -295,6 +295,31 @@ public class FinancingTotpService {
         return Map.of("secreto",secreto,"otpauthUri",uri);
     }
 
+    /**
+     * Descarta una clave de enrolamiento no activada. No revoca factores activos.
+     * Permite regenerar un QR si el anterior se mostró por accidente.
+     */
+    @Transactional
+    public Map<String,String> descartarEnrolamiento(Jwt jwt) {
+        long id=actor(jwt);
+        Cuenta c=fila(id,true);
+        if (c!=null && c.secreto()!=null) {
+            throw fallo(HttpStatus.CONFLICT,"El autenticador está activo; utilice el flujo de revocación.");
+        }
+        if (c!=null) {
+            db.update("""
+                UPDATE public.seg_fin_totp_cuentas
+                SET secreto_pendiente=NULL, pendiente_expira_en=NULL, pendiente_jti=NULL,
+                    email_otp_hash=NULL, email_otp_expira_en=NULL, email_otp_jti=NULL,
+                    email_otp_intentos=0, actualizado_en=now()
+                WHERE id_usuario=? AND secreto_cifrado IS NULL
+                """,id);
+            auditar(id,"MFA_FIN_ENROLAMIENTO_DESCARTADO",
+                "Clave de enrolamiento pendiente descartada; se exige nueva verificación de identidad.");
+        }
+        return Map.of("mensaje","Enrolamiento descartado. Realice nuevamente la verificación.");
+    }
+
     @Transactional(noRollbackFor=ResponseStatusException.class)
     public Map<String,Object> confirmar(Jwt jwt,String codigo) {
         long id=actor(jwt);
