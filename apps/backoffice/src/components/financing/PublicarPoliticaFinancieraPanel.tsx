@@ -27,6 +27,7 @@ export function PublicarPoliticaFinancieraPanel({
   const [confirmado, setConfirmado] = useState(false);
   const [frase, setFrase] = useState('');
   const [codigo, setCodigo] = useState('');
+  const [ensayoValidado, setEnsayoValidado] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
@@ -36,6 +37,7 @@ export function PublicarPoliticaFinancieraPanel({
     setVista(null);
     setConfirmado(false);
     setCodigo('');
+    setEnsayoValidado(false);
     setFrase('');
     setError('');
   }, [politica.idPolitica]);
@@ -46,6 +48,7 @@ export function PublicarPoliticaFinancieraPanel({
     setConfirmado(false);
     setFrase('');
     setCodigo('');
+    setEnsayoValidado(false);
     setError('');
     setMensaje('');
   }
@@ -62,13 +65,34 @@ export function PublicarPoliticaFinancieraPanel({
   }
 
   const previsualizar=async()=>{
-    setOcupado(true);setError('');setMensaje('');
+    setOcupado(true);setError('');setMensaje('');setCodigo('');setEnsayoValidado(false);
     try {
       const r=await financingPolicyPublicationService.previsualizar(politica.version,borrador);
       setVista(r);
     } catch(e) {
       setVista(null);
       setError(e instanceof Error?e.message:'No se pudo validar el borrador financiero.');
+    } finally {setOcupado(false);}
+  };
+
+  /** Firma de prueba ligada a la huella SQL, sin crear recibo publicador ni nueva versión. */
+  const ensayarTotp=async()=>{
+    if(!vista || vista.publicacionHabilitada || ensayoValidado || !/^[0-9]{6}$/.test(codigo)) return;
+    setOcupado(true);setError('');setMensaje('');
+    const codigoTemporal=codigo;
+    setCodigo('');
+    try {
+      const resultado=await financingPolicyPublicationService.ensayarTotp(
+        vista.versionActual,borrador,codigoTemporal);
+      if(!resultado.ensayoValidado || resultado.publicacionRealizada!==false ||
+          resultado.versionEsperada!==vista.versionActual ||
+          resultado.hashPropuesta!==vista.hashPropuesta) {
+        throw new Error('El ensayo no corresponde a la versión o a las condiciones revisadas.');
+      }
+      setEnsayoValidado(true);
+      setMensaje('Firma TOTP verificada y registrada en auditoría. No se publicó ninguna política.');
+    } catch(e) {
+      setError(e instanceof Error?e.message:'No se pudo completar el ensayo TOTP.');
     } finally {setOcupado(false);}
   };
 
@@ -178,10 +202,42 @@ export function PublicarPoliticaFinancieraPanel({
         <strong>Justificación:</strong> {vista.condiciones.motivoPublicacion}
       </p>
       <p className="break-all text-[10px] font-mono text-brand-500">Huella de propuesta: {vista.hashPropuesta}</p>
-      {!vista.publicacionHabilitada ? <Alert tone="warning" title="Validación completada, publicación suspendida">
-        La propuesta puede revisarse, pero no se solicitará TOTP ni se enviará ninguna publicación
-        mientras el interruptor de seguridad esté deshabilitado en TEST.
-      </Alert> : <div className="space-y-3 rounded-lg border border-brand-200 bg-white p-3">
+      {!vista.publicacionHabilitada ? <div className="space-y-3">
+        <Alert tone="warning" title="Validación completada, publicación suspendida">
+          La propuesta puede revisarse, pero no se publicará ni se generará autorización
+          para publicar mientras el interruptor de seguridad permanezca deshabilitado.
+        </Alert>
+        <div className="space-y-3 rounded-lg border border-brand-200 bg-white p-3">
+          <h6 className="text-xs font-semibold text-brand-900">
+            Ensayo de firma TOTP · sin publicación
+          </h6>
+          <p className="text-xs text-brand-700">
+            Comprobaremos que el autenticador corresponde a su cuenta y a esta propuesta.
+            No se cambiarán tarifas, contratos ni cronogramas; no se emitirá un recibo
+            que permita publicar. El resultado quedará registrado en auditoría.
+          </p>
+          {!ensayoValidado ? <>
+            <label className="block text-xs font-medium text-brand-800">
+              Código nuevo de Google Authenticator o Microsoft Authenticator
+              <Input className="mt-1" type="text" inputMode="numeric"
+                autoComplete="one-time-code" maxLength={6} value={codigo} disabled={ocupado}
+                onChange={e=>setCodigo(e.target.value.replace(/\D/g,'').slice(0,6))}/>
+            </label>
+            <p className="text-xs text-brand-600">
+              Utilice un código nuevo de 6 dígitos. Si acaba de activar el autenticador,
+              espere a que cambie el código (aproximadamente cada 30 segundos).
+              No repita un código rechazado: varios intentos inválidos pueden bloquear temporalmente la cuenta.
+            </p>
+            <Button variant="secondary" onClick={()=>void ensayarTotp()}
+              disabled={ocupado || codigo.length!==6}>
+              {ocupado?'Verificando…':'Probar firma TOTP sin publicar'}
+            </Button>
+          </> : <p className="text-xs font-semibold text-brand-800" role="status">
+            Ensayo correcto: firma vinculada a la versión {vista.versionActual}
+            y huella verificada. No se publicó ninguna política.
+          </p>}
+        </div>
+      </div> : <div className="space-y-3 rounded-lg border border-brand-200 bg-white p-3">
         <label className="flex gap-2 text-xs text-brand-800">
           <input type="checkbox" checked={confirmado} disabled={ocupado}
             onChange={e=>setConfirmado(e.target.checked)} />
