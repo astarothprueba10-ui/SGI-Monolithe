@@ -93,3 +93,27 @@ test('Backoffice obliga vista previa, doble confirmación y TOTP; no almacena c�
   assert.match(service,/confirmacionExplicita: true/);
   assert.doesNotMatch(service,/coreApi\.post/);
 });
+
+
+test('migración 116 acepta el correo principal ya registrado, sin quitar MFA ni candado',()=>{
+  const sql=read('../../../database/migrations/116_financiamiento_correo_principal_verificado_v1.sql');
+  const totp=read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/FinancingTotpService.java');
+  const publicar=read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/FinancingPolicyPublicationService.java');
+  const ui=read('../src/components/financing/SeguridadFinancieraTotpPanel.tsx');
+  const api=read('../src/services/financingMfaService.ts');
+
+  assert.match(sql,/CREATE OR REPLACE FUNCTION public\.sp_fin_publicar_politica_v1/);
+  assert.match(sql,/c\.principal AND c\.verificado AND c\.activo/);
+  assert.match(sql,/PUBLICACION_BLOQUEADA/);
+  assert.match(sql,/v_aut\.token_jti IS DISTINCT FROM p_jti/);
+  assert.match(sql,/v_aut\.nonce IS DISTINCT FROM p_nonce/);
+  assert.match(sql,/v_aut\.hash_propuesta IS DISTINCT FROM v_hash/);
+  assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.sp_fin_publicar_politica_v1/);
+  assert.match(totp,/c\.activo AND c\.verificado AND c\.principal/);
+  assert.match(publicar,/c\.verificado AND c\.activo/);
+  assert.match(api,/correoPrincipalVerificado: boolean/);
+  assert.match(ui,/estado\.correoPrincipalVerificado/);
+  for (const code of [sql,totp,publicar,ui,api]) {
+    assert.doesNotMatch(code,/@monolithe\.pe/);
+  }
+});
