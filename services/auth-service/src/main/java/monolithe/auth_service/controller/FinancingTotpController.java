@@ -30,6 +30,11 @@ public class FinancingTotpController {
                              @NotBlank @Pattern(regexp="[0-9]{6}") String codigoTotp) {}
     public record Recuperacion(@NotBlank @Pattern(regexp="[0-9]{6}") String codigoEmail,
                                @NotBlank @Pattern(regexp="[A-Fa-f0-9]{32}") String codigoRecuperacion) {}
+    public record Ensayo(
+        @NotBlank @Pattern(regexp="[0-9]{6}") String codigo,
+        @NotNull @Positive Integer versionEsperada,
+        @NotNull Map<String,Object> borrador
+    ) {}
     public record Autorizacion(
         @NotBlank @Pattern(regexp="[0-9]{6}") String codigo,
         @Positive Integer versionEsperada,
@@ -72,6 +77,15 @@ public class FinancingTotpController {
             @Valid @RequestBody CodigoTotp req) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
             .body(service.confirmar(jwt,req.codigo()));
+    }
+
+    /** Verifica TOTP y vínculo con hash real sin autorizar ni publicar cambios. */
+    @PostMapping("/rehearse")
+    @PreAuthorize("hasAuthority('financing.configure')")
+    public ResponseEntity<Map<String,Object>> ensayar(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody Ensayo req) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .body(service.ensayarAutorizacion(jwt,req.codigo(),req.versionEsperada(),req.borrador()));
     }
 
     @PostMapping("/authorize")
