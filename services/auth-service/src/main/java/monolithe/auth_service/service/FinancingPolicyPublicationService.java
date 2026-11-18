@@ -110,7 +110,7 @@ public class FinancingPolicyPublicationService {
           JOIN public.cfg_tipos_contacto t ON t.id_tipo_contacto=c.id_tipo_contacto
           WHERE u.id_usuario=? AND t.codigo='EMAIL' AND t.activo AND c.principal
             AND c.verificado AND c.activo AND nullif(btrim(c.valor),'') IS NOT NULL
-          LIMIT 1
+          ORDER BY c.id_persona_contacto LIMIT 1
           """,(rs,n)->rs.getString(1),id);
         if (emails.isEmpty()) throw error(HttpStatus.CONFLICT,"Falta el correo verificado.");
         String destino=emails.getFirst();
