@@ -104,6 +104,14 @@ export function CarteraFinanciamientoPanel() {
   }, [rango]);
 
   useEffect(() => {
+    // Staging ejecuta MFA y la política vía Auth Service, sin conectar Core de producción.
+    // Evitar consultas a la cartera cuando solo se prueba Configuración de Gerencia.
+    if (vista === 'CONFIGURACION' &&
+        import.meta.env.VITE_FINANCING_STAGING_AUTH_CURRENT === 'true') {
+      setCargando(false);
+      setError(null);
+      return;
+    }
     if (!rango || rangoTablaInvalido) {
       if (!rango) setDatos(null);
       setCargando(false);
@@ -132,7 +140,7 @@ export function CarteraFinanciamientoPanel() {
       if (vigente) setError(cause instanceof Error ? cause.message : 'No pudimos consultar la cartera financiera.');
     }).finally(() => { if (vigente) setCargando(false); });
     return () => { vigente = false; };
-  }, [rango, consulta, pagina, revision, rangoTablaInvalido,
+  }, [vista, rango, consulta, pagina, revision, rangoTablaInvalido,
     filtrosTabla.proyecto, filtrosTabla.lote, filtrosTabla.estado,
     filtrosTabla.fechaDesde, filtrosTabla.fechaHasta]);
 
