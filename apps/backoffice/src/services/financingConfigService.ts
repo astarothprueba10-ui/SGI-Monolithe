@@ -1,4 +1,4 @@
-import { coreApi } from '../lib/apiClient';
+import { authSecuredApi, coreApi } from '../lib/apiClient';
 
 /** Catálogo financiero de SOLO LECTURA hasta completar MFA y publicación auditada. */
 export interface PoliticaFinanciamientoVersion {
@@ -34,5 +34,7 @@ export interface PoliticaFinanciamientoActual {
 export const financingConfigService = {
   /** Actor y permisos se extraen del JWT de Core; SQL valida rol GERENCIA activo. */
   obtenerPoliticaActual: () =>
-    coreApi.get<PoliticaFinanciamientoActual>('/crm/financiamiento/configuracion/actual')
+    import.meta.env.VITE_FINANCING_STAGING_AUTH_CURRENT === 'true'
+      ? authSecuredApi.get<PoliticaFinanciamientoActual>('/financing-policies/current', { cache: 'no-store' })
+      : coreApi.get<PoliticaFinanciamientoActual>('/crm/financiamiento/configuracion/actual')
 };
