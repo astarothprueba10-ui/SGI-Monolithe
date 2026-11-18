@@ -70,5 +70,5 @@ test('UI no persiste secretos ni publica políticas', () => {
   assert.doesNotMatch(ui,/localStorage\.|sessionStorage\./);
   assert.match(api,/authSecuredApi\.post/);
   assert.doesNotMatch(api,/\/publish|\/publicar/);
-  assert.match(panel,/La publicación de otra versión permanece bloqueada/);
+  assert.match(panel,/datos\.publicacionHabilitada/);
 });
