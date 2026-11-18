@@ -52,9 +52,10 @@ test('tercera pestaña solo visible para Gerencia con permiso y solo permite lec
   assert.match(parent, /Configuración de planes de financiamiento/);
   assert.match(parent, /vista === 'CONFIGURACION' && puedeConfigurar/);
   assert.match(panel, /financingConfigService\.obtenerPoliticaActual\(\)/);
-  assert.match(panel, /Configuración en modo consulta/);
-  assert.match(panel, /Historial de versiones/);
-  assert.match(panel, /TOTP/);
+  assert.match(panel, /Versión actual/);
+  assert.match(panel, /Versión vigente|Vigente/);
+  assert.match(panel, /HistorialPoliticasFinancierasPanel/);
+  assert.match(panel, /SeguridadFinancieraTotpPanel/);
   assert.match(api, /coreApi\.get<PoliticaFinanciamientoActual>/);
   assert.doesNotMatch(api, /coreApi\.(post|put|patch|delete)/);
 });
@@ -143,12 +144,46 @@ test('conflictos de version aceptada tienen HTTP 409 y mensajes coherentes con e
   assert.match(service, /mensaje\.contains\("POLITICA_REQUERIDA\|"\)/);
   assert.match(service, /mensaje\.contains\("FINANCIAMIENTO_INVALIDO\|"\)/);
   assert.match(service, /mensaje\.contains\("SEPARACION_MONTO_INVALIDO\|"\)/);
-  assert.match(panel, /Las nuevas separaciones y ventas se validan contra políticas financieras versionadas/);
+  assert.match(panel, /Las operaciones anteriores conservan las condiciones aceptadas/);
   assert.doesNotMatch(panel, /el motor de ventas continúa usando/i);
-  assert.match(panel, /publicación de otra versión permanece bloqueada/);
+  assert.match(panel, /datos\.publicacionHabilitada/);
   assert.match(panel, /PublicarPoliticaFinancieraPanel/);
   const sales = read('../src/pages/Sales.tsx');
   assert.match(sales, /err instanceof ApiError && err\.status === 409/);
   assert.match(sales, /setRevisionPolitica\(revision => revision \+ 1\)/);
   assert.match(sales, /setDatosVentaValidados\(null\)/);
+});
+
+
+test('pantalla financiera organiza versiones en columnas, seguridad e historial por debajo', () => {
+  const parent=read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
+  const editor=read('../src/components/financing/PublicarPoliticaFinancieraPanel.tsx');
+  const historial=read('../src/components/financing/HistorialPoliticasFinancierasPanel.tsx');
+  const mfa=read('../src/components/financing/SeguridadFinancieraTotpPanel.tsx');
+
+  assert.match(parent, /xl:grid-cols-2/);
+  assert.match(parent, /grid-cols-1/);
+  assert.match(parent, /Versión actual/);
+  assert.match(editor, /Versión a actualizar/);
+  assert.match(editor, /Propuesta · Versión/);
+  assert.match(editor, /Vista previa validada/);
+  assert.match(editor, /comparacion\.map/);
+  assert.match(editor, /cambiosPendientes/);
+  assert.match(editor, /sm:grid-cols-2/);
+  assert.match(historial, /Historial de versiones/);
+  assert.match(historial, /sm:grid-cols-\[/);
+  assert.match(historial, /versiones\.map/);
+  const twoColumns=parent.indexOf('xl:grid-cols-2');
+  const security=parent.indexOf('<SeguridadFinancieraTotpPanel />');
+  const history=parent.indexOf('<HistorialPoliticasFinancierasPanel politica={datos} />');
+  assert.ok(twoColumns>0 && security>twoColumns && history>security,
+    'Seguridad e historial deben quedar debajo de las columnas');
+  assert.match(mfa, /Administrar autenticador/);
+  assert.match(mfa, /mostrarGestion/);
+  for(const code of [parent,editor,mfa,historial]) {
+    assert.doesNotMatch(code, /bloqueada en TEST|del Bloque 3|modo consulta · protección activa/i);
+  }
+  assert.match(parent, /datos\.publicacionHabilitada/);
+  assert.match(editor, /!vista\.publicacionHabilitada/);
+  assert.match(editor, /confirmado/);
 });
