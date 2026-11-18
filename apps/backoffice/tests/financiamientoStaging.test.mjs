@@ -48,3 +48,14 @@ test('login documental invoca procedimiento PostgreSQL por CALL, no por escape J
   assert.match(repo, /rs\.getString\("p_usuario_login"\)/);
   assert.doesNotMatch(repo, /new SimpleJdbcCall|\.withProcedureName/);
 });
+
+
+test('contexto de autenticación invoca PROCEDURE real con 1 IN y 8 OUT', () => {
+  const repo=read('../../../services/auth-service/src/main/java/monolithe/auth_service/repository/AuthenticationContextRepository.java');
+  assert.match(repo, /CALL public\.sp_obtener_contexto_autenticacion\(/);
+  assert.match(repo, /NULL::bigint/);
+  assert.match(repo, /NULL::text\[\]/);
+  assert.match(repo, /ps -> ps\.setString\(1, login\)/);
+  assert.match(repo, /rs\.getArray\("p_authorities"\)/);
+  assert.doesNotMatch(repo, /new SimpleJdbcCall|\.withProcedureName/);
+});
