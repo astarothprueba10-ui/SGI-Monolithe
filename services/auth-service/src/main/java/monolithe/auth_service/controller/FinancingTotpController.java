@@ -59,6 +59,13 @@ public class FinancingTotpController {
             .body(service.enrolar(jwt,req.codigo()));
     }
 
+    @PostMapping("/cancel-enrollment")
+    @PreAuthorize("hasAuthority('financing.configure')")
+    public ResponseEntity<Map<String,String>> descartarEnrolamiento(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .body(service.descartarEnrolamiento(jwt));
+    }
+
     @PostMapping("/confirm")
     @PreAuthorize("hasAuthority('financing.configure')")
     public ResponseEntity<Map<String,Object>> confirmar(@AuthenticationPrincipal Jwt jwt,
