@@ -37,6 +37,13 @@ public class FinancingPolicyController {
         @NotNull Boolean confirmacionExplicita
     ) {}
 
+    @GetMapping("/current")
+    @PreAuthorize("hasAuthority('financing.configure')")
+    public ResponseEntity<JsonNode> consultarActual(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .body(service.consultarActual(jwt));
+    }
+
     @PostMapping("/preview")
     @PreAuthorize("hasAuthority('financing.configure')")
     public ResponseEntity<JsonNode> vistaPrevia(@AuthenticationPrincipal Jwt jwt,
