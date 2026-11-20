@@ -21,6 +21,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.versionSesiones FROM User u WHERE u.idUsuario = :idUsuario")
     Optional<Long> findVersionSesionesByIdUsuario(@Param("idUsuario") Long idUsuario);
 
+    /** Comparte el orden de bloqueo del segundo factor al rotar o revocar una sesión. */
+    @Query(value = "SELECT id_usuario FROM public.seg_usuarios WHERE id_usuario = :id FOR NO KEY UPDATE", nativeQuery = true)
+    Optional<Long> lockSessionAccount(@Param("id") Long id);
+
     /** Devuelve la persona vinculada sin exponer otros datos de la cuenta. */
     @Query("SELECT u.idPersona FROM User u WHERE u.idUsuario = :idUsuario")
     Optional<Long> findIdPersonaByIdUsuario(@Param("idUsuario") Long idUsuario);

@@ -1,6 +1,6 @@
 package monolithe.auth_service.controller;
 
-import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.dto.MfaChallenge;
 import monolithe.auth_service.exception.GlobalExceptionHandler;
 import monolithe.auth_service.service.AuditService;
 import monolithe.auth_service.service.AuthenticationService;
@@ -14,8 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.List;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -23,6 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,19 +68,8 @@ class LoginSecurityValidationTest {
                 .replace("\t", "\\t");
     }
 
-    private LoginResponse crearRespuestaExitosa() {
-        return new LoginResponse(
-                1L,
-                "admin@sigi.pe",
-                "Admin S.",
-                "AS",
-                List.of("ROLE_ADMINISTRADOR"),
-                false,
-                "access-token",
-                "refresh-token",
-                "Bearer",
-                900L,
-                "Login exitoso");
+    private MfaChallenge crearRespuestaExitosa() {
+        return new MfaChallenge("A".repeat(43), MfaChallenge.Paso.CODIGO, 300);
     }
 
     private void assertDocumentoInvalidoResponde400(String tipoDocumento, String numeroDocumento) throws Exception {
@@ -211,8 +199,11 @@ class LoginSecurityValidationTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(aJson(documento, "Password123!", tipo)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.idUsuario").value(1L));
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.paso").value("CODIGO"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
 
         verify(authenticationService).autenticar(any(), any(), any());
     }
@@ -225,8 +216,11 @@ class LoginSecurityValidationTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(aJson("12345678", "Abc!@#$%_+-123")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.idUsuario").value(1L));
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.paso").value("CODIGO"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
 
         verify(authenticationService).autenticar(any(), any(), any());
     }

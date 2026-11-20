@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, authApi } from '../lib/apiClient';
+import { MfaLoginForm } from './auth/MfaLoginForm';
+import { requireMfaChallenge, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -12,20 +14,6 @@ import {
   UserIcon
 } from 'lucide-react';
 import { TextField } from './TextField';
-
-type LoginResponse = {
-  idUsuario: number;
-  usuario: string;
-  nombreMostrar: string | null;
-  iniciales: string | null;
-  autoridades: string[];
-  requiereCambioPassword: boolean;
-  accessToken: string;
-  refreshToken: string;
-  tokenType: string;
-  expiresIn: number;
-  mensaje: string;
-};
 
 type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
 
@@ -104,6 +92,7 @@ export function LoginForm() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [cambioObligatorio, setCambioObligatorio] = useState(false);
   const usuarioRef = useRef<HTMLInputElement>(null);
@@ -126,87 +115,60 @@ export function LoginForm() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
-
+    if (loading || signedIn) return;
     setError(null);
-
-    const errorValidacion = validarFormularioPortal(tipoDocumento, usuario, password);
-    if (errorValidacion) {
-      setError(errorValidacion);
+    const validation = validarFormularioPortal(tipoDocumento, usuario, password);
+    if (validation) {
+      setError(validation);
       usuarioRef.current?.focus();
       return;
     }
+    await solicitarReto();
+  }
 
+  async function solicitarReto() {
     setLoading(true);
-
     try {
-      const data = await authApi.post<LoginResponse>('/login', {
-        usuario: usuario.trim(),
-        tipoDocumento,
-        contrasena: password
+      const data = await authApi.post<MfaChallenge>('/login', {
+        usuario: usuario.trim(), tipoDocumento, contrasena: password, portal: 'CLIENTE'
       });
-
-      const esCliente = data.autoridades.includes('ROLE_CLIENTE');
-
-      if (!esCliente) {
-        try {
-          await authApi.post<void>('/logout', {
-            refreshToken: data.refreshToken
-          });
-        } catch {
-          console.warn(
-            'No fue posible revocar la sesion de un usuario sin acceso al Portal Cliente.'
-          );
-        }
-
-        throw new ApiError(
-          403,
-          'Este usuario no tiene acceso al Portal Cliente.'
-        );
-      }
-
-      const storage = remember ? localStorage : sessionStorage;
-      const otherStorage = remember ? sessionStorage : localStorage;
-
-      otherStorage.removeItem('monolithe_access_token');
-      otherStorage.removeItem('monolithe_refresh_token');
-      otherStorage.removeItem('monolithe_user');
-
-      storage.setItem('monolithe_access_token', data.accessToken);
-      storage.setItem('monolithe_refresh_token', data.refreshToken);
-
-      storage.setItem(
-        'monolithe_user',
-        JSON.stringify({
-          idUsuario: data.idUsuario,
-          usuario: data.usuario,
-          nombreMostrar: data.nombreMostrar,
-          iniciales: data.iniciales,
-          autoridades: data.autoridades,
-          requiereCambioPassword: data.requiereCambioPassword
-        })
-      );
-
-      setCambioObligatorio(data.requiereCambioPassword);
-      setSignedIn(true);
-
-      setTimeout(() => {
-        navigate(data.requiereCambioPassword ? '/cambiar-contrasena' : '/portal', { replace: true });
-      }, 350);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        setError(resolverMensajeErrorLogin(error));
-      } else {
-        setError(
-          'No pudimos conectar con el servicio de autenticacion. Intentalo nuevamente.'
-        );
-      }
-
+      setChallenge(requireMfaChallenge(data));
+      setPassword('');
+    } catch (problem) {
+      setError(problem instanceof ApiError ? resolverMensajeErrorLogin(problem)
+        : 'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.');
       usuarioRef.current?.focus();
     } finally {
       setLoading(false);
     }
   }
+
+  async function finalizarSesion(data: MfaLoginSession) {
+    if (!data.autoridades.includes('ROLE_CLIENTE')) {
+      await authApi.post<void>('/logout', { refreshToken: data.refreshToken });
+      throw new ApiError(403, 'Este usuario no tiene acceso al Portal Cliente.');
+    }
+    const storage = remember ? localStorage : sessionStorage;
+    const otherStorage = remember ? sessionStorage : localStorage;
+    for (const key of ['monolithe_access_token', 'monolithe_refresh_token', 'monolithe_user']) otherStorage.removeItem(key);
+    const { accessToken, refreshToken, ...user } = data;
+    storage.setItem('monolithe_access_token', accessToken);
+    storage.setItem('monolithe_refresh_token', refreshToken);
+    storage.setItem('monolithe_user', JSON.stringify(user));
+    setChallenge(null);
+    setCambioObligatorio(data.requiereCambioPassword);
+    setSignedIn(true);
+    window.setTimeout(() => {
+      navigate(data.requiereCambioPassword ? '/cambiar-contrasena' : '/portal', { replace: true });
+    }, 350);
+  }
+
+  function reiniciarLogin(message?: string) {
+    setChallenge(null);
+    setError(message ?? null);
+  }
+
+  if (challenge) return <MfaLoginForm challenge={challenge} onSuccess={finalizarSesion} onRestart={reiniciarLogin} />;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
@@ -344,7 +306,7 @@ export function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || signedIn}
         className="flex h-11 w-full items-center justify-center gap-2 rounded-field bg-ink-800 text-[14.5px] font-semibold text-white hover:bg-ink-700 disabled:cursor-not-allowed disabled:bg-ink-800/70"
       >
         {loading ? (

@@ -53,47 +53,35 @@ public class RefreshTokenService {
                                 userAgent);
         }
 
+        /** Rota el token de una sesión activa bajo el bloqueo de su cuenta. */
         @Transactional
         public RefreshTokenRotation rotarRefreshToken(
-                        String refreshTokenActual,
-                        String ipOrigen,
-                        String userAgent) {
-
-                String refreshTokenHash = calcularSha256(refreshTokenActual);
-
-                Session sesionActual = sessionRepository
-                                .findByRefreshTokenHashAndFechaRevocacionIsNull(
-                                                refreshTokenHash)
-                                .orElseThrow(() -> new InvalidTokenException(
-                                                "Refresh token inválido"));
-
+                        String refreshTokenActual, String ipOrigen, String userAgent) {
+                Session sesion = bloquearSesionActiva(calcularSha256(refreshTokenActual));
                 LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
-
-                if (!sesionActual.getFechaExpiracion().isAfter(ahora)) {
-                        throw new InvalidTokenException(
-                                        "Refresh token expirado");
+                if (!sesion.getFechaExpiracion().isAfter(ahora)) {
+                        throw new InvalidTokenException("Refresh token expirado");
                 }
 
-                User usuario = sesionActual.getUsuario();
-
+                User usuario = sesion.getUsuario();
                 validarUsuario(usuario, ahora);
+                sesion.setUltimaActividad(ahora);
+                sesion.setFechaRevocacion(ahora);
+                sesion.setMotivoRevocacion("ROTACION_REFRESH_TOKEN");
+                sessionRepository.save(sesion);
 
-                sesionActual.setUltimaActividad(ahora);
-                sesionActual.setFechaRevocacion(ahora);
-                sesionActual.setMotivoRevocacion(
-                                "ROTACION_REFRESH_TOKEN");
+                String nuevoRefreshToken = crearNuevaSesion(usuario, ipOrigen, userAgent);
+                return new RefreshTokenRotation(usuario.getIdUsuario(), usuario.getUsuarioLogin(),
+                                nuevoRefreshToken, usuario.getVersionSesiones());
+        }
 
-                sessionRepository.save(sesionActual);
-
-                String nuevoRefreshToken = crearNuevaSesion(
-                                usuario,
-                                ipOrigen,
-                                userAgent);
-
-                return new RefreshTokenRotation(
-                                usuario.getIdUsuario(),
-                                usuario.getUsuarioLogin(),
-                                nuevoRefreshToken);
+        private Session bloquearSesionActiva(String hash) {
+                Long usuario = sessionRepository.findUserIdByActiveRefreshHash(hash)
+                                .orElseThrow(() -> new InvalidTokenException("Refresh token inválido"));
+                userRepository.lockSessionAccount(usuario)
+                                .orElseThrow(() -> new InvalidTokenException("Refresh token inválido"));
+                return sessionRepository.findByRefreshTokenHashAndFechaRevocacionIsNull(hash)
+                                .orElseThrow(() -> new InvalidTokenException("Refresh token inválido"));
         }
 
         public String calcularSha256(String token) {
@@ -242,11 +230,26 @@ public class RefreshTokenService {
                 return sesion.getUsuario().getIdUsuario();
         }
 
+        /** Invalida todas las sesiones y su versión bajo el mismo bloqueo de cuenta. */
         @Transactional
         public void revocarTodasLasSesiones(
                         Long idUsuario,
                         String motivo) {
 
+                userRepository.lockSessionAccount(idUsuario)
+                                .orElseThrow(() -> new IllegalStateException("No se encontró la cuenta"));
+                revocarSesionesActivas(idUsuario, motivo);
+
+                int actualizados = userRepository
+                                .incrementarVersionSesiones(idUsuario);
+
+                if (actualizados != 1) {
+                        throw new IllegalStateException(
+                                        "No se pudo invalidar la versión de sesión del usuario");
+                }
+        }
+
+        private void revocarSesionesActivas(Long idUsuario, String motivo) {
                 LocalDateTime ahora = LocalDateTime.now(ZoneOffset.UTC);
 
                 var sesionesActivas = sessionRepository
@@ -260,14 +263,6 @@ public class RefreshTokenService {
                 });
 
                 sessionRepository.saveAll(sesionesActivas);
-
-                int actualizados = userRepository
-                                .incrementarVersionSesiones(idUsuario);
-
-                if (actualizados != 1) {
-                        throw new IllegalStateException(
-                                        "No se pudo invalidar la versión de sesión del usuario");
-                }
         }
 
 }

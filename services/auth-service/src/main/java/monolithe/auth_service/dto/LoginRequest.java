@@ -28,6 +28,8 @@ public class LoginRequest {
     @Pattern(regexp = "^[^\\p{Cntrl}]+$", message = "La contraseña contiene caracteres no permitidos")
     private String contrasena;
 
+    private MfaPortal portal;
+
     @AssertTrue(message = "El formato del número de documento no corresponde al tipo seleccionado")
     public boolean isFormatoDocumentoValido() {
         if (usuario == null || usuario.isBlank()) {

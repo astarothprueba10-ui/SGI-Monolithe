@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.dto.MfaChallenge;
+import monolithe.auth_service.dto.MfaCodeRequest;
+import monolithe.auth_service.dto.MfaEnrollment;
 import monolithe.auth_service.dto.RefreshTokenRequest;
 import monolithe.auth_service.dto.RefreshTokenResponse;
 import monolithe.auth_service.dto.ResetPasswordOtpResponse;
@@ -27,6 +30,7 @@ import org.springframework.mail.MailException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,20 +48,40 @@ public class AuthController {
         private final PasswordResetService passwordResetService;
         private final AuditService auditService;
 
+        /** Valida la contraseña y devuelve un reto temporal para el segundo factor. */
         @PostMapping("/login")
-        public ResponseEntity<LoginResponse> login(
+        public ResponseEntity<MfaChallenge> login(
                         @Valid @RequestBody LoginRequest solicitud,
                         HttpServletRequest request) {
 
                 String ipOrigen = request.getRemoteAddr();
                 String userAgent = request.getHeader("User-Agent");
 
-                LoginResponse respuesta = authenticationService.autenticar(
+                MfaChallenge respuesta = authenticationService.autenticar(
                                 solicitud,
                                 ipOrigen,
                                 userAgent);
 
-                return ResponseEntity.ok(respuesta);
+                return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(respuesta);
+        }
+
+        /** Entrega el QR tras validar un código de activación o recuperación. */
+        @PostMapping("/mfa/preparar")
+        public ResponseEntity<MfaEnrollment> prepareMfa(@Valid @RequestBody MfaCodeRequest solicitud) {
+                return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                                .body(authenticationService.prepararMfa(solicitud));
+        }
+
+        /** Emite la sesión una vez verificado el código del autenticador. */
+        @PostMapping("/mfa/verificar")
+        public ResponseEntity<LoginResponse> verifyMfa(@Valid @RequestBody MfaCodeRequest solicitud,
+                        HttpServletRequest request) {
+                String ip = request.getRemoteAddr();
+                String agent = request.getHeader("User-Agent");
+                LoginResponse login = authenticationService.confirmarMfa(solicitud, ip, agent);
+                auditService.registrar(login.getIdUsuario(), "LOGIN_EXITOSO", "EXITOSO",
+                                "Inicio de sesión con dos factores", ip, agent, "POST", "/api/auth/mfa/verificar");
+                return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(login);
         }
 
         @PostMapping("/refresh")
