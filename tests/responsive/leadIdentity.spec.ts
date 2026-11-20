@@ -6,7 +6,7 @@ type Document = { tipoDocumento: string; numeroDocumento: string };
 function found(document: Document) {
   const second = document.numeroDocumento.endsWith('2');
   return { ...document, estado: 'ENCONTRADO', fuente: document.tipoDocumento === 'DNI' ? 'DNI' : 'MONOLITHE',
-    persona: { nombres: second ? 'Andrea' : 'Lucía María', apellidoPaterno: second ? 'Segunda' : 'Prueba', apellidoMaterno: 'Ejemplo' },
+    persona: { nombres: second ? 'ANDREA' : 'LUCÍA MARÍA', apellidoPaterno: second ? 'SEGUNDA' : 'PRUEBA', apellidoMaterno: 'EJEMPLO' },
     mensaje: 'Datos encontrados. Revisa los nombres antes de registrar el lead.' };
 }
 
@@ -123,6 +123,20 @@ test('guarda los nombres recuperados con el mismo documento y los datos de conta
   await expect(dialog).not.toBeVisible();
   expect(writes).toEqual([expect.objectContaining({ tipoDocumento: 'DNI', numeroDocumento: '00000001',
     nombres: 'Lucía María', apellidoPaterno: 'Prueba', apellidoMaterno: 'Ejemplo', telefono: '987654321', correo: 'prueba@example.com' })]);
+});
+
+test('los nombres escritos manualmente se normalizan al guardar el lead', async ({ page }) => {
+  const { dialog, writes } = await prepare(page);
+  await page.locator('#lead-numero-documento').fill('00000001');
+  await expect(page.locator('#lead-nombres')).toHaveValue('Lucía María');
+  await page.locator('#lead-nombres').fill('cÉSAR jAVIER');
+  await page.locator('#lead-apellido-paterno').fill('ROJAS');
+  await page.locator('#lead-apellido-materno').fill('yaipen');
+  await page.locator('#lead-phone-number').fill('987654321');
+  await page.getByPlaceholder('persona@example.com', { exact: true }).fill('prueba@example.com');
+  await dialog.getByRole('button', { name: 'Registrar lead', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(writes[0]).toEqual(expect.objectContaining({ nombres: 'César Javier', apellidoPaterno: 'Rojas', apellidoMaterno: 'Yaipen' }));
 });
 
 test('cerrar y reabrir el formulario descarta una consulta pendiente', async ({ page }) => {

@@ -2,6 +2,7 @@
 package monolithe.core_service.dto;
 
 import java.time.LocalDate;
+import monolithe.core_service.validation.NombrePersona;
 
 public record TrabajadorResponse(
 
@@ -51,6 +52,12 @@ public record TrabajadorResponse(
             String distrito
 
     ) {
+        /** Presenta también los registros históricos con iniciales uniformes. */
+        public InformacionPersonal {
+            nombres = NombrePersona.normalizar(nombres);
+            apellidoPaterno = NombrePersona.normalizar(apellidoPaterno);
+            apellidoMaterno = NombrePersona.normalizar(apellidoMaterno);
+        }
     }
 
     // =========================================

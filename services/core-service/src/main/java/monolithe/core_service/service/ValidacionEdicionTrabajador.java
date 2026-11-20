@@ -26,7 +26,10 @@ public final class ValidacionEdicionTrabajador {
     public static JsonNode validar(JsonNode solicitud, JsonNode actual) {
         ObjectNode copia = ((ObjectNode) solicitud).deepCopy();
         JsonNode personal = copia.path("informacionPersonal");
-        if (personal.isObject()) validarTelefono((ObjectNode) personal);
+        if (personal.isObject()) {
+            validarTelefono((ObjectNode) personal);
+            monolithe.core_service.validation.NombrePersona.normalizarCampos((ObjectNode) personal);
+        }
         if (requiereFechaActual(copia)) validarFecha(copia.path("informacionLaboral").path("fechaIngreso"), actual);
         return copia;
     }

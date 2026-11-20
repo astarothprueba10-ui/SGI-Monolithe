@@ -3,6 +3,7 @@ package monolithe.core_service.service;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.RegistrarProspectoRequest;
 import monolithe.core_service.repository.CrmCaptacionRepository;
+import monolithe.core_service.validation.NombrePersona;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,9 +35,9 @@ public class CrmCaptacionService {
         final String payload;
         try {
             Map<String, Object> datos = new LinkedHashMap<>();
-            datos.put("nombres", solicitud.nombres());
-            datos.put("apellidoPaterno", solicitud.apellidoPaterno());
-            datos.put("apellidoMaterno", solicitud.apellidoMaterno());
+            datos.put("nombres", NombrePersona.normalizar(solicitud.nombres()));
+            datos.put("apellidoPaterno", NombrePersona.normalizar(solicitud.apellidoPaterno()));
+            datos.put("apellidoMaterno", NombrePersona.normalizar(solicitud.apellidoMaterno()));
             datos.put("correo", solicitud.correo());
             datos.put("telefono", solicitud.telefono());
             datos.put("idProyecto", solicitud.idProyecto());

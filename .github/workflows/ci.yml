@@ -53,6 +53,14 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/securityAccess.test.cjs
 
+      - name: Verify Workers DNI lookup, name normalization and form regressions
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: |
+          npm run test:worker-identity
+          npm run test:workers
+          npm run test:lead-identity
+
       - name: Verify real financial dashboards and JWT safeguards
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice

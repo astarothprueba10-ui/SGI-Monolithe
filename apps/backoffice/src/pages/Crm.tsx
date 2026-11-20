@@ -4,6 +4,7 @@ import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
 import { useLeadIdentity } from '../hooks/useLeadIdentity';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { queryLeadTable } from '../lib/crmTableQueries';
+import { formatPersonName } from '../lib/personName';
 import { useCrmTableCounts } from '../hooks/useCrmTableCounts';
 import { toast } from 'sonner';
 import {
@@ -848,9 +849,9 @@ export function Crm() {
     try {
       await crmBackend.crear({
         idSolicitud: solicitudId,
-        nombres: form.names.trim(),
-        apellidoPaterno: form.paternalSurname.trim(),
-        apellidoMaterno: form.maternalSurname.trim() || undefined,
+        nombres: formatPersonName(form.names),
+        apellidoPaterno: formatPersonName(form.paternalSurname),
+        apellidoMaterno: formatPersonName(form.maternalSurname) || undefined,
         correo: form.email.trim().toLowerCase(),
         telefono: serializeLeadPhone(form.phone.trim(), form.phoneCountry ?? 'PE'),
         idProyecto: Number(form.idProyecto),
@@ -1743,7 +1744,7 @@ export function Crm() {
                         {formatDateLima(lead.fecha_registro)}
                       </TD>
                       <TD className="min-w-44">
-                        <p className="font-semibold text-brand-900">{lead.nombre_completo}</p>
+                        <p className="font-semibold text-brand-900">{formatPersonName(lead.nombre_completo)}</p>
                         <p className="font-mono text-[11px] text-brand-400">{lead.codigo}</p>
                       </TD>
                       <TD className="min-w-56">
