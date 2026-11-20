@@ -1,11 +1,13 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
 import { Input, Select, FieldLabel } from '../ui/Field';
 import { Button } from '../ui/Button';
-import { coreService, type PersonaIdentificadaResponse } from '../../services/coreService';
+import { coreService } from '../../services/coreService';
+import { useWorkerIdentity } from '../../hooks/useWorkerIdentity';
 import { ApiError } from '../../lib/apiClient';
+import { formatPersonName } from '../../lib/personName';
 import { GeoLocationSelector, type GeoLocationValue } from '../geo/GeoLocationSelector';
 import type { CatalogosTrabajadorResponse } from '../../types/workers';
 import { usePeruToday } from '../../hooks/usePeruToday';
@@ -130,26 +132,6 @@ function mensajeDeError(err: unknown): string {
   return 'Ocurrio un error inesperado al registrar el trabajador.';
 }
 
-function clasificarErrorIdentificacion(err: unknown): { mensaje: string; es404: boolean } {
-  if (err instanceof ApiError) {
-    if (err.status === 404) {
-      return { mensaje: 'Documento no registrado. Puedes continuar registrando una persona nueva.', es404: true };
-    }
-    if (err.status === 409) {
-      return { mensaje: `Trabajador ya registrado: ${err.message}`, es404: false };
-    }
-    if (err.status === 400) {
-      return { mensaje: `Identidad inactiva o documento inválido: ${err.message}`, es404: false };
-    }
-    return { mensaje: `Error del servidor (${err.status}): ${err.message}`, es404: false };
-  }
-  const esRed = err instanceof TypeError || (err instanceof Error && /fetch|network/i.test(err.message));
-  const msg = esRed
-    ? 'Error de conexión: No se pudo verificar el documento con el servidor.'
-    : 'No se pudo verificar el documento debido a un error inesperado.';
-  return { mensaje: msg, es404: false };
-}
-
 export function NewWorkerModal({
   open,
   onClose,
@@ -166,18 +148,7 @@ export function NewWorkerModal({
   const [errores, setErrores] = useState<FormErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
   const [submitting, setSubmitting] = useState(false);
-  const [personaIdentificada, setPersonaIdentificada] =
-    useState<PersonaIdentificadaResponse | null>(null);
-  const [personaConfirmada, setPersonaConfirmada] = useState<number | null>(null);
-  const [buscandoPersona, setBuscandoPersona] = useState(false);
-  const [errorIdentificacion, setErrorIdentificacion] = useState<string | null>(null);
-  const [infoIdentificacion, setInfoIdentificacion] = useState<string | null>(null);
-  const busquedaPersonaRef = useRef(0);
   const hoy = usePeruToday(open);
-
-  const camposPersonaBloqueados =
-    personaIdentificada !== null &&
-    personaConfirmada === personaIdentificada.idPersona;
 
   // Cargar catalogos al abrir
   useEffect(() => {
@@ -219,13 +190,6 @@ export function NewWorkerModal({
   // Limpiar formulario al cerrar
   useEffect(() => {
     if (!open) {
-      busquedaPersonaRef.current += 1;
-      setPersonaIdentificada(null);
-      setPersonaConfirmada(null);
-      setBuscandoPersona(false);
-      setErrorIdentificacion(null);
-      setInfoIdentificacion(null);
-
       setForm(estadoInicial());
       setErrores({});
       setTouched({});
@@ -235,6 +199,11 @@ export function NewWorkerModal({
   const tipoDocSeleccionado = catalogos?.tiposDocumento.find(
     (t) => String(t.idTipoDocumento) === form.idTipoDocumento
   );
+
+  const { personaIdentificada, personaConfirmada, buscandoPersona, errorIdentificacion, infoIdentificacion,
+    buscarPersonaPorDocumento, limpiarIdentificacion, confirmarPersona, cancelarSeleccionPersona
+  } = useWorkerIdentity(open, form, tipoDocSeleccionado, setForm, setErrores);
+  const camposPersonaBloqueados = personaIdentificada !== null && personaConfirmada === personaIdentificada.idPersona;
 
   const cargosDisponibles =
     catalogos?.cargos.filter(
@@ -257,99 +226,6 @@ export function NewWorkerModal({
     setTouched((prev) => ({ ...prev, [key]: true }));
     setErrores((prev) => ({ ...prev, [key]: errorBlur }));
   }
-
-  async function buscarPersonaPorDocumento() {
-    if (!tipoDocSeleccionado || !form.idTipoDocumento) {
-      setErrorIdentificacion('Selecciona un tipo de documento.');
-      setInfoIdentificacion(null);
-      return;
-    }
-
-    const errorDocumento = validarDocumento(
-      form.numeroDocumento,
-      tipoDocSeleccionado
-    );
-
-    if (errorDocumento) {
-      setErrorIdentificacion(errorDocumento);
-      setInfoIdentificacion(null);
-      return;
-    }
-
-    const idBusqueda = ++busquedaPersonaRef.current;
-
-    setBuscandoPersona(true);
-    setPersonaIdentificada(null);
-    setPersonaConfirmada(null);
-    setErrorIdentificacion(null);
-    setInfoIdentificacion(null);
-
-    try {
-      const persona = await coreService.identifyWorkerPerson(
-        Number(form.idTipoDocumento),
-        form.numeroDocumento.trim()
-      );
-
-      if (idBusqueda !== busquedaPersonaRef.current) return;
-
-      setPersonaIdentificada(persona);
-    } catch (err) {
-      if (idBusqueda !== busquedaPersonaRef.current) return;
-
-      const clasificado = clasificarErrorIdentificacion(err);
-      if (clasificado.es404) {
-        setInfoIdentificacion(clasificado.mensaje);
-      } else {
-        setErrorIdentificacion(clasificado.mensaje);
-      }
-    } finally {
-      if (idBusqueda === busquedaPersonaRef.current) {
-        setBuscandoPersona(false);
-      }
-    }
-  }
-
-  function limpiarIdentificacion() {
-    busquedaPersonaRef.current += 1;
-    setPersonaIdentificada(null);
-    setPersonaConfirmada(null);
-    setErrorIdentificacion(null);
-    setInfoIdentificacion(null);
-    setBuscandoPersona(false);
-  }
-
-
-  function confirmarPersona() {
-    if (!personaIdentificada) return;
-
-    setForm((prev) => ({
-      ...prev,
-      nombres: personaIdentificada.nombres,
-      apellidoPaterno: personaIdentificada.apellidoPaterno || '',
-      apellidoMaterno: personaIdentificada.apellidoMaterno || '',
-      fechaNacimiento: personaIdentificada.fechaNacimiento || '',
-      correoElectronico:
-        personaIdentificada.correoElectronico ??
-        prev.correoElectronico
-    }));
-
-    setPersonaConfirmada(personaIdentificada.idPersona);
-
-    setErrores((prev) => ({
-      ...prev,
-      nombres: undefined,
-      apellidoPaterno: undefined,
-      apellidoMaterno: undefined,
-      fechaNacimiento: undefined,
-      correoElectronico: undefined
-    }));
-  }
-
-
-  function cancelarSeleccionPersona() {
-    setPersonaConfirmada(null);
-  }
-
 
   function handleTipoDocumentoChange(valor: string) {
     limpiarIdentificacion();
@@ -384,6 +260,12 @@ export function NewWorkerModal({
       key, filtrado,
       touched[key] ? validarNombreCampo(filtrado, etiqueta, esNom) : undefined
     );
+  }
+
+  function handleNombreBlur(key: 'nombres' | 'apellidoPaterno' | 'apellidoMaterno') {
+    const value = formatPersonName(form[key]);
+    actualizarCampo(key, value);
+    marcarTocado(key, validarNombreCampo(value, key === 'nombres' ? 'Los nombres' : 'El apellido', key === 'nombres'));
   }
 
   function handleAreaChange(valor: string) {
@@ -443,9 +325,9 @@ export function NewWorkerModal({
           : {}),
         idTipoDocumento: Number(form.idTipoDocumento),
         numeroDocumento: form.numeroDocumento.trim(),
-        nombres: form.nombres.trim(),
-        apellidoPaterno: form.apellidoPaterno.trim() || null,
-        apellidoMaterno: form.apellidoMaterno.trim() || null,
+        nombres: formatPersonName(form.nombres),
+        apellidoPaterno: formatPersonName(form.apellidoPaterno) || null,
+        apellidoMaterno: formatPersonName(form.apellidoMaterno) || null,
         fechaNacimiento: form.fechaNacimiento || null,
         correoElectronico: normalizeEmailAddress(form.correoElectronico),
         telefono: form.telefono.trim() || null,
@@ -758,9 +640,7 @@ export function NewWorkerModal({
                   id="nombres"
                   value={form.nombres}
                   onChange={(e) => handleNombreChange('nombres', e.target.value)}
-                  onBlur={() =>
-                    marcarTocado('nombres', validarNombreCampo(form.nombres, 'Los nombres', true))
-                  }
+                  onBlur={() => handleNombreBlur('nombres')}
                   placeholder="Nombres completos"
                   disabled={submitting || camposPersonaBloqueados}
                 />
@@ -776,9 +656,7 @@ export function NewWorkerModal({
                   id="apellidoPaterno"
                   value={form.apellidoPaterno}
                   onChange={(e) => handleNombreChange('apellidoPaterno', e.target.value)}
-                  onBlur={() =>
-                    marcarTocado('apellidoPaterno', validarNombreCampo(form.apellidoPaterno, 'El apellido paterno', false))
-                  }
+                  onBlur={() => handleNombreBlur('apellidoPaterno')}
                   placeholder="Apellido paterno"
                   disabled={submitting || camposPersonaBloqueados}
                 />
@@ -794,9 +672,7 @@ export function NewWorkerModal({
                   id="apellidoMaterno"
                   value={form.apellidoMaterno}
                   onChange={(e) => handleNombreChange('apellidoMaterno', e.target.value)}
-                  onBlur={() =>
-                    marcarTocado('apellidoMaterno', validarNombreCampo(form.apellidoMaterno, 'El apellido materno', false))
-                  }
+                  onBlur={() => handleNombreBlur('apellidoMaterno')}
                   placeholder="Apellido materno"
                   disabled={submitting || camposPersonaBloqueados}
                 />

@@ -54,4 +54,18 @@ class CrmCaptacionServiceTest {
                                 () -> service.registrarProspecto(5L, solicitud()));
                 assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         }
+
+        @Test
+        void normalizaNombresAntesDeRegistrarElProspecto() {
+                var request = new RegistrarProspectoRequest(UUID.randomUUID(), "MARÍA elena", "muñoz", "DE LA CRUZ",
+                                "persona@institucion.example", "987654321", 2L, "WEB", "Interés de prueba", "Consulta inicial",
+                                null, null, "DNI", "00000001", null);
+                when(repository.registrar(any(), eq(5L), anyString())).thenReturn("{\"estado\":\"REGISTRADO\"}");
+                service.registrarProspecto(5L, request);
+                verify(repository).registrar(any(), eq(5L), argThat(json -> {
+                        var data = new JsonMapper().readTree(json);
+                        return "María Elena".equals(data.path("nombres").asString()) && "Muñoz".equals(data.path("apellidoPaterno").asString())
+                                        && "De La Cruz".equals(data.path("apellidoMaterno").asString()) && "00000001".equals(data.path("numeroDocumento").asString());
+                }));
+        }
 }

@@ -31,6 +31,7 @@ public final class ValidacionAltaTrabajador {
         ObjectNode copia = ((ObjectNode) datos).deepCopy();
         validarTelefono((ObjectNode) copia.path("informacionPersonal"));
         normalizarCorreo((ObjectNode) copia.path("informacionPersonal"));
+        monolithe.core_service.validation.NombrePersona.normalizarCampos((ObjectNode) copia.path("informacionPersonal"));
         return copia;
     }
 
