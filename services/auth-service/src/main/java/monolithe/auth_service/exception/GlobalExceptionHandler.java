@@ -3,6 +3,7 @@ package monolithe.auth_service.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import monolithe.auth_service.dto.ApiErrorResponse;
 import org.springframework.mail.MailException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -13,9 +14,17 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+        /** Devuelve un fallo de verificación sin incorporar códigos ni retos. */
+        @ExceptionHandler(MfaException.class)
+        public ResponseEntity<Map<String, String>> handleMfa(MfaException exception) {
+                return ResponseEntity.status(exception.status()).cacheControl(CacheControl.noStore())
+                                .body(Map.of("code", exception.code(), "message", exception.getMessage()));
+        }
 
         @ExceptionHandler(UserDisabledException.class)
         public ResponseEntity<ApiErrorResponse> handleUserDisabled(

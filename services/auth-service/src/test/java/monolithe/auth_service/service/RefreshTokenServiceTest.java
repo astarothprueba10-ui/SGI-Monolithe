@@ -35,6 +35,8 @@ class RefreshTokenServiceTest {
                 sessionRepository = mock(SessionRepository.class);
                 userRepository = mock(UserRepository.class);
                 jdbcTemplate = mock(JdbcTemplate.class);
+                when(userRepository.lockSessionAccount(1L)).thenReturn(Optional.of(1L));
+                when(sessionRepository.findUserIdByActiveRefreshHash(anyString())).thenReturn(Optional.of(1L));
 
                 refreshTokenService = new RefreshTokenService(
                                 sessionRepository,
@@ -176,10 +178,7 @@ class RefreshTokenServiceTest {
         @Test
         void debeRechazarRefreshTokenInexistenteORevocado() {
 
-                when(sessionRepository
-                                .findByRefreshTokenHashAndFechaRevocacionIsNull(
-                                                anyString()))
-                                .thenReturn(Optional.empty());
+                when(sessionRepository.findUserIdByActiveRefreshHash(anyString())).thenReturn(Optional.empty());
 
                 assertThrows(
                                 InvalidTokenException.class,
@@ -325,6 +324,20 @@ class RefreshTokenServiceTest {
                                                 1L, "LOGOUT_TODAS_SESIONES"));
 
                 verify(userRepository).incrementarVersionSesiones(1L);
+        }
+
+        @Test
+        void revalidaLaSesionDespuesDeObtenerElBloqueoDeCuenta() {
+                String hash = refreshTokenService.calcularSha256("revocado-durante-rotacion");
+                when(sessionRepository.findByRefreshTokenHashAndFechaRevocacionIsNull(hash))
+                        .thenReturn(Optional.empty());
+                assertThrows(InvalidTokenException.class,
+                        () -> refreshTokenService.rotarRefreshToken("revocado-durante-rotacion", "127.0.0.1", "JUnit"));
+                var ordered = inOrder(sessionRepository, userRepository);
+                ordered.verify(sessionRepository).findUserIdByActiveRefreshHash(hash);
+                ordered.verify(userRepository).lockSessionAccount(1L);
+                ordered.verify(sessionRepository).findByRefreshTokenHashAndFechaRevocacionIsNull(hash);
+                verify(sessionRepository, never()).save(any());
         }
 
         private User crearUsuarioActivo() {

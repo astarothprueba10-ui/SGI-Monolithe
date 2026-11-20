@@ -15,6 +15,7 @@ services:
       DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      AUTH_MFA_KEY_PATH: /run/secrets/auth-mfa.key
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000}
     volumes:
       - type: bind
@@ -25,6 +26,12 @@ services:
         source: ${JWT_PUBLIC_KEY_PATH_HOST:-./.secret/keys/jwt-public.pem}
         target: /run/secrets/jwt-public.pem
         read_only: true
+      - type: bind
+        source: ${AUTH_MFA_KEY_PATH_HOST:-./.secret/keys/auth-mfa.key}
+        target: /run/secrets/auth-mfa.key
+        read_only: true
+        bind:
+          create_host_path: false
     restart: unless-stopped
 
   core-service:

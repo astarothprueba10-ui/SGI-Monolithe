@@ -9,25 +9,13 @@ import {
 } from 'lucide-react';
 
 import { ApiError, authApi } from '../lib/apiClient';
+import { MfaLoginForm } from '../components/auth/MfaLoginForm';
+import { requireMfaChallenge, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
 import { beginSessionActivity } from '../lib/inactivitySession';
 import { getSessionRoles } from '../lib/authSession';
 import { Alert } from '../components/ui/Feedback';
 import { Button } from '../components/ui/Button';
 import { FieldLabel, Input, Select } from '../components/ui/Field';
-
-type LoginResponse = {
-    idUsuario: number;
-    usuario: string;
-    nombreMostrar: string | null;
-    iniciales: string | null;
-    autoridades: string[];
-    requiereCambioPassword: boolean;
-    accessToken: string;
-    refreshToken: string;
-    tokenType: string;
-    expiresIn: number;
-    mensaje: string;
-};
 
 type TipoDocumento = 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
 
@@ -111,6 +99,7 @@ export function Login() {
     const [remember, setRemember] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
@@ -133,97 +122,55 @@ export function Login() {
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-
-        if (loading) return;
-
+        if (loading || success) return;
         setError(null);
-        setSuccess(false);
-
-        const errorValidacion = validarFormulario(tipoDocumento, usuario, password);
-        if (errorValidacion) {
-            setError(errorValidacion);
+        const validation = validarFormulario(tipoDocumento, usuario, password);
+        if (validation) {
+            setError(validation);
             usuarioRef.current?.focus();
             return;
         }
+        await solicitarReto();
+    }
 
+    async function solicitarReto() {
         setLoading(true);
-
-        const payload = {
-            usuario: usuario.trim(),
-            tipoDocumento,
-            contrasena: password
-        };
-
         try {
-            const data = await authApi.post<LoginResponse>('/login', payload);
-
-            const tieneRolInterno = getSessionRoles(data.autoridades).length > 0;
-
-            if (!tieneRolInterno) {
-                try {
-                    await authApi.post<void>('/logout', {
-                        refreshToken: data.refreshToken
-                    });
-                } catch {
-                    console.warn(
-                        'No fue posible revocar la sesión de un usuario sin acceso al Backoffice.'
-                    );
-                }
-
-                throw new ApiError(
-                    403,
-                    'Este usuario no tiene acceso al Backoffice.'
-                );
-            }
-
-            const storage = remember ? localStorage : sessionStorage;
-            const otherStorage = remember ? sessionStorage : localStorage;
-
-            otherStorage.removeItem('monolithe_access_token');
-            otherStorage.removeItem('monolithe_refresh_token');
-            otherStorage.removeItem('monolithe_user');
-
-            storage.setItem(
-                'monolithe_access_token',
-                data.accessToken
-            );
-
-            storage.setItem(
-                'monolithe_refresh_token',
-                data.refreshToken
-            );
-
-            storage.setItem(
-                'monolithe_user',
-                JSON.stringify({
-                    idUsuario: data.idUsuario,
-                    usuario: data.usuario,
-                    nombreMostrar: data.nombreMostrar,
-                    iniciales: data.iniciales,
-                    autoridades: data.autoridades,
-                    requiereCambioPassword: data.requiereCambioPassword
-                })
-            );
-
-            beginSessionActivity(storage);
-            setSuccess(true);
-
-            window.setTimeout(() => {
-                window.location.replace('/');
-            }, 350);
-        } catch (error) {
-            if (error instanceof ApiError) {
-                setError(resolverMensajeErrorLogin(error));
-            } else {
-                setError(
-                    'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.'
-                );
-            }
-
+            const data = await authApi.post<MfaChallenge>('/login', {
+                usuario: usuario.trim(), tipoDocumento, contrasena: password, portal: 'BACKOFFICE'
+            });
+            setChallenge(requireMfaChallenge(data));
+            setPassword('');
+        } catch (problem) {
+            setError(problem instanceof ApiError ? resolverMensajeErrorLogin(problem)
+                : 'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.');
             usuarioRef.current?.focus();
         } finally {
             setLoading(false);
         }
+    }
+
+    async function finalizarSesion(data: MfaLoginSession) {
+        if (getSessionRoles(data.autoridades).length === 0) {
+            await authApi.post<void>('/logout', { refreshToken: data.refreshToken });
+            throw new ApiError(403, 'Este usuario no tiene acceso al Backoffice.');
+        }
+        const storage = remember ? localStorage : sessionStorage;
+        const otherStorage = remember ? sessionStorage : localStorage;
+        for (const key of ['monolithe_access_token', 'monolithe_refresh_token', 'monolithe_user']) otherStorage.removeItem(key);
+        const { accessToken, refreshToken, ...user } = data;
+        storage.setItem('monolithe_access_token', accessToken);
+        storage.setItem('monolithe_refresh_token', refreshToken);
+        storage.setItem('monolithe_user', JSON.stringify(user));
+        beginSessionActivity(storage);
+        setChallenge(null);
+        setSuccess(true);
+        window.setTimeout(() => window.location.replace('/'), 350);
+    }
+
+    function reiniciarLogin(message?: string) {
+        setChallenge(null);
+        setError(message ?? null);
     }
 
     return (
@@ -244,7 +191,7 @@ export function Login() {
                 </div>
 
                 <div className="rounded-xl border border-brand-100 bg-white p-7 shadow-sm">
-                    <div className="mb-6">
+                    {!challenge && <div className="mb-6">
                         <h2 className="text-lg font-semibold text-brand-900">
                             Iniciar sesión
                         </h2>
@@ -253,7 +200,7 @@ export function Login() {
                             Ingresa con tus credenciales corporativas para acceder al
                             sistema de gestión.
                         </p>
-                    </div>
+                    </div>}
 
                     {searchParams.get('motivo') === 'inactividad' && (
                         <Alert tone="info" title="Sesión cerrada por inactividad" className="mb-5">
@@ -261,15 +208,13 @@ export function Login() {
                         </Alert>
                     )}
 
-                    {error ? (
-                        <Alert
-                            tone="danger"
-                            title="No pudimos iniciar tu sesión"
-                            className="mb-5"
-                        >
-                            {error}
-                        </Alert>
-                    ) : null}
+                    {error && (
+                        <div role="alert">
+                            <Alert tone="danger" title="No pudimos iniciar tu sesión" className="mb-5">
+                                {error}
+                            </Alert>
+                        </div>
+                    )}
 
                     {success ? (
                         <Alert
@@ -281,6 +226,9 @@ export function Login() {
                         </Alert>
                     ) : null}
 
+                    {challenge ? (
+                        <MfaLoginForm challenge={challenge} onSuccess={finalizarSesion} onRestart={reiniciarLogin} />
+                    ) : (
                     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
 
                         <div>
@@ -410,6 +358,7 @@ export function Login() {
                             )}
                         </Button>
                     </form>
+                    )}
 
                     <p className="mt-6 text-center text-[11px] leading-relaxed text-brand-300">
                         Acceso exclusivo para personal autorizado de Inmobiliaria

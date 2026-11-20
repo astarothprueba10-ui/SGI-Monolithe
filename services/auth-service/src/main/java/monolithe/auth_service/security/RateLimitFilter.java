@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
         private final Map<String, Bucket> loginBuckets = new ConcurrentHashMap<>();
+        private final Map<String, Bucket> mfaBuckets = new ConcurrentHashMap<>();
         private final Map<String, Bucket> forgotPasswordBuckets = new ConcurrentHashMap<>();
         private final Map<String, Bucket> changePasswordBuckets = new ConcurrentHashMap<>();
 
@@ -37,6 +38,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 }
 
                 String ip = request.getRemoteAddr();
+
+                if (ruta.startsWith("/api/auth/mfa/") && limitarMfa(response, ip, ruta)) return;
 
                 if ("/api/auth/login".equals(ruta)) {
 
@@ -84,6 +87,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 }
 
                 filterChain.doFilter(request, response);
+        }
+
+        private boolean limitarMfa(HttpServletResponse response, String ip, String ruta) throws IOException {
+                var bucket = mfaBuckets.computeIfAbsent(ip, key -> Bucket.builder()
+                                .addLimit(Bandwidth.builder().capacity(60).refillIntervally(60, Duration.ofMinutes(1)).build())
+                                .build());
+                if (bucket.tryConsume(1)) return false;
+                responderTooManyRequests(response, ruta, "Demasiadas solicitudes de verificación. Espera un minuto.");
+                return true;
         }
 
         private Bucket crearBucketLogin() {

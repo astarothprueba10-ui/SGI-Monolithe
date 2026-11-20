@@ -5,6 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.dto.MfaChallenge;
+import monolithe.auth_service.dto.MfaCodeRequest;
+import monolithe.auth_service.dto.MfaEnrollment;
+import monolithe.auth_service.exception.MfaException;
+import monolithe.auth_service.exception.InvalidTokenException;
 import monolithe.auth_service.exception.AccountAccessRestrictedException;
 import monolithe.auth_service.exception.AccountTemporarilyLockedException;
 import monolithe.auth_service.exception.UserDisabledException;
@@ -35,6 +40,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -53,78 +59,60 @@ public class AuthenticationService {
         private final PasswordPolicyService passwordPolicyService;
         private final AuditService auditService;
         private final UserVisualIdentityRepository userVisualIdentityRepository;
+        private final MfaLoginService mfaLoginService;
 
         @Value("${security.jwt.access-token-expiration}")
         private long accessTokenExpiration;
 
-        public LoginResponse autenticar(
-                        LoginRequest solicitud,
-                        String ipOrigen,
-                        String userAgent) {
+        /** Comprueba el primer factor sin emitir una sesión. */
+        public MfaChallenge autenticar(LoginRequest solicitud, String ipOrigen, String userAgent) {
+                String login = resolverLoginEfectivo(solicitud, ipOrigen, userAgent);
+                var principal = autenticarContrasena(login, solicitud.getContrasena(), ipOrigen, userAgent);
+                return mfaLoginService.start(principal, solicitud.getPortal());
+        }
 
-                String loginEfectivo = resolverLoginEfectivo(
-                                solicitud, ipOrigen, userAgent);
+        /** Prepara la vinculación con una prueba de activación o recuperación válida. */
+        public MfaEnrollment prepararMfa(MfaCodeRequest solicitud) {
+                return mfaLoginService.prepare(solicitud);
+        }
 
-                Authentication authentication;
-
-                try {
-
-                        authentication = authenticationManager.authenticate(
-                                        new UsernamePasswordAuthenticationToken(
-                                                        loginEfectivo,
-                                                        solicitud.getContrasena()));
-
-                } catch (LockedException e) {
-                        throw procesarCuentaBloqueada(loginEfectivo, ipOrigen, userAgent);
-                } catch (DisabledException e) {
-                        throw procesarRestriccionAcceso(loginEfectivo, ipOrigen, userAgent, e);
-                } catch (BadCredentialsException e) {
-                        throw procesarCredencialesInvalidas(loginEfectivo, ipOrigen, userAgent, e);
+        /** Consume el reto y emite tokens en la misma transacción. */
+        @Transactional(noRollbackFor = MfaException.class)
+        public LoginResponse confirmarMfa(MfaCodeRequest solicitud, String ip, String agent) {
+                var verified = mfaLoginService.verify(solicitud);
+                UserPrincipal principal = verified.principal();
+                if (verified.factorChanged()) {
+                        refreshTokenService.revocarTodasLasSesiones(principal.getIdUsuario(), "VINCULACION_MFA");
+                        principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(principal.getUsername());
                 }
+                return crearSesionVerificada(principal, ip, agent);
+        }
 
-                UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        private UserPrincipal autenticarContrasena(String login, String password, String ip, String agent) {
+                try {
+                        Authentication authentication = authenticationManager.authenticate(
+                                        new UsernamePasswordAuthenticationToken(login, password));
+                        return (UserPrincipal) authentication.getPrincipal();
+                } catch (LockedException e) {
+                        throw procesarCuentaBloqueada(login, ip, agent);
+                } catch (DisabledException e) {
+                        throw procesarRestriccionAcceso(login, ip, agent, e);
+                } catch (BadCredentialsException e) {
+                        throw procesarCredencialesInvalidas(login, ip, agent, e);
+                }
+        }
 
-                loginSecurityService.registrarAccesoExitoso(
-                                principal.getIdUsuario());
-
-                String accessToken = jwtService.generarAccessToken(principal);
-
-                String refreshToken = refreshTokenService.crearSesion(
-                                principal.getIdUsuario(),
-                                ipOrigen,
-                                userAgent);
-
-                auditService.registrar(
-                                principal.getIdUsuario(),
-                                "LOGIN_EXITOSO",
-                                "EXITOSO",
-                                "Inicio de sesión exitoso",
-                                ipOrigen,
-                                userAgent,
-                                "POST",
-                                "/api/auth/login");
-
-                List<String> autoridades = principal.getAuthorities()
-                                .stream()
-                                .map(authority -> authority.getAuthority())
-                                .toList();
-
-                UserVisualIdentityRepository.IdentidadVisual identidad = userVisualIdentityRepository
-                                .obtenerPorIdUsuario(
-                                                principal.getIdUsuario());
-
-                return new LoginResponse(
-                                principal.getIdUsuario(),
-                                principal.getUsername(),
-                                identidad.nombreMostrar(),
-                                identidad.iniciales(),
-                                autoridades,
-                                principal.isRequiereCambioPassword(),
-                                accessToken,
-                                refreshToken,
-                                "Bearer",
-                                accessTokenExpiration,
-                                "Autenticación exitosa");
+        private LoginResponse crearSesionVerificada(UserPrincipal principal, String ip, String agent) {
+                Long user = principal.getIdUsuario();
+                loginSecurityService.registrarAccesoExitoso(user);
+                String access = jwtService.generarAccessToken(principal);
+                String refresh = refreshTokenService.crearSesion(user, ip, agent);
+                var identity = userVisualIdentityRepository.obtenerPorIdUsuario(user);
+                List<String> authorities = principal.getAuthorities().stream()
+                                .map(authority -> authority.getAuthority()).toList();
+                return new LoginResponse(user, principal.getUsername(), identity.nombreMostrar(),
+                                identity.iniciales(), authorities, principal.isRequiereCambioPassword(),
+                                access, refresh, "Bearer", accessTokenExpiration, "Autenticación exitosa");
         }
 
         public RefreshTokenResponse renovarToken(
@@ -141,6 +129,9 @@ public class AuthenticationService {
                                 .loadUserByUsername(
                                                 rotacion.usuarioLogin());
 
+                if (!Objects.equals(rotacion.versionSesiones(), principal.getVersionSesiones())) {
+                        throw new InvalidTokenException("Sesión revocada");
+                }
                 String nuevoAccessToken = jwtService.generarAccessToken(principal);
 
                 auditService.registrar(

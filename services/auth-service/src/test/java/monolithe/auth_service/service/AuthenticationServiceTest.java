@@ -3,6 +3,12 @@ package monolithe.auth_service.service;
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.dto.MfaChallenge;
+import monolithe.auth_service.dto.MfaCodeRequest;
+import monolithe.auth_service.dto.RefreshTokenRequest;
+import monolithe.auth_service.exception.MfaException;
+import monolithe.auth_service.exception.InvalidTokenException;
+import monolithe.auth_service.security.RefreshTokenRotation;
 import monolithe.auth_service.exception.AccountAccessRestrictedException;
 import monolithe.auth_service.exception.AccountTemporarilyLockedException;
 import monolithe.auth_service.exception.UserDisabledException;
@@ -49,6 +55,8 @@ class AuthenticationServiceTest {
         private UserVisualIdentityRepository userVisualIdentityRepository;
 
         private AuthenticationService authenticationService;
+        private MfaLoginService mfaLoginService;
+        private final MfaChallenge reto = new MfaChallenge("A".repeat(43), MfaChallenge.Paso.CODIGO, 300);
 
         @BeforeEach
         void setUp() {
@@ -71,6 +79,8 @@ class AuthenticationServiceTest {
                                                                 "Juan P.",
                                                                 "JP"));
 
+                mfaLoginService = mock(MfaLoginService.class);
+                when(mfaLoginService.start(any(), any())).thenReturn(reto);
                 authenticationService = new AuthenticationService(
                                 authenticationManager,
                                 jwtService,
@@ -83,7 +93,7 @@ class AuthenticationServiceTest {
                                 passwordEncoder,
                                 passwordPolicyService,
                                 auditService,
-                                userVisualIdentityRepository);
+                                userVisualIdentityRepository, mfaLoginService);
         }
 
         @Test
@@ -94,12 +104,9 @@ class AuthenticationServiceTest {
                 UserPrincipal principal = crearPrincipal(10L, "juan.perez");
                 Authentication auth = autenticacionExitosa(principal);
                 when(authenticationManager.authenticate(any())).thenReturn(auth);
-                when(jwtService.generarAccessToken(principal)).thenReturn("jwt-dni");
-                when(refreshTokenService.crearSesion(eq(10L), anyString(), anyString())).thenReturn("refresh-dni");
-
-                LoginResponse resp = authenticationService.autenticar(solicitud, "1.1.1.1", "test");
-
-                assertEquals("jwt-dni", resp.getAccessToken());
+                assertSame(reto, authenticationService.autenticar(solicitud, "1.1.1.1", "test"));
+                verify(mfaLoginService).start(principal, null);
+                verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
                 verify(documentLoginProcedureRepository).resolverLogin("DNI", "12345678");
         }
 
@@ -114,12 +121,9 @@ class AuthenticationServiceTest {
                 UserPrincipal principal = crearPrincipal(11L, "maria.rios");
                 Authentication auth = autenticacionExitosa(principal);
                 when(authenticationManager.authenticate(any())).thenReturn(auth);
-                when(jwtService.generarAccessToken(principal)).thenReturn("jwt-ce");
-                when(refreshTokenService.crearSesion(eq(11L), anyString(), anyString())).thenReturn("refresh-ce");
-
-                LoginResponse resp = authenticationService.autenticar(solicitud, "1.1.1.1", "test");
-
-                assertEquals("jwt-ce", resp.getAccessToken());
+                assertSame(reto, authenticationService.autenticar(solicitud, "1.1.1.1", "test"));
+                verify(mfaLoginService).start(principal, null);
+                verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
                 verify(documentLoginProcedureRepository).resolverLogin("CE", "ab123456");
         }
 
@@ -134,12 +138,9 @@ class AuthenticationServiceTest {
                 UserPrincipal principal = crearPrincipal(12L, "luis.garcia");
                 Authentication auth = autenticacionExitosa(principal);
                 when(authenticationManager.authenticate(any())).thenReturn(auth);
-                when(jwtService.generarAccessToken(principal)).thenReturn("jwt-pasaporte");
-                when(refreshTokenService.crearSesion(eq(12L), anyString(), anyString())).thenReturn("refresh-pas");
-
-                LoginResponse resp = authenticationService.autenticar(solicitud, "1.1.1.1", "test");
-
-                assertEquals("jwt-pasaporte", resp.getAccessToken());
+                assertSame(reto, authenticationService.autenticar(solicitud, "1.1.1.1", "test"));
+                verify(mfaLoginService).start(principal, null);
+                verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
                 verify(documentLoginProcedureRepository).resolverLogin("PASAPORTE", "pa1234567");
         }
 
@@ -154,12 +155,9 @@ class AuthenticationServiceTest {
                 UserPrincipal principal = crearPrincipal(13L, "empresa.ruc");
                 Authentication auth = autenticacionExitosa(principal);
                 when(authenticationManager.authenticate(any())).thenReturn(auth);
-                when(jwtService.generarAccessToken(principal)).thenReturn("jwt-ruc");
-                when(refreshTokenService.crearSesion(eq(13L), anyString(), anyString())).thenReturn("refresh-ruc");
-
-                LoginResponse resp = authenticationService.autenticar(solicitud, "1.1.1.1", "test");
-
-                assertEquals("jwt-ruc", resp.getAccessToken());
+                assertSame(reto, authenticationService.autenticar(solicitud, "1.1.1.1", "test"));
+                verify(mfaLoginService).start(principal, null);
+                verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
                 verify(documentLoginProcedureRepository).resolverLogin("RUC", "20123456789");
         }
 
@@ -452,25 +450,50 @@ class AuthenticationServiceTest {
         }
 
         @Test
-        void debeAutenticarExitosamenteCuandoCredencialesSonCorrectas() {
-                LoginRequest solicitud = crearSolicitudConDocumento("12345678", "claveValida", "DNI");
-                when(documentLoginProcedureRepository.resolverLogin("DNI", "12345678"))
-                                .thenReturn(Optional.of("usuarioOk"));
-                UserPrincipal principal = crearPrincipal(3L, "usuarioOk");
-                Authentication auth = autenticacionExitosa(principal);
-                when(authenticationManager.authenticate(any())).thenReturn(auth);
+        void emiteUnaSesionSoloDespuesDeValidarElSegundoFactor() {
+                var code = new MfaCodeRequest(reto.reto(), "123456");
+                var principal = crearPrincipal(3L, "usuarioOk");
+                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(principal, false));
                 when(jwtService.generarAccessToken(principal)).thenReturn("mockJwt");
-                when(refreshTokenService.crearSesion(eq(3L), anyString(), anyString())).thenReturn("mockRefresh");
+                when(refreshTokenService.crearSesion(3L, "127.0.0.1", "JUnit")).thenReturn("mockRefresh");
 
-                LoginResponse resp = authenticationService.autenticar(solicitud, "127.0.0.1", "JUnit");
-
-                assertNotNull(resp);
+                LoginResponse resp = authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit");
                 assertEquals("mockJwt", resp.getAccessToken());
                 assertEquals("mockRefresh", resp.getRefreshToken());
                 verify(loginSecurityService).registrarAccesoExitoso(3L);
-                verify(auditService).registrar(
-                                eq(3L), eq("LOGIN_EXITOSO"), eq("EXITOSO"),
-                                anyString(), eq("127.0.0.1"), eq("JUnit"), eq("POST"), eq("/api/auth/login"));
+        }
+
+        @Test
+        void unSegundoFactorRechazadoNoCreaSesion() {
+                var code = new MfaCodeRequest(reto.reto(), "000000");
+                when(mfaLoginService.verify(code)).thenThrow(MfaException.invalidCode());
+                assertThrows(MfaException.class, () -> authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit"));
+                verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
+        }
+
+        @Test
+        void vincularOtroFactorInvalidaLasSesionesYEmiteConLaVersionActual() {
+                var code = new MfaCodeRequest(reto.reto(), "123456");
+                var old = crearPrincipal(3L, "usuarioOk");
+                var updated = new UserPrincipal(3L, "usuarioOk", "hash", old.getAuthorities(), true, true, false, 1L);
+                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(old, true));
+                when(customUserDetailsService.loadUserByUsername("usuarioOk")).thenReturn(updated);
+                authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit");
+                var ordered = inOrder(refreshTokenService, jwtService);
+                ordered.verify(refreshTokenService).revocarTodasLasSesiones(3L, "VINCULACION_MFA");
+                ordered.verify(jwtService).generarAccessToken(updated);
+                ordered.verify(refreshTokenService).crearSesion(3L, "127.0.0.1", "JUnit");
+        }
+
+        @Test
+        void rechazaRenovacionSiCambioLaVersionDuranteLaRotacion() {
+                var request = new RefreshTokenRequest();
+                request.setRefreshToken("anterior");
+                when(refreshTokenService.rotarRefreshToken("anterior", "127.0.0.1", "JUnit"))
+                        .thenReturn(new RefreshTokenRotation(3L, "nuevo.login", "renovado", -1L));
+                when(customUserDetailsService.loadUserByUsername("nuevo.login")).thenReturn(crearPrincipal(3L, "nuevo.login"));
+                assertThrows(InvalidTokenException.class, () -> authenticationService.renovarToken(request, "127.0.0.1", "JUnit"));
+                verifyNoInteractions(jwtService);
         }
 
         @Test
