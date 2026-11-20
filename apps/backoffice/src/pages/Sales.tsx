@@ -48,7 +48,7 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
-import { calcularVenta, validarInicialTotal, TASA_ANUAL_FIJA_PCT, TASA_MENSUAL_NOMINAL_PCT, type ResumenVentaCalculado } from '../utils/financiamientoFrances';
+import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
 
@@ -210,6 +210,12 @@ export function Sales() {
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [formLotId, setFormLotId] = useState('');
+  const [politicaOperativa, setPoliticaOperativa] = useState<{
+    idProspecto: number; idLote: number; condiciones: CondicionesFrancesas;
+  } | null>(null);
+  const [consultandoPolitica, setConsultandoPolitica] = useState(false);
+  const [errorPolitica, setErrorPolitica] = useState<string | null>(null);
+  const [revisionPolitica, setRevisionPolitica] = useState(0);
   const [precioLote, setPrecioLote] = useState<LotePrecioVigente | null>(null);
   const [estadoPrecio, setEstadoPrecio] = useState<
     'inicial' | 'cargando' | 'disponible' | 'sin_precio' | 'error'
@@ -238,6 +244,8 @@ export function Sales() {
     codigoLote: string;
     idAsesor?: number | null;
     resumen: ResumenVentaCalculado;
+    tasaAnualPct: number;
+    idPolitica: number;
   } | null>(null);
 
   const [datosVentaValidados, setDatosVentaValidados] = useState<{
@@ -246,6 +254,8 @@ export function Sales() {
     codigoLote: string;
     idAsesor?: number | null;
     resumen: ResumenVentaCalculado;
+    tasaAnualPct: number;
+    idPolitica: number;
   } | null>(null);
   const [editandoComprador, setEditandoComprador] = useState(false);
   const [loadingFormData, setLoadingFormData] = useState(false);
@@ -555,6 +565,29 @@ export function Sales() {
   };
 
   useEffect(() => {
+    setPoliticaOperativa(null);
+    setErrorPolitica(null);
+    if (!isModalOpen || !selectedProspectId || !formLotId) {
+      setConsultandoPolitica(false);
+      return;
+    }
+    let vigente = true;
+    const idProspecto = Number(selectedProspectId);
+    const idLote = Number(formLotId);
+    setConsultandoPolitica(true);
+    void crmBackend.obtenerCondicionesVenta(idProspecto, idLote)
+      .then(condiciones => {
+        if (vigente) setPoliticaOperativa({ idProspecto, idLote, condiciones });
+      })
+      .catch(err => {
+        if (vigente) setErrorPolitica(err instanceof Error ? err.message
+          : 'No se pudo consultar la política financiera.');
+      })
+      .finally(() => { if (vigente) setConsultandoPolitica(false); });
+    return () => { vigente = false; };
+  }, [isModalOpen, selectedProspectId, formLotId, revisionPolitica]);
+
+  useEffect(() => {
     setVoucherFile(null);
     setComprobantesVenta([]);
   }, [
@@ -633,6 +666,10 @@ export function Sales() {
 
   const validarFormularioSeparacion = (): boolean => {
     setFormTouched(true);
+    if (!condicionesVenta || consultandoPolitica) {
+      toast.error('Las condiciones financieras no están verificadas. Selecciona nuevamente el lote.');
+      return false;
+    }
     if (!selectedProspectId) {
       toast.error('Debe seleccionar un prospecto del CRM.');
       return false;
@@ -662,7 +699,7 @@ export function Sales() {
     }
 
     if (!voucherFile) {
-      toast.error('Debe adjuntar el comprobante de pago de S/ 500.');
+      toast.error(`Debe adjuntar el comprobante de S/ ${condicionesVenta.montoSeparacion.toFixed(2)}.`);
       return false;
     }
     return true;
@@ -684,6 +721,9 @@ export function Sales() {
       if (!voucherFile) {
         throw new Error('Comprobante requerido.');
       }
+      if (!condicionesVenta) {
+        throw new Error('No se han confirmado las condiciones de separación.');
+      }
 
       const prospectId = Number(selectedProspectId);
       const lotIdNum = Number(formLotId);
@@ -703,7 +743,7 @@ export function Sales() {
         idLote: lotIdNum,
         metodoPago: formPaymentMethod,
         numeroOperacion: formOperationNumber.trim() || null,
-        monto: 500.00,
+        monto: condicionesVenta.montoSeparacion,
         observaciones: formObservations.trim() || null,
         claveArchivo: carga.claveArchivo,
         nombreArchivo: carga.nombreArchivo,
@@ -721,7 +761,7 @@ export function Sales() {
       toast.success('Separación registrada exitosamente', {
         description:
           `Código: ${res.codigo_reserva || res.id_reserva}. ` +
-          `Monto: S/ 500.00 PEN. ` +
+          `Monto: S/ ${condicionesVenta.montoSeparacion.toFixed(2)} PEN. ` +
           `Vence: ${vencimiento}. ` +
           'Comprobante pendiente de revisión por Finanzas.'
       });
@@ -776,6 +816,10 @@ export function Sales() {
       return;
     }
 
+    if (!condicionesVenta || consultandoPolitica) {
+      toast.error('No se pudieron cargar las condiciones contractuales de este lote. Actualiza la selección.');
+      return;
+    }
     const montoTotal = Number(precioLote.precio);
     const esFinanciada = formSaleModality === 'FINANCIADA';
     const montoInicial = Number(formSaleDownPayment);
@@ -791,12 +835,14 @@ export function Sales() {
       (
         !formSaleDownPayment.trim() ||
         !Number.isFinite(montoInicial) ||
-        montoInicial < 5000 ||
+        Boolean(validarInicialTotal(formSaleDownPayment,montoTotal,reservaAplicable,condicionesVenta)) ||
         montoInicial >= montoTotal ||
-        !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments)
+        !Number.isInteger(numeroCuotas) ||
+        numeroCuotas < condicionesVenta.cuotasMin ||
+        numeroCuotas > condicionesVenta.cuotasMax
       )
     ) {
-      toast.error('La inicial total mínima es S/ 5,000 y el plazo debe ser de 1 a 36 meses.');
+      toast.error('La inicial o el número de cuotas no cumple la política financiera de esta operación.');
       return;
     }
 
@@ -832,24 +878,32 @@ export function Sales() {
         validacion.modalidad !== formSaleModality ||
         Number(validacion.precioVigente) !== montoTotal ||
         Number(validacion.montoReservaAplicable) !== reservaAplicable ||
-        (esFinanciada && (
-          !validacion.planFrances ||
-          Number(validacion.planFrances.capitalFinanciado) !== resumenVenta.capitalFinanciado ||
-          Number(validacion.planFrances.cuotaMensual) !== resumenVenta.cuotaMensual ||
-          Number(validacion.planFrances.interesTotal) !== resumenVenta.interesTotal ||
-          Number(validacion.planFrances.totalCuotas) !== resumenVenta.totalCuotas ||
-          Number(validacion.planFrances.totalOperacion) !== resumenVenta.totalOperacionConIntereses
-        ))
+        validacion.idPolitica !== condicionesVenta.idPolitica ||
+        (esFinanciada && !validacion.planFrances)
       ) {
         throw new Error('La validación comercial no coincide con la operación.');
       }
 
+      // La simulación local es orientativa: el cronograma financiero que
+      // prevalece es el de Core/Supabase, con redondeo decimal exacto.
+      const plan = validacion.planFrances;
+      const resumenValidado: ResumenVentaCalculado = esFinanciada && plan ? {
+        ...resumenVenta!,
+        capitalFinanciado: Number(plan.capitalFinanciado),
+        interesTotal: Number(plan.interesTotal),
+        totalCuotas: Number(plan.totalCuotas),
+        totalOperacionConIntereses: Number(plan.totalOperacion),
+        cuotaMensual: Number(plan.cuotaMensual),
+        cuotas: plan.cuotas ?? resumenVenta!.cuotas
+      } : resumenVenta!;
       setDatosVentaValidados({
         datos,
         codigoProspecto: validacion.codigoProspecto,
         codigoLote: validacion.codigoLote,
         idAsesor: validacion.idAsesor,
-        resumen: resumenVenta!
+        tasaAnualPct: condicionesVenta.tasaNominalAnualPct,
+        idPolitica: condicionesVenta.idPolitica,
+        resumen: resumenValidado
       });
       setEditandoComprador(true);
 
@@ -877,7 +931,7 @@ export function Sales() {
       return;
     }
 
-    // Flujo existente de separaciones de S/ 500.
+    // Separaciones usan la política vigente, sin montos fijos del frontend.
     if (!validarFormularioSeparacion()) return;
 
     if (SEPARACION_ENVIO_DESHABILITADO) {
@@ -918,6 +972,7 @@ export function Sales() {
       const resultado = await crmBackend.registrarVentaPendiente({
         ...solicitud.datos,
         datosPago: {
+          idPoliticaEsperada: solicitud.idPolitica,
           metodoPago: formPaymentMethod,
           numeroOperacion: formOperationNumber.trim() || null,
           comprobantes: cargados
@@ -947,13 +1002,21 @@ export function Sales() {
       await fetchSalesData();
     } catch (err: unknown) {
       setConfirmacionVenta(null);
-
-      toast.error('No se pudo confirmar el registro', {
-        description:
-          (err instanceof Error
-            ? err.message
-            : 'Error inesperado.') +
-          ' Revise las operaciones antes de reintentar.',
+      const cambioPolitica = err instanceof ApiError && err.status === 409
+        && err.message.includes('La política financiera cambió.');
+      if (cambioPolitica) {
+        // Invalida la cotización y exige una nueva revisión antes de intentar registrar.
+        setDatosVentaValidados(null);
+        setPoliticaOperativa(null);
+        setRevisionPolitica(revision => revision + 1);
+      }
+      toast.error(cambioPolitica
+        ? 'Las condiciones de financiamiento cambiaron'
+        : 'No se pudo confirmar el registro', {
+        description: cambioPolitica
+          ? 'Se están consultando las condiciones actualizadas. Revise la inicial, las cuotas y vuelva a validar la venta.'
+          : (err instanceof Error ? err.message : 'Error inesperado.')
+            + ' Revise las operaciones antes de reintentar.',
         duration: 10000
       });
     } finally {
@@ -988,34 +1051,46 @@ export function Sales() {
   const reservaAplicable = opType === 'Venta' && formLotId
     ? reservasVigentes.find((r) => r.idLote === Number(formLotId))?.montoReservaAplicable ?? 0
     : 0;
+  const condicionesVenta = politicaOperativa
+    && politicaOperativa.idProspecto === Number(selectedProspectId)
+    && politicaOperativa.idLote === Number(formLotId)
+    ? politicaOperativa.condiciones : null;
+  const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
+    ? Number(condicionesVenta.inicialFija)
+    : Number(condicionesVenta?.inicialMinima ?? 0);
+  const cuotasMinimas = condicionesVenta?.cuotasMin ?? 1;
+  const cuotasMaximas = condicionesVenta?.cuotasMax ?? 36;
 
   const resumenVenta = useMemo(() => {
     if (opType !== 'Venta' || !precioLote || estadoPrecio !== 'disponible'
-        || precioLote.idLote !== Number(formLotId)) return null;
+        || precioLote.idLote !== Number(formLotId) || !condicionesVenta) return null;
     try {
       if (formSaleModality === 'CONTADO')
-        return calcularVenta(Number(precioLote.precio), reservaAplicable);
+        return calcularVenta(Number(precioLote.precio), reservaAplicable, 0, 0, condicionesVenta);
       if (!formSaleDownPayment.trim() || !formSaleInstallments.trim()
-          || Number(formSaleDownPayment) < 5000) return null;
+          || Number(formSaleDownPayment) < inicialMinimaVigente) return null;
       return calcularVenta(
         Number(precioLote.precio), reservaAplicable,
-        Number(formSaleDownPayment), Number(formSaleInstallments));
+        Number(formSaleDownPayment), Number(formSaleInstallments), condicionesVenta);
     } catch {
       return null;
     }
   }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
-      formSaleDownPayment, formSaleInstallments, reservaAplicable]);
+      formSaleDownPayment, formSaleInstallments, reservaAplicable, condicionesVenta, inicialMinimaVigente]);
 
   const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
     ? validarInicialTotal(
         formSaleDownPayment,
         precioLote ? Number(precioLote.precio) : null,
-        reservaAplicable
+        reservaAplicable,
+        condicionesVenta ?? undefined
       )
     : null;
   const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
-    && (!formSaleDownPayment.trim() || Boolean(errorMontoInicial)
-      || !/^(?:[1-9]|[12][0-9]|3[0-6])$/.test(formSaleInstallments));
+    && (!condicionesVenta || !formSaleDownPayment.trim() || Boolean(errorMontoInicial)
+      || !/^[0-9]{1,2}$/.test(formSaleInstallments)
+      || Number(formSaleInstallments) < cuotasMinimas
+      || Number(formSaleInstallments) > cuotasMaximas);
 
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
@@ -1232,7 +1307,7 @@ export function Sales() {
       <PageHeader
         title="Separaciones y ventas"
         description={tab === 'Separación'
-          ? 'Gestiona separaciones de S/ 500, métodos de pago, comprobantes y reservas de lotes.'
+          ? 'Gestiona separaciones según la política vigente, métodos de pago y reservas de lotes.'
           : tab === 'Venta'
             ? 'Gestiona las ventas, modalidades de financiamiento y contratos asociados.'
             : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
@@ -1810,7 +1885,7 @@ export function Sales() {
         onClose={cerrarModalOperacion}
         title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
         description={opType === 'Separacion'
-          ? 'Registra la separación de S/ 500 y adjunta su comprobante para revisión por Finanzas.'
+          ? 'Registra la separación según el importe vigente y adjunta su comprobante para revisión por Finanzas.'
           : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
           <div className="flex justify-end gap-2">
@@ -1826,6 +1901,8 @@ export function Sales() {
 
               disabled={
                 submitting ||
+                consultandoPolitica ||
+                (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
                 (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
               }
@@ -2056,12 +2133,29 @@ export function Sales() {
               )}
             </div>
 
+            {formLotId && (
+              <div className="mb-3" role="status">
+                {consultandoPolitica ? (
+                  <p className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs text-brand-700">
+                    Consultando condiciones comerciales autorizadas…
+                  </p>
+                ) : errorPolitica ? (
+                  <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                    No se pudieron cargar las condiciones financieras: {errorPolitica}. Selecciona nuevamente el lote.
+                  </p>
+                ) : condicionesVenta ? (
+                  <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    Condiciones contractuales verificadas · Versión {condicionesVenta.version}
+                  </p>
+                ) : null}
+              </div>
+            )}
             {opType === 'Separacion' ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Método de pago (S/ 500.00) *
+                      Método de pago (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}) *
                     </label>
                     <Select
                       value={formPaymentMethod}
@@ -2100,7 +2194,7 @@ export function Sales() {
                         Caja / Modalidad
                       </label>
                       <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                        Pago directo en efectivo (S/ 500)
+                        Pago directo en efectivo (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'})
                       </div>
                     </div>
                   )}
@@ -2133,15 +2227,15 @@ export function Sales() {
                   </div>
                   {!voucherFile && formTouched && (
                     <p className="mt-1 text-[11px] font-medium text-rose-600">
-                      Debe adjuntar el comprobante o voucher de pago de S/ 500.00.
+                      Debe adjuntar el comprobante o voucher de S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}.
                     </p>
                   )}
                 </div>
 
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
                   <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
-                  <p>Monto reglamentario: <span className="font-bold">S/ 500.00 PEN</span></p>
-                  <p>Plazo de vigencia: <span className="font-bold">7 días calendario</span> (vence automáticamente si no se formaliza venta).</p>
+                  <p>Monto reglamentario: <span className="font-bold">S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'} PEN</span></p>
+                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (vence automáticamente si no se formaliza venta).</p>
                   <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
                   <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
                 </div>
@@ -2194,12 +2288,18 @@ export function Sales() {
                         <Input
                           id="venta-inicial"
                           type="number"
-                          min="5000"
-                          max={precioLote
-                            ? Math.max(5000, Number(precioLote.precio) - 0.01)
-                            : undefined}
+                          min={condicionesVenta ? inicialMinimaVigente : undefined}
+                          max={precioLote && condicionesVenta ? Math.min(
+                            Number(precioLote.precio) - 0.01,
+                            condicionesVenta.modoInicial === 'RANGO' && condicionesVenta.inicialMaxima != null
+                              ? condicionesVenta.inicialMaxima : Number(precioLote.precio) - 0.01,
+                            condicionesVenta.modoInicial === 'FIJA' && condicionesVenta.inicialFija != null
+                              ? condicionesVenta.inicialFija : Number(precioLote.precio) - 0.01
+                          ) : undefined}
                           step="0.01"
-                          placeholder="Mínimo S/ 5,000"
+                          placeholder={condicionesVenta?.modoInicial === 'FIJA'
+                            ? `Inicial fija S/ ${condicionesVenta.inicialFija?.toFixed(2)}`
+                            : `Desde S/ ${inicialMinimaVigente.toFixed(2)}`}
                           value={formSaleDownPayment}
                           aria-invalid={Boolean(errorMontoInicial)}
                           aria-describedby={errorMontoInicial ? 'venta-inicial-error' : 'venta-inicial-ayuda'}
@@ -2214,32 +2314,37 @@ export function Sales() {
                           </p>
                         ) : (
                           <p id="venta-inicial-ayuda" className="mt-1.5 text-[11px] text-brand-500">
-                            Mínimo S/ 5,000 de inicial total. La separación confirmada puede cubrir S/ 500 de ese importe.
+                            {condicionesVenta?.modoInicial === 'FIJA'
+                              ? `Inicial total fija S/ ${condicionesVenta.inicialFija?.toFixed(2)}.`
+                              : condicionesVenta?.modoInicial === 'RANGO'
+                                ? `Inicial entre S/ ${condicionesVenta.inicialMinima?.toFixed(2)} y S/ ${condicionesVenta.inicialMaxima?.toFixed(2)}.`
+                                : `Inicial mínima S/ ${inicialMinimaVigente.toFixed(2)}.`}
+                            {' '}La separación confirmada se descuenta de la inicial pactada.
                           </p>
                         )}
                       </div>
                       <div className="min-w-0">
                         <label htmlFor="venta-plazo" className="mb-1.5 block text-xs font-semibold text-brand-700">
-                          Número de cuotas (1 a 36) *
+                          Número de cuotas ({cuotasMinimas} a {cuotasMaximas}) *
                         </label>
                         <Input
                           id="venta-plazo"
                           type="text"
                           inputMode="numeric"
-                          pattern="(?:[1-9]|[12][0-9]|3[0-6])"
+                          pattern="[0-9]{1,2}"
                           maxLength={2}
-                          placeholder="1 a 36 meses"
+                          placeholder={`${cuotasMinimas} a ${cuotasMaximas} meses`}
                           value={formSaleInstallments}
                           onChange={(e) => {
                             const limpio = e.target.value.replace(/[^0-9]/g, '');
-                            if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= 36)) {
+                            if (!limpio || (Number(limpio) >= 1 && Number(limpio) <= cuotasMaximas)) {
                               setFormSaleInstallments(limpio);
                             }
                           }}
                           className="bg-white"
                         />
                         <p className="mt-1.5 text-[11px] text-brand-500">
-                          Ingresa un plazo entero de 1 a 36 meses.
+                          Ingresa un plazo entero entre {cuotasMinimas} y {cuotasMaximas} meses.
                         </p>
                       </div>
                     </div>
@@ -2247,11 +2352,11 @@ export function Sales() {
                       <div>
                         <p className="text-xs font-semibold text-sky-900">Interés nominal anual fijo</p>
                         <p className="mt-0.5 text-[11px] text-sky-700">
-                          Equivalente mensual: {TASA_MENSUAL_NOMINAL_PCT.toFixed(4)} %. No modificable.
+                          Equivalente nominal mensual: {((condicionesVenta?.tasaNominalAnualPct ?? 0) / 12).toFixed(4)} %. No modificable por el asesor.
                         </p>
                       </div>
                       <strong className="text-xl font-bold tabular-nums text-sky-900">
-                        {TASA_ANUAL_FIJA_PCT} % anual
+                        {condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual
                       </strong>
                     </div>
                   </div>
@@ -2307,7 +2412,7 @@ export function Sales() {
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <dt className="text-brand-600">Intereses totales ({TASA_ANUAL_FIJA_PCT} % anual)</dt>
+                            <dt className="text-brand-600">Intereses totales ({condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual)</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
                               {currency(resumenVenta.interesTotal)}
                             </dd>
@@ -2351,7 +2456,7 @@ export function Sales() {
                 ) : (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
                     {formSaleModality === 'FINANCIADA'
-                      ? 'Complete una inicial válida de al menos S/ 5,000 y un plazo entre 1 y 36 meses para calcular las cuotas.'
+                      ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
                       : 'Seleccione un lote con precio oficial vigente para consultar el saldo.'}
                   </p>
                 )}
@@ -2601,7 +2706,7 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Tasa nominal anual fija</dt>
                     <dd className="font-semibold text-brand-900">
-                      {TASA_ANUAL_FIJA_PCT} % anual
+                      {confirmacionVenta.tasaAnualPct} % anual
                     </dd>
                   </div>
                   <div>

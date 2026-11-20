@@ -20,6 +20,8 @@ import { AlertasCuotasPanel } from './AlertasCuotasPanel';
 import { RevisionClausulaPanel } from './RevisionClausulaPanel';
 import { PlanFinanciamientoDetalleModal } from './PlanFinanciamientoDetalleModal';
 import { PageHeader } from '../ui/PageHeader';
+import { useAuth } from '../../contexts/AuthContext';
+import { ConfiguracionPlanesFinanciamientoPanel } from './ConfiguracionPlanesFinanciamientoPanel';
 
 const estadoPlan = (p: CrmPlanCarteraReal) => {
   if (p.estadoFiltro === 'ANULADO') return { etiqueta: 'Anulado', clases: 'border-slate-200 bg-slate-50 text-slate-700' };
@@ -41,9 +43,20 @@ const fechaCorta = (v: string) => new Intl.DateTimeFormat('es-PE', {
 /** Cartera de ventas del período, con saldos vigentes a la fecha de consulta. */
 export function CarteraFinanciamientoPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const vista = searchParams.get('tab') === 'alertas' ? 'ALERTAS' : 'PLANES';
+  const { can, user } = useAuth();
+  // La visibilidad depende del rol Gerencia; el acceso real exige permiso vigente
+  // en JWT y además permiso + rol activo comprobados otra vez por la base de datos.
+  const puedeConfigurar = user.roles.includes('Gerencia');
+  const permisoConfiguracionVigente = can('financing.configure');
+  const tabUrl = searchParams.get('tab');
+  const vista = tabUrl === 'configuracion' && puedeConfigurar ? 'CONFIGURACION'
+    : tabUrl === 'alertas' ? 'ALERTAS' : 'PLANES';
   const cambiarVista = (tab: string) => {
-    setSearchParams({ tab: tab === 'ALERTAS' ? 'alertas' : 'planes' });
+    if (tab === 'CONFIGURACION' && !puedeConfigurar) return;
+    setSearchParams({
+      tab: tab === 'CONFIGURACION' ? 'configuracion'
+        : tab === 'ALERTAS' ? 'alertas' : 'planes'
+    });
   };
   const [modo, setModo] = useState<PeriodoCrmModo>('ANIO');
   const [fechaReferencia, setFechaReferencia] = useState(getPeruTodayDateString);
@@ -91,6 +104,14 @@ export function CarteraFinanciamientoPanel() {
   }, [rango]);
 
   useEffect(() => {
+    // Staging ejecuta MFA y la política vía Auth Service, sin conectar Core de producción.
+    // Evitar consultas a la cartera cuando solo se prueba Configuración de Gerencia.
+    if (vista === 'CONFIGURACION' &&
+        import.meta.env.VITE_FINANCING_STAGING_AUTH_CURRENT === 'true') {
+      setCargando(false);
+      setError(null);
+      return;
+    }
     if (!rango || rangoTablaInvalido) {
       if (!rango) setDatos(null);
       setCargando(false);
@@ -119,7 +140,7 @@ export function CarteraFinanciamientoPanel() {
       if (vigente) setError(cause instanceof Error ? cause.message : 'No pudimos consultar la cartera financiera.');
     }).finally(() => { if (vigente) setCargando(false); });
     return () => { vigente = false; };
-  }, [rango, consulta, pagina, revision, rangoTablaInvalido,
+  }, [vista, rango, consulta, pagina, revision, rangoTablaInvalido,
     filtrosTabla.proyecto, filtrosTabla.lote, filtrosTabla.estado,
     filtrosTabla.fechaDesde, filtrosTabla.fechaHasta]);
 
@@ -187,7 +208,7 @@ export function CarteraFinanciamientoPanel() {
       <PageHeader
         title="Financiamiento y pagos"
         description="Cartera de ventas financiadas: capital, cuotas, vencimientos y saldos."
-        actions={
+        actions={vista === 'CONFIGURACION' ? undefined : (
           <div className="flex flex-col items-end gap-1">
             <Button
               icon={FileSpreadsheetIcon}
@@ -207,10 +228,11 @@ export function CarteraFinanciamientoPanel() {
               </span>
             )}
           </div>
-        }
+        )}
       />
     </div>
 
+    {vista !== 'CONFIGURACION' && <>
     {/* Filtro global debajo de la cabecera */}
     <CrmPeriodoGlobal
       descripcion="Filtra el Resumen de Financiamiento según la fecha de registro de la venta."
@@ -240,13 +262,17 @@ export function CarteraFinanciamientoPanel() {
       </div>
       {cargando && <p className="mt-2 text-[11px] text-brand-400" role="status">Actualizando indicadores del período…</p>}
     </section>
+    </>}
 
     <Card className="overflow-hidden">
       <CardHeader
-        title={vista === 'ALERTAS' ? 'Alertas de cuotas Vencidas' : 'Planes y saldos'}
-        description={vista === 'ALERTAS'
-          ? 'Cuotas por vencer, vencidas y revisión de mora de toda la cartera autorizada.'
-          : 'Ventas financiadas registradas en el período.'}
+        title={vista === 'CONFIGURACION' ? 'Configuración de planes de financiamiento'
+          : vista === 'ALERTAS' ? 'Alertas de cuotas Vencidas' : 'Planes y saldos'}
+        description={vista === 'CONFIGURACION'
+          ? 'Condiciones financieras versionadas, acceso exclusivo de Gerencia.'
+          : vista === 'ALERTAS'
+            ? 'Cuotas por vencer, vencidas y revisión de mora de toda la cartera autorizada.'
+            : 'Ventas financiadas registradas en el período.'}
         actions={vista === 'PLANES' ?
           <Button icon={RefreshCwIcon} variant="secondary" onClick={() => setRevision(v => v + 1)} disabled={cargando}>Actualizar</Button>
           : null}
@@ -254,7 +280,8 @@ export function CarteraFinanciamientoPanel() {
       <div className="border-b border-brand-100 px-4 pt-2 sm:px-5">
         <Tabs active={vista} onChange={cambiarVista}
           items={[{ id: 'PLANES', label: 'Planes y saldos', count: datos?.total ?? null },
-          { id: 'ALERTAS', label: 'Alertas de cuotas Vencidas' }]} />
+          { id: 'ALERTAS', label: 'Alertas de cuotas Vencidas' },
+          ...(puedeConfigurar ? [{ id: 'CONFIGURACION', label: 'Configuración de planes de financiamiento' }] : [])]} />
         {vista === 'PLANES' && <div className="w-full py-3">
           <FiltrosCarteraFinanciera filtros={filtrosTabla}
             proyectos={catalogos.proyectos} lotes={catalogos.lotes}
@@ -275,6 +302,17 @@ export function CarteraFinanciamientoPanel() {
         <AlertasCuotasPanel />
         <RevisionClausulaPanel />
       </div>}
+
+      {vista === 'CONFIGURACION' && puedeConfigurar &&
+        (permisoConfiguracionVigente
+          ? <ConfiguracionPlanesFinanciamientoPanel />
+          : <div className="p-4 sm:p-5">
+              <Alert tone="warning" title="Actualiza tu sesión de Gerencia">
+                Tu cuenta tiene el rol Gerencia, pero la sesión actual todavía no incluye
+                el nuevo permiso de configuración financiera. Cierra sesión y vuelve a
+                ingresar para actualizarlo. Ningún cambio financiero está habilitado.
+              </Alert>
+            </div>)}
 
       {vista === 'PLANES' && <>
         {error && <div className="m-4"><Alert title="No se pudo consultar la cartera" tone="danger">{error}</Alert></div>}

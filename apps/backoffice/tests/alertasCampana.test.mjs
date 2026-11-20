@@ -8,7 +8,8 @@ test('alertas mantienen su pestaña propia sin bloques independientes ni nota az
   const cartera=read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const financing=read('../src/pages/Financing.tsx');
   assert.match(cartera,/id:\s*'ALERTAS'\s*,\s*label:\s*'Alertas de cuotas Vencidas'/);
-  assert.match(cartera,/searchParams\.get\(\s*'tab'\s*\)\s*===\s*'alertas'/);
+  assert.match(cartera,/const tabUrl = searchParams\.get\('tab'\)/);
+  assert.match(cartera,/tabUrl === 'alertas'/);
   assert.match(cartera,/<AlertasCuotasPanel\s*\/>/);
   assert.match(cartera,/<RevisionClausulaPanel\s*\/>/);
   assert.doesNotMatch(cartera,/Cartera real · saldos provenientes de pagos aplicados/);

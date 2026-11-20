@@ -493,6 +493,33 @@ public class CrmVentaController {
                             desde,hastaExclusivo,proyecto,lote,estado,fechaTablaDesde,fechaTablaHasta));
         }
 
+        /**
+         * Catálogo de políticas de financiamiento - lectura exclusiva de Gerencia.
+         * El SQL exige adicionalmente el rol GERENCIA activo y financing.configure.
+         * No se habilita aún ningún endpoint de edición/publicación.
+         */
+        @GetMapping("/financiamiento/configuracion/actual")
+        @PreAuthorize("hasAuthority('financing.configure')")
+        public ResponseEntity<JsonNode> consultarPoliticasFinanciamiento(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.consultarPoliticasFinanciamiento(obtenerActor(jwt)));
+        }
+
+        /**
+         * Condiciones financieras de una operación nueva. La BD valida sales.create,
+         * cartera del prospecto y proyecto del lote; una reserva conserva su política.
+         */
+        @GetMapping("/financiamiento/condiciones-venta")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> condicionesVentaFinanciada(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam Long idProspecto,
+                @RequestParam Long idLote) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.condicionesVentaFinanciada(obtenerActor(jwt),idProspecto,idLote));
+        }
+
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
         @GetMapping("/finanzas/movimientos")
         @PreAuthorize("hasAuthority('finance.view')")

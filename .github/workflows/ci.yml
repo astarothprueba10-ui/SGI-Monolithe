@@ -68,6 +68,36 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/financiamientoPeriodoModal.test.mjs
 
+      - name: Verify financial configuration baseline security and read-only access
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/configuracionFinanciamiento.test.mjs
+
+      - name: Verify financial MFA restrictions and end-to-end wiring
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoMfa.test.mjs
+
+      - name: Verify offline scannable TOTP QR and safe enrollment reset
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoTotpQr.test.mjs
+
+      - name: Verify audited versioned financial publication safeguards
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoPublicacion.test.mjs
+
+      - name: Verify TOTP signature rehearsal without policy publication
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoEnsayoTotp.test.mjs
+
+      - name: Verify staging Auth-only financing panel and safe static proxy
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: node --test tests/financiamientoStaging.test.mjs
+
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice

@@ -919,6 +919,30 @@ public class CrmVentaService {
             """,actor,idVenta);
     }
 
+    /** Políticas financieras versionadas: acceso de lectura exclusivamente para Gerencia. */
+    @Transactional(readOnly = true)
+    public JsonNode consultarPoliticasFinanciamiento(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+            SELECT public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))::text
+            """, actor);
+    }
+
+    /** Condiciones contractuales vigentes o congeladas por reserva del comprador. */
+    @Transactional(readOnly = true)
+    public JsonNode condicionesVentaFinanciada(Long actor,Long idProspecto,Long idLote) {
+        validarActor(actor);
+        if (idProspecto==null || idProspecto<=0 || idLote==null || idLote<=0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Seleccione prospecto y lote válidos.");
+        }
+        return ejecutar("""
+            SELECT public.sp_fin_terminos_operacion_v1(
+                CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint)
+            )::text
+            """,actor,idProspecto,idLote);
+    }
+
     /** Cartera financiera real: planes y cuotas con el motor de saldos del Portal Cliente. */
     @Transactional(readOnly = true)
     public JsonNode carteraFinancieraReal(Long actor, String vista, String busqueda,
@@ -1874,6 +1898,27 @@ public class CrmVentaService {
         ResponseStatusException errorAnulacion = mapearErrorAnulacion(mensaje, ex);
         if (errorAnulacion != null) {
             return errorAnulacion;
+        }
+
+        // Finanzas versionadas: conflictos de aceptación no son fallas del servidor.
+        // Mantener el rechazo atómico de PostgreSQL; nunca confirmar con otra política.
+        if (mensaje.contains("POLITICA_CAMBIO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La política financiera cambió. Actualice las condiciones y confirme nuevamente.", ex);
+        }
+        if (mensaje.contains("POLITICA_REQUERIDA|")
+                || mensaje.contains("FINANCIAMIENTO_INVALIDO|")
+                || mensaje.contains("SEPARACION_MONTO_INVALIDO|")) {
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Las condiciones financieras enviadas no coinciden con la política autorizada.", ex);
+        }
+        if (mensaje.contains("POLITICA_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se pudo obtener la política financiera vigente para la operación.", ex);
+        }
+        if (mensaje.contains("POLITICA_INMUTABLE|") || mensaje.contains("POLITICA_INVALIDA|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La política aceptada por esta operación no admite cambios.", ex);
         }
 
         // Imputación de dinero confirmado / reversión auditada 5.3.4.

@@ -249,6 +249,9 @@ async function refreshSession(): Promise<boolean> {
 export const authApi =
   createApiClient(authApiUrl);
 
+/** Endpoints autenticados del Auth Service, exclusivos del usuario en sesión. */
+export const authSecuredApi = createApiClient(authApiUrl, true);
+
 export const cmsApi =
   createApiClient(cmsApiUrl, true);
 
