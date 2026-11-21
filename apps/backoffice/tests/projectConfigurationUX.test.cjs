@@ -30,3 +30,13 @@ test('el simulador calcula al cambiar de lote y la matriz agrupa por etapa', () 
   assert.match(matriz,/catalogos\.zonas\.map/);
   assert.doesNotMatch(matriz, /tarifas\.map\(\(tarifa, i\) => <FilaTarifa/);
 });
+
+test('el selector integra búsqueda, navegación de teclado y selección', () => {
+  const buscador = archivo('components/projects/detail/LotSearchCombobox.tsx');
+  assert.match(buscador,/role="combobox"/);
+  assert.match(buscador,/role="listbox"/);
+  assert.match(buscador,/role="option"/);
+  assert.match(buscador,/event.key === 'ArrowDown'/);
+  assert.match(buscador,/event.key === 'Enter'/);
+  assert.match(buscador,/event.key === 'Escape'/);
+});

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalculatorIcon, SearchIcon } from 'lucide-react';
-import { Input, Select, FieldLabel } from '../../ui/Field';
+import { useEffect, useState } from 'react';
+import { CalculatorIcon } from 'lucide-react';
+import { Select, FieldLabel } from '../../ui/Field';
+import { LotSearchCombobox } from './LotSearchCombobox';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
 import type { ConfiguracionProyectoResponse, SimulacionComercialResponse } from '../../../types/projectConfiguration';
 import type { ProyectoResponse } from '../../../types/core';
@@ -32,20 +33,16 @@ function Resultado({ r }: { r: SimulacionComercialResponse }) {
 
 export function CommercialSimulationPanel({ project, config, dirty }: Props) {
   const [id, setId] = useState('');
-  const [busqueda, setBusqueda] = useState('');
   const [moneda, setMoneda] = useState(config.monedas.includes('PEN') ? 'PEN' : config.monedas[0] ?? '');
   const [resultado, setResultado] = useState<SimulacionComercialResponse | null>(null);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  const filtrados = useMemo(() => config.lotes.filter(l =>
-    l.codigo.toLowerCase().includes(busqueda.trim().toLowerCase())), [config.lotes, busqueda]);
-
   useEffect(() => {
-    if (!filtrados.some(l => String(l.id) === id)) {
-      setId(filtrados[0] ? String(filtrados[0].id) : '');
+    if (!config.lotes.some(l => String(l.id) === id)) {
+      setId(config.lotes[0] ? String(config.lotes[0].id) : '');
     }
-  }, [id, filtrados]);
+  }, [id, config.lotes]);
 
   useEffect(() => {
     if (!id || !moneda || dirty || config.version === 0) {
@@ -72,29 +69,20 @@ export function CommercialSimulationPanel({ project, config, dirty }: Props) {
         <p className="text-xs text-brand-500">Selecciona un lote y el precio se calcula automáticamente. No registra operaciones.</p>
       </div>
     </div>
-    <div className="grid gap-3 md:grid-cols-[1fr_2fr_1fr]">
-      <div><FieldLabel>Buscar lote</FieldLabel>
-        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-brand-400" aria-hidden="true"/>
-          <Input aria-label="Buscar lote por código" className="pl-9" value={busqueda}
-            onChange={e => setBusqueda(e.target.value)} placeholder="Ej. ALM-L008"/></div>
-      </div>
-      <div><FieldLabel>Lote ({filtrados.length} encontrados)</FieldLabel>
-        <Select aria-label="Lote para simular" value={filtrados.some(l => String(l.id) === id) ? id : ''}
-          onChange={e => setId(e.target.value)}>
-          <option value="">Selecciona lote</option>
-          {filtrados.map(l => <option key={l.id} value={l.id}>{l.codigo}</option>)}
-        </Select>
+    <div className="grid gap-3 md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+      <div><FieldLabel>Lote</FieldLabel>
+        <LotSearchCombobox lotes={config.lotes} value={id} onChange={setId}/>
       </div>
       <div><FieldLabel>Moneda</FieldLabel>
         <Select aria-label="Moneda de simulación" value={moneda}
           onChange={e => setMoneda(e.target.value)}>
           {config.monedas.map(m => <option key={m} value={m}>{m}</option>)}
-        </Select></div>
+        </Select>
+      </div>
     </div>
     {config.lotes.length === 0 && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
       Este proyecto aún no tiene lotes en el catálogo. Registra la importación y vuelve al simulador.
     </p>}
-    {filtrados.length === 0 && config.lotes.length > 0 && <p className="text-sm text-brand-500">Sin coincidencias para la búsqueda.</p>}
     {dirty && <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
       Tienes cambios pendientes. Guarda el borrador desde la parte superior para calcular con la versión actual.
     </p>}
