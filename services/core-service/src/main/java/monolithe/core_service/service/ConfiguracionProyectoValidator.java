@@ -30,7 +30,7 @@ public final class ConfiguracionProyectoValidator {
     private static void validarDescuento(Etapa etapa) {
         boolean promocion = etapa.disponibilidad() == Disponibilidad.PROMOCION;
         boolean tieneDescuento = etapa.tipoDescuento() != TipoDescuento.NINGUNO;
-        if (!promocion && tieneDescuento || tieneDescuento && etapa.descuento().signum() <= 0
+        if (promocion && !tieneDescuento || !promocion && tieneDescuento || tieneDescuento && etapa.descuento().signum() <= 0
                 || !tieneDescuento && etapa.descuento().signum() != 0) {
             error("El descuento debe ser coherente con la disponibilidad y el tipo seleccionado.");
         }

@@ -19,6 +19,7 @@ export function asignacion(filas: AsignacionComercial[], id: number): string {
 export function actualizarEtapa(datos: ConfiguracionComercial, index: number, cambio: Partial<ReglaEtapaComercial>) {
   const anterior = datos.etapas[index];
   const etapa = { ...anterior, ...cambio };
+  if (datos.etapas.some((e, i) => i !== index && e.codigo === etapa.codigo)) return datos;
   if (etapa.disponibilidad !== 'PROMOCION') {
     etapa.tipoDescuento = 'NINGUNO';
     etapa.descuento = 0;
@@ -41,6 +42,7 @@ export function validarConfiguracion(datos: ConfiguracionComercial): string | nu
     if (!/^[A-Z0-9][A-Z0-9_-]{0,29}$/.test(e.codigo) || !e.nombre.trim()) return 'Revisa el código y nombre de cada etapa.';
     if (!Number.isFinite(e.descuento) || e.descuento < 0 || e.descuento > 999999999999.99)
       return 'El descuento debe ser un importe válido.';
+    if (e.disponibilidad === 'PROMOCION' && e.tipoDescuento === 'NINGUNO') return 'Configura el descuento de la etapa promocional.';
     if (e.tipoDescuento !== 'NINGUNO' && e.descuento <= 0) return 'Ingresa el descuento de la promoción.';
     if (e.tipoDescuento === 'PORCENTAJE' && e.descuento >= 100) return 'El porcentaje debe ser inferior al 100%.';
   }

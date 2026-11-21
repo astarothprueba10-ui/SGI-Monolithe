@@ -4,6 +4,7 @@ import { Card } from '../../ui/Card';
 import { useProjectConfiguration } from '../../../hooks/useProjectConfiguration';
 import { CommercialStageEditor } from './CommercialStageEditor';
 import { CommercialAssignmentEditor } from './CommercialAssignmentEditor';
+import { ProjectImportPreparation } from './ProjectImportPreparation';
 import type { ProyectoResponse } from '../../../types/core';
 
 export function ProjectConfigurationTab({ project }: { project: ProyectoResponse }) {
@@ -26,12 +27,13 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
     {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex flex-wrap items-center justify-between gap-2">
       {error}<Button size="sm" onClick={model.recargar} disabled={guardando}>Recargar borrador guardado</Button>
     </div>}
+    <ProjectImportPreparation project={project}/>
     <fieldset disabled={guardando || !project.activo} className="space-y-6">
       <CommercialStageEditor datos={datos} onChange={model.setDatos}/>
       <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
     </fieldset>
     <div className="rounded-lg border border-brand-100 p-3 text-sm text-brand-500">
-      Importación Excel, tarifas promocionales, publicación y validación de operaciones: pendientes de integración.
+      Carga masiva, tarifas promocionales, publicación y validación de operaciones: pendientes de integración.
     </div>
   </Card>;
 }

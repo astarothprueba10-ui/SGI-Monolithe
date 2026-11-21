@@ -9,7 +9,7 @@ import ts from 'typescript';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = mkdtempSync(join(tmpdir(), 'monolithe-project-tests-'));
-const program = ts.createProgram([join(root, 'src/lib/projectForm.ts')], {
+const program = ts.createProgram([join(root, 'src/lib/projectForm.ts'), join(root, 'src/lib/projectConfiguration.ts'), join(root, 'src/lib/projectTemplateSchema.ts')], {
   outDir: output, rootDir: join(root, 'src'), module: ts.ModuleKind.CommonJS,
   target: ts.ScriptTarget.ES2020, strict: true, skipLibCheck: true
 });
@@ -208,4 +208,31 @@ test('cambiar un campo valida la descripción y las fechas dentro del contexto d
   assert.ok(past.errors.fechaInicio);
   assert.equal(changeProjectField(past.form, past.errors, 'fechaInicio', creation.registrationDate, rows, creation).errors.fechaInicio, undefined);
   assert.ok(changeProjectField(form, {}, 'descripcion', 'Muy breve', rows, creation).errors.descripcion);
+});
+
+const { nuevaEtapa, asignar, actualizarEtapa, validarConfiguracion } = require(join(output, 'lib/projectConfiguration.js'));
+const { HOJAS_ESTRUCTURA } = require(join(output, 'lib/projectTemplateSchema.js'));
+
+test('asignaciones comerciales se actualizan y se eliminan sin duplicar registros', () => {
+  const filas = asignar([{ id: 1, codigoEtapa: 'COM-01' }], 1, 'COM-02');
+  assert.deepEqual(filas, [{ id: 1, codigoEtapa: 'COM-02' }]);
+  assert.deepEqual(asignar(filas, 1, ''), []);
+});
+
+test('el cambio de código conserva las referencias y el bloqueo elimina promoción', () => {
+  const e = { ...nuevaEtapa([]), disponibilidad: 'PROMOCION', tipoDescuento: 'PORCENTAJE', descuento: 10 };
+  const datos = { etapas: [e], manzanas: [{ id: 1, codigoEtapa: e.codigo }], lotes: [] };
+  const modificado = actualizarEtapa(datos, 0, { codigo: 'E-01', disponibilidad: 'BLOQUEADA' });
+  assert.equal(modificado.manzanas[0].codigoEtapa, 'E-01');
+  assert.equal(modificado.etapas[0].descuento, 0);
+  assert.equal(validarConfiguracion(modificado), null);
+  assert.notEqual(validarConfiguracion({ ...datos, etapas: [{ ...e, descuento: 100 }] }), null);
+});
+
+test('la plantilla usa claves estables para manzanas y lotes', () => {
+  const manzanas = HOJAS_ESTRUCTURA.find(h => h.nombre === 'Manzanas');
+  const lotes = HOJAS_ESTRUCTURA.find(h => h.nombre === 'Lotes');
+  assert.ok(manzanas.columnas.includes('codigo_etapa_fisica'));
+  assert.ok(lotes.columnas.includes('codigo_manzana'));
+  assert.equal(new Set(HOJAS_ESTRUCTURA.map(h => h.nombre)).size, HOJAS_ESTRUCTURA.length);
 });
