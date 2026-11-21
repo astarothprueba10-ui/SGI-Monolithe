@@ -3,6 +3,7 @@ package monolithe.auth_service.controller;
 import monolithe.auth_service.exception.GlobalExceptionHandler;
 import monolithe.auth_service.service.AuditService;
 import monolithe.auth_service.service.AuthenticationService;
+import monolithe.auth_service.service.MfaInvitationService;
 import monolithe.auth_service.service.PasswordResetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class ForgotPasswordValidationTest {
 
         AuthController authController = new AuthController(
                 authenticationService,
+                mock(MfaInvitationService.class),
                 passwordResetService,
                 auditService
         );

@@ -55,6 +55,25 @@ public class EmailService {
     }
   }
 
+  /** Alerta al propietario por un restablecimiento administrativo de su autenticador. */
+  public void enviarAvisoRestablecimientoMfa(String destinatario) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, false, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(monolithe.auth_service.validation.EmailAddressPolicy.normalizeRequired(destinatario));
+      helper.setSubject("Alerta: autenticador restablecido - MONOLITHE");
+      helper.setText("MONOLITHE: un administrador autorizó el restablecimiento "
+        + "de tu autenticador de inicio de sesión tras verificar tu identidad. "
+        + "Las sesiones anteriores han sido revocadas. Para acceder, inicia sesión "
+        + "con tu documento y contraseña y solicita una nueva invitación MFA en tu correo verificado. "
+        + "Si no solicitaste el restablecimiento, contacta inmediatamente a Seguridad.", false);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      throw new MailException("No se pudo preparar el aviso de restablecimiento MFA.", e) {};
+    }
+  }
+
   /** Aviso de seguridad sin OTP ni datos de recuperación. */
   public void enviarAvisoMfaFinanciero(String destinatario, String evento) {
     try {
