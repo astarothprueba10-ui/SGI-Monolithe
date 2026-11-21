@@ -219,6 +219,12 @@ export const securityApi = {
       { method: 'PATCH' }
     ),
 
+  restablecerMfa: (idUsuario: number, confirmacionLogin: string, motivo: string) =>
+    request<{ mensaje: string }>(`/users/${idUsuario}/mfa/reset`, {
+      method: 'POST',
+      body: JSON.stringify({ confirmacionLogin, motivo, identidadVerificada: true })
+    }),
+
   desactivarUsuario: (idUsuario: number) =>
     request<SecurityOperationResponse>(
       `/users/${idUsuario}/deactivate`,
