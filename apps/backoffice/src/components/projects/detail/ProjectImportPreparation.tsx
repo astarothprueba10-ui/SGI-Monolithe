@@ -8,11 +8,15 @@ import { Button } from '../../ui/Button';
 import { descargarPlantillaConfiguracion } from '../../../utils/projectConfigurationExcel';
 import type { ProyectoResponse } from '../../../types/core';
 
-export function ProjectImportPreparation({ project }: { project: ProyectoResponse }) {
+export function ProjectImportPreparation({ project, onImportCompleted, disabledByDraft = false }: {
+  project: ProyectoResponse;
+  onImportCompleted?: () => void;
+  disabledByDraft?: boolean;
+}) {
   const [descargando, setDescargando] = useState(false);
   const { can } = useAuth();
-  const model = useProjectImport(project);
-  const puedeImportar = project.activo && can('lots.edit');
+  const model = useProjectImport(project, onImportCompleted);
+  const puedeImportar = project.activo && can('lots.edit') && !disabledByDraft;
   async function descargar() {
     if (descargando) return;
     setDescargando(true);
@@ -31,6 +35,9 @@ export function ProjectImportPreparation({ project }: { project: ProyectoRespons
         {descargando ? 'Generando...' : 'Descargar plantilla'}</Button>
     </div>
     <p className="text-xs text-brand-500">Importa las ocho hojas. La estructura existente se conserva; las reglas y tarifas se incorporan o actualizan únicamente en el borrador comercial.</p>
+    {disabledByDraft && <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+      Guarda los cambios manuales del borrador antes de importar un Excel para no sobrescribirlos.
+    </p>}
     {puedeImportar && <div className="space-y-3">
       <label className="block text-sm font-medium text-brand-800">Seleccionar Excel para validar
         <input type="file" accept=".xlsx" disabled={model.ocupado} className="mt-2 block w-full text-sm"
@@ -41,6 +48,6 @@ export function ProjectImportPreparation({ project }: { project: ProyectoRespons
       {model.resultado && <ProjectImportPreview resultado={model.resultado} ocupado={model.ocupado}
         aceptado={model.aceptado} setAceptado={model.setAceptado} confirmar={model.confirmar}/>}
     </div>}
-    {!puedeImportar && <p className="text-xs text-brand-500">Necesitas permiso de edición de lotes y un proyecto habilitado para importar.</p>}
+    {!puedeImportar && !disabledByDraft && <p className="text-xs text-brand-500">Necesitas permiso de edición de lotes y un proyecto habilitado para importar.</p>}
   </section>;
 }

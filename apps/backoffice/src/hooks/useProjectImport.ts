@@ -5,7 +5,7 @@ import { projectImportService } from '../services/projectImportService';
 import type { ProyectoResponse } from '../types/core';
 import type { SolicitudImportacion, RespuestaImportacion } from '../types/projectImport';
 
-export function useProjectImport(project: ProyectoResponse) {
+export function useProjectImport(project: ProyectoResponse, onImportCompleted?: () => void) {
   const [solicitud, setSolicitud] = useState<SolicitudImportacion | null>(null);
   const [resultado, setResultado] = useState<RespuestaImportacion | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -31,7 +31,8 @@ export function useProjectImport(project: ProyectoResponse) {
     try {
       const respuesta = await projectImportService.confirmar(project.idProyecto, solicitud, resultado.huella);
       setResultado(respuesta);
-      toast.success('Importación registrada correctamente.');
+      toast.success('Importación registrada. Actualizando los datos del proyecto…');
+      onImportCompleted?.();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo registrar. Valida el archivo nuevamente.');
       setResultado(null);

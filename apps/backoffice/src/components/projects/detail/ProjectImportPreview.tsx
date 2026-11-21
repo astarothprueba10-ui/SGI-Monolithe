@@ -29,7 +29,7 @@ export function ProjectImportPreview({ resultado, ocupado, aceptado, setAceptado
       <span>{resultado.confirmado ? 'Registrados' : 'Nuevos'}: {nuevos}</span><span>Existentes: {existentes}</span><span>Reglas de borrador: {borrador}</span>
       <span className={errores ? 'text-red-700' : ''}>Errores: {errores}</span></div>
     <Filas resultado={resultado}/>
-    {resultado.confirmado ? <p className="text-sm text-emerald-700">Importación completada. Vuelve a abrir la pestaña para actualizar las asignaciones comerciales.</p>
+    {resultado.confirmado ? <p className="text-sm text-emerald-700">Importación completada. Las etapas, lotes y tarifas se actualizan automáticamente.</p>
       : <><label className="flex gap-2 items-start text-sm text-brand-700">
         <input type="checkbox" checked={aceptado} disabled={ocupado || errores > 0 || nuevos + borrador === 0} onChange={e => setAceptado(e.target.checked)}/>
         Confirmo registrar la estructura nueva e incorporar o actualizar las reglas y tarifas del borrador. Los lotes nuevos quedarán como No disponible; no se modifican precios vigentes.
