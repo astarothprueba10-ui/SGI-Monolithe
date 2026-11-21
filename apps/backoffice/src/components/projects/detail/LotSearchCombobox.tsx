@@ -87,6 +87,7 @@ export function LotSearchCombobox({ lotes, value, onChange, disabled = false }: 
         disabled={disabled || !lotes.length} placeholder="Busca por código o despliega la lista"
         className="h-11 w-full min-w-0 rounded-md border border-brand-200 bg-white py-2 pl-10 pr-11 text-sm text-brand-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-brand-50"
         onFocus={() => { if (!abierto) abrir(); }}
+        onClick={() => { if (!abierto) abrir(); }}
         onChange={e => { setBusqueda(e.target.value); setActivo(0); setAbierto(true); }}
         onKeyDown={tecla}/>
       <button type="button" aria-label={abierto ? 'Cerrar lista de lotes' : 'Abrir lista de lotes'}

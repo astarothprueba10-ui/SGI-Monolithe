@@ -12,6 +12,8 @@ const importe = (v: number | null) => v === null ? '—' : moneda.format(v);
 const etiquetas = { HABILITADA: 'Habilitada', BLOQUEADA: 'Bloqueada', PROTEGIDA: 'Protegida', ERROR: 'Error' };
 
 function Resumen({ r }: { r: PublicacionComercialResponse }) {
+  const errores = r.lotes.filter(l => l.situacion === 'ERROR');
+  const noAsignados = r.lotes.filter(l => l.situacion === 'BLOQUEADA' && !l.codigoEtapa);
   return <div className="space-y-3">
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
       {(['HABILITADA','BLOQUEADA','PROTEGIDA','ERROR'] as const).map(s =>
@@ -20,6 +22,18 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
           <p className={`text-xl font-semibold ${s==='ERROR'?'text-red-700':'text-brand-900'}`}>{r.lotes.filter(l=>l.situacion===s).length}</p>
         </div>)}
     </div>
+    {errores.length > 0 && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      <p className="font-semibold">Publicación detenida: {errores.length} lote(s) necesitan corrección.</p>
+      <p className="mt-1">No se habilitará la confirmación mientras existan errores. Revisa estos registros:</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        {errores.map(l => <li key={l.idLote}><strong>{l.codigo}</strong>: {l.mensaje}</li>)}
+      </ul>
+    </div>}
+    {noAsignados.length > 0 && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <p className="font-semibold">{noAsignados.length} lote(s) sin etapa comercial quedarán bloqueados.</p>
+      <p className="mt-1">No serán ofertados ni podrán separarse o venderse. Se conservarán sus datos y su estado de inventario.</p>
+      <p className="mt-1 font-medium">{noAsignados.map(l => l.codigo).join(', ')}</p>
+    </div>}
     <div className="max-h-96 overflow-auto rounded-md border border-brand-200">
       <table className="w-full text-xs text-left">
         <thead className="sticky top-0 bg-brand-50 text-brand-900"><tr>
@@ -91,7 +105,7 @@ export function CommercialPublicationPanel({ project, config, dirty }: Props) {
       {resultado.publicado?<p role="status" className="text-sm text-emerald-700">Política v{resultado.version} publicada. Los precios y restricciones ya están vigentes.</p>:
       <><label className="flex gap-2 text-sm items-start text-brand-800">
         <input type="checkbox" checked={aceptado} disabled={!puede||resultado.lotes.some(l=>l.situacion==='ERROR')} onChange={e=>setAceptado(e.target.checked)}/>
-        Confirmo aplicar los precios y restricciones revisados. Las separaciones y ventas previas se respetarán.
+        Confirmo aplicar los precios y restricciones revisados. Los lotes sin etapa se bloquearán comercialmente y las operaciones previas se respetarán.
       </label><Button variant="primary" disabled={!puede||!aceptado||resultado.lotes.some(l=>l.situacion==='ERROR')} onClick={publicar}>Publicar política comercial</Button></>}
     </>}
   </section>;

@@ -69,9 +69,14 @@ public class PublicacionComercialService {
         BigDecimal actual = repository.precioActual(lote.getIdLote());
         if (protegido) return sinPrecio(lote,null,"PROTEGIDA","Operación existente: se conserva el precio.",actual);
         var r = simulacion.evaluar(config,lote,"PEN",ahora,candidatos);
-        if (r.resultado().equals("BLOQUEADA")) return sinPrecio(lote,r.codigoEtapa(),"BLOQUEADA",r.mensaje(),actual);
-        if (!r.resultado().equals("SIMULADO") || !precioValido(r))
-            return sinPrecio(lote,r.codigoEtapa(),"ERROR",r.resultado().equals("SIMULADO")?"Precio fuera de los límites permitidos.":r.mensaje(),actual);
+        if (!r.resultado().equals("SIMULADO")) {
+            return sinPrecio(lote,r.codigoEtapa(),
+                ClasificadorPublicacionComercial.situacion(r.resultado()),
+                ClasificadorPublicacionComercial.detalle(r.resultado(),r.mensaje()),actual);
+        }
+        if (!precioValido(r)) {
+            return sinPrecio(lote,r.codigoEtapa(),"ERROR","Precio fuera de los límites permitidos.",actual);
+        }
         var hasta = config.datos().tarifas().stream()
             .filter(t -> Objects.equals(t.codigoZona(),r.codigoZona()) && t.codigoEtapa().equals(r.codigoEtapa()) && t.moneda().equals("PEN"))
             .findFirst().orElseThrow().vigenteHasta();
