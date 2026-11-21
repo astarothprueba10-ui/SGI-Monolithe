@@ -128,6 +128,25 @@ jobs:
         working-directory: apps/backoffice
         run: node --test tests/crm_bloque4.test.mjs tests/crm_unit.test.mjs
 
+  mfa-login-browser-tests:
+    name: MFA login - Backoffice y Portal Cliente
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar dependencias de ambos portales y Playwright
+        run: |
+          npm install --prefix apps/backoffice --no-audit --no-fund
+          npm install --prefix apps/portal-cliente --no-audit --no-fund
+          npm ci --prefix tests/responsive --no-audit --no-fund
+      - name: Instalar navegador Chromium
+        run: cd tests/responsive && npx playwright install --with-deps chromium
+      - name: Probar contraseña, invitación, vinculación y recuperación MFA
+        working-directory: tests/responsive
+        run: npx playwright test --config=mfaLogin.config.ts
+
   backend-validation:
     name: Backend Java Services Compile
     runs-on: ubuntu-latest

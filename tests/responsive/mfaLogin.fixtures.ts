@@ -16,7 +16,7 @@ export const enrollment = {
 
 type Portal = typeof portals[number];
 type AuthStep = 'ACTIVACION' | 'CODIGO';
-type Overrides = { phase?: AuthStep; old?: boolean; expired?: boolean; temporary?: boolean };
+type Overrides = { phase?: AuthStep; old?: boolean; expired?: boolean; temporary?: boolean; invitationFailure?: boolean };
 
 function session(portal: Portal, temporary: boolean) {
   return { idUsuario: 14, usuario: 'persona', nombreMostrar: 'Persona de prueba', iniciales: 'PP',
@@ -43,6 +43,9 @@ export async function openLogin(page: Page, portal: Portal, options: Overrides =
     requests.push({ path: url.pathname, body: route.request().postDataJSON() });
     if (url.pathname.endsWith('/login')) return options.old ? route.fulfill({ json: session(portal, false) })
       : route.fulfill({ status: 202, json: { reto: 'A'.repeat(43), paso: options.phase ?? 'CODIGO', venceEn: 300 } });
+    if (url.pathname.endsWith('/mfa/activacion/enviar')) return options.invitationFailure
+      ? route.fulfill({ status: 503, json: { message: 'Correo no disponible temporalmente.' } })
+      : route.fulfill({ json: { mensaje: 'Invitación enviada al correo principal verificado.', segundosEspera: 60 } });
     if (url.pathname.endsWith('/preparar')) return route.fulfill({ json: enrollment });
     if (url.pathname.endsWith('/verificar')) return verify(route, portal, options);
     return route.fulfill({ status: 204 });
