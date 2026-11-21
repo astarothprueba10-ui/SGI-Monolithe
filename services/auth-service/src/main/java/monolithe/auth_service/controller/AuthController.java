@@ -9,11 +9,14 @@ import monolithe.auth_service.dto.LoginResponse;
 import monolithe.auth_service.dto.MfaChallenge;
 import monolithe.auth_service.dto.MfaCodeRequest;
 import monolithe.auth_service.dto.MfaEnrollment;
+import monolithe.auth_service.dto.MfaInvitationRequest;
+import monolithe.auth_service.dto.MfaInvitationResponse;
 import monolithe.auth_service.dto.RefreshTokenRequest;
 import monolithe.auth_service.dto.RefreshTokenResponse;
 import monolithe.auth_service.dto.ResetPasswordOtpResponse;
 import monolithe.auth_service.dto.ResetPasswordRequest;
 import monolithe.auth_service.service.AuthenticationService;
+import monolithe.auth_service.service.MfaInvitationService;
 import monolithe.auth_service.dto.ChangePasswordRequest;
 import monolithe.auth_service.dto.ForgotPasswordRequest;
 import monolithe.auth_service.dto.MessageResponse;
@@ -30,6 +33,8 @@ import org.springframework.mail.MailException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +50,7 @@ import java.util.Optional;
 public class AuthController {
 
         private final AuthenticationService authenticationService;
+        private final MfaInvitationService mfaInvitationService;
         private final PasswordResetService passwordResetService;
         private final AuditService auditService;
 
@@ -63,6 +69,19 @@ public class AuthController {
                                 userAgent);
 
                 return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(respuesta);
+        }
+
+        /** Reenvía la invitación únicamente tras verificar contraseña y reto vigente. */
+        @PostMapping("/mfa/activacion/enviar")
+        public ResponseEntity<MfaInvitationResponse> enviarInvitacionMfa(
+                        @Valid @RequestBody MfaInvitationRequest solicitud) {
+                try {
+                        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                                        .body(mfaInvitationService.enviar(solicitud.reto()));
+                } catch (MailException falloCorreo) {
+                        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                                        "No pudimos enviar el correo. Intenta de nuevo más tarde o contacta a soporte.");
+                }
         }
 
         /** Entrega el QR tras validar un código de activación o recuperación. */

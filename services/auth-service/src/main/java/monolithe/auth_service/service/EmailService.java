@@ -31,6 +31,30 @@ public class EmailService {
   @Value("${security.portal.cliente-url}")
   private String portalClienteUrl;
 
+  /**
+   * Invitación de primera vinculación, enviada al correo principal verificado.
+   * No contiene contraseña, semilla TOTP, URL con credenciales ni códigos de recuperación.
+   */
+  public void enviarInvitacionMfa(String destinatario, String codigo) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, false, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(monolithe.auth_service.validation.EmailAddressPolicy.normalizeRequired(destinatario));
+      helper.setSubject("Activa la verificación en dos pasos - MONOLITHE");
+      helper.setText("MONOLITHE - Activación del autenticador de inicio de sesión.\n\n"
+          + "Tu código de activación es: " + codigo + "\n"
+          + "Válido durante 24 horas. Ingresa este código en la pantalla de activación que "
+          + "aparece después de introducir tu documento y contraseña.\n"
+          + "Luego vincula una aplicación autenticadora y guarda tu código de recuperación.\n\n"
+          + "Si no solicitaste este acceso, no compartas el código y comunícate con soporte.\n"
+          + "Nunca pediremos tu contraseña por correo.", false);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      throw new MailException("No se pudo preparar el correo de activación MFA.", e) {};
+    }
+  }
+
   /** Aviso de seguridad sin OTP ni datos de recuperación. */
   public void enviarAvisoMfaFinanciero(String destinatario, String evento) {
     try {

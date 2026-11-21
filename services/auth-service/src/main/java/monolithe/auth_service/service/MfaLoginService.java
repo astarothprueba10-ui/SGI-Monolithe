@@ -14,6 +14,8 @@ import monolithe.auth_service.security.Totp;
 import monolithe.auth_service.security.UserPrincipal;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +59,16 @@ public class MfaLoginService {
         var step = stored.filter(state -> state.encryptedSeed() != null).isPresent()
                 ? MfaChallenge.Paso.CODIGO : MfaChallenge.Paso.ACTIVACION;
         return new MfaChallenge(challenge, step, CHALLENGE_SECONDS);
+    }
+
+    /** Solo un reto posterior a la contraseña puede solicitar la invitación inicial. */
+    public long autorizarInvitacionInicial(String reto) {
+        Pending pending = resolve(reto);
+        if (pending.state().encryptedSeed() != null || pending.state().pendingSeed() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El autenticador ya está configurado o hay una vinculación en curso.");
+        }
+        return pending.account().id();
     }
 
     /** Valida una invitación o un código de recuperación antes de mostrar el QR. */
