@@ -26,6 +26,12 @@ public class MfaInvitationRepository {
             """).param("usuario", usuario).query(String.class).optional();
     }
 
+    /** El administrador puede invitar antes del primer intento de inicio de sesión. */
+    public void asegurarEstado(long usuario) {
+        jdbc.sql("INSERT INTO auth_mfa.estado (id_usuario) VALUES (:usuario) ON CONFLICT (id_usuario) DO NOTHING")
+            .param("usuario", usuario).update();
+    }
+
     /**
      * Sustituye el código previo solo si no se ha vinculado un autenticador.
      * Se ejecuta dentro de la transacción que envía el correo: un fallo SMTP revierte el cambio.

@@ -4,7 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import monolithe.auth_service.dto.MfaResetRequest;
 import monolithe.auth_service.dto.MfaResetResponse;
+import monolithe.auth_service.dto.MfaManualInvitationResponse;
 import monolithe.auth_service.service.MfaAdminResetService;
+import monolithe.auth_service.service.MfaManualInvitationService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,17 @@ import monolithe.auth_service.exception.MfaFlowException;
 @RequiredArgsConstructor
 public class MfaAdminController {
     private final MfaAdminResetService service;
+    private final MfaManualInvitationService invitaciones;
+
+    /** Activación asistida con identidad comprobada, sin necesidad de acceder a Supabase. */
+    @PostMapping("/{idUsuario}/mfa/invitacion-manual")
+    @PreAuthorize("hasAuthority('ROLE_ADMINISTRADOR') and hasAuthority('users.edit')")
+    public ResponseEntity<MfaManualInvitationResponse> invitacionManual(
+            @PathVariable long idUsuario, @Valid @RequestBody MfaResetRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(invitaciones.emitir(Long.parseLong(jwt.getSubject()), idUsuario, request));
+    }
 
     @PostMapping("/{idUsuario}/mfa/reset")
     @PreAuthorize("hasAuthority('ROLE_ADMINISTRADOR') and hasAuthority('users.edit')")

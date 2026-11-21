@@ -38,10 +38,7 @@ public class MfaAdminResetService {
         if (!login.equals(request.confirmacionLogin().trim())) {
             throw new MfaFlowException(HttpStatus.BAD_REQUEST, "El documento de confirmación no coincide.");
         }
-        String correo = contacts.correoVerificado(usuario)
-                .map(EmailAddressPolicy::normalizeRequired)
-                .orElseThrow(() -> new MfaFlowException(HttpStatus.CONFLICT,
-                        "La cuenta no tiene correo verificado. Valídalo antes de restablecer MFA."));
+        var correo = contacts.correoVerificado(usuario).map(EmailAddressPolicy::normalizeRequired);
 
         int cambios = jdbc.sql("""
             UPDATE auth_mfa.estado
@@ -71,16 +68,19 @@ public class MfaAdminResetService {
             SELECT public.sp_registrar_auditoria(
                 :actor, 'SEGURIDAD', 'RESTABLECER_MFA_LOGIN', 'USUARIO',
                 CAST(:usuario AS varchar), 'EXITOSO', CAST(:motivo AS varchar),
-                jsonb_build_object('identidad_verificada', TRUE, 'id_usuario_objetivo', :usuario)
+                jsonb_build_object('identidad_verificada', TRUE, 'id_usuario_objetivo', :usuario,
+                    'aviso_email_disponible', :correoDisponible)
             )
             """)
             .param("actor", actor).param("usuario", Long.toString(usuario))
             .param("motivo", request.motivo().trim())
+            .param("correoDisponible", correo.isPresent())
             .query(Long.class).single();
 
-        // Si el correo falla, revierte el restablecimiento para no dejar la cuenta sin aviso.
-        email.enviarAvisoRestablecimientoMfa(correo);
-        return new MfaResetResponse("Autenticador restablecido y sesiones revocadas. "
-                + "El usuario recibirá un aviso y podrá solicitar una nueva invitación al iniciar sesión.");
+        // Si hay un correo verificado, el fallo del envío revierte toda la operación.
+        correo.ifPresent(email::enviarAvisoRestablecimientoMfa);
+        return new MfaResetResponse(correo.isPresent()
+            ? "Autenticador restablecido y sesiones revocadas. Se envió aviso al correo verificado. El titular puede solicitar la nueva invitación."
+            : "Autenticador restablecido y sesiones revocadas. No hay correo verificado: comprueba presencialmente la identidad y emite una invitación manual para el titular.");
     }
 }
