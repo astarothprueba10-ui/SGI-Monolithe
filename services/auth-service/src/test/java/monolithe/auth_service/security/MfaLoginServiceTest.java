@@ -97,6 +97,7 @@ class MfaLoginServiceTest {
                 aryEq(MfaCrypto.codeHash(setup.codigoRecuperacion())));
         assertEquals(setup.claveManual(), Totp.base32(crypto.decrypt(ID, encrypted.getValue())));
         verify(repository, never()).consume(anyLong(), anyLong());
+        verify(repository).confirmarCorreoPorCodigo(ID);
     }
 
     @Test
@@ -127,6 +128,7 @@ class MfaLoginServiceTest {
         var setup = service.prepare(input);
         assertNotEquals(RECUPERACION, setup.codigoRecuperacion());
         verify(repository, never()).consume(anyLong(), anyLong());
+        verify(repository, never()).confirmarCorreoPorCodigo(anyLong());
     }
 
     @Test

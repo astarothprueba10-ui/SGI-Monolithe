@@ -10,7 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
-import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,7 +47,7 @@ class MfaInvitationServiceTest {
         assertArrayEquals(MfaCrypto.digest("cliente@ejemplo.com"), hashCorreo.getValue());
         assertEquals(36, codigo.getValue().length());
         assertFalse(respuesta.mensaje().contains(codigo.getValue()));
-        assertTrue(respuesta.mensaje().contains("verificaremos"));
+        assertTrue(respuesta.mensaje().contains("comprobaremos"));
         assertEquals(60, respuesta.segundosEspera());
     }
 
