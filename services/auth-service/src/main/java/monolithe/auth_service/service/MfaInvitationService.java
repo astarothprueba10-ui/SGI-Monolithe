@@ -8,7 +8,7 @@ import monolithe.auth_service.validation.EmailAddressPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -29,13 +29,13 @@ public class MfaInvitationService {
         long usuario = mfa.autorizarInvitacionInicial(reto);
         String destinatario = repository.correoVerificado(usuario)
             .map(EmailAddressPolicy::normalizeRequired)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+            .orElseThrow(() -> new MfaFlowException(HttpStatus.CONFLICT,
                 "No tienes un correo principal verificado. Contacta a administración para verificarlo."));
 
         String codigo = UUID.randomUUID().toString();
         byte[] hash = MfaCrypto.codeHash(codigo);
         if (!repository.emitir(usuario, hash, OffsetDateTime.now(ZoneOffset.UTC).plusHours(24))) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new MfaFlowException(HttpStatus.TOO_MANY_REQUESTS,
                 "Ya se envió una invitación recientemente o alcanzaste el límite de reenvíos. "
                 + "Revisa tu correo y, si no recibes el mensaje, contacta a soporte.");
         }

@@ -13,7 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 
 /**
  * Solo Administración con sesión MFA completada y permiso users.edit.
@@ -34,7 +34,7 @@ public class MfaAdminController {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                     .body(service.restablecer(Long.parseLong(jwt.getSubject()), idUsuario, request));
         } catch (MailException error) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+            throw new MfaFlowException(HttpStatus.SERVICE_UNAVAILABLE,
                     "El aviso de seguridad no pudo enviarse. No se completó el restablecimiento.");
         }
     }

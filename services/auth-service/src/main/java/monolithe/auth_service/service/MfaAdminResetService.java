@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 
 /** Recuperación excepcional, autorizada y auditada: nunca permite resetearse a sí mismo. */
 @Service
@@ -26,21 +26,21 @@ public class MfaAdminResetService {
         if (actor <= 0 || usuario <= 0 || actor == usuario
                 || request == null || !Boolean.TRUE.equals(request.identidadVerificada())
                 || request.motivo() == null || request.motivo().trim().length() < 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new MfaFlowException(HttpStatus.BAD_REQUEST,
                     "Verifica la identidad, indica un motivo suficiente y selecciona otra cuenta.");
         }
         if (!permissions.puedeEditar(actor, usuario)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "La cuenta no es gestionable por este operador.");
+            throw new MfaFlowException(HttpStatus.FORBIDDEN, "La cuenta no es gestionable por este operador.");
         }
         String login = jdbc.sql("SELECT usuario_login FROM public.seg_usuarios WHERE id_usuario = :id FOR NO KEY UPDATE")
                 .param("id", usuario).query(String.class).optional()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuenta no encontrada."));
+                .orElseThrow(() -> new MfaFlowException(HttpStatus.NOT_FOUND, "Cuenta no encontrada."));
         if (!login.equals(request.confirmacionLogin().trim())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El documento de confirmación no coincide.");
+            throw new MfaFlowException(HttpStatus.BAD_REQUEST, "El documento de confirmación no coincide.");
         }
         String correo = contacts.correoVerificado(usuario)
                 .map(EmailAddressPolicy::normalizeRequired)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                .orElseThrow(() -> new MfaFlowException(HttpStatus.CONFLICT,
                         "La cuenta no tiene correo verificado. Valídalo antes de restablecer MFA."));
 
         int cambios = jdbc.sql("""
@@ -56,7 +56,7 @@ public class MfaAdminResetService {
             WHERE id_usuario = :id AND secreto_cifrado IS NOT NULL
             """).param("id", usuario).update();
         if (cambios != 1) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new MfaFlowException(HttpStatus.CONFLICT,
                     "Esta cuenta no tiene un autenticador activo que restablecer.");
         }
         jdbc.sql("UPDATE public.seg_usuarios SET version_sesiones = version_sesiones + 1 WHERE id_usuario = :id")

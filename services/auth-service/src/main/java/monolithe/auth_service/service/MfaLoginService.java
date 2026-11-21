@@ -15,7 +15,7 @@ import monolithe.auth_service.security.UserPrincipal;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +65,7 @@ public class MfaLoginService {
     public long autorizarInvitacionInicial(String reto) {
         Pending pending = resolve(reto);
         if (pending.state().encryptedSeed() != null || pending.state().pendingSeed() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new MfaFlowException(HttpStatus.CONFLICT,
                     "El autenticador ya está configurado o hay una vinculación en curso.");
         }
         return pending.account().id();
