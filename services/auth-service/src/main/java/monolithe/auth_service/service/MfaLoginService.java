@@ -77,6 +77,9 @@ public class MfaLoginService {
         var pending = resolve(request.reto());
         if (pending.state().pendingSeed() != null) throw MfaException.expired();
         if (!validSetupCode(pending, request.codigo())) throw recordFailure(pending);
+        if (pending.state().encryptedSeed() == null) {
+            repository.confirmarCorreoPorCodigo(pending.account().id());
+        }
         return createEnrollment(pending);
     }
 

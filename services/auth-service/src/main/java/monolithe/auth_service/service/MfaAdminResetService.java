@@ -44,6 +44,7 @@ public class MfaAdminResetService {
             UPDATE auth_mfa.estado
             SET secreto_cifrado = NULL, ultimo_paso = NULL, recuperacion_hash = NULL,
                 activacion_hash = NULL, activacion_expira = NULL,
+                activacion_contacto_id = NULL, activacion_correo_hash = NULL,
                 reto_hash = NULL, reto_expira = NULL, version_reto = NULL,
                 password_reto_hash = NULL, portal = NULL,
                 pendiente_cifrado = NULL, pendiente_recuperacion_hash = NULL,
