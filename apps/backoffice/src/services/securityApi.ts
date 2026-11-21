@@ -219,6 +219,14 @@ export const securityApi = {
       { method: 'PATCH' }
     ),
 
+  invitarMfaAsistido: (idUsuario: number, confirmacionLogin: string, motivo: string) =>
+    request<{ codigoActivacion: string; horasVigencia: number; mensaje: string }>(
+      `/users/${idUsuario}/mfa/invitacion-manual`, {
+        method: 'POST',
+        body: JSON.stringify({ confirmacionLogin, motivo, identidadVerificada: true })
+      }
+    ),
+
   restablecerMfa: (idUsuario: number, confirmacionLogin: string, motivo: string) =>
     request<{ mensaje: string }>(`/users/${idUsuario}/mfa/reset`, {
       method: 'POST',

@@ -15,6 +15,7 @@ import { PermissionMatrix } from '../components/users/PermissionMatrix';
 import { CreateUserModal } from '../components/users/CreateUserModal';
 import { ManageUserRolesModal } from '../components/users/ManageUserRolesModal';
 import { MfaResetModal } from '../components/users/MfaResetModal';
+import { MfaManualInvitationModal } from '../components/users/MfaManualInvitationModal';
 import { CreateRoleModal } from '../components/users/CreateRoleModal';
 import { EditRoleModal } from '../components/users/EditRoleModal';
 import { motivoBloqueoDesactivacion } from '../components/users/roleManagementPolicy';
@@ -61,6 +62,7 @@ export function UsersAndRoles() {
   const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SecurityUser | null>(null);
   const [mfaResetUser, setMfaResetUser] = useState<SecurityUser | null>(null);
+  const [mfaInviteUser, setMfaInviteUser] = useState<SecurityUser | null>(null);
 
   const [securityUsers, setSecurityUsers] = useState<SecurityUser[]>([]);
   const [securityRoles, setSecurityRoles] = useState<SecurityRole[]>([]);
@@ -238,6 +240,9 @@ export function UsersAndRoles() {
         onSuccess={recargarCatalogos}
         user={editingUser}
       />
+
+      <MfaManualInvitationModal open={mfaInviteUser !== null} user={mfaInviteUser}
+        onClose={() => setMfaInviteUser(null)} />
 
       <MfaResetModal open={mfaResetUser !== null} user={mfaResetUser}
         onClose={() => setMfaResetUser(null)} onSuccess={recargarUsuarios} />
@@ -469,7 +474,12 @@ export function UsersAndRoles() {
                         <Button size="sm" variant="secondary" icon={RotateCcwIcon}
                           title="Restablecer autenticador tras verificar la identidad"
                           onClick={() => setMfaResetUser(user)}>
-                          MFA
+                          Restablecer MFA
+                        </Button>
+                        <Button size="sm" variant="secondary" icon={ShieldCheckIcon}
+                          title="Emitir activación MFA asistida tras verificar identidad"
+                          onClick={() => setMfaInviteUser(user)}>
+                          Invitar MFA
                         </Button>
                       </AccountAdminGate>
                     )}

@@ -84,8 +84,9 @@ export function MfaResetModal({ open, user, onClose, onSuccess }: Props) {
               la identidad del titular. Su correo principal está verificado.</span>
           </label>
           <p className="text-xs text-brand-600">
-            El usuario recibirá una alerta en su correo verificado. Después podrá iniciar sesión
-            y solicitar una nueva invitación MFA. Si no tiene correo verificado, primero actualízalo.
+            Si el usuario tiene correo verificado recibirá una alerta. Después podrá solicitar una
+            nueva invitación por correo o recibirla presencialmente mediante «Invitar MFA».
+            Si no hay correo verificado, la entrega asistida exige comprobar su identidad.
           </p>
         </form>
       )}
