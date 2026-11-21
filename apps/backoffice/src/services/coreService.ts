@@ -446,6 +446,10 @@ export const coreService = {
     );
   },
 
+  getCommercializableLots(idProyecto: number): Promise<number[]> {
+    return coreApi.get<number[]>(`/lotes/proyecto/${idProyecto}/comercializables`);
+  },
+
   searchLots(filters: LoteFiltroRequest = {}): Promise<LoteResponse[]> {
     return coreApi.get<LoteResponse[]>(buildLotSearchParams(filters));
   },

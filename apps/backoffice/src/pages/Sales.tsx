@@ -1158,7 +1158,7 @@ export function Sales() {
 
     const cargarLotes = async () => {
       try {
-        const [lotes, reservas] = await Promise.all([
+        const [lotes, reservas, comercializables] = await Promise.all([
           coreService.searchLots({
             idProyecto,
             idEtapa,
@@ -1169,7 +1169,8 @@ export function Sales() {
             ? crmBackend.listarLotesReservadosDelProspecto(
               Number(selectedProspectId)
             )
-            : Promise.resolve({ idLotes: [] as number[] })
+            : Promise.resolve({ idLotes: [] as number[] }),
+          coreService.getCommercializableLots(idProyecto)
         ]);
 
         if (!vigente) return;
@@ -1180,6 +1181,7 @@ export function Sales() {
           )
         );
 
+        const idsComerciales = new Set(comercializables);
         const lotesPermitidos = (lotes ?? []).filter((lote) => {
           if (
             lote.activo !== true ||
@@ -1192,7 +1194,7 @@ export function Sales() {
           const estado = lote.codigoEstadoLote?.toUpperCase();
 
           if (estado === 'DISPONIBLE') {
-            return true;
+            return idsComerciales.has(lote.idLote);
           }
 
           return (

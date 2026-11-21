@@ -22,6 +22,12 @@ public class LoteController {
 
     private final LoteService loteService;
 
+    @GetMapping("/proyecto/{idProyecto}/comercializables")
+    @PreAuthorize("hasAuthority('lots.view')")
+    public List<Long> listarComercializables(@PathVariable Long idProyecto) {
+        return loteService.listarComercializables(idProyecto);
+    }
+
     @GetMapping("/manzana/{idManzana}")
     @PreAuthorize("hasAuthority('lots.view')")
     public ResponseEntity<List<LoteResponse>> listarPorManzana(@PathVariable Long idManzana) {
