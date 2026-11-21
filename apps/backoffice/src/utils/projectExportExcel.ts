@@ -100,8 +100,11 @@ export async function generarExcelProyectos(proyectos: ProyectoResponse[]): Prom
 }
 
 export function nombreArchivoProyectos(): string {
-  const date = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-  return 'MONOLITHE_Proyectos_' + date + '.xlsx';
+  const parts = new Intl.DateTimeFormat('es-PE', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const value = (part: string) => parts.find(item => item.type === part)?.value ?? '00';
+  return `MONOLITHE_Proyectos_${value('year')}-${value('month')}-${value('day')}.xlsx`;
 }
 
 export function descargarExcelProyectos(blob: Blob, fileName: string): void {
