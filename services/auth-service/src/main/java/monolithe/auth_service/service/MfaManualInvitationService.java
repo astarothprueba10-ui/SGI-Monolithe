@@ -49,7 +49,7 @@ public class MfaManualInvitationService {
         invitations.asegurarEstado(usuario);
         String codigo = UUID.randomUUID().toString();
         if (!invitations.emitir(usuario, MfaCrypto.codeHash(codigo),
-                OffsetDateTime.now(ZoneOffset.UTC).plusHours(24))) {
+                OffsetDateTime.now(ZoneOffset.UTC).plusHours(24), null, null)) {
             throw new MfaFlowException(HttpStatus.TOO_MANY_REQUESTS,
                     "El autenticador ya está vinculado, hay una vinculación pendiente o se alcanzó el límite de invitaciones.");
         }

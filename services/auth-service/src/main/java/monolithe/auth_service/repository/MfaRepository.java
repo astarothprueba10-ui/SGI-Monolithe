@@ -5,6 +5,8 @@ import monolithe.auth_service.dto.MfaPortal;
 import monolithe.auth_service.security.MfaCrypto;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import monolithe.auth_service.exception.MfaFlowException;
+import org.springframework.http.HttpStatus;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -104,6 +106,32 @@ public class MfaRepository {
                 """).param("id", id).param("attempts", attempts).param("locked", lockedUntil).update();
     }
 
+    /**
+     * Tras introducir correctamente el código recibido por correo, comprueba la misma
+     * dirección y el mismo contacto antes de marcarlo verificado. Las invitaciones
+     * manuales y los códigos de recuperación no verifican correos.
+     */
+    public void confirmarCorreoPorCodigo(long usuario) {
+        Long contacto = jdbc.sql("SELECT activacion_contacto_id FROM auth_mfa.estado WHERE id_usuario = :usuario")
+            .param("usuario", usuario).query(Long.class).optional().orElse(null);
+        if (contacto == null) return;
+        int actualizados = jdbc.sql("""
+            UPDATE public.core_personas_contactos c
+               SET verificado = TRUE, fecha_actualizacion = timezone('utc', NOW())
+              FROM public.seg_usuarios u, public.cfg_tipos_contacto t, auth_mfa.estado m
+             WHERE u.id_usuario = :usuario AND c.id_persona = u.id_persona
+               AND m.id_usuario = :usuario AND m.activacion_contacto_id = c.id_persona_contacto
+               AND c.id_persona_contacto = :contacto AND c.activo = TRUE AND c.principal = TRUE
+               AND t.id_tipo_contacto = c.id_tipo_contacto AND t.codigo = 'EMAIL' AND t.activo = TRUE
+               AND m.activacion_correo_hash = sha256(convert_to(lower(btrim(c.valor)), 'UTF8'))
+               AND m.activacion_hash IS NOT NULL AND m.activacion_expira > CURRENT_TIMESTAMP
+            """).param("usuario", usuario).param("contacto", contacto).update();
+        if (actualizados != 1) {
+            throw new MfaFlowException(HttpStatus.CONFLICT,
+                "El correo registrado cambió o dejó de estar disponible. Solicita otra invitación.");
+        }
+    }
+
     /** Consume reto y paso TOTP, vinculando la semilla pendiente cuando corresponde. */
     public void consume(long id, long step) {
         jdbc.sql("""
@@ -111,6 +139,7 @@ public class MfaRepository {
                    SET secreto_cifrado = COALESCE(pendiente_cifrado, secreto_cifrado),
                        recuperacion_hash = COALESCE(pendiente_recuperacion_hash, recuperacion_hash),
                        ultimo_paso = :step, activacion_hash = NULL, activacion_expira = NULL,
+                       activacion_contacto_id = NULL, activacion_correo_hash = NULL,
                        reto_hash = NULL, reto_expira = NULL, version_reto = NULL, password_reto_hash = NULL,
                        portal = NULL, pendiente_cifrado = NULL, pendiente_recuperacion_hash = NULL,
                        intentos = 0, bloqueo_expira = NULL

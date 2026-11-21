@@ -89,7 +89,7 @@ public class UserEmailRepository {
     private void promoverContacto(Long contacto, String correo) {
         jdbc.update("""
                 UPDATE public.core_personas_contactos
-                SET valor = ?, principal = TRUE, verificado = TRUE, activo = TRUE,
+                SET valor = ?, principal = TRUE, activo = TRUE,
                     fecha_actualizacion = timezone('utc', NOW())
                 WHERE id_persona_contacto = ?
                 """, correo, contacto);
@@ -100,7 +100,7 @@ public class UserEmailRepository {
                 INSERT INTO public.core_personas_contactos
                     (id_persona, id_tipo_contacto, valor, principal, verificado,
                      permite_notificaciones, activo, fecha_creacion, fecha_actualizacion)
-                VALUES (?, ?, ?, TRUE, TRUE, TRUE, TRUE, timezone('utc', NOW()), timezone('utc', NOW()))
+                VALUES (?, ?, ?, TRUE, FALSE, TRUE, TRUE, timezone('utc', NOW()), timezone('utc', NOW()))
                 """, persona, tipo, correo);
     }
 
