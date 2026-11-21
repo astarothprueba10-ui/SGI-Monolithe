@@ -29,11 +29,16 @@ public class SimulacionComercialService {
         if (!config.monedas().contains(codigoMoneda)) throw new ReglaNegocioException("Moneda inválida.");
         Lote lote = obtenerLote(proyecto, idLote, config.lotes());
         var ahora = ZonedDateTime.now(ZoneId.of("America/Lima"));
-        var parcela = new EvaluadorPoliticaComercial.Parcela(idLote, lote.getManzana().getIdManzana(),
+        return evaluar(config, lote, codigoMoneda, ahora, ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto));
+    }
+
+    SimulacionComercialResponse evaluar(monolithe.core_service.dto.ConfiguracionProyectoResponse config,
+            Lote lote, String moneda, ZonedDateTime ahora, List<AjusteTipoLote> candidatos) {
+        var parcela = new EvaluadorPoliticaComercial.Parcela(lote.getIdLote(), lote.getManzana().getIdManzana(),
             lote.getZona() == null || !Boolean.TRUE.equals(lote.getZona().getActivo()) ? null : lote.getZona().getCodigo(), lote.getAreaM2());
-        var resultado = EvaluadorPoliticaComercial.evaluar(config.datos(), parcela, codigoMoneda,
-            ahora.toLocalDate(), ajustesAplicables(proyecto, lote, codigoMoneda, ahora.toOffsetDateTime()));
-        return respuesta(version, lote, parcela, codigoMoneda, ahora.toLocalDate(), resultado);
+        var resultado = EvaluadorPoliticaComercial.evaluar(config.datos(), parcela, moneda,
+            ahora.toLocalDate(), ajustesAplicables(candidatos, lote, moneda, ahora.toOffsetDateTime()));
+        return respuesta(config.version(), lote, parcela, moneda, ahora.toLocalDate(), resultado);
     }
 
     private Lote obtenerLote(Long proyecto, Long id, List<monolithe.core_service.dto.ConfiguracionProyectoResponse.Lote> activos) {
@@ -43,9 +48,9 @@ public class SimulacionComercialService {
         return lote;
     }
 
-    private List<EvaluadorPoliticaComercial.Ajuste> ajustesAplicables(Long proyecto, Lote lote, String moneda, OffsetDateTime ahora) {
+    private List<EvaluadorPoliticaComercial.Ajuste> ajustesAplicables(List<AjusteTipoLote> disponibles, Lote lote, String moneda, OffsetDateTime ahora) {
         if (lote.getTipoLote() == null) return List.of();
-        var candidatos = ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto).stream()
+        var candidatos = disponibles.stream()
             .filter(a -> aplicable(a,lote,moneda,ahora)).toList();
         var especificos = candidatos.stream().filter(a -> a.getMoneda() != null).toList();
         var elegidos = especificos.isEmpty() ? candidatos : candidatos.stream()

@@ -1896,6 +1896,15 @@ public class CrmVentaService {
 
         String mensaje = errores.toString();
 
+        if (mensaje.contains("COMERCIAL_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El lote no está habilitado por la política comercial vigente.", ex);
+        }
+        if (mensaje.contains("COMERCIAL_PRECIO_CAMBIO|") || mensaje.contains("COMERCIAL_INMUTABLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Las condiciones comerciales cambiaron. Actualice el precio y consulte a Gerencia.", ex);
+        }
+
         ResponseStatusException errorSep = mapearErrorSeparacion(mensaje, ex);
         if (errorSep != null) {
             return errorSep;

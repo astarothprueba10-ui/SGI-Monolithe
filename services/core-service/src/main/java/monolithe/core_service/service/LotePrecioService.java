@@ -98,6 +98,7 @@ public class LotePrecioService {
     @Transactional
     public LotePrecioResponse calcularYRegistrar(LotePrecioRequest request) {
         ContextoPrecio ctx = resolverContexto(request);
+        validarEdicionComercial(ctx.lote());
         ResultadoCalculo resultado = calcular(ctx);
         if (resultado.precioFinal() == null
                 || resultado.precioFinal().signum() <= 0) {
@@ -127,6 +128,7 @@ public class LotePrecioService {
         }
 
         Lote lote = obtenerLote(idLote);
+        validarEdicionComercial(lote);
 
         if (!Boolean.TRUE.equals(lote.getActivo())) {
             throw new ReglaNegocioException(
@@ -174,6 +176,7 @@ public class LotePrecioService {
             ActualizarPrecioManualRequest request) {
         validarMontoPrecio(request.monto());
         Lote lote = obtenerLote(idLote);
+        validarEdicionComercial(lote);
         validarOperacionesLoteParaPrecio(lote);
         Moneda moneda = obtenerMonedaActiva("PEN");
         Optional<LotePrecio> vigenteOpt = lotePrecioRepository
@@ -187,6 +190,11 @@ public class LotePrecioService {
         LotePrecio nuevo = crearEntidadPrecioManual(
                 lote, moneda, request.monto(), request.observaciones(), ahora);
         return toResponse(lotePrecioRepository.saveAndFlush(nuevo));
+    }
+
+    private void validarEdicionComercial(Lote lote) {
+        if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto()))
+            throw new ReglaNegocioException("El precio se administra desde la política comercial del proyecto.");
     }
 
     private void validarMontoPrecio(BigDecimal monto) {
