@@ -25,13 +25,14 @@ class ImportacionProyectoServiceTest {
     private final ZonaService zonas = mock(ZonaService.class);
     private final ManzanaService manzanas = mock(ManzanaService.class);
     private final LoteService lotes = mock(LoteService.class);
+    private final ConfiguracionProyectoService configuracion = mock(ConfiguracionProyectoService.class);
     private ValidatorFactory factory;
     private ImportacionProyectoService service;
 
     @BeforeEach
     void preparar() {
         factory = Validation.buildDefaultValidatorFactory();
-        service = new ImportacionProyectoService(repo, proyectos, etapas, zonas, manzanas, lotes, factory.getValidator());
+        service = new ImportacionProyectoService(repo, proyectos, etapas, zonas, manzanas, lotes, factory.getValidator(), configuracion);
         Proyecto p = new Proyecto();
         p.setCodigo("PROY-001");
         when(proyectos.findById(2L)).thenReturn(Optional.of(p));
@@ -64,7 +65,7 @@ class ImportacionProyectoServiceTest {
         when(zonas.crear(any())).thenReturn(new ZonaResponse(10L,2L,"PROY-001","Proyecto","Z-B","Zona de prueba",null,1,true));
         var filas = List.of(zona(2,"Z-A"),zona(3,"Z-B"));
         var previo = service.previsualizar(2L, solicitud(filas,null));
-        assertTrue(service.confirmar(2L, solicitud(filas,previo.huella())).confirmado());
+        assertTrue(service.confirmar(2L, solicitud(filas,previo.huella()), 1L).confirmado());
         verify(zonas, times(1)).crear(argThat(z -> z.codigo().equals("Z-B")));
         verifyNoInteractions(etapas, manzanas, lotes);
     }
@@ -74,7 +75,7 @@ class ImportacionProyectoServiceTest {
         var filas = List.of(zona(2,"Z-A"), zona(3,"z-a"));
         var previo = service.previsualizar(2L, solicitud(filas,null));
         assertEquals("ERROR", previo.filas().get(1).estado());
-        assertThrows(ReglaNegocioException.class, () -> service.confirmar(2L, solicitud(filas,previo.huella())));
+        assertThrows(ReglaNegocioException.class, () -> service.confirmar(2L, solicitud(filas,previo.huella()), 1L));
         verifyNoInteractions(etapas, zonas, manzanas, lotes);
     }
 
@@ -83,7 +84,7 @@ class ImportacionProyectoServiceTest {
         var filas = List.of(zona(2,"Z-A"));
         var previo = service.previsualizar(2L, solicitud(filas,null));
         when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L,"Z-A",true)));
-        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella())));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()), 1L));
         verifyNoInteractions(etapas, zonas, manzanas, lotes);
     }
 

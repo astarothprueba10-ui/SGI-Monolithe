@@ -16,7 +16,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ImportacionProyectoService {
-    private static final List<String> ORDEN = List.of("EtapasFisicas", "Zonas", "Manzanas", "Lotes");
+    private static final List<String> ORDEN = List.of("EtapasFisicas", "Zonas", "Manzanas", "Lotes", "EtapasComerciales", "AsignacionManzanas", "AsignacionLotes", "Tarifas");
     private final ImportacionProyectoRepository repo;
     private final ProyectoRepository proyectos;
     private final EtapaService etapas;
@@ -24,27 +24,55 @@ public class ImportacionProyectoService {
     private final ManzanaService manzanas;
     private final LoteService lotes;
     private final Validator validator;
+    private final ConfiguracionProyectoService configuracion;
 
     @Transactional(readOnly = true)
     public ImportacionProyectoResponse previsualizar(Long id, ImportacionProyectoRequest solicitud) {
         validarProyecto(id, solicitud);
         var contexto = new ImportacionProyectoContexto(repo, id);
         var filas = ordenar(solicitud);
-        var resultados = filas.stream().map(f -> revisar(id, f, contexto)).toList();
-        return new ImportacionProyectoResponse(huella(id, solicitud, resultados), resultados, false);
+        var base = baseComercial(id, filas);
+        var comercial = base == null ? null : new ImportacionComercialProyecto(base, validator);
+        var resultados = filas.stream().map(f -> revisar(id, f, contexto, comercial)).toList();
+        return new ImportacionProyectoResponse(huella(id, solicitud, resultados, base == null ? -1 : base.version()), resultados, false);
     }
 
     @Transactional
-    public ImportacionProyectoResponse confirmar(Long id, ImportacionProyectoRequest solicitud) {
+    public ImportacionProyectoResponse confirmar(Long id, ImportacionProyectoRequest solicitud, Long actor) {
+        var filas = ordenar(solicitud);
+        var base = baseComercial(id, filas);
         var previo = previsualizar(id, solicitud);
+        if (!previo.huella().equals(huella(id, solicitud, previo.filas(), base == null ? -1 : base.version())))
+            throw new ConflictoNegocioException("El borrador comercial cambió. Valida otra vez.");
         if (!Objects.equals(previo.huella(), solicitud.huella())) throw new ConflictoNegocioException("La vista previa cambió. Valida nuevamente.");
         if (previo.filas().stream().anyMatch(r -> r.estado().equals("ERROR"))) throw new ReglaNegocioException("Corrige todas las filas con errores.");
         var contexto = new ImportacionProyectoContexto(repo, id);
-        var filas = ordenar(solicitud);
+        registrarEstructura(id, filas, previo, contexto);
+        if (base != null) guardarComercial(id, actor, filas, base, contexto);
+        return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
+    }
+
+    private ConfiguracionProyectoResponse baseComercial(Long id, List<ImportacionProyectoFila> filas) {
+        return filas.stream().anyMatch(f -> ImportacionComercialProyecto.esComercial(f.hoja()))
+            ? configuracion.obtener(id) : null;
+    }
+
+    private void registrarEstructura(Long id, List<ImportacionProyectoFila> filas,
+            ImportacionProyectoResponse previo, ImportacionProyectoContexto contexto) {
         for (int i = 0; i < filas.size(); i++) {
             if (previo.filas().get(i).estado().equals("NUEVO")) registrar(id, filas.get(i), contexto);
         }
-        return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
+    }
+
+    private void guardarComercial(Long id, Long actor, List<ImportacionProyectoFila> filas,
+            ConfiguracionProyectoResponse base, ImportacionProyectoContexto contexto) {
+        var comercial = new ImportacionComercialProyecto(base, validator);
+        for (var fila : filas) {
+            if (ImportacionComercialProyecto.esComercial(fila.hoja())) comercial.incorporar(fila, contexto);
+        }
+        var request = new ConfiguracionProyectoRequest(base.version(), comercial.datos());
+        validar(request);
+        configuracion.guardar(id, actor, request);
     }
 
     private void validarProyecto(Long id, ImportacionProyectoRequest solicitud) {
@@ -58,9 +86,13 @@ public class ImportacionProyectoService {
             .sorted(Comparator.comparingInt(f -> ORDEN.contains(f.hoja()) ? ORDEN.indexOf(f.hoja()) : ORDEN.size())).toList();
     }
 
-    private Resultado revisar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c) {
+    private Resultado revisar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c, ImportacionComercialProyecto comercial) {
         try {
             f.validarColumnas();
+            if (ImportacionComercialProyecto.esComercial(f.hoja())) {
+                comercial.incorporar(f, c);
+                return resultado(f, "BORRADOR", "Se incorporará o actualizará solo en el borrador comercial.");
+            }
             boolean nuevo = switch (f.hoja()) {
                 case "EtapasFisicas" -> revisarEtapa(id, f, c);
                 case "Zonas" -> revisarZona(id, f, c);
@@ -119,6 +151,7 @@ public class ImportacionProyectoService {
             ImportacionProyectoFila.error("Código de lote existente con otra ubicación o proyecto.");
         }
         if (manzana.id() > 0 && repo.numeroExiste(manzana.id(), f.codigo("numero"))) ImportacionProyectoFila.error("Número de lote ya registrado con otro código.");
+        c.nueva(c.lotes, f.codigo("codigo"));
         return true;
     }
     private void validar(Object dto) {
@@ -136,18 +169,19 @@ public class ImportacionProyectoService {
             case "Zonas" -> agregar(c.zonas, f.codigo("codigo"), zonas.crear(f.zona(id)).idZona());
             case "Manzanas" -> agregar(c.manzanas, f.claveManzana(), manzanas.crear(
                 f.manzana(c.referencia(c.etapas, f.codigo("codigo_etapa_fisica")).id())).idManzana());
-            case "Lotes" -> lotes.crear(f.lote(c.referencia(c.manzanas, f.claveManzana()).id(),
-                c.referencia(c.zonas, f.codigo("codigo_zona")).id()));
+            case "Lotes" -> agregar(c.lotes, f.codigo("codigo"), lotes.crear(f.lote(
+                c.referencia(c.manzanas, f.claveManzana()).id(),
+                c.referencia(c.zonas, f.codigo("codigo_zona")).id())).idLote());
             default -> throw new ReglaNegocioException("Hoja no admitida.");
         }
     }
     private void agregar(Map<String, Referencia> mapa, String codigo, Long id) {
         mapa.put(codigo, new Referencia(id, codigo, true));
     }
-    private String huella(Long id, ImportacionProyectoRequest solicitud, List<Resultado> resultados) {
+    private String huella(Long id, ImportacionProyectoRequest solicitud, List<Resultado> resultados, int versionComercial) {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
-            digest.update((id + ":" + solicitud.codigoProyecto() + ":" + solicitud.versionPlantilla()).getBytes(StandardCharsets.UTF_8));
+            digest.update((id + ":" + solicitud.codigoProyecto() + ":" + solicitud.versionPlantilla() + ":" + versionComercial).getBytes(StandardCharsets.UTF_8));
             for (var f : solicitud.filas()) {
                 actualizar(digest, f.hoja()); actualizar(digest, f.numero().toString());
                 new TreeMap<>(f.celdas()).forEach((k,v) -> { actualizar(digest,k); actualizar(digest,v); });
