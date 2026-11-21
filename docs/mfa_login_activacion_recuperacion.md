@@ -4,6 +4,7 @@
 - Aplicable al Backoffice y Portal Cliente. No modifica la autenticación financiera TOTP de Gerencia.
 - Se exige documento y contraseña; el JWT solo se entrega después de confirmar el TOTP.
 - La clave secreta auth-mfa.key debe permanecer consistente en las instancias del mismo entorno; no rotarla sin migrar los factores cifrados.
+- En Railway se usa la variable protegida AUTH_MFA_KEY_BASE64 con el contenido Base64 de la clave existente del entorno (32 bytes decodificados). En Docker local se sigue montando auth-mfa.key. No subirla a GitHub ni compartirla en el chat.
 - La migración 118_mfa_login_invitaciones_autogestionadas_v1.sql debe aplicarse antes de desplegar el Auth Service que usa nuevas columnas.
 
 ## Alta autónoma

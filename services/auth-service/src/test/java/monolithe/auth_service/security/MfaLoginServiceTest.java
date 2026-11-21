@@ -53,6 +53,16 @@ class MfaLoginServiceTest {
     }
 
     @Test
+    void permitsSecretFromEnvironmentWithoutMountedFile() {
+        var encoded = Base64.getEncoder().encodeToString(new byte[32]);
+        var cipher = new MfaCrypto("/missing/secret/file", encoded);
+        var secret = cipher.seed();
+        assertArrayEquals(secret, cipher.decrypt(ID, cipher.encrypt(ID, secret)));
+        assertThrows(IllegalStateException.class,
+                () -> new MfaCrypto("/missing/secret/file", "clave-invalida"));
+    }
+
+    @Test
     void startsOnlyAfterPasswordAndOpensNoSession() {
         when(repository.lockState(ID)).thenReturn(Optional.empty());
         var result = service.start(principal, MfaPortal.BACKOFFICE);
