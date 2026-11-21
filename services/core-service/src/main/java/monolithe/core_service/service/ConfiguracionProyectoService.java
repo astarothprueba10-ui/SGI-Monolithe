@@ -1,7 +1,7 @@
 package monolithe.core_service.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.ConfiguracionProyectoRequest;
 import monolithe.core_service.dto.ConfiguracionProyectoRequest.Datos;
@@ -21,7 +21,7 @@ import java.util.List;
 public class ConfiguracionProyectoService {
     private final ConfiguracionProyectoRepository repository;
     private final ProyectoRepository proyectos;
-    private final ObjectMapper mapper;
+    private final JsonMapper mapper;
 
     @Transactional(readOnly = true)
     public ConfiguracionProyectoResponse obtener(Long proyecto) {
@@ -53,7 +53,7 @@ public class ConfiguracionProyectoService {
     private Datos leer(String json) {
         try {
             return mapper.readValue(json, Datos.class);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("Borrador comercial inválido.", ex);
         }
     }
@@ -61,7 +61,7 @@ public class ConfiguracionProyectoService {
     private String escribir(Datos datos) {
         try {
             return mapper.writeValueAsString(datos);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalStateException("No se pudo serializar el borrador.", ex);
         }
     }
