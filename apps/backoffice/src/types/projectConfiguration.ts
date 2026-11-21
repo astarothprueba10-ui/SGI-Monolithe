@@ -57,3 +57,26 @@ export interface SimulacionComercialResponse {
   descuento: number | null;
   precioSimulado: number | null;
 }
+
+export interface PublicacionComercialFila {
+  idLote: number;
+  codigo: string;
+  estadoInventario: string;
+  codigoEtapa: string | null;
+  situacion: 'HABILITADA' | 'BLOQUEADA' | 'PROTEGIDA' | 'ERROR';
+  mensaje: string;
+  precioActual: number | null;
+  base: number | null;
+  ajuste: number | null;
+  descuento: number | null;
+  precioFinal: number | null;
+  vigenteHasta: string | null;
+  habilitarInventario: boolean;
+}
+export interface PublicacionComercialResponse {
+  version: number;
+  versionPublicada: number;
+  huella: string;
+  publicado: boolean;
+  lotes: PublicacionComercialFila[];
+}
