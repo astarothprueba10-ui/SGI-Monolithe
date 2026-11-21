@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { admiteMatrizRecargos, importeZona, calcularMatrizTarifas, aplicarVigenciaTarifas,
-  tarifaDeZona } = require('../src/lib/projectTariffMatrix.ts');
+  tarifaDeZona, completarEtapasConTarifas } = require('../src/lib/projectTariffMatrix.ts');
 
 const etapas = ['E1', 'E2', 'E3', 'E4', 'E5'].map(codigo => ({
   codigo, nombre: codigo, disponibilidad: 'REGULAR', tipoDescuento: 'NINGUNO', descuento: 0
@@ -44,4 +44,16 @@ test('rechaza zonas desconocidas, importes negativos o fechas invertidas', () =>
   assert.equal(admiteMatrizRecargos(['Z-NORTE']),false);
   assert.throws(()=>importeZona('ABC',50000,{ A:5000,B:-1,C:3000 }),/válidos/);
   assert.throws(()=>aplicarVigenciaTarifas([],['E1'],'PEN','2027-01-01','2026-01-01'),/rango/);
+});
+
+test('rellena tarifas faltantes de otras etapas sin sobrescribir precios propios', () => {
+  const datos = { etapas, manzanas: [], lotes: [], tarifas: [] };
+  const origen = calcularMatrizTarifas(datos,['D','A'],['E1'],'PEN',50000,recargos,'2026-11-21',null);
+  const otro = calcularMatrizTarifas({ ...datos, tarifas: origen },['D'],['E2'],'PEN',60000,recargos,'2026-12-01',null);
+  const copiado = completarEtapasConTarifas(otro,'E1',['E1','E2','E3'],'PEN');
+  assert.equal(tarifaDeZona(copiado,'E2','PEN','D').valor,60000);
+  assert.equal(tarifaDeZona(copiado,'E2','PEN','A').valor,55000);
+  assert.equal(tarifaDeZona(copiado,'E3','PEN','D').valor,50000);
+  assert.equal(copiado.length,6);
+  assert.equal(completarEtapasConTarifas(copiado,'E1',['E1','E2','E3'],'PEN').length,6);
 });

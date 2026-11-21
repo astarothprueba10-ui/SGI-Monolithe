@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarRangeIcon, LayersIcon, PlusIcon, Trash2Icon, WandSparklesIcon } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Input, Select, FieldLabel } from '../../ui/Field';
-import { admiteMatrizRecargos, aplicarVigenciaTarifas, calcularMatrizTarifas,
+import { admiteMatrizRecargos, aplicarVigenciaTarifas, calcularMatrizTarifas, completarEtapasConTarifas,
   tarifaDeZona, actualizarTarifa, vigenciaValida } from '../../../lib/projectTariffMatrix';
 import type { ConfiguracionComercial, ConfiguracionProyectoResponse, TarifaComercial } from '../../../types/projectConfiguration';
 
@@ -76,6 +76,17 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
     onChange({ ...datos, tarifas: actualizadas });
     setError('');
     setAviso(enTodas ? 'Vigencia aplicada a todas las etapas del borrador.' : 'Vigencia aplicada a esta etapa del borrador.');
+  }
+
+  function completar() {
+    try {
+      const nuevas = completarEtapasConTarifas(tarifas, etapa, datos.etapas.map(e => e.codigo), moneda);
+      onChange({ ...datos, tarifas: nuevas });
+      setAviso(`Se añadieron ${nuevas.length - tarifas.length} tarifas faltantes en otras etapas. Las existentes se conservaron.`);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron copiar las tarifas.');
+    }
   }
 
   function generar(enTodas: boolean) {
@@ -175,6 +186,16 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
           })}
         </tbody>
       </table>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-brand-50 p-3">
+      <div>
+        <p className="text-sm font-semibold text-brand-900">¿Las demás etapas utilizan las mismas tarifas?</p>
+        <p className="text-xs text-brand-500">
+          Copia estas zonas a otras etapas solo donde todavía falten precios. No reemplaza tarifas existentes.
+        </p>
+      </div>
+      <Button size="sm" icon={LayersIcon} disabled={!seleccion.length || datos.etapas.length < 2}
+        onClick={completar}>Completar tarifas faltantes</Button>
     </div>
     <p className="text-xs text-brand-500">
       Los precios son de la etapa seleccionada; los descuentos promocionales se calculan aparte.

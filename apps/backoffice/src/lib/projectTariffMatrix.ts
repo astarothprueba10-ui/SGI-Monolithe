@@ -40,6 +40,24 @@ export function aplicarVigenciaTarifas(
     ? { ...t, vigenteDesde: desde, vigenteHasta: hasta } : t);
 }
 
+export function completarEtapasConTarifas(
+  tarifas: readonly TarifaComercial[], etapaOrigen: string, etapasDestino: readonly string[],
+  moneda: string): TarifaComercial[] {
+  const origen = tarifas.filter(t => t.codigoEtapa === etapaOrigen && t.moneda === moneda);
+  if (!origen.length) throw new Error('La etapa seleccionada no tiene tarifas para copiar.');
+  const resultado = [...tarifas];
+  for (const codigo of etapasDestino) {
+    if (codigo === etapaOrigen) continue;
+    for (const tarifa of origen) {
+      if (!tarifaDeZona(resultado, codigo, moneda, tarifa.codigoZona)) {
+        resultado.push({ ...tarifa, codigoEtapa: codigo });
+      }
+    }
+  }
+  if (resultado.length > 2000) throw new Error('Se superó el máximo de tarifas.');
+  return resultado;
+}
+
 export function calcularMatrizTarifas(
   datos: ConfiguracionComercial, zonas: readonly string[], etapas: readonly string[],
   moneda: string, base: number, recargos: Record<string, number>,
@@ -52,13 +70,11 @@ export function calcularMatrizTarifas(
     if (!datos.etapas.some(e => e.codigo === etapa)) throw new Error('Etapa comercial inexistente.');
     for (const zona of zonas) {
       const valor = importeZona(zona, base, recargos);
-      const anterior = tarifaDeZona(tarifas, etapa, moneda, zona);
       tarifas = actualizarTarifa(tarifas, {
         codigoZona: zona, codigoEtapa: etapa, moneda,
         tipoTarifa: 'MONTO_FIJO', valor, vigenteDesde,
         vigenteHasta
       });
-      void anterior;
     }
   }
   if (tarifas.length > 2000) throw new Error('Se superó el máximo de tarifas.');
