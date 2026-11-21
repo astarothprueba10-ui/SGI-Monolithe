@@ -556,8 +556,20 @@ class CrmVentaServiceSeguridadTest {
         assertEquals("FRANCES",
                 respuesta.path("planFrances").path("sistema").asString());
         var sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
-        assertTrue(sql.getValue().contains("sp_crm_validar_formalizacion_v10"));
+        verify(jdbc, times(2)).queryForObject(sql.capture(), eq(String.class), any(Object[].class));
+        assertTrue(sql.getAllValues().get(0).contains("sp_crm_validar_formalizacion_v10"));
+        assertTrue(sql.getAllValues().get(1).contains("fn_inm_comercial_snapshot_v1"));
+    }
+
+    @Test
+    void validacionVentaRechazaPoliticaComercialBloqueada() {
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn("{\"elegible\":true}")
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("COMERCIAL_NO_DISPONIBLE|Lote bloqueado"));
+        var req = new FormalizarVentaCrmRequest(5L,92L,"CONTADO",new BigDecimal("30000.00"),null,null,null,null,null,null);
+        var error = assertThrows(ResponseStatusException.class,() -> service.validar(5L,req));
+        assertEquals(HttpStatus.CONFLICT,error.getStatusCode());
+        assertTrue(error.getReason().contains("política comercial"));
     }
 
     @Test
