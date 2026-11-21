@@ -60,7 +60,7 @@ ALTER TABLE public.ven_ventas ADD COLUMN politica_comercial_snapshot jsonb;
 -- Para proyectos publicados, cualquier lote omitido, protegido, bloqueado,
 -- vencido o con precio oficial distinto queda cerrado para operaciones nuevas.
 CREATE FUNCTION public.fn_inm_comercial_snapshot_v1(p_lote bigint, p_moneda integer)
-RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = ''
+RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY INVOKER SET search_path = ''
 AS $function$
 DECLARE
     v_proyecto bigint;
@@ -106,6 +106,13 @@ BEGIN
     END IF;
     -- Mismo bloqueo de lote empleado por los procedimientos de CRM.
     PERFORM 1 FROM public.inm_lotes WHERE id_lote=NEW.id_lote FOR UPDATE;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.inm_politicas_comerciales_publicadas p
+        JOIN public.inm_lotes l ON l.id_proyecto=p.id_proyecto WHERE l.id_lote=NEW.id_lote
+    ) THEN
+        NEW.politica_comercial_snapshot := NULL;
+        RETURN NEW;
+    END IF;
     IF TG_TABLE_NAME='ven_ventas' THEN
         IF NEW.id_reserva IS NOT NULL THEN
             SELECT r.politica_comercial_snapshot, true INTO v_snapshot, v_reserva_valida
