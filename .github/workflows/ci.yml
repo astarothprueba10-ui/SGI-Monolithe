@@ -2,7 +2,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, master, develop, "feature/**", "fix/**"]
+    branches: [main, master, develop, "feature/**", "fix/**", "MFA-en-portal-cliente"]
   pull_request:
     branches: [main, master]
   # El despliegue a Oracle requiere lanzamiento manual desde Actions.
