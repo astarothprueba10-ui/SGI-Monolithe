@@ -53,16 +53,18 @@ public class ConfiguracionProyectoRepository {
 
     public List<Manzana> manzanas(Long proyecto) {
         return jdbc.query("""
-            SELECT id_manzana, codigo, nombre FROM public.inm_manzanas
-            WHERE id_proyecto = ? AND activo ORDER BY codigo, id_manzana
+            SELECT m.id_manzana, m.codigo, m.nombre FROM public.inm_manzanas m
+            JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
+            WHERE m.id_proyecto = ? AND m.activo AND e.activo ORDER BY m.codigo, m.id_manzana
             """, (rs, n) -> new Manzana(rs.getLong("id_manzana"), rs.getString("codigo"),
                 rs.getString("nombre")), proyecto);
     }
 
     public List<Lote> lotes(Long proyecto) {
         return jdbc.query("""
-            SELECT id_lote, id_manzana, codigo FROM public.inm_lotes
-            WHERE id_proyecto = ? AND activo ORDER BY codigo, id_lote
+            SELECT l.id_lote, l.id_manzana, l.codigo FROM public.inm_lotes l
+            JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
+            WHERE l.id_proyecto = ? AND l.activo AND m.activo AND e.activo ORDER BY l.codigo, l.id_lote
             """, (rs, n) -> new Lote(rs.getLong("id_lote"), rs.getLong("id_manzana"),
                 rs.getString("codigo")), proyecto);
     }

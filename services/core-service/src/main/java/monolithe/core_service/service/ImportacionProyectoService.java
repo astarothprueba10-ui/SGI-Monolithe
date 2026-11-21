@@ -33,7 +33,8 @@ public class ImportacionProyectoService {
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
         var comercial = base == null ? null : new ImportacionComercialProyecto(base, validator);
-        var resultados = filas.stream().map(f -> revisar(id, f, contexto, comercial)).toList();
+        var resultados = new ArrayList<>(filas.stream().map(f -> revisar(id, f, contexto, comercial)).toList());
+        if (comercial != null) validarBorradorCompleto(comercial, contexto, resultados);
         return new ImportacionProyectoResponse(huella(id, solicitud, resultados, base == null ? -1 : base.version()), resultados, false);
     }
 
@@ -50,6 +51,22 @@ public class ImportacionProyectoService {
         registrarEstructura(id, filas, previo, contexto);
         if (base != null) guardarComercial(id, actor, filas, base, contexto);
         return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
+    }
+
+    private void validarBorradorCompleto(ImportacionComercialProyecto comercial, ImportacionProyectoContexto contexto,
+            List<Resultado> resultados) {
+        if (resultados.stream().anyMatch(r -> r.estado().equals("ERROR"))) return;
+        try {
+            comercial.validarCompleto(contexto);
+        } catch (ReglaNegocioException ex) {
+            for (int i = resultados.size() - 1; i >= 0; i--) {
+                var fila = resultados.get(i);
+                if (fila.estado().equals("BORRADOR")) {
+                    resultados.set(i, new Resultado(fila.hoja(), fila.numero(), fila.codigo(), "ERROR", ex.getMessage()));
+                    break;
+                }
+            }
+        }
     }
 
     private ConfiguracionProyectoResponse baseComercial(Long id, List<ImportacionProyectoFila> filas) {
@@ -160,7 +177,13 @@ public class ImportacionProyectoService {
                 .map(e -> e.getPropertyPath() + ": " + e.getMessage()).sorted().findFirst().orElse("Datos inválidos."));
     }
     private Resultado resultado(ImportacionProyectoFila f, String estado, String mensaje) {
-        return new Resultado(f.hoja(), f.numero(), f.texto("codigo"), estado, mensaje);
+        String codigo = switch (f.hoja()) {
+            case "AsignacionManzanas" -> f.texto("codigo_etapa_fisica") + "/" + f.texto("codigo_manzana");
+            case "AsignacionLotes" -> f.texto("codigo_lote");
+            case "Tarifas" -> f.texto("codigo_zona") + "/" + f.texto("codigo_etapa_comercial") + "/" + f.texto("moneda");
+            default -> f.texto("codigo");
+        };
+        return new Resultado(f.hoja(), f.numero(), codigo, estado, mensaje);
     }
 
     private void registrar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c) {

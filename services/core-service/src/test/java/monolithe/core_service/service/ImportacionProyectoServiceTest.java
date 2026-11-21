@@ -5,6 +5,9 @@ import jakarta.validation.ValidatorFactory;
 import monolithe.core_service.dto.ImportacionProyectoRequest;
 import monolithe.core_service.dto.ImportacionProyectoRequest.Fila;
 import monolithe.core_service.dto.ZonaResponse;
+import monolithe.core_service.dto.ConfiguracionProyectoRequest;
+import monolithe.core_service.dto.ConfiguracionProyectoResponse;
+import org.mockito.ArgumentCaptor;
 import monolithe.core_service.entity.Proyecto;
 import monolithe.core_service.exception.ConflictoNegocioException;
 import monolithe.core_service.exception.ReglaNegocioException;
@@ -97,5 +100,57 @@ class ImportacionProyectoServiceTest {
         var fila = new Fila("Lotes",2,c);
         assertEquals("ERROR",service.previsualizar(2L,solicitud(List.of(fila),null)).filas().getFirst().estado());
         assertThrows(ReglaNegocioException.class, () -> service.previsualizar(2L,new ImportacionProyectoRequest(1,"PROY-002",List.of(fila),null)));
+    }
+    private Fila comercial(String codigo, String modo, String tipo, String descuento) {
+        return new Fila("EtapasComerciales", 2, Map.of("codigo", codigo, "nombre", "Etapa comercial",
+            "disponibilidad", modo, "tipo_descuento", tipo, "descuento", descuento));
+    }
+
+    private Fila tarifa(String zona, String etapa, String desde, String hasta) {
+        return new Fila("Tarifas", 2, Map.of("codigo_zona", zona, "codigo_etapa_comercial", etapa,
+            "moneda", "PEN", "tipo_tarifa", "POR_M2", "valor", "60.1234", "vigente_desde", desde, "vigente_hasta", hasta));
+    }
+
+    private ConfiguracionProyectoResponse base(int version) {
+        return new ConfiguracionProyectoResponse(version,
+            new ConfiguracionProyectoRequest.Datos(List.of(), List.of(), List.of()),
+            List.of(), List.of(), List.of("Z-A"), List.of("PEN"));
+    }
+
+    @Test
+    void importaEstructuraComercialEnBorradorYNoPublica() {
+        when(configuracion.obtener(2L)).thenReturn(base(4));
+        when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L, "Z-A", true)));
+        when(repo.manzanas(2L)).thenReturn(List.of(new Referencia(12L, "ET-01" + (char)31 + "M-A", true)));
+        when(repo.lotes(2L)).thenReturn(List.of(new Referencia(14L, "LT-01", true)));
+        var filas = List.of(comercial("COM-01","PROMOCION","PORCENTAJE","10"),
+            new Fila("AsignacionManzanas",2,Map.of("codigo_etapa_fisica","ET-01","codigo_manzana","M-A","codigo_etapa_comercial","COM-01")),
+            new Fila("AsignacionLotes",2,Map.of("codigo_lote","LT-01","codigo_etapa_comercial","COM-01")),
+            tarifa("Z-A","COM-01","2026-11-01",""));
+        var previo = service.previsualizar(2L, solicitud(filas,null));
+        assertTrue(previo.filas().stream().allMatch(f -> f.estado().equals("BORRADOR")));
+        verify(configuracion, never()).guardar(anyLong(), anyLong(), any());
+        service.confirmar(2L, solicitud(filas,previo.huella()), 3L);
+        var captor = ArgumentCaptor.forClass(ConfiguracionProyectoRequest.class);
+        verify(configuracion).guardar(eq(2L), eq(3L), captor.capture());
+        assertEquals(4, captor.getValue().version());
+        assertEquals(12L, captor.getValue().datos().manzanas().getFirst().id());
+        assertEquals(14L, captor.getValue().datos().lotes().getFirst().id());
+        assertEquals("60.1234", captor.getValue().datos().tarifas().getFirst().valor().toPlainString());
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    @Test
+    void protegeBorradorConcurrenteYValidaTarifas() {
+        when(configuracion.obtener(2L)).thenReturn(base(4));
+        when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L, "Z-A", true)));
+        var etapa = comercial("COM-01","REGULAR","NINGUNO","0");
+        var incorrecto = service.previsualizar(2L, solicitud(List.of(etapa, tarifa("Z-A","COM-01","2026-11-10","2026-11-01")),null));
+        assertEquals("ERROR", incorrecto.filas().getLast().estado());
+        var filas = List.of(etapa, tarifa("Z-A","COM-01","2026-11-01",""));
+        var previo = service.previsualizar(2L, solicitud(filas,null));
+        when(configuracion.obtener(2L)).thenReturn(base(5));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()),3L));
+        verify(configuracion, never()).guardar(anyLong(), anyLong(), any());
     }
 }

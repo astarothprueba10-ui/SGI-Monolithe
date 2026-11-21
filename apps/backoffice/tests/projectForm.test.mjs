@@ -236,3 +236,13 @@ test('la plantilla usa claves estables para manzanas y lotes', () => {
   assert.ok(lotes.columnas.includes('codigo_manzana'));
   assert.equal(new Set(HOJAS_ESTRUCTURA.map(h => h.nombre)).size, HOJAS_ESTRUCTURA.length);
 });
+
+test('renombrar una etapa conserva las tarifas y evita quitar etapas con tarifas asociadas', () => {
+  const e = nuevaEtapa([]);
+  const tarifa = { codigoZona: 'Z-A', codigoEtapa: e.codigo, moneda: 'PEN', tipoTarifa: 'POR_M2', valor: 60, vigenteDesde: '2026-11-01', vigenteHasta: null };
+  const datos = { etapas: [e], manzanas: [], lotes: [], tarifas: [tarifa] };
+  const modificado = actualizarEtapa(datos, 0, { codigo: 'E-01' });
+  assert.equal(modificado.tarifas[0].codigoEtapa, 'E-01');
+  assert.equal(validarConfiguracion(modificado), null);
+  assert.notEqual(validarConfiguracion({ ...modificado, tarifas: [modificado.tarifas[0], modificado.tarifas[0]] }), null);
+});

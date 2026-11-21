@@ -79,6 +79,18 @@ final class ImportacionComercialProyecto {
                 .map(e -> e.getPropertyPath() + ": " + e.getMessage()).sorted().findFirst().orElse("Datos inválidos."));
     }
 
+    void validarCompleto(ImportacionProyectoContexto c) {
+        if (manzanas.size() > 2000 || lotes.size() > 10000 || tarifas.size() > 2000)
+            ImportacionProyectoFila.error("El borrador supera el máximo de asignaciones o tarifas.");
+        var bloques = c.manzanas.values().stream().filter(r -> r.activo())
+            .map(r -> new ConfiguracionProyectoResponse.Manzana(r.id(), r.codigo(), r.codigo())).toList();
+        var parcelas = c.lotes.values().stream().filter(r -> r.activo())
+            .map(r -> new ConfiguracionProyectoResponse.Lote(r.id(), null, r.codigo())).toList();
+        var zonas = c.zonas.values().stream().filter(r -> r.activo()).map(r -> r.codigo()).toList();
+        ConfiguracionProyectoValidator.validar(datos(), bloques, parcelas);
+        ConfiguracionProyectoValidator.validarTarifas(datos(), zonas, List.copyOf(monedas));
+    }
+
     Datos datos() {
         return new Datos(List.copyOf(etapas.values()), List.copyOf(manzanas.values()),
             List.copyOf(lotes.values()), List.copyOf(tarifas.values()));
