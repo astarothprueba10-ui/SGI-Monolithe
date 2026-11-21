@@ -64,6 +64,13 @@ export async function leerArchivoProyecto(file: File, codigoProyecto: string): P
   if (!/\.xlsx$/i.test(file.name) || file.size < 1 || file.size > MAX_BYTES)
     throw new Error('Selecciona un archivo XLSX de hasta 5 MB.');
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await file.arrayBuffer());
+  try {
+    await wb.xlsx.load(await file.arrayBuffer());
+  } catch {
+    throw new Error(
+      'No se pudo interpretar la estructura del XLSX. Utiliza la plantilla descargada del Backoffice ' +
+      'o abre el archivo en Excel y guárdalo como Libro de Excel (.xlsx) antes de volver a cargarlo.'
+    );
+  }
   return leerLibroProyecto(wb, codigoProyecto);
 }
