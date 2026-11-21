@@ -27,12 +27,12 @@ export function actualizarEtapa(datos: ConfiguracionComercial, index: number, ca
   if (etapa.tipoDescuento === 'NINGUNO') etapa.descuento = 0;
   const reemplazar = (filas: AsignacionComercial[]) =>
     filas.map(f => f.codigoEtapa === anterior.codigo ? { ...f, codigoEtapa: etapa.codigo } : f);
-  return { etapas: datos.etapas.map((e, i) => i === index ? etapa : e),
+  return { ...datos, tarifas: (datos.tarifas ?? []).map(t => t.codigoEtapa === anterior.codigo ? { ...t, codigoEtapa: etapa.codigo } : t), etapas: datos.etapas.map((e, i) => i === index ? etapa : e),
     manzanas: reemplazar(datos.manzanas), lotes: reemplazar(datos.lotes) };
 }
 
 export function etapaEnUso(datos: ConfiguracionComercial, codigo: string): boolean {
-  return [...datos.manzanas, ...datos.lotes].some(f => f.codigoEtapa === codigo);
+  return [...datos.manzanas, ...datos.lotes, ...(datos.tarifas ?? [])].some(f => f.codigoEtapa === codigo);
 }
 
 export function validarConfiguracion(datos: ConfiguracionComercial): string | null {
@@ -47,5 +47,17 @@ export function validarConfiguracion(datos: ConfiguracionComercial): string | nu
     if (e.tipoDescuento === 'PORCENTAJE' && e.descuento >= 100) return 'El porcentaje debe ser inferior al 100%.';
   }
   if ([...datos.manzanas, ...datos.lotes].some(f => !codigos.includes(f.codigoEtapa))) return 'Hay asignaciones con etapas inexistentes.';
+  const claves = new Set<string>();
+  for (const tarifa of datos.tarifas ?? []) {
+    const clave = [tarifa.codigoZona, tarifa.codigoEtapa, tarifa.moneda].join('|');
+    if (claves.has(clave)) return 'Solo se admite una tarifa por zona, etapa y moneda.';
+    claves.add(clave);
+    if (!tarifa.codigoZona || !codigos.includes(tarifa.codigoEtapa) || !tarifa.moneda)
+      return 'Completa las referencias de la tarifa.';
+    if (!Number.isFinite(tarifa.valor) || tarifa.valor <= 0 || tarifa.valor > 9999999999.9999)
+      return 'La tarifa debe ser mayor a cero y tener un valor válido.';
+    if (!tarifa.vigenteDesde || (tarifa.vigenteHasta && tarifa.vigenteHasta < tarifa.vigenteDesde))
+      return 'Revisa las fechas de vigencia de las tarifas.';
+  }
   return null;
 }

@@ -30,7 +30,7 @@ export function ProjectImportPreparation({ project }: { project: ProyectoRespons
       <Button icon={DownloadIcon} disabled={descargando} onClick={descargar}>
         {descargando ? 'Generando...' : 'Descargar plantilla'}</Button>
     </div>
-    <p className="text-xs text-brand-500">Importación habilitada para EtapasFisicas, Zonas, Manzanas y Lotes. Deja vacías las hojas comerciales y de tarifas hasta integrar su carga. Los registros existentes no se modifican.</p>
+    <p className="text-xs text-brand-500">Importa las ocho hojas. La estructura existente se conserva; las reglas y tarifas se incorporan o actualizan únicamente en el borrador comercial.</p>
     {puedeImportar && <div className="space-y-3">
       <label className="block text-sm font-medium text-brand-800">Seleccionar Excel para validar
         <input type="file" accept=".xlsx" disabled={model.ocupado} className="mt-2 block w-full text-sm"

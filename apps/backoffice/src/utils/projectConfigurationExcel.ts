@@ -26,7 +26,7 @@ function guia(wb: ExcelJS.Workbook, project: ProyectoResponse) {
   ws.getColumn(2).width = 115;
   ws.addRows([['MONOLITHE', 'Plantilla de estructura y configuración comercial'],
     ['version_plantilla', VERSION_PLANTILLA], ['codigo_proyecto', project.codigo],
-    ['proyecto', project.nombre], ['ESTADO', 'Carga de estructura física habilitada; hojas comerciales pendientes']]);
+    ['proyecto', project.nombre], ['ESTADO', 'Carga física y comercial en borrador habilitada']]);
   ws.getRow(1).font = { bold: true, size: 15, color: { argb: 'FF193A55' } };
   INSTRUCCIONES_PLANTILLA.forEach((texto, i) => {
     const row = ws.addRow([i + 1, texto]);

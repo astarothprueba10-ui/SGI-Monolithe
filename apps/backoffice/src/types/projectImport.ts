@@ -13,7 +13,7 @@ export interface ResultadoImportacion {
   hoja: string;
   numero: number;
   codigo: string;
-  estado: 'NUEVO' | 'EXISTENTE' | 'ERROR';
+  estado: 'NUEVO' | 'EXISTENTE' | 'ERROR' | 'BORRADOR';
   mensaje: string;
 }
 export interface RespuestaImportacion {

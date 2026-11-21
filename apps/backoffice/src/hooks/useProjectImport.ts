@@ -26,12 +26,12 @@ export function useProjectImport(project: ProyectoResponse) {
 
   async function confirmar() {
     if (!solicitud || !resultado || resultado.confirmado || !aceptado || ocupado
-      || resultado.filas.some(f => f.estado === 'ERROR') || !resultado.filas.some(f => f.estado === 'NUEVO')) return;
+      || resultado.filas.some(f => f.estado === 'ERROR') || !resultado.filas.some(f => f.estado === 'NUEVO' || f.estado === 'BORRADOR')) return;
     setOcupado(true); setError('');
     try {
       const respuesta = await projectImportService.confirmar(project.idProyecto, solicitud, resultado.huella);
       setResultado(respuesta);
-      toast.success('Estructura registrada correctamente.');
+      toast.success('Importación registrada correctamente.');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo registrar. Valida el archivo nuevamente.');
       setResultado(null);

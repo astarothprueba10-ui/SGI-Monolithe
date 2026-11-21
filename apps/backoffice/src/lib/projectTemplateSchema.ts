@@ -22,5 +22,5 @@ export const INSTRUCCIONES_PLANTILLA = [
   'Las etapas físicas y comerciales son independientes. Una excepción de lote prevalece sobre la asignación de manzana.',
   'Los descuentos solo se aplican a etapas con disponibilidad PROMOCION. Los porcentajes deben ser menores que 100.',
   'MONTO_FIJO en descuentos se expresa en PEN. POR_M2 y MONTO_FIJO son los modos de tarifa.',
-  'La importación de estructura física está habilitada. Deja vacías EtapasComerciales, AsignacionManzanas, AsignacionLotes y Tarifas hasta incorporar sus validaciones.'
+  'Las ocho hojas pueden importarse. Las reglas y tarifas solo se guardan en el borrador; una fila de tarifa actualiza la combinación zona, etapa y moneda del borrador. Vigente_desde es obligatoria; vigente_hasta es opcional.'
 ] as const;

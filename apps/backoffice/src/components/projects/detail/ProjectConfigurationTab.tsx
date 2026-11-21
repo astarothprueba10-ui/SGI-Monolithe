@@ -5,6 +5,7 @@ import { useProjectConfiguration } from '../../../hooks/useProjectConfiguration'
 import { CommercialStageEditor } from './CommercialStageEditor';
 import { CommercialAssignmentEditor } from './CommercialAssignmentEditor';
 import { ProjectImportPreparation } from './ProjectImportPreparation';
+import { CommercialTariffEditor } from './CommercialTariffEditor';
 import type { ProyectoResponse } from '../../../types/core';
 
 export function ProjectConfigurationTab({ project }: { project: ProyectoResponse }) {
@@ -31,9 +32,10 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
     <fieldset disabled={guardando || !project.activo} className="space-y-6">
       <CommercialStageEditor datos={datos} onChange={model.setDatos}/>
       <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
+      <CommercialTariffEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
     </fieldset>
     <div className="rounded-lg border border-brand-100 p-3 text-sm text-brand-500">
-      Carga de reglas comerciales desde Excel, tarifas promocionales, publicación y validación de operaciones: pendientes de integración.
+      Publicación de reglas, cálculo de precios y validación de operaciones: pendientes de integración.
     </div>
   </Card>;
 }
