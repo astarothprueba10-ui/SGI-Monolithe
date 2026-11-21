@@ -7,9 +7,6 @@ import { validateProjectDescription } from './projectDescriptionValidation';
 function validateIdentity(form: ProjectFormValues): ProjectFormErrors {
   const errors: ProjectFormErrors = {};
   if (!form.codigoEstadoProyecto.trim()) errors.codigoEstadoProyecto = 'El estado es obligatorio.';
-  if (!form.codigo.trim()) errors.codigo = 'El código del proyecto es obligatorio.';
-  else if (form.codigo.trim().length < 5 || form.codigo.trim().length > 12)
-    errors.codigo = 'El código debe tener entre 5 y 12 caracteres.';
   if (!form.nombre.trim()) errors.nombre = 'El nombre es obligatorio.';
   else if (form.nombre.trim().length > 150) errors.nombre = 'El nombre no puede superar los 150 caracteres.';
   return errors;

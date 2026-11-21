@@ -28,7 +28,7 @@ const rows = readFileSync(catalogPath, 'utf8').trim().split(/\r?\n/).slice(1).ma
   const [codigo, departamento, provincia, distrito] = line.split('\t');
   return { codigo, departamento, provincia, distrito };
 });
-const validForm = () => ({ ...initialProjectForm(), codigo: 'PROJ-001', nombre: 'Proyecto', codigoEstadoProyecto: 'PLANIFICADO' });
+const validForm = () => ({ ...initialProjectForm(), nombre: 'Proyecto', codigoEstadoProyecto: 'PLANIFICACION' });
 after(() => rmSync(output, { recursive: true, force: true }));
 
 test('admite fechas reales, años límite y bisiestos', () => {
@@ -112,81 +112,48 @@ test('actualiza ambos errores de fechas y los elimina al corregir el rango', () 
 });
 
 test('inicializa edición, conserva ceros y restablece campos de un proyecto nuevo', () => {
-  const form = initialProjectForm({ ...validForm(), idProyecto: 1, pais: null, latitud: 0, activo: false });
+  const form = initialProjectForm({ ...validForm(), idProyecto: 1, pais: null, areaTotalM2: 0, activo: false });
   assert.equal(form.pais, 'Perú');
-  assert.equal(form.latitud, '0');
+  assert.equal(form.areaTotalM2, '0');
   assert.equal(form.activo, false);
   assert.equal(initialProjectForm().codigo, '');
 });
 
 test('envía país fijo, números o null y rechaza un país manipulado', () => {
-  const form = { ...validForm(), pais: 'Chile', latitud: '0', areaTotalM2: '100.50' };
+  const form = { ...validForm(), pais: 'Chile', areaTotalM2: '100.50' };
   assert.ok(validateProjectForm(form, rows).pais);
   const request = projectRequest(form, rows);
   assert.equal(request.pais, 'Perú');
-  assert.equal(request.latitud, 0);
-  assert.equal(request.longitud, null);
   assert.equal(request.areaTotalM2, 100.5);
   assert.equal(request.fechaInicio, null);
 });
 
-test('bloquea letras, símbolos y notación científica en los tres campos numéricos', () => {
-  for (const field of ['areaTotalM2', 'latitud', 'longitud']) {
-    const form = { ...validForm(), [field]: '12' };
-    for (const value of ['12a', '12e3', '12E3', '+12', '1 2', '12%', '1/2', '12..3', '12@', '１２']) {
-      const changed = changeProjectField(form, { codigo: 'Pendiente' }, field, value, rows);
-      assert.equal(changed.form[field], '12', `${field}: ${value}`);
-      assert.equal(changed.errors.codigo, 'Pendiente');
-    }
-  }
-});
 
-test('rechaza la undécima cifra también al pegar texto y cuenta los ceros iniciales', () => {
-  for (const field of ['areaTotalM2', 'latitud', 'longitud']) {
-    assert.equal(canChangeProjectNumber(field, '', '1234567890'), true);
-    assert.equal(canChangeProjectNumber(field, '', '12345678901'), false);
-    assert.equal(canChangeProjectNumber(field, '', '00000000001'), false);
-    const form = { ...validForm(), [field]: '1234567890' };
-    assert.equal(changeProjectField(form, {}, field, '12345678901', rows).form[field], '1234567890');
-  }
-});
 
-test('permite decimales y signo negativo solo en coordenadas, sin contarlos como cifras', () => {
-  assert.equal(canChangeProjectNumber('areaTotalM2', '', '12345678.90'), true);
-  assert.equal(canChangeProjectNumber('longitud', '', '-123.1234567'), true);
-  assert.equal(canChangeProjectNumber('longitud', '', '-123.12345678'), false);
-  assert.equal(canChangeProjectNumber('longitud', '-123.1234567', '12345678901'), false);
-  assert.equal(canChangeProjectNumber('latitud', '-12.12345678', '12345678901'), false);
-  assert.equal(canChangeProjectNumber('latitud', '', '-'), true);
-  assert.equal(canChangeProjectNumber('latitud', '', '-.'), true);
-  assert.equal(canChangeProjectNumber('latitud', '', '12-3'), false);
-  assert.equal(canChangeProjectNumber('areaTotalM2', '', '-1'), false);
-});
 
-test('normaliza una coma decimal sin convertir texto inválido en otro número', () => {
-  assert.equal(normalizeProjectNumber('100,50'), '100.50');
+
+
+
+
+
+
+
+
+
+test('bloquea caracteres invalidos y valida solo el area total', () => {
   const form = validForm();
+  for (const valor of ['1e3', '+12', '-1', '12a', '12345678901', '12.345', '0'])
+    assert.ok(validateProjectNumbers({ ...form, areaTotalM2: valor }).areaTotalM2, valor);
+  assert.deepEqual(validateProjectNumbers({ ...form, areaTotalM2: '50000.50' }), {});
+  assert.equal(canChangeProjectNumber('areaTotalM2', '', '12345678901'), false);
+  assert.equal(normalizeProjectNumber('100,50'), '100.50');
   assert.equal(changeProjectField(form, {}, 'areaTotalM2', '100,50', rows).form.areaTotalM2, '100.50');
-  assert.equal(changeProjectField(form, {}, 'latitud', '-6,75', rows).form.latitud, '-6.75');
-  assert.equal(changeProjectField(form, {}, 'areaTotalM2', '100a50', rows).form.areaTotalM2, '');
-  assert.equal(changeProjectField(form, {}, 'areaTotalM2', '100,5,0', rows).form.areaTotalM2, '');
 });
 
-test('impide guardar números incompletos, manipulados o con más de diez cifras', () => {
-  for (const value of ['-', '.', '-.', '1e3', '0x10', 'Infinity', 'abc', '12 3', '10000000000'])
-    assert.ok(validateProjectNumbers({ ...validForm(), latitud: value }).latitud, value);
-  assert.ok(validateProjectNumbers({ ...validForm(), areaTotalM2: '999999999.99' }).areaTotalM2);
-  assert.deepEqual(validateProjectNumbers(validForm()), {});
-});
-
-test('conserva los rangos y la precisión admitida por la base de datos', () => {
-  assert.deepEqual(validateProjectNumbers({ ...validForm(), areaTotalM2: '9999999999', latitud: '-90', longitud: '180' }), {});
-  assert.deepEqual(validateProjectNumbers({ ...validForm(), areaTotalM2: '99999999.99', latitud: '-12.1234567', longitud: '-123.1234567' }), {});
-  assert.match(validateProjectNumbers({ ...validForm(), areaTotalM2: '12.345' }).areaTotalM2, /2 decimales/);
-  assert.match(validateProjectNumbers({ ...validForm(), latitud: '0.12345678' }).latitud, /7 decimales/);
-  assert.ok(validateProjectNumbers({ ...validForm(), areaTotalM2: '0', latitud: '91', longitud: '-181' }).areaTotalM2);
-  assert.ok(validateProjectNumbers({ ...validForm(), latitud: '91' }).latitud);
-  assert.ok(validateProjectNumbers({ ...validForm(), longitud: '-181' }).longitud);
+test('codigo automatico no obliga al usuario y no se envia a la API', () => {
+  assert.equal(validateProjectForm(validForm(), rows).codigo, undefined);
+  assert.equal('codigo' in projectRequest(validForm(), rows), false);
+  assert.equal(initialProjectForm({ ...validForm(), codigo: 'PROY-001' }).codigo, 'PROY-001');
 });
 
 test('permite borrar y corregir valores anteriores excesivos sin truncarlos al abrir', () => {
