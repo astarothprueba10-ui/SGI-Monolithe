@@ -71,6 +71,17 @@ BEGIN
     SELECT max(version) INTO v_version FROM public.inm_politicas_comerciales_publicadas
         WHERE id_proyecto=v_proyecto;
     IF v_version IS NULL THEN RETURN NULL; END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM public.inm_lotes l
+        JOIN public.inm_manzanas mz ON mz.id_manzana=l.id_manzana
+        JOIN public.inm_etapas ef ON ef.id_etapa=mz.id_etapa
+        JOIN public.inm_proyectos pr ON pr.id_proyecto=l.id_proyecto
+        JOIN public.cfg_estados_lote el ON el.id_estado_lote=l.id_estado_lote
+        WHERE l.id_lote=p_lote AND l.activo AND mz.activo AND ef.activo AND pr.activo
+          AND el.activo AND el.codigo='DISPONIBLE'
+    ) THEN
+        RAISE EXCEPTION 'COMERCIAL_NO_DISPONIBLE|El inventario no esta disponible para una operacion nueva.';
+    END IF;
     SELECT * INTO v_regla FROM public.inm_politicas_comerciales_lotes
         WHERE id_proyecto=v_proyecto AND version=v_version AND id_lote=p_lote;
     IF NOT FOUND OR v_regla.situacion <> 'HABILITADA'
@@ -101,6 +112,19 @@ BEGIN
     IF TG_OP='UPDATE' THEN
         IF NEW.politica_comercial_snapshot IS DISTINCT FROM OLD.politica_comercial_snapshot THEN
             RAISE EXCEPTION 'COMERCIAL_INMUTABLE|La politica comercial de la operacion no admite cambios.';
+        END IF;
+        IF OLD.politica_comercial_snapshot IS NOT NULL THEN
+            IF NEW.id_lote IS DISTINCT FROM OLD.id_lote OR NEW.id_moneda IS DISTINCT FROM OLD.id_moneda THEN
+                RAISE EXCEPTION 'COMERCIAL_INMUTABLE|No se puede cambiar el lote o moneda de la operacion.';
+            END IF;
+            IF TG_TABLE_NAME='ven_ventas' THEN
+                IF NEW.precio_venta IS DISTINCT FROM OLD.precio_venta
+                   OR NEW.precio_lista IS DISTINCT FROM OLD.precio_lista
+                   OR NEW.descuento IS DISTINCT FROM OLD.descuento
+                   OR NEW.id_reserva IS DISTINCT FROM OLD.id_reserva THEN
+                    RAISE EXCEPTION 'COMERCIAL_INMUTABLE|No se puede modificar el precio pactado.';
+                END IF;
+            END IF;
         END IF;
         RETURN NEW;
     END IF;
@@ -147,9 +171,9 @@ REVOKE ALL ON FUNCTION public.fn_inm_comercial_snapshot_v1(bigint, integer),
 GRANT EXECUTE ON FUNCTION public.fn_inm_comercial_snapshot_v1(bigint, integer)
     TO sgi_backend_user, sigi_app_user;
 
-CREATE TRIGGER trg_inm_comercial_reserva BEFORE INSERT OR UPDATE OF politica_comercial_snapshot
+CREATE TRIGGER trg_inm_comercial_reserva BEFORE INSERT OR UPDATE OF politica_comercial_snapshot,id_lote,id_moneda
     ON public.ven_reservas FOR EACH ROW EXECUTE FUNCTION public.fn_inm_congelar_politica_comercial_v1();
-CREATE TRIGGER trg_inm_comercial_venta BEFORE INSERT OR UPDATE OF politica_comercial_snapshot
+CREATE TRIGGER trg_inm_comercial_venta BEFORE INSERT OR UPDATE OF politica_comercial_snapshot,id_lote,id_moneda,id_reserva,precio_venta,precio_lista,descuento
     ON public.ven_ventas FOR EACH ROW EXECUTE FUNCTION public.fn_inm_congelar_politica_comercial_v1();
 
 COMMIT;

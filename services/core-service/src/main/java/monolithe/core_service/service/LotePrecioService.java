@@ -193,6 +193,7 @@ public class LotePrecioService {
     }
 
     private void validarEdicionComercial(Lote lote) {
+        lotePrecioRepository.bloquearLoteParaPrecio(lote.getIdLote());
         if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto()))
             throw new ReglaNegocioException("El precio se administra desde la política comercial del proyecto.");
     }

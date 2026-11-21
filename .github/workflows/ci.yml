@@ -351,6 +351,38 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/portal_documentos_alertas_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/portal_integracion_end_to_end_546_pg_test.sql
 
+  commercial-postgres-validation:
+    name: Politicas comerciales - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: comercial_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: comercial_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comercial_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: comercial_ci_password
+      PGDATABASE: comercial_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar publicacion y proteccion de operaciones
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/publicacion_comercial_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/122_proyectos_configuracion_comercial_borradores_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/123_proyectos_publicacion_comercial_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/publicacion_comercial_v1_pg_test.sql
+
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: [frontend-validation, backend-validation, database-validation]

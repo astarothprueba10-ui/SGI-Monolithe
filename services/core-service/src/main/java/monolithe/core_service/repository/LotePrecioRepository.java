@@ -11,6 +11,9 @@ import java.util.Optional;
 
 public interface LotePrecioRepository extends JpaRepository<LotePrecio, Long> {
 
+    @Query(value="SELECT id_lote FROM public.inm_lotes WHERE id_lote=:lote FOR UPDATE", nativeQuery=true)
+    Long bloquearLoteParaPrecio(@Param("lote") Long lote);
+
     @Query(value="SELECT EXISTS(SELECT 1 FROM public.inm_politicas_comerciales_publicadas WHERE id_proyecto=:proyecto)", nativeQuery=true)
     boolean proyectoConPolitica(@Param("proyecto") Long proyecto);
 
