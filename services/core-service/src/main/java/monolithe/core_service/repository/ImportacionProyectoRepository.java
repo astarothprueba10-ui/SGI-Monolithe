@@ -27,6 +27,14 @@ public class ImportacionProyectoRepository {
             WHERE m.id_proyecto = ?
             """, (r,n) -> new Referencia(r.getLong(1), r.getString(2), r.getBoolean(3)), proyecto);
     }
+    public List<Referencia> lotes(Long proyecto) {
+        return jdbc.query("""
+            SELECT l.id_lote,l.codigo,l.activo AND m.activo AND e.activo FROM public.inm_lotes l
+            JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana
+            JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
+            WHERE l.id_proyecto=?
+            """, (r,n) -> new Referencia(r.getLong(1),r.getString(2),r.getBoolean(3)), proyecto);
+    }
     public List<LoteExistente> lote(String codigo) {
         return jdbc.query("""
             SELECT id_lote,id_proyecto,id_manzana,numero,activo FROM public.inm_lotes WHERE codigo=?

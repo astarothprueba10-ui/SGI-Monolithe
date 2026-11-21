@@ -43,6 +43,14 @@ public class ConfiguracionProyectoRepository {
                 Disponibilidad.BLOQUEADA, TipoDescuento.NINGUNO, BigDecimal.ZERO), proyecto);
     }
 
+    public List<String> zonas(Long proyecto) {
+        return jdbc.queryForList("SELECT codigo FROM public.inm_zonas WHERE id_proyecto=? AND activo ORDER BY codigo", String.class, proyecto);
+    }
+
+    public List<String> monedas() {
+        return jdbc.queryForList("SELECT codigo FROM public.cfg_monedas WHERE activo ORDER BY codigo", String.class);
+    }
+
     public List<Manzana> manzanas(Long proyecto) {
         return jdbc.query("""
             SELECT id_manzana, codigo, nombre FROM public.inm_manzanas

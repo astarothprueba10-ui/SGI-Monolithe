@@ -8,6 +8,8 @@ final class ImportacionProyectoContexto {
     final Map<String, Referencia> etapas = new HashMap<>();
     final Map<String, Referencia> zonas = new HashMap<>();
     final Map<String, Referencia> manzanas = new HashMap<>();
+    final Map<String, Referencia> lotes = new HashMap<>();
+    private long temporal = -1L;
     final Set<String> estadosEtapa;
     final Set<String> estadosManzana;
     final Set<String> tiposLote;
@@ -17,6 +19,7 @@ final class ImportacionProyectoContexto {
         repo.etapas(proyecto).forEach(r -> etapas.put(r.codigo(), r));
         repo.zonas(proyecto).forEach(r -> zonas.put(r.codigo(), r));
         repo.manzanas(proyecto).forEach(r -> manzanas.put(r.codigo(), r));
+        repo.lotes(proyecto).forEach(r -> lotes.put(r.codigo(), r));
         estadosEtapa = new HashSet<>(repo.estadosEtapa());
         estadosManzana = new HashSet<>(repo.estadosManzana());
         tiposLote = new HashSet<>(repo.tiposLote());
@@ -30,7 +33,7 @@ final class ImportacionProyectoContexto {
         return ref;
     }
     void nueva(Map<String, Referencia> mapa, String clave) {
-        mapa.put(clave, new Referencia(0L, clave, true));
+        mapa.put(clave, new Referencia(temporal--, clave, true));
     }
     void catalogo(Set<String> catalogo, String codigo) {
         if (!catalogo.contains(codigo)) ImportacionProyectoFila.error("Código de catálogo inválido o inactivo: " + codigo);

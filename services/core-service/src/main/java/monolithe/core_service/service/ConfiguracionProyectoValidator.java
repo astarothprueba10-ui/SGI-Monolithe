@@ -18,7 +18,7 @@ public final class ConfiguracionProyectoValidator {
         validarAsignaciones(datos.lotes(), etapas, lotes.stream().map(Lote::id).collect(Collectors.toSet()));
     }
 
-    private static Set<String> validarEtapas(List<Etapa> etapas) {
+    public static Set<String> validarEtapas(List<Etapa> etapas) {
         Set<String> codigos = new HashSet<>();
         for (Etapa etapa : etapas) {
             if (!codigos.add(etapa.codigo())) error("Código de etapa comercial duplicado.");
@@ -27,7 +27,7 @@ public final class ConfiguracionProyectoValidator {
         return codigos;
     }
 
-    private static void validarDescuento(Etapa etapa) {
+    public static void validarDescuento(Etapa etapa) {
         boolean promocion = etapa.disponibilidad() == Disponibilidad.PROMOCION;
         boolean tieneDescuento = etapa.tipoDescuento() != TipoDescuento.NINGUNO;
         if (promocion && !tieneDescuento || !promocion && tieneDescuento || tieneDescuento && etapa.descuento().signum() <= 0
@@ -46,6 +46,22 @@ public final class ConfiguracionProyectoValidator {
             if (!ids.contains(fila.id())) error("La asignación contiene un registro inactivo o de otro proyecto.");
             if (!etapas.contains(fila.codigoEtapa())) error("La etapa comercial asignada no existe.");
             if (!asignados.add(fila.id())) error("Un registro no puede tener dos asignaciones comerciales.");
+        }
+    }
+
+    public static String claveTarifa(Tarifa t) {
+        return t.codigoZona() + "\u001f" + t.codigoEtapa() + "\u001f" + t.moneda();
+    }
+
+    public static void validarTarifas(Datos datos, List<String> zonas, List<String> monedas) {
+        Set<String> etapas = datos.etapas().stream().map(Etapa::codigo).collect(Collectors.toSet());
+        Set<String> claves = new HashSet<>();
+        for (Tarifa tarifa : datos.tarifas()) {
+            if (!zonas.contains(tarifa.codigoZona()) || !monedas.contains(tarifa.moneda()) || !etapas.contains(tarifa.codigoEtapa()))
+                error("La tarifa tiene una zona, moneda o etapa inválida.");
+            if (tarifa.vigenteHasta() != null && tarifa.vigenteHasta().isBefore(tarifa.vigenteDesde()))
+                error("La vigencia final de la tarifa precede al inicio.");
+            if (!claves.add(claveTarifa(tarifa))) error("Solo se admite una tarifa por zona, etapa y moneda en el borrador.");
         }
     }
 

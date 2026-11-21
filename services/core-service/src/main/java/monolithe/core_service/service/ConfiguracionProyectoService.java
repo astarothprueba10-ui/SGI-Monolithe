@@ -30,7 +30,7 @@ public class ConfiguracionProyectoService {
         var datos = version.map(v -> leer(v.json()))
                 .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
         return new ConfiguracionProyectoResponse(version.map(v -> v.numero()).orElse(0), datos,
-                repository.manzanas(proyecto), repository.lotes(proyecto));
+                repository.manzanas(proyecto), repository.lotes(proyecto), repository.zonas(proyecto), repository.monedas());
     }
 
     @Transactional
@@ -41,9 +41,10 @@ public class ConfiguracionProyectoService {
         var actual = obtener(proyecto);
         if (solicitud.version() != actual.version()) conflicto();
         ConfiguracionProyectoValidator.validar(solicitud.datos(), actual.manzanas(), actual.lotes());
+        ConfiguracionProyectoValidator.validarTarifas(solicitud.datos(), actual.zonas(), actual.monedas());
         int siguiente = actual.version() + 1;
         if (!repository.insertar(proyecto, siguiente, escribir(solicitud.datos()), actor)) conflicto();
-        return new ConfiguracionProyectoResponse(siguiente, solicitud.datos(), actual.manzanas(), actual.lotes());
+        return new ConfiguracionProyectoResponse(siguiente, solicitud.datos(), actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
     }
 
     private Proyecto obtenerProyecto(Long id) {

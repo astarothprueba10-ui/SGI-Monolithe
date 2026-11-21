@@ -15,7 +15,11 @@ final class ImportacionProyectoFila {
         "Zonas", Set.of("codigo","nombre","orden","descripcion"),
         "Manzanas", Set.of("codigo_etapa_fisica","codigo","nombre","codigo_estado","orden","descripcion"),
         "Lotes", Set.of("codigo_etapa_fisica","codigo_manzana","codigo","numero","codigo_zona","codigo_tipo_lote",
-            "area_m2","frente_m","fondo_m","lateral_derecho_m","lateral_izquierdo_m","observaciones"));
+            "area_m2","frente_m","fondo_m","lateral_derecho_m","lateral_izquierdo_m","observaciones"),
+        "EtapasComerciales", Set.of("codigo","nombre","disponibilidad","tipo_descuento","descuento"),
+        "AsignacionManzanas", Set.of("codigo_etapa_fisica","codigo_manzana","codigo_etapa_comercial"),
+        "AsignacionLotes", Set.of("codigo_lote","codigo_etapa_comercial"),
+        "Tarifas", Set.of("codigo_zona","codigo_etapa_comercial","moneda","tipo_tarifa","valor","vigente_desde","vigente_hasta"));
     private final Fila fila;
     ImportacionProyectoFila(Fila fila) { this.fila = fila; }
 
@@ -32,12 +36,12 @@ final class ImportacionProyectoFila {
     String claveNumero() { return claveManzana() + "\u001f" + codigo("numero"); }
 
     void validarColumnas() {
-        if (!COLUMNAS.containsKey(hoja())) error("Esta hoja comercial aún no admite importación. Configúrala en el panel.");
+        if (!COLUMNAS.containsKey(hoja())) error("Hoja no admitida.");
         if (!COLUMNAS.get(hoja()).equals(fila.celdas().keySet())) error("Encabezados incompatibles con la plantilla v1.");
     }
     private Integer orden() { return texto("orden").isEmpty() ? 1 : Integer.valueOf(texto("orden")); }
-    private LocalDate fecha(String k) { return texto(k).isEmpty() ? null : LocalDate.parse(texto(k)); }
-    private BigDecimal decimal(String k) {
+    LocalDate fecha(String k) { return texto(k).isEmpty() ? null : LocalDate.parse(texto(k)); }
+    BigDecimal decimal(String k) {
         String valor = texto(k);
         if (valor.isEmpty()) return null;
         if (!valor.matches("[0-9]{1,12}(\\.[0-9]{1,2})?")) error("Número decimal inválido en " + k);
@@ -61,6 +65,18 @@ final class ImportacionProyectoFila {
         return new LoteRequest(manzana, zona, codigo("codigo_tipo_lote"), "NO_DISPONIBLE",
                 codigo("codigo"), codigo("numero"), decimal("area_m2"), decimal("frente_m"),
                 decimal("fondo_m"), decimal("lateral_derecho_m"), decimal("lateral_izquierdo_m"), opcional("observaciones"), true);
+    }
+    ConfiguracionProyectoRequest.Etapa comercial() {
+        return new ConfiguracionProyectoRequest.Etapa(codigo("codigo"), texto("nombre"),
+            ConfiguracionProyectoRequest.Disponibilidad.valueOf(codigo("disponibilidad")),
+            ConfiguracionProyectoRequest.TipoDescuento.valueOf(codigo("tipo_descuento")), decimal("descuento"));
+    }
+    ConfiguracionProyectoRequest.Tarifa tarifa() {
+        String valor = texto("valor");
+        if (!valor.matches("[0-9]{1,10}(\\.[0-9]{1,4})?")) error("Valor de tarifa inválido.");
+        return new ConfiguracionProyectoRequest.Tarifa(codigo("codigo_zona"), codigo("codigo_etapa_comercial"),
+            codigo("moneda"), ConfiguracionProyectoRequest.TipoTarifa.valueOf(codigo("tipo_tarifa")),
+            new BigDecimal(valor), fecha("vigente_desde"), fecha("vigente_hasta"));
     }
     static void error(String mensaje) { throw new ReglaNegocioException(mensaje); }
 }
