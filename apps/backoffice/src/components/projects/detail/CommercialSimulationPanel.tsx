@@ -42,10 +42,10 @@ export function CommercialSimulationPanel({ project, config, dirty }: Props) {
     l.codigo.toLowerCase().includes(busqueda.trim().toLowerCase())), [config.lotes, busqueda]);
 
   useEffect(() => {
-    if (!config.lotes.some(l => String(l.id) === id)) {
-      setId(config.lotes[0] ? String(config.lotes[0].id) : '');
+    if (!filtrados.some(l => String(l.id) === id)) {
+      setId(filtrados[0] ? String(filtrados[0].id) : '');
     }
-  }, [id, config.lotes]);
+  }, [id, filtrados]);
 
   useEffect(() => {
     if (!id || !moneda || dirty || config.version === 0) {
