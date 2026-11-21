@@ -202,6 +202,34 @@ jobs:
           ls -la database/migrations/*.sql
           echo "All migrations found and valid."
 
+  mfa-email-postgres-validation:
+    name: MFA correo - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: mfa_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: mfa_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mfa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: mfa_ci_password
+      PGDATABASE: mfa_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar migración 119 y validar SQL real de correo MFA
+        run: python3 database/tests/test_mfa_correo_119.py
+
   financing-postgres-validation:
     name: French Financing V3 - PostgreSQL 17
     runs-on: ubuntu-latest
