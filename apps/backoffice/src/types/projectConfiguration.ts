@@ -39,3 +39,21 @@ export interface ConfiguracionProyectoResponse {
   manzanas: { id: number; codigo: string; nombre: string }[];
   lotes: { id: number; idManzana: number; codigo: string }[];
 }
+
+export interface SimulacionComercialResponse {
+  version: number;
+  idLote: number;
+  codigoLote: string;
+  estadoInventario: string;
+  codigoZona: string | null;
+  codigoEtapa: string | null;
+  disponibilidad: DisponibilidadComercial | null;
+  moneda: string;
+  fecha: string;
+  resultado: string;
+  mensaje: string;
+  precioBase: number | null;
+  ajusteTipo: number | null;
+  descuento: number | null;
+  precioSimulado: number | null;
+}

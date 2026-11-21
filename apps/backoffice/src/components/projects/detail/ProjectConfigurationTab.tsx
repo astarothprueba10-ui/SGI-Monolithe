@@ -6,6 +6,7 @@ import { CommercialStageEditor } from './CommercialStageEditor';
 import { CommercialAssignmentEditor } from './CommercialAssignmentEditor';
 import { ProjectImportPreparation } from './ProjectImportPreparation';
 import { CommercialTariffEditor } from './CommercialTariffEditor';
+import { CommercialSimulationPanel } from './CommercialSimulationPanel';
 import type { ProyectoResponse } from '../../../types/core';
 
 export function ProjectConfigurationTab({ project }: { project: ProyectoResponse }) {
@@ -34,8 +35,9 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
       <CommercialTariffEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
     </fieldset>
+    <CommercialSimulationPanel key={respuesta.version} project={project} config={respuesta} dirty={JSON.stringify(datos) !== JSON.stringify(respuesta.datos)} />
     <div className="rounded-lg border border-brand-100 p-3 text-sm text-brand-500">
-      Publicación de reglas, cálculo de precios y validación de operaciones: pendientes de integración.
+      Publicación de reglas y aplicación de precios y restricciones en operaciones reales: pendientes de integración.
     </div>
   </Card>;
 }
