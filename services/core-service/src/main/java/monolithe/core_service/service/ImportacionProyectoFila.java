@@ -23,7 +23,11 @@ final class ImportacionProyectoFila {
     int numero() { return fila.numero(); }
     String texto(String k) { return fila.celdas().getOrDefault(k, "").strip(); }
     String opcional(String k) { return texto(k).isEmpty() ? null : texto(k); }
-    String codigo(String k) { return texto(k).toUpperCase(Locale.ROOT); }
+    String codigo(String k) {
+        String valor = texto(k).toUpperCase(Locale.ROOT);
+        if (valor.codePoints().anyMatch(Character::isISOControl)) error("El código contiene caracteres de control.");
+        return valor;
+    }
     String claveManzana() { return codigo("codigo_etapa_fisica") + "\u001f" + codigo(hoja().equals("Manzanas") ? "codigo" : "codigo_manzana"); }
     String claveNumero() { return claveManzana() + "\u001f" + codigo("numero"); }
 
@@ -33,7 +37,12 @@ final class ImportacionProyectoFila {
     }
     private Integer orden() { return texto("orden").isEmpty() ? 1 : Integer.valueOf(texto("orden")); }
     private LocalDate fecha(String k) { return texto(k).isEmpty() ? null : LocalDate.parse(texto(k)); }
-    private BigDecimal decimal(String k) { return texto(k).isEmpty() ? null : new BigDecimal(texto(k)); }
+    private BigDecimal decimal(String k) {
+        String valor = texto(k);
+        if (valor.isEmpty()) return null;
+        if (!valor.matches("[0-9]{1,12}(\\.[0-9]{1,2})?")) error("Número decimal inválido en " + k);
+        return new BigDecimal(valor);
+    }
 
     EtapaRequest etapa(Long proyecto) {
         var inicio = fecha("fecha_inicio"); var fin = fecha("fecha_fin_estimada");

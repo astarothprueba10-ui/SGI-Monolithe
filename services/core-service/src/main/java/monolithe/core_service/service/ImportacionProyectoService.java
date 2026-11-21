@@ -127,7 +127,7 @@ public class ImportacionProyectoService {
                 .map(e -> e.getPropertyPath() + ": " + e.getMessage()).sorted().findFirst().orElse("Datos inválidos."));
     }
     private Resultado resultado(ImportacionProyectoFila f, String estado, String mensaje) {
-        return new Resultado(f.hoja(), f.numero(), f.codigo("codigo"), estado, mensaje);
+        return new Resultado(f.hoja(), f.numero(), f.texto("codigo"), estado, mensaje);
     }
 
     private void registrar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c) {
