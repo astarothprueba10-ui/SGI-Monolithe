@@ -20,15 +20,17 @@ import { ProjectStagesTab } from '../components/projects/detail/ProjectStagesTab
 import { ProjectZonesTab } from '../components/projects/detail/ProjectZonesTab';
 import { ProjectBlocksTab } from '../components/projects/detail/ProjectBlocksTab';
 import { ProjectLotsTab } from '../components/projects/detail/ProjectLotsTab';
+import { ProjectConfigurationTab } from '../components/projects/detail/ProjectConfigurationTab';
 import { number } from '../utils/format';
 import type { ProyectoResponse } from '../types/core';
 import { useNavigationDetail } from '../hooks/useNavigationTrail';
 
 export function ProjectDetail() {
   const { idProyecto } = useParams<{ idProyecto: string }>();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const canEdit = can('projects.edit');
   const canViewLots = can('lots.view');
+  const canConfigure = canEdit && can('projects.view') && user.roles.includes('Gerencia');
 
   const [project, setProject] = useState<ProyectoResponse | null>(null);
   useNavigationDetail(project?.idProyecto === Number(idProyecto) ? project.nombre : 'Proyecto');
@@ -75,8 +77,9 @@ export function ProjectDetail() {
     if (canViewLots) {
       items.push({ id: 'lotes', label: 'Lotes' });
     }
+    if (canConfigure) items.push({ id: 'configuracion', label: 'Configuración del proyecto' });
     return items;
-  }, [canViewLots]);
+  }, [canViewLots, canConfigure]);
 
   if (loading) {
     return (
@@ -193,6 +196,7 @@ export function ProjectDetail() {
         {activeTab === 'zonas' && <ProjectZonesTab project={project} />}
         {activeTab === 'manzanas' && <ProjectBlocksTab project={project} />}
         {activeTab === 'lotes' && canViewLots && <ProjectLotsTab project={project} />}
+        {activeTab === 'configuracion' && canConfigure && <ProjectConfigurationTab key={project.idProyecto} project={project} />}
       </div>
     </div>
   );
