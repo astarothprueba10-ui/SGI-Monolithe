@@ -35,7 +35,7 @@ public class MfaInvitationService {
         // Solo un correo inicialmente no verificado requiere registrar prueba de posesión.
         Long contactoPrueba = contacto.verificado() ? null : contacto.id();
         byte[] correoPruebaHash = contacto.verificado() ? null
-            : MfaCrypto.digest(destinatario.toLowerCase(Locale.ROOT));
+            : MfaCrypto.digest(contacto.direccion().trim().toLowerCase(Locale.ROOT));
 
         String codigo = UUID.randomUUID().toString();
         byte[] hash = MfaCrypto.codeHash(codigo);

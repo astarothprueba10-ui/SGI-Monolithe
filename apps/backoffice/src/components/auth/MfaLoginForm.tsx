@@ -137,7 +137,8 @@ function ActivationEmail({ props, flow, update }: { props: Props; flow: Flow; up
         <section className="space-y-2 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm">
             <p className="font-semibold text-brand-900">¿Todavía no tienes tu código de activación?</p>
             <p className="text-brand-700">
-                Te lo enviaremos al correo principal verificado de tu cuenta.
+                Te lo enviaremos al correo principal registrado en tu cuenta.
+                Al introducirlo, verificaremos que tienes acceso a ese correo.
                 El código dura 24 horas. Revisa también la carpeta de spam.
             </p>
             <button type="button" disabled={flow.invitationSending || flow.busy} onClick={() => void send()}
@@ -147,7 +148,7 @@ function ActivationEmail({ props, flow, update }: { props: Props; flow: Flow; up
             {flow.invitationStatus && <p role="status" className="text-brand-800">{flow.invitationStatus}</p>}
             {flow.invitationError && <p role="alert" className="text-rose-700">{flow.invitationError}</p>}
             <p className="text-xs text-brand-600">
-                Si tu correo no está verificado o no tienes acceso a él, contacta a administración.
+                Si no tienes un correo registrado o no puedes acceder a él, contacta a administración.
                 Este paso de inicio de sesión caduca en 5 minutos; puedes volver a iniciar sesión con el mismo código recibido.
             </p>
         </section>

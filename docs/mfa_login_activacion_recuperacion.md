@@ -10,8 +10,8 @@
 ## Alta autónoma
 1. La persona introduce documento y contraseña.
 2. Si todavía no ha vinculado un autenticador, selecciona Enviar código a mi correo.
-3. El backend valida el reto asociado a esa contraseña y selecciona exclusivamente el EMAIL activo, principal y verificado registrado en PostgreSQL, nunca un correo proporcionado por el navegador.
-4. El código de activación dura 24 horas; solo su hash SHA-256 se almacena en auth_mfa.estado, nunca el texto en claro.
+3. El backend valida el reto asociado a esa contraseña y selecciona exclusivamente el EMAIL activo y principal registrado en PostgreSQL, nunca un correo proporcionado por el navegador.
+4. El código de activación dura 24 horas; solo su hash SHA-256 se almacena en auth_mfa.estado, nunca el texto en claro. Si el correo todavía no está verificado, guarda además el identificador del contacto y un hash del valor original. Después de introducir correctamente el código recibido, verifica ese contacto exacto en la misma transacción que genera la vinculación TOTP.
 5. El usuario introduce el código, escanea el QR, guarda el código de recuperación y verifica el TOTP de seis dígitos.
 6. La sesión se emite solo después de comprobar TOTP; el código inicial se invalida al finalizar.
 Se aplica un límite de 5 invitaciones por cuenta cada 24 horas, con 60 segundos entre envíos. El reto de contraseña caduca en 5 minutos, pero una invitación ya recibida sigue vigente hasta su vencimiento de 24 horas.
@@ -32,7 +32,7 @@ Este flujo sustituye el uso habitual de scripts SQL de soporte para cuentas sin 
 - El usuario vuelve al login, solicita invitación por correo verificado o recibe la invitación asistida. No se permite bypass por pérdida de dispositivo.
 
 ## Continuidad y seguridad
-- Verificar el correo principal antes de activar nuevas cuentas. La ausencia de correo nunca permite omitir MFA.
+- Verificar el correo principal antes de activar nuevas cuentas cuando sea posible. Si el correo está registrado pero pendiente, el código MFA enviado al titular permite confirmar su posesión. La ausencia de correo nunca permite omitir MFA.
 - El acceso de emergencia cuando no existe ningún administrador disponible debe realizarlo el responsable de seguridad mediante el procedimiento auditado y los scripts de database/operations. No repartir credenciales de Supabase al personal.
 - No compartir códigos en capturas, tickets ni mensajes públicos. Una invitación expuesta debe sustituirse por otra.
 - El aviso de restablecimiento no incluye códigos. El MFA financiero utiliza claves distintas, que no deben reemplazarse.
@@ -41,5 +41,6 @@ Este flujo sustituye el uso habitual de scripts SQL de soporte para cuentas sin 
 ## Pruebas y despliegue
 - CI: builds del Backoffice y Portal Cliente, Maven de Auth Service y Playwright con respuestas simuladas en ambos portales.
 - Pruebas reales controladas: entrega de correo, código vigente/vencido, rechazo de TOTP erróneo, reenvío 60 s, límite 5/día, cuenta sin email, pérdida de dispositivo y recuperación administrativa.
-- Comprobar la migración en la base de datos y la entrega de un correo real antes de dar por completado un despliegue; los tests no envían correo real.
+- La migración 119 añade identificador y hash de la dirección destinataria de activación. Aplicarla primero en el entorno de prueba antes de probar el nuevo backend; no modifica cuentas existentes por sí sola.
+- Comprobar las migraciones 118/119 en la base de datos y la entrega de un correo real antes de dar por completado un despliegue; los tests no envían correo real.
 - No ejecutar una operación administrativa de MFA ni borrar factores de cuentas reales como prueba.
