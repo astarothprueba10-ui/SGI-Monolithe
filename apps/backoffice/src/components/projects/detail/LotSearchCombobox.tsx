@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { CheckIcon, ChevronDownIcon, SearchIcon } from 'lucide-react';
 import { buscarLotes } from '../../../lib/projectLotSearch';
 import type { ConfiguracionProyectoResponse } from '../../../types/projectConfiguration';
@@ -57,7 +58,7 @@ export function LotSearchCombobox({ lotes, value, onChange, disabled = false }: 
     setAbierto(false);
   }
 
-  function tecla(event: React.KeyboardEvent<HTMLInputElement>) {
+  function tecla(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (!abierto) {

@@ -40,9 +40,13 @@ export function CommercialSimulationPanel({ project, config, dirty }: Props) {
 
   useEffect(() => {
     if (!config.lotes.some(l => String(l.id) === id)) {
-      setId(config.lotes[0] ? String(config.lotes[0].id) : '');
+      const lotesAsignados = new Set(config.datos.lotes.map(l => l.id));
+      const manzanasAsignadas = new Set(config.datos.manzanas.map(m => m.id));
+      const inicial = config.lotes.find(l => lotesAsignados.has(l.id) || manzanasAsignadas.has(l.idManzana))
+        ?? config.lotes[0];
+      setId(inicial ? String(inicial.id) : '');
     }
-  }, [id, config.lotes]);
+  }, [id, config.lotes, config.datos.lotes, config.datos.manzanas]);
 
   useEffect(() => {
     if (!id || !moneda || dirty || config.version === 0) {

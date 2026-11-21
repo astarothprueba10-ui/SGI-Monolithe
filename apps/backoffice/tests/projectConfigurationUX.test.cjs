@@ -25,7 +25,7 @@ test('el simulador calcula al cambiar de lote y la matriz agrupa por etapa', () 
   const simulador = archivo('components/projects/detail/CommercialSimulationPanel.tsx');
   const matriz = archivo('components/projects/detail/CommercialTariffEditor.tsx');
   assert.match(simulador,/useEffect\(\(\) => \{[\s\S]*?projectConfigurationService\.simular/);
-  assert.match(simulador,/onChange=\{e => setId\(e\.target\.value\)\}/);
+  assert.match(simulador,/<LotSearchCombobox lotes=\{config\.lotes\} value=\{id\} onChange=\{setId\}/);
   assert.match(matriz,/datos\.etapas\.map/);
   assert.match(matriz,/catalogos\.zonas\.map/);
   assert.doesNotMatch(matriz, /tarifas\.map\(\(tarifa, i\) => <FilaTarifa/);
