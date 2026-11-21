@@ -31,7 +31,10 @@ class ProyectoServiceValidationTest {
         estado.setCodigo("PLANIFICADO");
         estado.setActivo(true);
         lenient().when(estados.findByCodigo("PLANIFICADO")).thenReturn(Optional.of(estado));
-        lenient().when(repository.findById(1L)).thenReturn(Optional.of(new Proyecto()));
+        var existente = new Proyecto();
+        existente.setCodigo("PROY-001");
+        lenient().when(repository.findById(1L)).thenReturn(Optional.of(existente));
+        lenient().when(repository.nextProjectCodeNumber()).thenReturn(3L);
         lenient().when(repository.save(any(Proyecto.class))).thenAnswer(call -> call.getArgument(0));
         service = new ProyectoService(repository, estados, mock(EtapaRepository.class), mock(ZonaRepository.class),
                 mock(ManzanaRepository.class), mock(LoteRepository.class), new ValidacionProyectoService(new UbigeoService()));
@@ -68,10 +71,24 @@ class ProyectoServiceValidationTest {
 
     @Test
     void laEdicionConservaDescripcionesAusentesYFechasHistoricas() {
-        var request = new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto", null, null, null,
-                null, null, null, "Perú", null, null, null, LocalDate.of(2020, 1, 1), null, true);
+        var request = new ProyectoRequest("PLANIFICADO", "Proyecto", null, null, null,
+                null, null, null, "Perú", null, LocalDate.of(2020, 1, 1), null, true);
         assertNull(guardar(true, request).descripcion());
         verify(repository).save(any(Proyecto.class));
+    }
+
+    @Test
+    void elAltaGeneraCodigoSecuencial() {
+        var generado = guardar(false, request(null, null, null, "Perú", null, null));
+        assertEquals("PROY-003", generado.codigo());
+        verify(repository).nextProjectCodeNumber();
+    }
+
+    @Test
+    void editarNoModificaCodigo() {
+        var actualizado = guardar(true, request(null, null, null, "Perú", null, null));
+        assertEquals("PROY-001", actualizado.codigo());
+        verify(repository, never()).nextProjectCodeNumber();
     }
 
     @Test
@@ -83,8 +100,8 @@ class ProyectoServiceValidationTest {
 
     @Test
     void elAltaRechazaUnaDescripcionAusenteAntesDeGuardar() {
-        var request = new ProyectoRequest("PLANIFICADO", "PROJ-001", "Proyecto", null, null, null,
-                null, null, null, "Perú", null, null, null, null, null, true);
+        var request = new ProyectoRequest("PLANIFICADO", "Proyecto", null, null, null,
+                null, null, null, "Perú", null, null, null, true);
         assertThrows(ReglaNegocioException.class, () -> guardar(false, request));
         verify(repository, never()).save(any(Proyecto.class));
     }

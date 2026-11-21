@@ -26,8 +26,6 @@ public class ValidacionProyectoService {
         validarFecha(request.fechaFinEstimada());
         validarOrden(request.fechaInicio(), request.fechaFinEstimada());
         validarDigitos(request.areaTotalM2(), "El área total");
-        validarDigitos(request.latitud(), "La latitud");
-        validarDigitos(request.longitud(), "La longitud");
         return ubigeoService.resolver(request.departamento(), request.provincia(), request.distrito());
     }
 
