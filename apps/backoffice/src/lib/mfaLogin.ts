@@ -57,3 +57,8 @@ export async function verifyMfa(reto: string, codigo: string): Promise<MfaLoginS
     }
     return session;
 }
+
+/** Invita al correo verificado después de probar contraseña; nunca devuelve el código. */
+export async function requestMfaInvitation(reto: string): Promise<{ mensaje: string; segundosEspera: number }> {
+    return authApi.post<{ mensaje: string; segundosEspera: number }>('/mfa/activacion/enviar', { reto });
+}

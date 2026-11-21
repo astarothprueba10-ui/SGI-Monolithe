@@ -19,6 +19,14 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+        /** Errores controlados de activación y recuperación, legibles pero sin datos sensibles. */
+        @ExceptionHandler(MfaFlowException.class)
+        public ResponseEntity<ApiErrorResponse> handleMfaFlow(
+                        MfaFlowException exception, HttpServletRequest request) {
+                return construirRespuesta(HttpStatus.valueOf(exception.getStatusCode().value()),
+                                exception.getReason(), request);
+        }
+
         /** Devuelve un fallo de verificación sin incorporar códigos ni retos. */
         @ExceptionHandler(MfaException.class)
         public ResponseEntity<Map<String, String>> handleMfa(MfaException exception) {

@@ -20,6 +20,28 @@ for (const portal of portals) {
       expect(await page.evaluate(() => localStorage.getItem('monolithe_access_token'))).toBe('prueba-access');
     });
 
+    test('solicita invitación MFA por correo sin recibir secretos ni abrir sesión', async ({ page }) => {
+      const requests = await openLogin(page, portal, { phase: 'ACTIVACION' });
+      await submitPassword(page);
+      await expect(page.getByRole('button', { name: 'Enviar código a mi correo' })).toBeVisible();
+      await page.getByRole('button', { name: 'Enviar código a mi correo' }).click();
+      await expect(page.getByRole('status')).toContainText('Invitación enviada al correo principal verificado.');
+      const invited = requests.find(request => request.path.endsWith('/mfa/activacion/enviar'));
+      expect(invited?.body).toEqual({ reto: 'A'.repeat(43) });
+      await expect(page.getByLabel('Código de activación')).toHaveValue('');
+      await assertNoSession(page);
+      await assertPageWidth(page);
+    });
+
+    test('explica los problemas de correo sin saltarse MFA', async ({ page }) => {
+      await openLogin(page, portal, { phase: 'ACTIVACION', invitationFailure: true });
+      await submitPassword(page);
+      await page.getByRole('button', { name: 'Enviar código a mi correo' }).click();
+      await expect(page.getByRole('alert')).toContainText('Correo no disponible temporalmente.');
+      await assertNoSession(page);
+      await expect(page.getByLabel('Código de activación')).toHaveValue('');
+    });
+
     test('vincula el primer autenticador con QR y confirma el código de recuperación guardado', async ({ page }) => {
       const requests = await openLogin(page, portal, { phase: 'ACTIVACION', temporary: true });
       await submitPassword(page);

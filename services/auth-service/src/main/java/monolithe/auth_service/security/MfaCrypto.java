@@ -1,6 +1,7 @@
 package monolithe.auth_service.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -27,15 +28,29 @@ public final class MfaCrypto {
     private final SecureRandom random = new SecureRandom();
     private final SecretKeySpec key;
 
-    /** Lee una clave AES de 32 bytes en Base64 desde un secreto montado. */
-    public MfaCrypto(@Value("${security.mfa.key-path}") String keyPath) {
+    /** Compatibilidad para tests y despliegues locales que montan un archivo. */
+    public MfaCrypto(String keyPath) {
+        this(keyPath, "");
+    }
+
+    /**
+     * Preferencia: variable secreta en Railway; en Docker local, archivo protegido.
+     * Nunca genera una clave nueva, pues invalidaría los factores TOTP existentes.
+     */
+    @Autowired
+    public MfaCrypto(@Value("${security.mfa.key-path}") String keyPath,
+                     @Value("${security.mfa.key-base64:}") String base64Key) {
         try {
-            byte[] bytes = Base64.getDecoder().decode(Files.readString(Path.of(keyPath)).strip());
+            String encoded = base64Key == null || base64Key.isBlank()
+                    ? Files.readString(Path.of(keyPath)).strip()
+                    : base64Key.strip();
+            byte[] bytes = Base64.getDecoder().decode(encoded);
             if (bytes.length != 32) throw new IllegalArgumentException("Tamaño de clave incorrecto");
             key = new SecretKeySpec(bytes, "AES");
             Arrays.fill(bytes, (byte) 0);
         } catch (IOException | IllegalArgumentException e) {
-            throw new IllegalStateException("Configura AUTH_MFA_KEY_PATH con una clave privada de 32 bytes en Base64.");
+            throw new IllegalStateException("Configura AUTH_MFA_KEY_BASE64 o AUTH_MFA_KEY_PATH "
+                + "con una clave privada de 32 bytes codificada en Base64.");
         }
     }
 

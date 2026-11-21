@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import { ApiError } from '../../lib/apiClient';
-import { prepareMfa, verifyMfa, type MfaChallenge, type MfaEnrollment, type MfaLoginSession } from '../../lib/mfaLogin';
+import { prepareMfa, verifyMfa, requestMfaInvitation, type MfaChallenge, type MfaEnrollment, type MfaLoginSession } from '../../lib/mfaLogin';
 
 interface Props {
     challenge: MfaChallenge;
@@ -23,9 +23,12 @@ type Flow = {
     code: string;
     busy: boolean;
     error: string;
+    invitationSending: boolean;
+    invitationStatus: string;
+    invitationError: string;
 };
 type Update = Dispatch<SetStateAction<Flow>>;
-const INITIAL: Flow = { enrollment: null, recovering: false, saved: false, code: '', busy: false, error: '' };
+const INITIAL: Flow = { enrollment: null, recovering: false, saved: false, code: '', busy: false, error: '', invitationSending: false, invitationStatus: '', invitationError: '' };
 
 function EnrollmentDetails({ enrollment, saved, setSaved }: {
     enrollment: MfaEnrollment; saved: boolean; setSaved: (saved: boolean) => void;
@@ -114,6 +117,43 @@ async function submitMfa(props: Props, flow: Flow, phase: Phase, update: Update)
     }
 }
 
+/** Envío explícito: no repite correos automáticamente al reabrir una pantalla. */
+function ActivationEmail({ props, flow, update }: { props: Props; flow: Flow; update: Update }) {
+    async function send() {
+        if (flow.invitationSending || flow.busy) return;
+        update(current => ({ ...current, invitationSending: true, invitationError: '', invitationStatus: '' }));
+        try {
+            const result = await requestMfaInvitation(props.challenge.reto);
+            update(current => ({ ...current, invitationStatus: result.mensaje }));
+        } catch (problem) {
+            if (problem instanceof ApiError && problem.status === 401) props.onRestart(problem.message);
+            else update(current => ({ ...current, invitationError: problem instanceof ApiError
+                ? problem.message : 'No fue posible enviar la invitación. Inténtalo nuevamente.' }));
+        } finally {
+            update(current => ({ ...current, invitationSending: false }));
+        }
+    }
+    return (
+        <section className="space-y-2 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm">
+            <p className="font-semibold text-brand-900">¿Todavía no tienes tu código de activación?</p>
+            <p className="text-brand-700">
+                Te lo enviaremos al correo principal verificado de tu cuenta.
+                El código dura 24 horas. Revisa también la carpeta de spam.
+            </p>
+            <button type="button" disabled={flow.invitationSending || flow.busy} onClick={() => void send()}
+                className="min-h-10 rounded-lg border border-brand-300 bg-white px-3 py-2 font-semibold text-brand-900 disabled:opacity-60">
+                {flow.invitationSending ? 'Enviando…' : flow.invitationStatus ? 'Volver a solicitar invitación' : 'Enviar código a mi correo'}
+            </button>
+            {flow.invitationStatus && <p role="status" className="text-brand-800">{flow.invitationStatus}</p>}
+            {flow.invitationError && <p role="alert" className="text-rose-700">{flow.invitationError}</p>}
+            <p className="text-xs text-brand-600">
+                Si tu correo no está verificado o no tienes acceso a él, contacta a administración.
+                Este paso de inicio de sesión caduca en 5 minutos; puedes volver a iniciar sesión con el mismo código recibido.
+            </p>
+        </section>
+    );
+}
+
 function LoginActions({ props, flow, phase, update }: { props: Props; flow: Flow; phase: Phase; update: Update }) {
     return (
         <>
@@ -153,7 +193,9 @@ export function MfaLoginForm(props: Props) {
             </div>
             {flow.enrollment && <EnrollmentDetails enrollment={flow.enrollment} saved={flow.saved}
                 setSaved={saved => update(current => ({ ...current, saved }))} />}
+            {phase === 'ACTIVACION' && <ActivationEmail props={props} flow={flow} update={update} />}
             <CodeField phase={phase} flow={flow} update={update} />
+            {phase === 'CODIGO' && <p className="text-xs text-brand-600">¿Perdiste tu autenticador y tu código de recuperación? Contacta a administración para verificar tu identidad y recuperar el acceso.</p>}
             <LoginActions props={props} flow={flow} phase={phase} update={update} />
         </form>
     );
