@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   LayersIcon,
   MapPinIcon,
   SaveIcon,
-  SearchIcon,
   Settings2Icon,
-  XIcon
+  XIcon,
+  MapIcon,
+  Grid2X2Icon,
+  FileImageIcon
 } from 'lucide-react';
 
 import { PageHeader } from '../components/ui/PageHeader';
-import { Card, CardHeader } from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
+import { LotMapDetailCard } from '../components/projects/detail/LotMapDetailCard';
+import { ProjectSvgPanel } from '../components/projects/detail/ProjectSvgPanel';
+import { PlanSvgShapes } from '../components/projects/detail/PlanSvgShapes';
+import { projectSvgService } from '../services/projectSvgService';
+import type { PlanoSvgDocumento } from '../types/projectSvg';
 import { SearchInput, Select } from '../components/ui/Field';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -75,18 +83,18 @@ const REAL_STATUSES: StatusFilter[] = [
   {
     code: 'VENDIDO',
     label: 'Vendidos',
-    dotColor: 'bg-slate-800',
-    badgeStyle: 'bg-slate-100 border-slate-400 text-slate-800 hover:bg-slate-200',
-    polygonFill: '#1e293b',
-    polygonStroke: '#0f172a'
+    dotColor: 'bg-red-500',
+    badgeStyle: 'bg-red-50 border-red-300 text-red-800 hover:bg-red-100',
+    polygonFill: '#ef4444',
+    polygonStroke: '#b91c1c'
   },
   {
     code: 'BLOQUEADO',
     label: 'Bloqueados',
-    dotColor: 'bg-rose-500',
-    badgeStyle: 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100',
-    polygonFill: '#f43f5e',
-    polygonStroke: '#be123c'
+    dotColor: 'bg-orange-500',
+    badgeStyle: 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100',
+    polygonFill: '#f97316',
+    polygonStroke: '#c2410c'
   },
   {
     code: 'NO_DISPONIBLE',
@@ -354,6 +362,7 @@ function buildDisplayGeometries(
 
 export function LotMap() {
   const { can } = useAuth();
+  const navigate = useNavigate();
   const canConfigurePlan = can('lots.configure');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [draftGeometries, setDraftGeometries] = useState<DisplayGeometria[]>([]);
@@ -367,6 +376,12 @@ export function LotMap() {
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
   const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
+  const [svgDocument, setSvgDocument] = useState<PlanoSvgDocumento | null>(null);
+  const [commercializable, setCommercializable] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<'matriz' | 'svg'>('matriz');
+  const [layoutMode, setLayoutMode] = useState<'manzanas' | 'general'>('manzanas');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [blockFilter, setBlockFilter] = useState('all');
 
   const [query, setQuery] = useState('');
   const [activeStatuses, setActiveStatuses] = useState<string[]>(
@@ -435,8 +450,10 @@ export function LotMap() {
     Promise.allSettled([
       coreService.searchLots({ idProyecto: projectId, activo: true }),
       coreService.getCurrentPlanDetail(projectId),
-      coreService.getProjectLotPrices(projectId)
-    ]).then(([lotsResult, planResult, pricesResult]) => {
+      coreService.getProjectLotPrices(projectId),
+      projectSvgService.obtener(projectId),
+      coreService.getCommercializableLots(projectId)
+    ]).then(([lotsResult, planResult, pricesResult, svgResult, commercialResult]) => {
       if (!isMounted) return;
       handleLoadLotsResult(lotsResult);
       if (planResult.status === 'fulfilled') {
@@ -445,6 +462,10 @@ export function LotMap() {
         setPlanDetail(null);
       }
       handleLoadPricesResult(pricesResult);
+      setSvgDocument(svgResult.status === 'fulfilled' && svgResult.value && svgResult.value.documento
+        ? svgResult.value.documento : null);
+      setCommercializable(commercialResult.status === 'fulfilled'
+        ? new Set(commercialResult.value) : new Set());
       setLoadingPlan(false);
     });
 
@@ -459,8 +480,13 @@ export function LotMap() {
       setLots([]);
       setPlanDetail(null);
       setPricesMap(new Map());
+      setSvgDocument(null);
+      setCommercializable(new Set());
       return;
     }
+    setViewMode('matriz');
+    setStageFilter('all');
+    setBlockFilter('all');
     const cleanup = loadProjectData(selectedProjectId, false);
     return cleanup;
   }, [selectedProjectId, loadProjectData]);
@@ -716,7 +742,7 @@ export function LotMap() {
 
   const canvasDimensions = useMemo(() => {
     let maxX = 920;
-    let maxY = 720;
+    let maxY = 510;
 
     renderedGeometries.forEach((g) => {
       g.puntos.forEach((p) => {
@@ -734,7 +760,7 @@ export function LotMap() {
 
     return {
       width: Math.max(920, maxX),
-      height: Math.max(720, maxY)
+      height: Math.max(510, maxY)
     };
   }, [renderedGeometries, planDetail]);
 
@@ -801,6 +827,14 @@ export function LotMap() {
     );
   };
 
+  const stageOptions = useMemo(() => Array.from(new Map(lots
+    .filter(l => l.idEtapa != null)
+    .map(l => [String(l.idEtapa), l.nombreEtapa || l.codigoEtapa || `Etapa ${l.idEtapa}`])).entries()), [lots]);
+  const blockOptions = useMemo(() => Array.from(new Map(lots
+    .filter(l => l.idManzana != null && (stageFilter === 'all' || String(l.idEtapa) === stageFilter))
+    .map(l => [String(l.idManzana), l.nombreManzana || l.codigoManzana || `Manzana ${l.idManzana}`])).entries()), [lots]);
+  const totalArea = useMemo(() => lots.reduce((acc,l) => acc + (Number(l.areaM2) || 0),0),[lots]);
+  const allBlocksCount = useMemo(() => new Set(lots.map(l=>l.idManzana).filter(v=>v!=null)).size,[lots]);
   const filteredLotIds = useMemo(() => {
     const q = query.trim().toLowerCase();
     const matches = lots.filter((l) => {
@@ -815,15 +849,28 @@ export function LotMap() {
       const st = l.codigoEstadoLote || 'NO_DISPONIBLE';
       const matchStatus = activeStatuses.includes(st);
 
-      return matchQuery && matchStatus;
+      const matchEtapa = stageFilter === 'all' || String(l.idEtapa) === stageFilter;
+      const matchManzana = blockFilter === 'all' || String(l.idManzana) === blockFilter;
+      return matchQuery && matchStatus && matchEtapa && matchManzana;
     });
     return new Set(matches.map((l) => l.idLote));
-  }, [lots, query, activeStatuses]);
+  }, [lots, query, activeStatuses, stageFilter, blockFilter]);
 
   const selectedLot = useMemo(() => {
     if (selectedLotId === null) return null;
     return lots.find((l) => l.idLote === selectedLotId) ?? null;
   }, [lots, selectedLotId]);
+  const canOperate = Boolean(selectedLot && can('sales.create') && selectedLot.activo
+    && selectedLot.codigoEstadoLote === 'DISPONIBLE' && pricesMap.has(selectedLot.idLote)
+    && commercializable.has(selectedLot.idLote));
+  const openCommercialFlow = (operacion: 'Separacion' | 'Venta') => {
+    if(!selectedLot || !canOperate || !selectedLot.idEtapa || !selectedProjectId) return;
+    const params = new URLSearchParams({
+      origen: 'plano', operacion, idProyecto: String(selectedProjectId),
+      idEtapa: String(selectedLot.idEtapa), idLote: String(selectedLot.idLote)
+    });
+    navigate(`/ventas?${params.toString()}`);
+  };
 
   if (loadingProjects) {
     return (
