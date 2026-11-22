@@ -382,6 +382,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/122_proyectos_configuracion_comercial_borradores_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/123_proyectos_publicacion_comercial_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/publicacion_comercial_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/124_planos_svg_proyecto_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_svg_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
