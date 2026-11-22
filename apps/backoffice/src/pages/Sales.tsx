@@ -570,7 +570,7 @@ export function Sales() {
   };
 
   useEffect(() => {
-    if(!origenPlano) return;
+    if(!origenPlano || !can('sales.create')) return;
     setTab(origenPlano.operacion === 'Venta' ? 'Venta' : 'Separación');
     handleOpenModal();
     window.history.replaceState(window.history.state,'',window.location.pathname);
@@ -586,6 +586,8 @@ export function Sales() {
     ) return;
 
     setIsModalOpen(false);
+    setOrigenPlano(null);
+    setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
     setEditandoComprador(false);
   };

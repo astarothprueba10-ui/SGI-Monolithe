@@ -48,12 +48,14 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
   const elementos: SvgFigura[]=[];
   const usados=new Set<string>();
   let visitados=0;
-  const recorrer=(node: Element, transformPadre='')=>{
+  const recorrer=(node: Element, transformPadre='', codigoPadre: string | null = null)=>{
     if(++visitados>4500) throw new Error('El archivo es demasiado complejo (más de 4,500 elementos).');
     const etiqueta=node.localName as SvgFiguraTipo;
     const transform=node.getAttribute('transform')?.trim() ?? '';
     if(transform && !validarAtributo('transform',transform)) throw new Error('Transformación SVG no compatible.');
     const transformTotal=[transformPadre,transform].filter(Boolean).join(' ');
+    const codigoGrupo = [node.getAttribute('data-lote'),node.getAttribute('id'),node.getAttribute('data-code')]
+      .map(x => codigoLoteVinculado(x,lotes)).find(Boolean) ?? codigoPadre;
     if(ALLOWED.has(etiqueta)){
       const atributos: Record<string,string>={};
       for(const atributo of Array.from(node.attributes)){
@@ -65,7 +67,8 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
       }
       if(transformTotal) atributos.transform=transformTotal;
       const opciones=[node.getAttribute('data-lote'),node.getAttribute('id'),node.getAttribute('data-code')];
-      const codigo=opciones.map(x=>codigoLoteVinculado(x,lotes)).find(Boolean) ?? null;
+      const codigoPropio=opciones.map(x=>codigoLoteVinculado(x,lotes)).find(Boolean) ?? null;
+      const codigo=codigoPropio ?? (codigoGrupo && !usados.has(codigoGrupo) ? codigoGrupo : null);
       if(codigo && usados.has(codigo)) throw new Error('Un mismo lote figura más de una vez en el SVG: '+codigo);
       if(codigo) usados.add(codigo);
       const texto=etiqueta==='text' ? (node.textContent??'').trim().slice(0,150) : null;
@@ -78,7 +81,7 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
       return;
     }
     if(['defs','title','desc','metadata'].includes(etiqueta)) return;
-    for(const hijo of Array.from(node.children)) recorrer(hijo,transformTotal);
+    for(const hijo of Array.from(node.children)) recorrer(hijo,transformTotal,codigoGrupo);
   };
   recorrer(root);
   if(!elementos.length) throw new Error('El SVG no contiene figuras compatibles (trazos, polígonos o rectángulos).');
