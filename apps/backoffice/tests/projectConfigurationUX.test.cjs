@@ -40,3 +40,16 @@ test('el selector integra búsqueda, navegación de teclado y selección', () =>
   assert.match(buscador,/event.key === 'Enter'/);
   assert.match(buscador,/event.key === 'Escape'/);
 });
+
+test('la publicación utiliza liberación por etapa y muestra el cambio de inventario', () => {
+  const ui = archivo('components/projects/detail/CommercialPublicationPanel.tsx');
+  const selector = archivo('components/projects/detail/CommercialStageReleaseSelector.tsx');
+  const service = archivo('services/projectConfigurationService.ts');
+  assert.match(ui,/<CommercialStageReleaseSelector/);
+  assert.match(ui,/etapasHabilitar/);
+  assert.match(ui,/Se habilitarán ahora/);
+  assert.match(ui,/Preparar nueva versión de publicación/);
+  assert.match(selector,/Ninguna etapa se libera automáticamente/);
+  assert.match(service,/\{ version, etapasHabilitar \}/);
+  assert.doesNotMatch(service,/habilitarNoDisponibles/);
+});
