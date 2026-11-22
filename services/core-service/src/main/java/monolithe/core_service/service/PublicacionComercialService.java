@@ -34,8 +34,10 @@ public class PublicacionComercialService {
             throw new ConflictoNegocioException("Guarda un borrador nuevo antes de publicar.");
         if (!config.monedas().contains("PEN") || config.lotes().isEmpty() || config.datos().etapas().isEmpty())
             throw new ReglaNegocioException("Se requieren lotes, etapas y moneda PEN para publicar.");
-        var filas = evaluar(proyecto,config,request.habilitarNoDisponibles());
-        return new PublicacionComercialResponse(config.version(),publicada,huella(proyecto,config.version(),publicada,request.habilitarNoDisponibles(),filas),false,filas);
+        var seleccion = SeleccionEtapasPublicacion.validar(request.etapasHabilitar(), config.datos().etapas());
+        var filas = evaluar(proyecto,config,seleccion);
+        return new PublicacionComercialResponse(config.version(),publicada,
+            huella(proyecto,config.version(),publicada,seleccion,filas),false,filas);
     }
 
     @Transactional
@@ -54,18 +56,18 @@ public class PublicacionComercialService {
         return repository.versionPublicada(proyecto);
     }
 
-    private List<Fila> evaluar(Long proyecto, ConfiguracionProyectoResponse config, boolean habilitar) {
+    private List<Fila> evaluar(Long proyecto, ConfiguracionProyectoResponse config, Set<String> etapasHabilitar) {
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var candidatos = ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto);
         var ahora = ZonedDateTime.now(ZoneId.of("America/Lima"));
         var parcelas = lotes.findAllById(config.lotes().stream().map(ConfiguracionProyectoResponse.Lote::id).toList());
         if (parcelas.size()!=config.lotes().size()) throw new ConflictoNegocioException("El inventario cambió.");
         return parcelas.stream().sorted(Comparator.comparing(Lote::getIdLote))
-            .map(l -> evaluarFila(config,l,protegidos.contains(l.getIdLote()),habilitar,ahora,candidatos)).toList();
+            .map(l -> evaluarFila(config,l,protegidos.contains(l.getIdLote()),etapasHabilitar,ahora,candidatos)).toList();
     }
 
     private Fila evaluarFila(ConfiguracionProyectoResponse config,Lote lote,boolean protegido,
-            boolean habilitar,ZonedDateTime ahora,List<AjusteTipoLote> candidatos) {
+            Set<String> etapasHabilitar,ZonedDateTime ahora,List<AjusteTipoLote> candidatos) {
         BigDecimal actual = repository.precioActual(lote.getIdLote());
         if (protegido) return sinPrecio(lote,null,"PROTEGIDA","Operación existente: se conserva el precio.",actual);
         var r = simulacion.evaluar(config,lote,"PEN",ahora,candidatos);
@@ -82,7 +84,8 @@ public class PublicacionComercialService {
             .findFirst().orElseThrow().vigenteHasta();
         return new Fila(lote.getIdLote(),lote.getCodigo(),r.estadoInventario(),r.codigoEtapa(),"HABILITADA",
             "Precio comercial calculado en PEN.",actual,r.precioBase(),r.ajusteTipo(),r.descuento(),r.precioSimulado(),
-            hasta,habilitar && r.estadoInventario().equals("NO_DISPONIBLE"));
+            hasta,SeleccionEtapasPublicacion.liberarInventario(
+                r.codigoEtapa(),r.estadoInventario(),etapasHabilitar));
     }
 
     private boolean precioValido(SimulacionComercialResponse r) {
@@ -102,9 +105,9 @@ public class PublicacionComercialService {
         if (fila.habilitarInventario()) repository.habilitarInventario(fila.idLote(),actor,version);
     }
 
-    private String huella(Long proyecto,int version,int publicada,boolean habilitar,List<Fila> filas) {
+    private String huella(Long proyecto,int version,int publicada,Set<String> etapasHabilitar,List<Fila> filas) {
         try {
-            byte[] bytes=mapper.writeValueAsBytes(List.of(proyecto,version,publicada,habilitar,filas));
+            byte[] bytes=mapper.writeValueAsBytes(List.of(proyecto,version,publicada,List.copyOf(etapasHabilitar),filas));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (Exception ex) {
             throw new IllegalStateException("No se pudo verificar la revisión comercial.",ex);
