@@ -22,7 +22,7 @@ CREATE TABLE public.inm_planos_cad_archivos (
   fecha_carga timestamptz NOT NULL DEFAULT now(),
   UNIQUE(id_proyecto,version),
   UNIQUE(id_proyecto,sha256),
-  CHECK(ruta_archivo ~ ('^proyectos/'||id_proyecto::text||'/originales/[a-f0-9-]{36}\\.(dwg|svg)$'))
+  CHECK(ruta_archivo ~ ('^proyectos/'||id_proyecto::text||'/originales/[a-f0-9-]{36}\.(dwg|svg)$'))
 );
 CREATE INDEX ix_planos_cad_archivos_proyecto_fecha
  ON public.inm_planos_cad_archivos(id_proyecto,fecha_carga DESC);
