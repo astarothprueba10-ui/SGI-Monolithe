@@ -449,7 +449,7 @@ export function LotMap() {
 
     Promise.allSettled([
       coreService.searchLots({ idProyecto: projectId, activo: true }),
-      coreService.getCurrentPlanDetail(projectId),
+      coreService.getOptionalCurrentPlanDetail(projectId),
       coreService.getProjectLotPrices(projectId),
       projectSvgService.obtener(projectId),
       coreService.getCommercializableLots(projectId)

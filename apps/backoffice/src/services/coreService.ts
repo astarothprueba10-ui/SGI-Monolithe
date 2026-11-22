@@ -545,6 +545,14 @@ export const coreService = {
     const query = idEtapa !== undefined && idEtapa !== null ? `?idEtapa=${idEtapa}` : '';
     return coreApi.get<PlanoInteractivoDetalleResponse>(`/planos/proyecto/${idProyecto}/detalle-vigente${query}`);
   },
+  async getOptionalCurrentPlanDetail(idProyecto: number, idEtapa?: number): Promise<PlanoInteractivoDetalleResponse | null> {
+    // Un proyecto importado puede tener lotes sin un plano manual vigente.
+    // Evita generar 404 esperados y conserva la matriz dinámica.
+    const versiones = await coreApi.get<PlanoInteractivoResponse[]>(`/planos/proyecto/${idProyecto}`);
+    const vigente = versiones.some(plano =>
+      plano.vigente && (idEtapa == null ? plano.idEtapa == null : plano.idEtapa === idEtapa));
+    return vigente ? this.getCurrentPlanDetail(idProyecto, idEtapa) : null;
+  },
   createPlanVersion(data: PlanoInteractivoRequest): Promise<PlanoInteractivoResponse> {
     return coreApi.post<PlanoInteractivoResponse>('/planos', data);
   },

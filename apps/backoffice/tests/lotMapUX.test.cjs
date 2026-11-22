@@ -26,3 +26,13 @@ test('separar y vender requiere permiso, precio y validacion comercial real',()=
   assert.match(ventas,/origenPlano/);
   assert.match(ventas,/elegibles\.some\(p=>p\.idProyecto===origenPlano\.idProyecto\)/);
 });
+
+test('no consulta el detalle manual si un proyecto no tiene plano vigente; mantiene la matriz dinámica',()=>{
+ const core = leer('services/coreService.ts');
+ const pagina = leer('pages/LotMap.tsx');
+ assert.match(core,/async getOptionalCurrentPlanDetail/);
+ assert.match(core,/versiones\.some\(plano/);
+ assert.match(core,/return vigente \? this\.getCurrentPlanDetail\(idProyecto, idEtapa\) : null/);
+ assert.match(pagina,/coreService\.getOptionalCurrentPlanDetail\(projectId\)/);
+ assert.match(pagina,/buildDisplayGeometries\(lots, planDetail, selectedProjectId\)/);
+});
