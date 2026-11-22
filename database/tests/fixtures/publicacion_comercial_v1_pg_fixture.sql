@@ -3,6 +3,7 @@ CREATE ROLE anon;
 CREATE ROLE authenticated;
 CREATE ROLE service_role;
 CREATE ROLE sgi_backend_user;
+CREATE ROLE sigi_app_user;
 CREATE ROLE sigi_app_user BYPASSRLS;
 CREATE TABLE public.seg_usuarios(id_usuario bigint PRIMARY KEY);
 CREATE TABLE public.inm_proyectos(id_proyecto bigint PRIMARY KEY,activo boolean NOT NULL DEFAULT true);
