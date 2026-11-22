@@ -384,6 +384,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/publicacion_comercial_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/124_planos_svg_proyecto_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_svg_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/125_planos_cad_storage_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_cad_storage_v1_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud

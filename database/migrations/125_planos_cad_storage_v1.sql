@@ -3,7 +3,7 @@
 BEGIN;
 INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 VALUES ('planos-cad-private','planos-cad-private',false,20971520,
-        ARRAY['application/octet-stream','image/svg+xml']::text[])
+        ARRAY['application/octet-stream']::text[])
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE public.inm_planos_cad_archivos (
@@ -15,7 +15,7 @@ CREATE TABLE public.inm_planos_cad_archivos (
   bucket varchar(64) NOT NULL DEFAULT 'planos-cad-private'
     CHECK(bucket='planos-cad-private'),
   ruta_archivo text NOT NULL UNIQUE,
-  mime varchar(64) NOT NULL CHECK(mime IN ('application/octet-stream','image/svg+xml')),
+  mime varchar(64) NOT NULL CHECK(mime='application/octet-stream'),
   bytes bigint NOT NULL CHECK(bytes>0 AND bytes<=20971520),
   sha256 char(64) NOT NULL CHECK(sha256 ~ '^[a-f0-9]{64}$'),
   id_usuario bigint NOT NULL REFERENCES public.seg_usuarios(id_usuario),
