@@ -100,7 +100,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       {seccion === 'simulador' && <CommercialSimulationPanel project={project}
         config={respuesta} dirty={hayCambios || guardando}/>}
       {seccion === 'publicacion' && <CommercialPublicationPanel project={project}
-        config={respuesta} dirty={hayCambios || guardando}/>}
+        config={respuesta} dirty={hayCambios || guardando} onPrepareVersion={model.guardar}/>}
     </div>
     <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-600">
       La importación y los cambios manuales preparan un borrador. Solo «Publicación» aplica precios o restricciones a nuevas operaciones.
