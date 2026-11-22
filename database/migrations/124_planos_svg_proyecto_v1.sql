@@ -9,7 +9,7 @@ CREATE TABLE public.inm_planos_svg_proyecto (
   CONSTRAINT ck_svg_documento CHECK (jsonb_typeof(documento)='object' AND octet_length(documento::text) <= 3000000)
 );
 ALTER TABLE public.inm_planos_svg_proyecto ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.inm_planos_svg_proyecto FROM PUBLIC, anon, authenticated, service_role, sgi_app_user;
+REVOKE ALL ON public.inm_planos_svg_proyecto FROM PUBLIC, anon, authenticated, service_role, sigi_app_user;
 GRANT SELECT, INSERT, UPDATE ON public.inm_planos_svg_proyecto TO sgi_backend_user;
 CREATE POLICY svg_backend_select ON public.inm_planos_svg_proyecto
  FOR SELECT TO sgi_backend_user USING (true);
