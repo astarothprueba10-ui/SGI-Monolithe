@@ -58,6 +58,20 @@ public class PublicacionComercialRepository {
     }
 
     public Long registrarPrecio(Fila f, int version) {
+        // Una revisión de liberación puede conservar exactamente los mismos precios.
+        // Reutilizar el registro vigente evita duplicar el historial sin cambios monetarios.
+        var existentes = jdbc.query("""
+            SELECT p.id_lote_precio FROM public.inm_lotes_precios p
+            JOIN public.inm_lotes l ON l.id_lote=p.id_lote
+            JOIN public.cfg_monedas m ON m.id_moneda=p.id_moneda
+            WHERE p.id_lote=? AND m.codigo='PEN' AND m.activo AND p.activo
+              AND p.fecha_desde<=now() AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
+              AND p.precio=? AND p.precio_base=? AND p.monto_ajuste=?
+              AND p.area_m2_aplicada=l.area_m2
+            ORDER BY p.fecha_desde DESC,p.id_lote_precio DESC LIMIT 1
+            """, (rs,n) -> rs.getLong(1),
+            f.idLote(), f.precioFinal(), f.base(), f.ajuste());
+        if (!existentes.isEmpty()) return existentes.getFirst();
         jdbc.update("""
             UPDATE public.inm_lotes_precios p SET activo=false, fecha_hasta=GREATEST(now(),fecha_desde)
             FROM public.cfg_monedas m WHERE p.id_lote=? AND p.id_moneda=m.id_moneda AND m.codigo='PEN' AND p.activo
