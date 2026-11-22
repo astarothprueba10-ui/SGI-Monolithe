@@ -15,11 +15,11 @@ export const projectConfigurationService = {
   versionPublicada(idProyecto: number) {
     return coreApi.get<{ version: number }>(`${ruta(idProyecto)}/publicacion`);
   },
-  revisarPublicacion(idProyecto: number, version: number, habilitarNoDisponibles: boolean) {
-    return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion/validar`, { version, habilitarNoDisponibles });
+  revisarPublicacion(idProyecto: number, version: number, etapasHabilitar: string[]) {
+    return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion/validar`, { version, etapasHabilitar });
   },
-  publicar(idProyecto: number, version: number, habilitarNoDisponibles: boolean, huella: string) {
-    return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion`, { version, habilitarNoDisponibles, huella });
+  publicar(idProyecto: number, version: number, etapasHabilitar: string[], huella: string) {
+    return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion`, { version, etapasHabilitar, huella });
   },
   guardar(idProyecto: number, version: number, datos: ConfiguracionComercial) {
     return coreApi.put<ConfiguracionProyectoResponse>(ruta(idProyecto), { version, datos });

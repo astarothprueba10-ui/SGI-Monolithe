@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CalculatorIcon } from 'lucide-react';
 import { Select, FieldLabel } from '../../ui/Field';
 import { LotSearchCombobox } from './LotSearchCombobox';
+import { estadoInventarioLegible, condicionComercialLegible } from '../../../lib/commercialPresentation';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
 import type { ConfiguracionProyectoResponse, SimulacionComercialResponse } from '../../../types/projectConfiguration';
 import type { ProyectoResponse } from '../../../types/core';
@@ -13,13 +14,18 @@ function Dinero({ valor, moneda }: { valor: number | null; moneda: string }) {
 }
 
 function Resultado({ r }: { r: SimulacionComercialResponse }) {
-  const items = [['Estado actual del lote', r.estadoInventario], ['Zona', r.codigoZona],
-    ['Etapa comercial', r.codigoEtapa], ['Disponibilidad simulada', r.disponibilidad], ['Fecha', r.fecha]];
+  const items = [['Estado de inventario', estadoInventarioLegible(r.estadoInventario)], ['Zona', r.codigoZona],
+    ['Etapa comercial', r.codigoEtapa], ['Condición comercial simulada', condicionComercialLegible(r.disponibilidad)], ['Fecha', r.fecha]];
   const precios = [['Precio base', r.precioBase], ['Ajuste por tipo', r.ajusteTipo],
     ['Descuento', r.descuento], ['Precio simulado', r.precioSimulado]] as const;
   return <div className="space-y-3">
     <p role="status" className={`rounded-md p-3 text-sm ${r.resultado === 'SIMULADO'
       ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>{r.mensaje}</p>
+    {r.resultado === 'SIMULADO' && r.estadoInventario === 'NO_DISPONIBLE' &&
+      <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        Este precio está calculado, pero el lote aún no está habilitado para separaciones ni ventas.
+        Gerencia puede liberarlo por etapa en la publicación.
+      </p>}
     <div className="grid grid-cols-2 gap-2 md:grid-cols-3">{items.map(([label, valor]) =>
       <div key={label}><p className="text-xs text-brand-500">{label}</p>
         <p className="text-sm font-medium text-brand-900">{valor ?? '—'}</p></div>)}</div>
