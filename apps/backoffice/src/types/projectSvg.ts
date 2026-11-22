@@ -18,3 +18,13 @@ export interface PlanoSvgProyectoResponse {
   documento: PlanoSvgDocumento;
   fechaActualizacion: string;
 }
+
+export interface ArchivoCadInfo {
+  id: number;
+  nombre: string;
+  formato: 'DWG' | 'SVG';
+  bytes: number;
+  version: number;
+  sha256: string;
+  fechaCarga: string;
+}

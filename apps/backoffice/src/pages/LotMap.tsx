@@ -991,9 +991,9 @@ export function LotMap() {
           <div className="flex flex-col items-start gap-3 lg:items-center lg:text-center">
             <FileImageIcon className="h-8 w-8 text-emerald-600"/>
             <div><p className="text-sm font-bold text-brand-900">Plano del proyecto</p>
-              <p className="mt-1 text-xs text-brand-500">{svgDocument ? svgDocument.nombreArchivo : 'SVG exportado desde AutoCAD'}</p></div>
+              <p className="mt-1 text-xs text-brand-500">{svgDocument ? svgDocument.nombreArchivo : 'DWG original o SVG interactivo'}</p></div>
             <Button size="sm" onClick={()=>{setViewMode('svg');if(isEditingPlan)handleCancelPlanEditing();}}>
-              {svgDocument?'Ver plano SVG':'Importar plano SVG'}
+              {svgDocument?'Ver plano SVG':'Importar DWG / SVG'}
             </Button>
           </div>
         </div>
