@@ -202,9 +202,10 @@ export function Sales() {
   // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
   const [preseleccionAgrupada,setPreseleccionAgrupada] = useState<{
     idOperacion:number;idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
+    modalidad:'CONTADO'|'FINANCIADA';
   }|null>(null);
   const [asociacionAgrupadaPendiente,setAsociacionAgrupadaPendiente] = useState<{
-    idOperacion:number;idLote:number;
+    idOperacion:number;idLote:number;idProspecto:number;modalidad:'CONTADO'|'FINANCIADA';
   }|null>(null);
   const [origenPlano, setOrigenPlano] = useState<{
     idProyecto:number; idEtapa:number; idLote:number; operacion:'Separacion'|'Venta'
@@ -596,6 +597,7 @@ export function Sales() {
     const seleccion=preseleccionAgrupada;
     if(!prospectsList.some(p=>p.id_prospecto===seleccion.idProspecto))return;
     setPreseleccionAgrupada(null);
+    setFormSaleModality(seleccion.modalidad);
     void handleSelectProspect(seleccion.idProspecto);
     // Al seleccionar comprador se conserva el origenPlano para preseleccionar lote.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1060,7 +1062,9 @@ export function Sales() {
       // El registro ya se confirmó; un error de agrupación nunca debe ocultar
       // ni reintentar la venta recién creada.
       if (asociacionAgrupadaPendiente
-          &&asociacionAgrupadaPendiente.idLote===resultado.idLote) {
+          &&asociacionAgrupadaPendiente.idLote===resultado.idLote
+          &&asociacionAgrupadaPendiente.idProspecto===resultado.idProspecto
+          &&asociacionAgrupadaPendiente.modalidad===resultado.modalidad) {
         try {
           await crmBackend.vincularVentaAgrupada(
             asociacionAgrupadaPendiente.idOperacion,resultado.idVenta
@@ -1490,7 +1494,8 @@ export function Sales() {
             });
             setPreseleccionAgrupada(datos);
             setAsociacionAgrupadaPendiente({
-              idOperacion:datos.idOperacion,idLote:datos.idLote
+              idOperacion:datos.idOperacion,idLote:datos.idLote,
+              idProspecto:datos.idProspecto,modalidad:datos.modalidad
             });
             setTab('Venta');
             handleOpenModal();
