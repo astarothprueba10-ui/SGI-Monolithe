@@ -21,6 +21,8 @@ import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
 import monolithe.core_service.dto.ConciliarCobroVentaRequest;
 import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
+import monolithe.core_service.dto.PrepararSubsanacionVentaRequest;
+import monolithe.core_service.dto.ConfirmarSubsanacionVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.service.CrmSeparacionStorageService;
@@ -557,6 +559,25 @@ public class CrmVentaController {
                     service.conciliarCobroVenta(obtenerActor(jwt),idVenta,
                             request.idCuentaFinanciera(),request.fechaOperacion(),
                             request.numeroOperacion(),request.observaciones()));
+        }
+
+        @PostMapping("/finanzas/ventas/{idVenta}/subsanacion/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararSubsanacionVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody PrepararSubsanacionVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    separacionStorageService.prepararCargaSubsanacionVenta(
+                            obtenerActor(jwt),idVenta,request));
+        }
+
+        @PostMapping("/finanzas/ventas/subsanacion/confirmar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> confirmarSubsanacionVenta(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody ConfirmarSubsanacionVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.confirmarSubsanacionVenta(obtenerActor(jwt),request.idCarga()));
         }
 
         @PostMapping("/finanzas/ventas/cuentas-receptoras")
