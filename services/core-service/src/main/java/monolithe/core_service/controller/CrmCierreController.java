@@ -188,6 +188,15 @@ public class CrmCierreController {
                 hastaExclusivo);
     }
 
+    /** Cartera histórica de canales con alcance por proyecto y asesor. */
+    @GetMapping("/fuentes/historico")
+    @PreAuthorize("hasAuthority('crm.view')")
+    public JsonNode fuentesHistorico(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) Long idProyecto) {
+        return service.fuentesHistorico(actor(jwt), idProyecto);
+    }
+
     @GetMapping("/fuentes/periodo")
     @PreAuthorize("hasAuthority('crm.view')")
     public JsonNode fuentesPeriodo(
