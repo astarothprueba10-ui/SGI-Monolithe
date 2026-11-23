@@ -182,7 +182,8 @@ test('CRM: filtros de compradores permanecen sin alertas externas', () => {
   const service = readFileSync(new URL('../src/services/crmBackend.ts', import.meta.url), 'utf8');
   assert.match(ui, /Proyecto global del CRM/);
   assert.match(ui, /compradoresFiltrados\(\{ \.\.\.buyerFilters/);
-  assert.match(ui, /buyer\.fecha_formalizacion \?\? buyer\.fecha_venta/);
+  assert.match(ui, /buyer\.cantidad_lotes/);
+  assert.match(ui, /key=\{buyer\.id_cliente\}/);
   assert.match(ui, /columnWidths=\{\[/);
   assert.match(ui, /whitespace-nowrap rounded-md bg-slate-50/);
   assert.doesNotMatch(ui, /Alerta financiera/);
@@ -210,4 +211,31 @@ test('CRM: expediente conserva cronograma y no solicita central de riesgos', () 
   assert.match(panel, /<CronogramaVentaPanel/);
   assert.doesNotMatch(panel, /Evaluación y riesgo crediticio/);
   assert.doesNotMatch(panel, /proveedor_evaluacion/);
+});
+
+test('CRM: expediente maestro agrupa proyectos y conserva detalle por operación', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(
+    new URL('../src/components/crm/ExpedienteCompradorMaestroPanel.tsx', import.meta.url), 'utf8'
+  );
+  const excel = readFileSync(new URL('../src/utils/crmExportExcel.ts', import.meta.url), 'utf8');
+  const sql = readFileSync(
+    new URL('../../../database/migrations/131_crm_compradores_unicos_expediente_maestro_v1.sql', import.meta.url), 'utf8'
+  );
+  assert.match(ui, /ExpedienteCompradorMaestroPanel/);
+  assert.match(ui, /Lotes adquiridos/);
+  assert.match(ui, /buyer\.cantidad_proyectos/);
+  assert.match(panel, /crmBackend\.expedienteMaestroComprador/);
+  assert.match(panel, /Adquisiciones por proyecto/);
+  assert.match(panel, /Ficha personal única/);
+  assert.match(panel, /Historial cronológico de adquisiciones/);
+  assert.match(panel, /<ExpedienteCompradorPanel/);
+  assert.match(excel, /'Adquisiciones'/);
+  assert.match(excel, /claveCompradorUnico/);
+  assert.match(sql, /COUNT\(DISTINCT id_lote\)/);
+  assert.match(sql, /fn_crm_compras_visibles_v1/);
+  assert.match(sql, /va\.id_venta=v\.id_venta/);
+  assert.match(sql, /ur\.fecha_revocacion IS NULL/);
+  assert.match(sql, /sp_crm_comprador_expediente_v1/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.sp_crm_comprador_expediente_v1/);
 });
