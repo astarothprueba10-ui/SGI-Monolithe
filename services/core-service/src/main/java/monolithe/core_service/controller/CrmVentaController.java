@@ -24,6 +24,7 @@ import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
 import monolithe.core_service.dto.CrearOperacionAgrupadaRequest;
 import monolithe.core_service.dto.ConfigurarDesgloseVentaRequest;
 import monolithe.core_service.dto.ConciliarDesgloseVentaRequest;
+import monolithe.core_service.dto.ReiniciarDesgloseVentaRequest;
 import monolithe.core_service.dto.PrepararSubsanacionVentaRequest;
 import monolithe.core_service.dto.ConfirmarSubsanacionVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
@@ -559,6 +560,16 @@ public class CrmVentaController {
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
         /** Evidencia de venta firmada por Storage, solo para Finanzas. */
+        @PostMapping("/finanzas/ventas/{idVenta}/desglose/reiniciar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> reiniciarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ReiniciarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.reiniciarDesgloseVenta(
+                            obtenerActor(jwt),idVenta,request.motivo()));
+        }
+
         @PostMapping("/finanzas/ventas/{idVenta}/desglose")
         @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
         public ResponseEntity<JsonNode> configurarDesgloseVenta(
