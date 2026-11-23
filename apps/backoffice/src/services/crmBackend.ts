@@ -576,10 +576,42 @@ export interface CrmCobroVentaPendiente {
     estadoRevision:'PENDIENTE'|'APROBADO'|'RECHAZADO';
     tipoMime:string;tamanioBytes:number;
   }>;
+  montoOriginal:number;
+  desgloses:CrmDesgloseComprobanteVenta[];
+  comprobantesConciliados:number;
+  comprobantesAprobados:number;
   estadoVenta:string;
   codigoContrato:string|null;
   estadoContrato:string|null;
   comprobantes:number;
+}
+export interface CrmDesgloseComprobanteVenta {
+  idDesglose:number;
+  idComprobante:number;
+  monto:number;
+  numeroOperacion:string|null;
+  estado:'PENDIENTE'|'OBSERVADO'|'APROBADO'|'CONCILIADO';
+  motivo:string|null;
+  idPago:number|null;
+  idMovimiento:number|null;
+  fechaRevision:string|null;
+}
+export interface CrmDesgloseVentaResultado {
+  idVenta:number;
+  totalDesglosado:number;
+  cantidad:number;
+  items:CrmDesgloseComprobanteVenta[];
+  dineroConfirmado:false;
+}
+export interface CrmRevisionDesgloseVenta {
+  idVenta:number;idDesglose:number;
+  estado:'APROBADO'|'OBSERVADO';dineroConfirmado:false;
+}
+export interface CrmConciliacionDesgloseVenta {
+  estado:'CONCILIADO';idVenta:number;idDesglose:number;
+  idPago:number;idVoucher:number;idMovimiento:number;
+  idAplicacionInicial:number|null;monto:number;
+  comprobantesRestantes:number;dineroConfirmado:true;
 }
 export interface CrmCobrosVentasPendientesPage {
   total:number;
@@ -1858,6 +1890,25 @@ export const crmBackend = {
     coreApi.get<CrmCobrosVentasPendientesPage>(
       `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
     ),
+
+  configurarDesgloseVenta: (idVenta:number,items:Array<{
+    idComprobante:number;monto:number;numeroOperacion:string|null
+  }>) => coreApi.post<CrmDesgloseVentaResultado>(
+    `/crm/finanzas/ventas/${idVenta}/desglose`,{items}
+  ),
+
+  revisarDesgloseVenta: (idDesglose:number,body:{
+    aprobar:boolean;motivo?:string|null;
+  }) => coreApi.put<CrmRevisionDesgloseVenta>(
+    `/crm/finanzas/ventas/desgloses/${idDesglose}/revision`,
+    {aprobar:body.aprobar,motivo:body.aprobar?null:body.motivo?.trim()??null}
+  ),
+
+  conciliarDesgloseVenta: (idDesglose:number,body:{
+    idCuentaFinanciera:number;fechaOperacion:string;observaciones?:string|null;
+  }) => coreApi.post<CrmConciliacionDesgloseVenta>(
+    `/crm/finanzas/ventas/desgloses/${idDesglose}/conciliar`,body
+  ),
 
   revisarComprobanteVenta: (idVenta:number,idComprobante:number,body:{
     aprobar:boolean;motivo?:string|null
