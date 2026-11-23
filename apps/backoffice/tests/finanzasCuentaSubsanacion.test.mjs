@@ -51,10 +51,10 @@ test('Subsanación añade evidencia existente en Storage y no acredita dinero',(
 });
 
 test('Comprobantes múltiples se pueden ver pero no atribuir a un pago único',()=>{
-  assert.match(cobros,/Ver \{item\.comprobantes\} comprobantes/);
+  assert.match(cobros,/Gestionar \{item\.comprobantes\} comprobantes/);
   assert.match(cobros,/archivosAbiertos\?\.archivos\.map/);
-  assert.match(cobros,/Revisión de importes bloqueada hasta desglose bancario/);
-  assert.match(cobros,/no se permitirá aprobar ni conciliar el total/);
+  assert.match(cobros,/Requiere desglose por importe y transferencia/);
+  assert.match(cobros,/No se permite atribuir el mismo abono bancario a varios contratos/);
   assert.match(sql142,/jsonb_agg\(jsonb_build_object/);
   assert.match(sql142,/idComprobante/);
   assert.match(sql142,/REVOKE ALL ON FUNCTION/);
