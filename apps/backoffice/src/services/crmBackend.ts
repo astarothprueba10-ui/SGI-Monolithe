@@ -1458,7 +1458,7 @@ export const crmBackend = {
         desde,
         hastaExclusivo,
         idProyecto
-      })}
+      })}`
     ),
 
   asesoresPeriodo: (
@@ -1471,7 +1471,7 @@ export const crmBackend = {
         desde,
         hastaExclusivo,
         idProyecto
-      })}
+      })}`
     ),
 
   subirComprobanteVenta: async (
