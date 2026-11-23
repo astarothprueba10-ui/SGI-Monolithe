@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 // Logica de validacion espejo del componente Crm.tsx
 function validateFollowUp(form) {
@@ -173,4 +174,33 @@ test('Visitas: transiciones validas entre estados (PROGRAMADA -> CONFIRMADA -> R
   assert.equal(visitStateMachine('CONFIRMADA', 'CANCELADA'), true);
   assert.equal(visitStateMachine('REALIZADA', 'CONFIRMADA'), false);
   assert.equal(visitStateMachine('CANCELADA', 'PROGRAMADA'), false);
+});
+
+
+test('CRM: proyecto global y filtros de comprador están conectados al servicio', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url), 'utf8');
+  const service = readFileSync(new URL('../src/services/crmBackend.ts', import.meta.url), 'utf8');
+  assert.match(ui, /Proyecto global del CRM/);
+  assert.match(ui, /compradoresFiltrados\(\{ \.\.\.buyerFilters/);
+  assert.match(ui, /buyer\.fecha_formalizacion \?\? buyer\.fecha_venta/);
+  assert.match(ui, /buyer\.modalidad === 'CONTADO'/);
+  assert.doesNotMatch(ui, /aria-label="Filtrar por proyecto"/);
+  assert.match(service, /\/crm\/compradores\/filtros/);
+});
+
+test('CRM: alerta externa pendiente nunca se trata como sin alerta', () => {
+  const sql = readFileSync(new URL('../../../database/migrations/127_crm_cartera_filtros_riesgo_crediticio_v1.sql', import.meta.url), 'utf8');
+  assert.match(sql, /WHEN evc\.id_evaluacion IS NULL THEN 'PENDIENTE'/);
+  assert.match(sql, /WHEN mv\.codigo <> 'FINANCIADA' THEN 'NO_APLICA'/);
+  assert.match(sql, /WHEN evc\.resultado='SIN_ALERTA' THEN 'NO'/);
+  assert.match(sql, /fn_crm_puede_consultar_prospecto/);
+  assert.match(sql, /REVOKE ALL ON TABLE public\.crm_evaluaciones_crediticias/);
+});
+
+test('CRM: avisos financieros son deduplicados y no modifican contratos', () => {
+  const sql = readFileSync(new URL('../../../database/migrations/129_crm_avisos_alerta_crediticia_v1.sql', import.meta.url), 'utf8');
+  assert.match(sql, /IF NEW\.resultado <> 'ALERTA'/);
+  assert.match(sql, /ON CONFLICT \(clave_deduplicacion\) DO NOTHING/);
+  assert.doesNotMatch(sql, /UPDATE\s+public\.ven_contratos/i);
+  assert.doesNotMatch(sql, /DELETE\s+FROM\s+public\.ven_ventas/i);
 });
