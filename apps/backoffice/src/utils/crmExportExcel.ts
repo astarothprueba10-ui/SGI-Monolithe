@@ -36,8 +36,11 @@ const BUYER_COLS = [
   { header: 'Codigo contrato' },
   { header: 'Estado contrato' },
   { header: 'Lote' },
+  { header: 'Proyecto' },
+  { header: 'Modalidad' },
   { header: 'Precio venta (S/)' },
-  { header: 'Fecha venta' }
+  { header: 'Fecha formalización' },
+  { header: 'Alerta financiera' }
 ];
 
 function sanitizeText(value: unknown): string {
@@ -210,11 +213,16 @@ function renderBuyerRow(ws: ExcelJS.Worksheet, b: CrmBuyer, rowNum: number, isAl
   row.getCell(5).value = sanitizeText(b.estado_contrato);
   row.getCell(6).numFmt = '@';
   row.getCell(6).value = sanitizeText(b.codigo_lote);
-  row.getCell(7).value = typeof b.precio_venta === 'number' ? b.precio_venta : Number(b.precio_venta) || 0;
-  row.getCell(7).numFmt = '#,##0.00';
-  row.getCell(7).alignment = { horizontal: 'right' };
-  row.getCell(8).value = formatDateLimaExcel(b.fecha_venta);
-  row.getCell(8).numFmt = 'dd/mm/yyyy';
+  row.getCell(7).value = sanitizeText(b.proyecto_nombre ?? '');
+  row.getCell(8).value = b.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado';
+  row.getCell(9).value = typeof b.precio_venta === 'number' ? b.precio_venta : Number(b.precio_venta) || 0;
+  row.getCell(9).numFmt = '#,##0.00';
+  row.getCell(9).alignment = { horizontal: 'right' };
+  row.getCell(10).value = formatDateLimaExcel(b.fecha_formalizacion ?? b.fecha_venta);
+  row.getCell(10).numFmt = 'dd/mm/yyyy';
+  row.getCell(11).value = b.modalidad === 'CONTADO' ? 'No aplica'
+    : b.alerta_financiera === 'SI' ? 'Sí' : b.alerta_financiera === 'NO' ? 'No'
+    : b.alerta_financiera === 'SIN_DATOS' ? 'Sin datos' : 'Pendiente';
   styleDataRow(ws, rowNum, isAlt);
 }
 
@@ -348,6 +356,8 @@ export interface ParametrosFiltroCrm {
 export interface OpcionesExportarCrm {
   filtros: ParametrosFiltroCrm;
   consultaCompradores?: string;
+  modalidadCompradores?: 'FINANCIADA' | 'CONTADO';
+  alertaCompradores?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
   notificarProgreso?: (mensaje: string) => void;
 }
 
@@ -386,16 +396,18 @@ async function consultarPotencialesExport(
 async function consultarCompradoresExport(
   filtros: ParametrosFiltroCrm,
   consulta?: string,
-  progreso?: (msg: string) => void
+  progreso?: (msg: string) => void,
+  modalidad?: 'FINANCIADA' | 'CONTADO',
+  alerta?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA'
 ): Promise<CrmBuyer[]> {
+  const fechaDesde = filtros.desde.slice(0, 10);
+  const fechaHasta = new Date(Date.parse(filtros.hastaExclusivo.slice(0, 10) + 'T00:00:00Z') - 86400000)
+    .toISOString().slice(0, 10);
   return consultarTodasLasPaginas(
-    (pagina) => crmBackend.compradoresPeriodo(
-      consulta,
-      pagina,
-      TAMANO_PAGINA_EXPORT,
-      filtros.desde,
-      filtros.hastaExclusivo
-    ),
+    (pagina) => crmBackend.compradoresFiltrados({
+      consulta, pagina, tamano: TAMANO_PAGINA_EXPORT,
+      idProyecto: filtros.idProyecto, modalidad, alerta, fechaDesde, fechaHasta
+    }),
     claveComprador,
     (act, tot, pag) => progreso?.(`Compradores: página ${pag} (${act}/${tot})`)
   );
@@ -404,13 +416,14 @@ async function consultarCompradoresExport(
 export async function ejecutarExportacionExcelCompleta(
   opciones: OpcionesExportarCrm
 ): Promise<{ nombre: string; totalLeads: number; totalPotenciales: number; totalCompradores: number }> {
-  const { filtros, consultaCompradores, notificarProgreso } = opciones;
+  const { filtros, consultaCompradores, modalidadCompradores, alertaCompradores, notificarProgreso } = opciones;
   notificarProgreso?.('Consultando leads...');
   const leads = await consultarLeadsExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando clientes potenciales...');
   const potenciales = await consultarPotencialesExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando compradores...');
-  const compradores = await consultarCompradoresExport(filtros, consultaCompradores, notificarProgreso);
+  const compradores = await consultarCompradoresExport(
+    filtros, consultaCompradores, notificarProgreso, modalidadCompradores, alertaCompradores);
   notificarProgreso?.('Generando archivo Excel...');
   const blob = await generarExcelCrm({ leads, potenciales, compradores });
   const nombre = obtenerNombreArchivoExcel();
