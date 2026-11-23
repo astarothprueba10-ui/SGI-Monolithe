@@ -506,6 +506,32 @@ export interface CrmCarteraReal {
   resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
     saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
 }
+export interface CrmCobroVentaPendiente {
+  idVenta:number;
+  codigoVenta:string;
+  fechaVenta:string;
+  codigoLote:string;
+  proyecto:string;
+  comprador:string|null;
+  tipoAbono:'CONTADO'|'INICIAL';
+  metodoPago:string;
+  numeroOperacion:string|null;
+  montoPendiente:number;
+  estadoRevision:'PENDIENTE';
+  estadoVenta:string;
+  codigoContrato:string|null;
+  estadoContrato:string|null;
+  comprobantes:number;
+}
+export interface CrmCobrosVentasPendientesPage {
+  total:number;
+  montoPendiente:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+  items:CrmCobroVentaPendiente[];
+  soloConsulta:true;
+}
 export interface CrmMovimientoFinanzasReal {
   idPago:number;codigo:string;fechaOperacion:string;fechaConfirmacion:string|null;
   monto:number;estado:string;tipo:'SEPARACION'|'FINANCIAMIENTO'|'VENTA'|'OTRO';
@@ -1696,6 +1722,11 @@ export const crmBackend = {
   ),
 
   /** FINANZAS: pagos realmente registrados, sin movimientos ficticios. */
+  listarCobrosVentasPendientes: (f: {busqueda?:string; pagina?:number; tamano?:number} = {}) =>
+    coreApi.get<CrmCobrosVentasPendientesPage>(
+      `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
+    ),
+
   listarMovimientosFinanzasReal: (params: {
     busqueda?:string;pagina?:number;tamano?:number;
   }={}) => coreApi.get<CrmMovimientosFinanzasReal>(
