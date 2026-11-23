@@ -1,4 +1,4 @@
-import { crmBackend, type CrmSearch } from '../services/crmBackend';
+import { crmBackend, type CrmSearch, type CrmBuyerFilters } from '../services/crmBackend';
 
 /** Filtros de cartera compartidos por la tabla y sus contadores. */
 export type LeadTableFilters = CrmSearch & { idProyecto?: number };
@@ -18,11 +18,11 @@ function total(result: PromiseSettledResult<{ total: number }>): number | undefi
 }
 
 /** Obtiene totales paginados del servidor con los mismos filtros de cada listado. */
-export async function loadCrmTableCounts(filters: LeadTableFilters, range: TableRange, buyerQuery: string): Promise<CrmTableCounts> {
+export async function loadCrmTableCounts(filters: LeadTableFilters, range: TableRange, buyerFilters: CrmBuyerFilters): Promise<CrmTableCounts> {
   const [leads, potentials, buyers] = await Promise.allSettled([
     queryLeadTable({ ...filters, categoria: 'LEAD', pagina: 1, tamano: 1 }, range),
     queryLeadTable({ ...filters, categoria: 'POTENCIAL', pagina: 1, tamano: 1 }, range),
-    crmBackend.compradores(buyerQuery.trim(), 1, 1)
+    crmBackend.compradoresFiltrados({ ...buyerFilters, pagina: 1, tamano: 1 })
   ]);
   return { leads: total(leads), potenciales: total(potentials), compradores: total(buyers) };
 }
