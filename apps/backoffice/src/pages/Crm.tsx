@@ -2283,8 +2283,8 @@ export function Crm() {
             {fuentesData.total} prospectos en la cartera consultada
           </p>}
           {fuentesError && !isLoadingPortfolio && (
-            <Alert tone="danger" className="mx-4 my-3">
-              No se pudieron consultar las fuentes de captación. {fuentesError}
+            <Alert tone="danger" title="No se pudieron cargar las fuentes" className="mx-4 my-3">
+              {fuentesError}
             </Alert>
           )}
           {fuentesModo === 'periodo' && !rangoPeriodo && !isLoadingPortfolio && (
