@@ -1087,6 +1087,22 @@ public class CrmVentaService {
                 """,actor,venta,cuenta,fecha,referencia,observaciones);
     }
 
+    /** Solo Gerencia con finance.edit puede crear una cuenta bancaria receptora. */
+    @Transactional
+    public JsonNode crearCuentaReceptora(
+            Long actor,monolithe.core_service.dto.CrearCuentaReceptoraRequest req) {
+        validarActor(actor);
+        if(req==null) throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,"Indique los datos bancarios verificados.");
+        return ejecutar("""
+                SELECT public.sp_fin_crear_cuenta_receptora_v1(
+                  CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar))::text
+                """,actor,req.nombre(),req.banco(),req.titular(),
+                req.numeroCuenta(),req.cci(),req.moneda());
+    }
+
     @Transactional(readOnly = true)
     public JsonNode cuentasReceptorasVenta(Long actor) {
         validarActor(actor);
