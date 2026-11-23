@@ -75,6 +75,24 @@ export interface CrmBuyer {
   codigo_lote: string;
   precio_venta: number;
   fecha_venta: string;
+  /** Fecha de firma, o creación del contrato cuando aún no tiene firma. */
+  fecha_formalizacion?: string | null;
+  id_proyecto?: number;
+  proyecto_nombre?: string;
+  modalidad?: 'FINANCIADA' | 'CONTADO';
+  alerta_financiera?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
+  proveedor_evaluacion?: string | null;
+  fecha_evaluacion?: string | null;
+}
+export interface CrmBuyerFilters {
+  consulta?: string;
+  pagina?: number;
+  tamano?: number;
+  idProyecto?: number;
+  modalidad?: 'FINANCIADA' | 'CONTADO';
+  alerta?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
+  fechaDesde?: string;
+  fechaHasta?: string;
 }
 export interface CrmSummary {
   total: number;
@@ -1331,19 +1349,21 @@ export const crmBackend = {
   catalogos: () => coreApi.get<CrmCatalogs>('/crm/catalogos'),
   resumen: () => coreApi.get<CrmSummary>('/crm/resumen'),
 
-  resumenPeriodo: (desde: string, hastaExclusivo: string) =>
+  resumenPeriodo: (desde: string, hastaExclusivo: string, idProyecto?: number) =>
     coreApi.get<CrmSummary>(
       `/crm/resumen/periodo${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
-  evolucionMensual: (desde: string, hastaExclusivo: string) =>
+  evolucionMensual: (desde: string, hastaExclusivo: string, idProyecto?: number) =>
     coreApi.get<CrmEvolucionMensual>(
       `/crm/evolucion-mensual${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
@@ -1402,6 +1422,15 @@ export const crmBackend = {
   compradores: (consulta: string, pagina: number, tamano: number) =>
     coreApi.get<CrmPage<CrmBuyer>>(`/crm/compradores${qs({ consulta, pagina, tamano })}`),
 
+  compradoresFiltrados: (f: CrmBuyerFilters) =>
+    coreApi.get<CrmPage<CrmBuyer>>(
+      `/crm/compradores/filtros${qs({
+        consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 15,
+        idProyecto: f.idProyecto, modalidad: f.modalidad,
+        alerta: f.alerta, fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
+      })}`
+    ),
+
   compradoresPeriodo: (
     consulta: string | undefined,
     pagina: number,
@@ -1421,24 +1450,28 @@ export const crmBackend = {
 
   fuentesPeriodo: (
     desde: string,
-    hastaExclusivo: string
+    hastaExclusivo: string,
+    idProyecto?: number
   ) =>
     coreApi.get<CrmFuentesPeriodo>(
       `/crm/fuentes/periodo${qs({
         desde,
-        hastaExclusivo
-      })}`
+        hastaExclusivo,
+        idProyecto
+      })}
     ),
 
   asesoresPeriodo: (
     desde: string,
-    hastaExclusivo: string
+    hastaExclusivo: string,
+    idProyecto?: number
   ) =>
     coreApi.get<CrmAsesoresPeriodo>(
       `/crm/asesores/periodo${qs({
         desde,
-        hastaExclusivo
-      })}`
+        hastaExclusivo,
+        idProyecto
+      })}
     ),
 
   subirComprobanteVenta: async (
