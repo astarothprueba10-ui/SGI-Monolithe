@@ -211,6 +211,23 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode compradoresFiltrados(Long actor,String consulta,Integer pagina,Integer tamano,
+            Long proyecto,String modalidad,String alerta,
+            java.time.LocalDate fechaDesde,java.time.LocalDate fechaHasta) {
+        validarActor(actor);
+        validarPagina(pagina,tamano);
+        validarTexto(consulta,120,"busqueda");
+        if ((proyecto != null && proyecto <= 0)
+                || (modalidad != null && !java.util.Set.of("CONTADO","FINANCIADA").contains(modalidad))
+                || (alerta != null && !java.util.Set.of("SI","NO","PENDIENTE","SIN_DATOS","NO_APLICA").contains(alerta))
+                || (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta))) {
+            throw badRequest("Filtros de compradores invalidos.");
+        }
+        return ejecutar(() -> repository.compradoresFiltrados(actor,consulta,pagina,tamano,
+                proyecto,modalidad,alerta,fechaDesde,fechaHasta),false);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode compradoresPeriodo(
             Long actor,
             String consulta,
