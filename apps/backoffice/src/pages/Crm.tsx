@@ -9,6 +9,7 @@ import { useCrmTableCounts } from '../hooks/useCrmTableCounts';
 import { toast } from 'sonner';
 import {
   CalendarIcon,
+  Building2,
   CheckCircleIcon,
   DownloadIcon,
   EyeIcon,
@@ -469,6 +470,9 @@ export function Crm() {
 
   const [fuentesData, setFuentesData] = useState<CrmFuentesPeriodo | null>(null);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
+  const [fuentesModo, setFuentesModo] = useState<'historico' | 'periodo'>('historico');
+  const [fuentesError, setFuentesError] = useState<string | null>(null);
+  const fuentesRequest = useRef(0);
 
 
   const loadCatalogsAndAdvisors = useCallback(async () => {
@@ -625,38 +629,34 @@ export function Crm() {
 
 
   const loadPortfolioLeads = useCallback(async () => {
+    const request = ++fuentesRequest.current;
     setIsLoadingPortfolio(true);
+    setFuentesError(null);
+    setFuentesData(null);
 
     try {
-      if (!rangoPeriodo) {
-        setFuentesData(null);
-        return;
-      }
+      if (fuentesModo === 'periodo' && !rangoPeriodo) return;
 
-      const res = await crmBackend.fuentesPeriodo(
-        rangoPeriodo.desde,
-        rangoPeriodo.hastaExclusivo,
-        projectFilter === '' ? undefined : projectFilter
-      );
-
-      setFuentesData(res);
-
+      const idProyecto = projectFilter === '' ? undefined : projectFilter;
+      const res = fuentesModo === 'historico'
+        ? await crmBackend.fuentesHistorico(idProyecto)
+        : await crmBackend.fuentesPeriodo(
+            rangoPeriodo!.desde,
+            rangoPeriodo!.hastaExclusivo,
+            idProyecto
+          );
+      if (request === fuentesRequest.current) setFuentesData(res);
     } catch (err: unknown) {
+      if (request !== fuentesRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'No se pudieron cargar las fuentes de captación.';
-
-      toast.error('Error en fuentes de captación', {
-        description: msg
-      });
-
-      setFuentesData(null);
-
+      setFuentesError(msg);
+      toast.error('Error en fuentes de captación', { description: msg });
     } finally {
-      setIsLoadingPortfolio(false);
+      if (request === fuentesRequest.current) setIsLoadingPortfolio(false);
     }
-  }, [rangoPeriodo, projectFilter]);
-
+  }, [fuentesModo, rangoPeriodo, projectFilter]);
 
   useEffect(() => {
     void loadCatalogsAndAdvisors();
@@ -1265,13 +1265,18 @@ export function Crm() {
         }
       />
 
-      <section className="mb-4 rounded-xl border border-brand-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-brand-900">Proyecto inmobiliario</h2>
-            <p className="mt-1 text-xs text-brand-500">
-              Segmenta los indicadores, gráficos y carteras. Por defecto se muestran todos.
-            </p>
+      <section className="mb-4 overflow-hidden rounded-xl border border-brand-800 bg-brand-900 px-4 py-4 text-white shadow-sm sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+              <Building2 className="h-5 w-5 text-white" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Proyecto inmobiliario</h2>
+              <p className="mt-1 text-xs text-brand-200">
+                Filtra indicadores, gráficos y carteras. Por defecto se muestran todos.
+              </p>
+            </div>
           </div>
           <Select
             aria-label="Proyecto global del CRM"
@@ -1282,7 +1287,7 @@ export function Crm() {
               setBuyersPage(1);
               setAgendaPage(1);
             }}
-            className="w-full sm:w-80"
+            className="w-full border-white/20 bg-white font-medium text-brand-900 shadow-sm focus:border-accent-400 sm:w-80"
           >
             <option value="">Todos los proyectos</option>
             {(catalogs?.proyectos ?? []).map((proyecto) => (
@@ -2241,9 +2246,59 @@ export function Crm() {
       {tab === 'fuentes' && (
         <Card>
           <CardHeader
-            title="Fuentes de captacion oficiales"
-            description="Estadisticas reales de canal de origen calculadas sobre la cartera completa del Core Service."
+            title="Fuentes de captación oficiales"
+            description={fuentesModo === 'historico'
+              ? 'Historial de prospectos por canal de origen dentro de la cartera accesible.'
+              : 'Captación por canal durante el período global seleccionado.'}
           />
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 px-4 pb-4">
+            <p className="text-xs text-brand-500">
+              {fuentesModo === 'historico'
+                ? 'Acumulado histórico · cambia a período para analizar fechas específicas.'
+                : 'Período seleccionado · cambia a histórico para ver la cartera acumulada.'}
+            </p>
+            <div role="group" aria-label="Alcance temporal de fuentes de captación"
+              className="inline-flex rounded-lg border border-brand-200 bg-brand-50/60 p-1">
+              <button type="button" aria-pressed={fuentesModo === 'historico'}
+                onClick={() => setFuentesModo('historico')}
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  fuentesModo === 'historico'
+                    ? 'bg-brand-900 text-white shadow-sm'
+                    : 'text-brand-700 hover:bg-white'
+                }`}>
+                Histórico completo
+              </button>
+              <button type="button" aria-pressed={fuentesModo === 'periodo'}
+                onClick={() => setFuentesModo('periodo')}
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  fuentesModo === 'periodo'
+                    ? 'bg-brand-900 text-white shadow-sm'
+                    : 'text-brand-700 hover:bg-white'
+                }`}>
+                Período seleccionado
+              </button>
+            </div>
+          </div>
+          {fuentesData && !isLoadingPortfolio && <p className="px-4 pt-3 text-xs text-brand-500">
+            {fuentesData.total} prospectos en la cartera consultada
+          </p>}
+          {fuentesError && !isLoadingPortfolio && (
+            <Alert tone="danger" className="mx-4 my-3">
+              No se pudieron consultar las fuentes de captación. {fuentesError}
+            </Alert>
+          )}
+          {fuentesModo === 'periodo' && !rangoPeriodo && !isLoadingPortfolio && (
+            <p className="mx-4 my-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              Selecciona un rango de fechas completo para consultar este período.
+            </p>
+          )}
+          {fuentesData?.total === 0 && !isLoadingPortfolio && !fuentesError && (
+            <p className="mx-4 my-3 rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-600">
+              No hay prospectos registrados en {fuentesModo === 'historico'
+                ? 'la cartera accesible para este proyecto.'
+                : 'el período seleccionado. Puedes consultar el histórico completo.'}
+            </p>
+          )}
           {isLoadingPortfolio ? (
             <div className="flex items-center justify-center p-12 text-brand-500">
               <RefreshCw className="h-6 w-6 animate-spin mr-2" />
@@ -2325,7 +2380,7 @@ export function Crm() {
         title={compradorExpediente ? `Expediente único del comprador ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
         description={compradorExpediente?.nombre_completo??''}
         width="max-w-6xl"
-        footer={<Button onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
+        footer={<Button variant="primary" className="bg-brand-900 hover:bg-brand-800" onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
         {compradorExpediente&&
           <ExpedienteCompradorMaestroPanel key={compradorExpediente.id_cliente}
             buyer={compradorExpediente}
