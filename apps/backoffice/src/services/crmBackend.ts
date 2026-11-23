@@ -81,6 +81,42 @@ export interface CrmBuyer {
   proyecto_nombre?: string;
   modalidad?: 'FINANCIADA' | 'CONTADO';
 }
+export interface CrmBuyerPortfolio {
+  id_cliente: number;
+  codigo_cliente: string;
+  nombre_completo: string;
+  /** Operaciones de compra que coinciden con los filtros actuales. */
+  cantidad_compras: number;
+  cantidad_lotes: number;
+  cantidad_proyectos: number;
+  modalidad_resumen: 'CONTADO' | 'FINANCIADA' | 'MIXTA';
+  fecha_ultima_compra: string;
+}
+
+export interface CrmCompradorExpediente {
+  cliente: {
+    id_cliente: number;
+    codigo_cliente: string;
+    nombre_completo: string;
+    tipo_documento: string | null;
+    numero_documento: string | null;
+    telefono: string | null;
+    correo: string | null;
+    estado_civil: string | null;
+    direccion: string | null;
+    distrito: string | null;
+    provincia: string | null;
+    departamento: string | null;
+    pais: string | null;
+  };
+  totales: {
+    cantidad_compras: number;
+    cantidad_lotes: number;
+    cantidad_proyectos: number;
+  };
+  operaciones: CrmBuyer[];
+}
+
 export interface CrmBuyerFilters {
   consulta?: string;
   pagina?: number;
@@ -1419,13 +1455,16 @@ export const crmBackend = {
     coreApi.get<CrmPage<CrmBuyer>>(`/crm/compradores${qs({ consulta, pagina, tamano })}`),
 
   compradoresFiltrados: (f: CrmBuyerFilters) =>
-    coreApi.get<CrmPage<CrmBuyer>>(
+    coreApi.get<CrmPage<CrmBuyerPortfolio>>(
       `/crm/compradores/filtros${qs({
         consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 15,
         idProyecto: f.idProyecto, modalidad: f.modalidad,
         fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
       })}`
     ),
+
+  expedienteMaestroComprador: (idCliente: number) =>
+    coreApi.get<CrmCompradorExpediente>(`/crm/compradores/${idCliente}/expediente`),
 
   compradoresPeriodo: (
     consulta: string | undefined,
