@@ -34,6 +34,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
   onPrepararVenta:(datos:Preseleccion)=>void
 }){
   const {can}=useAuth();
+  const puedeCrear=can('sales.create');
   const [prospectos,setProspectos]=useState<CrmProspect[]>([]);
   const [proyectos,setProyectos]=useState<ProyectoResponse[]>([]);
   const [etapas,setEtapas]=useState<EtapaResponse[]>([]);
@@ -64,7 +65,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
 
   useEffect(()=>{
     let live=true;
-    if(!can('sales.create'))return;
+    if(!puedeCrear)return;
     void Promise.all([crmBackend.prospectos(),coreService.getActiveProjects()])
       .then(([p,proy])=>{
         if(live){
@@ -75,7 +76,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
       })
       .catch(e=>{if(live)toast.error('No se pudieron cargar los catálogos',{description:msg(e)});});
     return ()=>{live=false;};
-  },[can]);
+  },[puedeCrear]);
 
   useEffect(()=>{
     let live=true;
@@ -150,7 +151,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
   };
 
   const crear=async()=>{
-    if(guardando||!can('sales.create')||!idProspecto||items.length<2)return;
+    if(guardando||!puedeCrear||!idProspecto||items.length<2)return;
     setGuardando(true);
     try{
       const creado=await crmBackend.crearOperacionAgrupada({
@@ -410,7 +411,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
           </Select>
         </label>
         {!cargandoCandidatas&&candidatas.length===0&&<p className="text-xs text-brand-600">
-          No se encontró una venta formalizada para este lote. Regístrala primero desde
+          No se encontró una venta registrada para este lote. Regístrala primero desde
           la pestaña Ventas y después vuelve aquí para asociarla.
         </p>}
       </div>
