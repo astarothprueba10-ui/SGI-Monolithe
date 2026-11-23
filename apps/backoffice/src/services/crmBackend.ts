@@ -1493,6 +1493,11 @@ export const crmBackend = {
       })}`
     ),
 
+  fuentesHistorico: (idProyecto?: number) =>
+    coreApi.get<CrmFuentesPeriodo>(
+      `/crm/fuentes/historico${qs({ idProyecto })}`
+    ),
+
   fuentesPeriodo: (
     desde: string,
     hastaExclusivo: string,
