@@ -84,6 +84,7 @@ public class CrmCierreController {
     public JsonNode resumenPeriodo(
             @AuthenticationPrincipal Jwt jwt,
 
+            @RequestParam(required = false) Long idProyecto,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
 
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo) {
@@ -91,7 +92,7 @@ public class CrmCierreController {
         return service.indicadoresPeriodo(
                 actor(jwt),
                 desde,
-                hastaExclusivo);
+                hastaExclusivo, idProyecto);
     }
 
     @GetMapping("/evolucion-mensual")
@@ -99,6 +100,7 @@ public class CrmCierreController {
     public JsonNode evolucionMensual(
             @AuthenticationPrincipal Jwt jwt,
 
+            @RequestParam(required = false) Long idProyecto,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
 
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo) {
@@ -106,7 +108,7 @@ public class CrmCierreController {
         return service.evolucionMensual(
                 actor(jwt),
                 desde,
-                hastaExclusivo);
+                hastaExclusivo, idProyecto);
     }
 
     @GetMapping("/compradores")
@@ -162,24 +164,26 @@ public class CrmCierreController {
     @PreAuthorize("hasAuthority('crm.view')")
     public JsonNode fuentesPeriodo(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) Long idProyecto,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo) {
         return service.fuentesPeriodo(
                 actor(jwt),
                 desde,
-                hastaExclusivo);
+                hastaExclusivo, idProyecto);
     }
 
     @GetMapping("/asesores/periodo")
     @PreAuthorize("hasAuthority('crm.view')")
     public JsonNode asesoresPeriodo(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) Long idProyecto,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
             @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo) {
         return service.asesoresPeriodo(
                 actor(jwt),
                 desde,
-                hastaExclusivo);
+                hastaExclusivo, idProyecto);
     }
 
     @GetMapping("/visitas/periodo")
