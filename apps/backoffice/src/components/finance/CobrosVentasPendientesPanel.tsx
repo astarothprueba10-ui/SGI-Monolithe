@@ -42,6 +42,7 @@ export function CobrosVentasPendientesPanel() {
   const [procesando,setProcesando] = useState(false);
   const [abriendo,setAbriendo] = useState<number|null>(null);
   const [subsanando,setSubsanando] = useState<number|null>(null);
+  const [archivosAbiertos,setArchivosAbiertos] = useState<CrmCobroVentaPendiente|null>(null);
 
   useEffect(()=>{
     const timer = window.setTimeout(()=>{setPagina(1);setConsulta(busqueda.trim());},350);
@@ -67,15 +68,15 @@ export function CobrosVentasPendientesPanel() {
     return ()=>{vigente=false;};
   },[revision]);
 
-  const abrirArchivo = async (item:CrmCobroVentaPendiente) => {
-    if (!item.idComprobante || item.comprobantes!==1) return;
+  const abrirArchivo = async (item:CrmCobroVentaPendiente,idComprobante=item.idComprobante) => {
+    if (!idComprobante) return;
     // Se abre desde el click: el navegador no bloquea la ventana emergente.
     const ventana=window.open('about:blank','_blank');
     if(!ventana) {toast.error('Permite las ventanas emergentes para revisar el comprobante.');return;}
     ventana.opener=null;
     setAbriendo(item.idVenta);
     try {
-      const res=await crmBackend.obtenerComprobanteVentaFinanzas(item.idVenta,item.idComprobante);
+      const res=await crmBackend.obtenerComprobanteVentaFinanzas(item.idVenta,idComprobante);
       if(!res.urlDescarga) throw new Error('No se recibió enlace de lectura.');
       ventana.location.replace(res.urlDescarga);
       setRevisados(old=>old.includes(item.idVenta)?old:[...old,item.idVenta]);
@@ -236,9 +237,15 @@ export function CobrosVentasPendientesPanel() {
                         if(file)void subsanar(item,file).finally(()=>{input.value='';});
                       }}/>
                   </label>}
-                {item.comprobantes>1&&<span className="text-xs text-amber-700">
-                  Evidencia múltiple: desglose de importes pendiente
-                </span>}
+                {item.comprobantes>1&&<>
+                  <Button size="sm" variant="secondary" icon={EyeIcon}
+                    onClick={()=>setArchivosAbiertos(item)}>
+                    Ver {item.comprobantes} comprobantes
+                  </Button>
+                  <span className="text-xs text-amber-700">
+                    Revisión de importes bloqueada hasta desglose bancario
+                  </span>
+                </>}
               </div>
             </TD>
           </TR>)}
@@ -252,6 +259,34 @@ export function CobrosVentasPendientesPanel() {
         </div>
       </div>}
     </Card>
+
+    <Modal open={archivosAbiertos!==null}
+      onClose={()=>setArchivosAbiertos(null)}
+      width="max-w-xl"
+      title="Comprobantes asociados a una venta"
+      description={archivosAbiertos?.codigoVenta}>
+      <div className="space-y-3">
+        <Alert tone="warning" title="Varios comprobantes no equivalen a un solo pago">
+          Estos archivos pueden representar transferencias distintas. Hasta que se
+          registre el importe y la referencia correspondientes a cada uno,
+          no se permitirá aprobar ni conciliar el total como si fuera una única operación.
+        </Alert>
+        {archivosAbiertos?.archivos.map(archivo=><div key={archivo.idComprobante}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 p-3">
+          <div className="min-w-0">
+            <p className="break-all text-xs font-semibold text-brand-900">{archivo.nombreArchivo}</p>
+            <p className="mt-1 text-[11px] text-brand-500">
+              {archivo.tipoMime} · {archivo.estadoRevision}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" icon={EyeIcon}
+            disabled={abriendo!==null}
+            onClick={()=>void abrirArchivo(archivosAbiertos,archivo.idComprobante)}>
+            Ver original
+          </Button>
+        </div>)}
+      </div>
+    </Modal>
 
     <Modal open={seleccion!==null} onClose={()=>{if(!procesando)setSeleccion(null);}}
       width="max-w-xl"
