@@ -1035,6 +1035,74 @@ public class CrmVentaService {
     }
 
     /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
+    /** Revisión de soporte sin confirmar ningún pago. */
+    @Transactional
+    public JsonNode revisarComprobanteVenta(
+            Long actor,Long venta,Long comprobante,Boolean aprobar,String motivo) {
+        validarActor(actor);
+        if (venta==null||venta<=0||comprobante==null||comprobante<=0||aprobar==null
+                || (motivo!=null&&motivo.length()>500)
+                || (aprobar && motivo!=null && !motivo.isBlank())
+                || (!aprobar && (motivo==null || motivo.trim().length()<10))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Decisión o motivo de comprobante inválido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_revisar_comprobante_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS boolean),CAST(? AS varchar))::text
+                """,actor,venta,comprobante,aprobar,motivo);
+    }
+
+    /** Comprobantes de venta, exclusivamente al área financiera. */
+    @Transactional(readOnly = true)
+    public JsonNode rutaComprobanteVentaFinanzas(
+            Long actor,Long venta,Long comprobante) {
+        validarActor(actor);
+        if(venta==null||venta<=0||comprobante==null||comprobante<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Referencia de comprobante inválida.");
+        return ejecutar("""
+                SELECT public.sp_fin_venta_autorizar_lectura_comprobante_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text
+                """,actor,venta,comprobante);
+    }
+
+    /** Solo permite confirmar dinero sobre evidencia documental ya aprobada. */
+    @Transactional
+    public JsonNode conciliarCobroVenta(
+            Long actor,Long venta,Long cuenta,java.time.LocalDate fecha,
+            String referencia,String observaciones) {
+        validarActor(actor);
+        if(venta==null||venta<=0||cuenta==null||cuenta<=0||fecha==null
+          || (referencia!=null&&referencia.length()>100)
+          || (observaciones!=null&&observaciones.length()>300)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cuenta, fecha o referencia de conciliación inválida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_conciliar_cobro_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS date),CAST(? AS varchar),CAST(? AS varchar))::text
+                """,actor,venta,cuenta,fecha,referencia,observaciones);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode cuentasReceptorasVenta(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+                SELECT public.sp_fin_cuentas_venta_receptoras_v1(CAST(? AS bigint))::text
+                """,actor);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode reservasVencidasParaRevision(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+                SELECT public.sp_fin_reservas_vencidas_revision_v1(CAST(? AS bigint))::text
+                """,actor);
+    }
+
     /** No acredita dinero ni altera la contabilidad; acceso restringido. */
     @Transactional(readOnly = true)
     public JsonNode listarCobrosVentaPendientes(
