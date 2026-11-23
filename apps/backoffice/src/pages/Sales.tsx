@@ -9,7 +9,7 @@ import { Table, TD, TH, TR } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
 import { StatusBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
-import { EmptyState } from '../components/ui/Feedback';
+import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -1130,6 +1130,10 @@ export function Sales() {
       || Number(formSaleInstallments) < cuotasMinimas
       || Number(formSaleInstallments) > cuotasMaximas);
 
+  const separacionesPlazoVencido = salesList.filter(s =>
+    s.type === 'Separación' &&
+    leyendaVencimiento(s.expiresAtIso, s.status, instanteActual) === 'Vencida'
+  ).length;
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
@@ -1420,6 +1424,15 @@ export function Sales() {
         ]}
       />
 
+      {tab === 'Separación' && separacionesPlazoVencido > 0 && (
+        <Alert tone="warning" title="Separaciones con plazo vencido" className="mb-4">
+          Hay {separacionesPlazoVencido} {separacionesPlazoVencido === 1 ? 'separación' : 'separaciones'}
+          {' '}con fecha vencida dentro de tu cartera. El estado almacenado puede seguir siendo
+          Pendiente o Vigente; el lote no debe liberarse ni el pago anularse sin revisión
+          comercial y financiera documentada. Revisa la fecha en el detalle de cada separación.
+        </Alert>
+      )}
+
       {/* Contratos pendientes de firma */}
       {tab === 'Contratos' && (
         <Gate permission="sales.view">
@@ -1700,7 +1713,14 @@ export function Sales() {
                       {sale.advisor?.trim() || '—'}
                     </TD>
                     <TD>
-                      <EstadoSeparacionBadge estado={sale.status} />
+                      <div className="flex flex-col items-start gap-1.5">
+                        <EstadoSeparacionBadge estado={sale.status} />
+                        {leyendaVencimiento(sale.expiresAtIso, sale.status, instanteActual) === 'Vencida' && (
+                          <span role="status" className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">
+                            Plazo vencido · revisar
+                          </span>
+                        )}
+                      </div>
                     </TD>
                     <TD align="right">
                       <Button
