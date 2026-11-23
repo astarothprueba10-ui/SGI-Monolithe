@@ -1147,6 +1147,52 @@ public class CrmVentaService {
     }
 
     /** No acredita dinero ni altera la contabilidad; acceso restringido. */
+    /** Planificación multílote: valida comprador, lote y modalidad, pero no crea contratos. */
+    @Transactional
+    public JsonNode crearOperacionAgrupada(
+            Long actor,monolithe.core_service.dto.CrearOperacionAgrupadaRequest req) {
+        validarActor(actor);
+        if(req==null||req.idProspecto()==null||req.idProspecto()<=0
+          ||req.lotes()==null||!req.lotes().isArray()
+          ||req.lotes().size()<2||req.lotes().size()>20
+          ||(req.observaciones()!=null&&req.observaciones().length()>500))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La negociación debe contener entre 2 y 20 lotes con sus modalidades.");
+        return ejecutar("""
+                SELECT public.sp_crm_crear_operacion_agrupada_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS jsonb),CAST(? AS varchar))::text
+                """,actor,req.idProspecto(),req.lotes().toString(),req.observaciones());
+    }
+
+    /** Vista resumida y paginada con comprador único y contratos por cada lote. */
+    @Transactional(readOnly = true)
+    public JsonNode listarOperacionesAgrupadas(Long actor,Integer pagina,Integer tamano) {
+        validarActor(actor);
+        final int p=pagina==null?1:pagina;
+        final int t=tamano==null?20:tamano;
+        if(p<1||p>10000||t<1||t>50)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de adquisiciones agrupadas inválida.");
+        return ejecutar("""
+                SELECT public.sp_crm_listar_operaciones_agrupadas_v1(
+                  CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer))::text
+                """,actor,p,t);
+    }
+
+    /** Vincula solamente ventas del mismo cliente, lote y modalidad. */
+    @Transactional
+    public JsonNode vincularVentaAgrupada(Long actor,Long idOperacion,Long idVenta) {
+        validarActor(actor);
+        if(idOperacion==null||idOperacion<=0||idVenta==null||idVenta<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Operación agrupada o venta inválida.");
+        return ejecutar("""
+                SELECT public.sp_crm_vincular_venta_operacion_agrupada_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text
+                """,actor,idOperacion,idVenta);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode listarCobrosVentaPendientes(
             Long actor,String busqueda,Integer pagina,Integer tamano) {
