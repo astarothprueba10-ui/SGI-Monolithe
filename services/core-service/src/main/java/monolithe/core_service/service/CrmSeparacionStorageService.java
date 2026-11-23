@@ -261,6 +261,19 @@ public class CrmSeparacionStorageService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
         }
         JsonNode info = ventaService.rutaComprobanteVenta(actor, idVenta, idComprobante);
+        return firmarComprobanteVenta(info);
+    }
+
+    /** Finanzas tiene permiso propio; no se amplía el acceso comercial a otras carteras. */
+    public EnlaceLecturaVoucherResponse prepararLecturaComprobanteVentaFinanzas(
+            Long actor,Long idVenta,Long idComprobante) {
+        if(actor==null||actor<=0)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        return firmarComprobanteVenta(
+                ventaService.rutaComprobanteVentaFinanzas(actor,idVenta,idComprobante));
+    }
+
+    private EnlaceLecturaVoucherResponse firmarComprobanteVenta(JsonNode info) {
         String bucket = info.path("bucket").asString("");
         String clave = info.path("clave_archivo").asString("");
         String nombre = info.path("nombre_archivo").asString("");
