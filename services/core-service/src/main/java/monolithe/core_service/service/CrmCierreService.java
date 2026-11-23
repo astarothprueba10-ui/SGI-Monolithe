@@ -251,6 +251,22 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode operacionesComprador(Long actor,String consulta,Integer pagina,Integer tamano,
+            Long proyecto,String modalidad,
+            java.time.LocalDate fechaDesde,java.time.LocalDate fechaHasta) {
+        validarActor(actor);
+        validarPagina(pagina,tamano);
+        validarTexto(consulta,120,"busqueda");
+        if ((proyecto != null && proyecto <= 0)
+                || (modalidad != null && !java.util.Set.of("CONTADO","FINANCIADA").contains(modalidad))
+                || (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta))) {
+            throw badRequest("Filtros de operaciones invalidos.");
+        }
+        return ejecutar(() -> repository.operacionesComprador(actor,consulta,pagina,tamano,
+                proyecto,modalidad,fechaDesde,fechaHasta),false);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode expedienteMaestroComprador(Long actor,Long cliente) {
         validarActor(actor);
         if (cliente == null || cliente <= 0) {
