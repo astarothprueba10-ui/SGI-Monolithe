@@ -26,6 +26,7 @@ import {
 } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
 import { DocumentacionContratosPanel } from '../components/sales/DocumentacionContratosPanel';
+import { OperacionesAgrupadasPanel } from '../components/sales/OperacionesAgrupadasPanel';
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
@@ -174,7 +175,7 @@ export function Sales() {
   const puedeReasignarComprador = can('crm.edit') && user.roles.some((r) =>
     r === 'Gerencia' || r === 'Supervisor comercial');
   const [tab, setTab] = useState<
-    'Separación' | 'Venta' | 'Contratos' | 'Anexos'
+    'Separación' | 'Venta' | 'Agrupadas' | 'Contratos' | 'Anexos'
   >('Separación');
   const [filtrosVenta, setFiltrosVenta] = useState<FiltrosVentas>(FILTROS_VENTAS_INICIALES);
   const [paginaVentas, setPaginaVentas] = useState(1);
@@ -199,6 +200,9 @@ export function Sales() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
+  const [preseleccionAgrupada,setPreseleccionAgrupada] = useState<{
+    idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
+  }|null>(null);
   const [origenPlano, setOrigenPlano] = useState<{
     idProyecto:number; idEtapa:number; idLote:number; operacion:'Separacion'|'Venta'
   } | null>(() => {
@@ -583,6 +587,17 @@ export function Sales() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(()=>{
+    if(!preseleccionAgrupada||!isModalOpen||loadingFormData||prospectsList.length===0
+        ||tab!=='Venta')return;
+    const seleccion=preseleccionAgrupada;
+    if(!prospectsList.some(p=>p.id_prospecto===seleccion.idProspecto))return;
+    setPreseleccionAgrupada(null);
+    void handleSelectProspect(seleccion.idProspecto);
+    // Al seleccionar comprador se conserva el origenPlano para preseleccionar lote.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preseleccionAgrupada,isModalOpen,loadingFormData,prospectsList,tab]);
+
   const cerrarModalOperacion = () => {
     if (
       registroSeparacionEnCursoRef.current ||
@@ -591,6 +606,7 @@ export function Sales() {
     ) return;
 
     setIsModalOpen(false);
+    setPreseleccionAgrupada(null);
     setOrigenPlano(null);
     setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
@@ -1353,7 +1369,9 @@ export function Sales() {
           ? 'Gestiona separaciones según la política vigente, métodos de pago y reservas de lotes.'
           : tab === 'Venta'
             ? 'Gestiona las ventas, modalidades de financiamiento y contratos asociados.'
-            : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
+            : tab === 'Agrupadas'
+              ? 'Organiza compras de múltiples lotes por comprador, proyecto y modalidad.'
+              : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
         actions={
           <div className="flex items-center gap-2">
             {tab === 'Venta' && (
@@ -1414,6 +1432,10 @@ export function Sales() {
             count: salesCount
           },
           {
+            id: 'Agrupadas',
+            label: 'Compras agrupadas'
+          },
+          {
             id: 'Contratos',
             label: 'Contratos pendientes de firma'
           },
@@ -1431,6 +1453,23 @@ export function Sales() {
           Pendiente o Vigente; el lote no debe liberarse ni el pago anularse sin revisión
           comercial y financiera documentada. Revisa la fecha en el detalle de cada separación.
         </Alert>
+      )}
+
+      {tab === 'Agrupadas' && (
+        <Gate permission="sales.view">
+          <OperacionesAgrupadasPanel onPrepararVenta={(datos)=>{
+            setOrigenPlano({
+              idProyecto:datos.idProyecto,idEtapa:datos.idEtapa,
+              idLote:datos.idLote,operacion:'Venta'
+            });
+            setPreseleccionAgrupada(datos);
+            setTab('Venta');
+            handleOpenModal();
+            toast.info('Formaliza el lote de la negociación',{
+              description:'Los datos del cliente y lote se preseleccionarán; la compra se valida individualmente.'
+            });
+          }}/>
+        </Gate>
       )}
 
       {/* Contratos pendientes de firma */}
