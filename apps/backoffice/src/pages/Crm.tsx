@@ -291,7 +291,6 @@ export function Crm() {
   const [buyersPage, setBuyersPage] = useState(1);
   const [buyersQuery, setBuyersQuery] = useState('');
   const [buyersModalidad, setBuyersModalidad] = useState<'' | 'CONTADO' | 'FINANCIADA'>('');
-  const [buyersAlerta, setBuyersAlerta] = useState<'' | 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA'>('');
   const [buyersFechaDesde, setBuyersFechaDesde] = useState('');
   const [buyersFechaHasta, setBuyersFechaHasta] = useState('');
   const [buyersLoading, setBuyersLoading] = useState(false);
@@ -523,10 +522,9 @@ export function Crm() {
     consulta: buyersQuery.trim() || undefined,
     idProyecto: projectFilter === '' ? undefined : projectFilter,
     modalidad: buyersModalidad || undefined,
-    alerta: buyersAlerta || undefined,
     fechaDesde: buyersFechaDesde || undefined,
     fechaHasta: buyersFechaHasta || undefined,
-  }), [buyersQuery, projectFilter, buyersModalidad, buyersAlerta, buyersFechaDesde, buyersFechaHasta]);
+  }), [buyersQuery, projectFilter, buyersModalidad, buyersFechaDesde, buyersFechaHasta]);
   const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyerFilters);
   const leadRequest = useRef(0); const buyerRequest = useRef(0);
 
@@ -1215,7 +1213,6 @@ export function Crm() {
       filtros: construirFiltrosExportacion(rango),
       consultaCompradores: qComp,
       modalidadCompradores: tab === 'compradores' ? buyersModalidad || undefined : undefined,
-      alertaCompradores: tab === 'compradores' ? buyersAlerta || undefined : undefined,
       notificarProgreso: (msg) => {
         setExportStatus(msg);
         toast.loading(msg, { id: 'crm-export' });
@@ -2139,21 +2136,6 @@ export function Crm() {
                   <option value="CONTADO">Contado</option>
                 </Select>
               </div>
-              <div className="w-full sm:w-44">
-                <label className="mb-1.5 block text-xs font-medium text-brand-600">Alerta financiera</label>
-                <Select aria-label="Filtrar alerta financiera" value={buyersAlerta}
-                  onChange={(e) => {
-                    setBuyersAlerta(e.target.value as typeof buyersAlerta);
-                    setBuyersPage(1);
-                  }} className="w-full">
-                  <option value="">Todas</option>
-                  <option value="SI">Sí</option>
-                  <option value="NO">No</option>
-                  <option value="PENDIENTE">Pendiente</option>
-                  <option value="SIN_DATOS">Sin datos</option>
-                  <option value="NO_APLICA">No aplica</option>
-                </Select>
-              </div>
               <div className="w-full sm:w-40">
                 <label className="mb-1.5 block text-xs font-medium text-brand-600">Formalización desde</label>
                 <Input type="date" aria-label="Formalización desde" value={buyersFechaDesde}
@@ -2167,7 +2149,7 @@ export function Crm() {
                   onChange={(e) => { setBuyersFechaHasta(e.target.value); setBuyersPage(1); }} />
               </div>
               <Button icon={RefreshCw} size="sm" onClick={() => {
-                setBuyersQuery(''); setBuyersModalidad(''); setBuyersAlerta('');
+                setBuyersQuery(''); setBuyersModalidad('');
                 setBuyersFechaDesde(''); setBuyersFechaHasta(''); setBuyersPage(1);
               }}>Limpiar filtros</Button>
             </div>
@@ -2185,7 +2167,7 @@ export function Crm() {
             />
           ) : (
             <>
-              <Table
+              <Table columnWidths={[155, 235, 165, 280, 145, 155, 180, 155]}
                 head={
                   <>
                     <TH>Código cliente</TH>
@@ -2195,50 +2177,46 @@ export function Crm() {
                     <TH>Modalidad</TH>
                     <TH align="right">Monto venta</TH>
                     <TH>Fecha formalización</TH>
-                    <TH>Alerta financiera</TH>
                     <TH align="right">Expediente</TH>
                   </>
                 }
               >
-                {buyersList.map((buyer) => {
-                  const alerta = buyer.modalidad === 'CONTADO'
-                    ? 'NO_APLICA' : buyer.alerta_financiera ?? 'PENDIENTE';
-                  const estilosAlerta = alerta === 'SI'
-                    ? 'border-red-200 bg-red-50 text-red-700'
-                    : alerta === 'NO' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : alerta === 'PENDIENTE' ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-slate-200 bg-slate-50 text-slate-600';
-                  const etiquetaAlerta = alerta === 'SI' ? 'Sí'
-                    : alerta === 'NO' ? 'No' : alerta === 'NO_APLICA' ? 'No aplica'
-                    : alerta === 'SIN_DATOS' ? 'Sin datos' : 'Pendiente';
-                  return <TR key={`${buyer.id_venta ?? buyer.id_cliente}-${buyer.id_contrato ?? 0}`}>
-                    <TD className="font-mono text-[12px] text-brand-500">{buyer.codigo_cliente}</TD>
-                    <TD className="font-medium text-brand-900">{buyer.nombre_completo}</TD>
-                    <TD className="text-brand-700 font-semibold">{buyer.codigo_lote}</TD>
+                {buyersList.map((buyer) => (
+                  <TR
+                    key={`${buyer.id_venta ?? buyer.id_cliente}-${buyer.id_contrato ?? 0}`}
+                    className="odd:bg-white even:bg-brand-50/20 hover:bg-brand-50/70"
+                  >
+                    <TD className="whitespace-nowrap">
+                      <span className="rounded-md bg-brand-50 px-2.5 py-1.5 font-mono text-xs font-semibold text-brand-700">
+                        {buyer.codigo_cliente}
+                      </span>
+                    </TD>
+                    <TD className="whitespace-nowrap font-medium text-brand-900">
+                      {buyer.nombre_completo}
+                    </TD>
+                    <TD className="whitespace-nowrap font-semibold text-brand-800">
+                      {buyer.codigo_lote}
+                    </TD>
                     <TD>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[12px]">{buyer.codigo_contrato}</span>
+                      <div className="flex min-w-0 flex-col items-start gap-2">
+                        <span className="whitespace-nowrap rounded-md bg-slate-50 px-2.5 py-1 font-mono text-xs font-semibold tracking-tight text-brand-900">
+                          {buyer.codigo_contrato}
+                        </span>
                         <Badge tone="brand">{buyer.estado_contrato}</Badge>
                       </div>
                     </TD>
-                    <TD><Badge tone={buyer.modalidad === 'FINANCIADA' ? 'info' : 'neutral'}>
-                      {buyer.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado'}
-                    </Badge></TD>
-                    <TD align="right" className="font-semibold text-brand-900">
+                    <TD className="whitespace-nowrap">
+                      <Badge tone={buyer.modalidad === 'FINANCIADA' ? 'info' : 'neutral'}>
+                        {buyer.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado'}
+                      </Badge>
+                    </TD>
+                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
                       {currency(buyer.precio_venta)}
                     </TD>
-                    <TD className="text-brand-500 tabular text-[12px]">
+                    <TD className="whitespace-nowrap text-xs tabular text-brand-600">
                       {formatDateLima(buyer.fecha_formalizacion ?? buyer.fecha_venta)}
                     </TD>
-                    <TD>
-                      <span className={`inline-flex whitespace-nowrap rounded border px-2 py-1 text-xs font-semibold ${estilosAlerta}`}
-                        title={buyer.fecha_evaluacion
-                          ? `Última evaluación: ${formatDateLima(buyer.fecha_evaluacion)}`
-                          : 'No existe evaluación vigente registrada'}>
-                        {etiquetaAlerta}
-                      </span>
-                    </TD>
-                    <TD align="right">
+                    <TD align="right" className="whitespace-nowrap">
                       <Gate permission="sales.view">
                         <Button size="sm" variant="ghost" icon={EyeIcon}
                           onClick={() => setCompradorExpediente(buyer)}
@@ -2247,8 +2225,8 @@ export function Crm() {
                         </Button>
                       </Gate>
                     </TD>
-                  </TR>;
-                })}
+                  </TR>
+                ))}
               </Table>
               <Pagination
                 page={buyersPage}
