@@ -39,8 +39,7 @@ const BUYER_COLS = [
   { header: 'Proyecto' },
   { header: 'Modalidad' },
   { header: 'Precio venta (S/)' },
-  { header: 'Fecha formalización' },
-  { header: 'Alerta financiera' }
+  { header: 'Fecha formalización' }
 ];
 
 function sanitizeText(value: unknown): string {
@@ -220,9 +219,6 @@ function renderBuyerRow(ws: ExcelJS.Worksheet, b: CrmBuyer, rowNum: number, isAl
   row.getCell(9).alignment = { horizontal: 'right' };
   row.getCell(10).value = formatDateLimaExcel(b.fecha_formalizacion ?? b.fecha_venta);
   row.getCell(10).numFmt = 'dd/mm/yyyy';
-  row.getCell(11).value = b.modalidad === 'CONTADO' ? 'No aplica'
-    : b.alerta_financiera === 'SI' ? 'Sí' : b.alerta_financiera === 'NO' ? 'No'
-    : b.alerta_financiera === 'SIN_DATOS' ? 'Sin datos' : 'Pendiente';
   styleDataRow(ws, rowNum, isAlt);
 }
 
@@ -357,7 +353,6 @@ export interface OpcionesExportarCrm {
   filtros: ParametrosFiltroCrm;
   consultaCompradores?: string;
   modalidadCompradores?: 'FINANCIADA' | 'CONTADO';
-  alertaCompradores?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
   notificarProgreso?: (mensaje: string) => void;
 }
 
@@ -397,8 +392,7 @@ async function consultarCompradoresExport(
   filtros: ParametrosFiltroCrm,
   consulta?: string,
   progreso?: (msg: string) => void,
-  modalidad?: 'FINANCIADA' | 'CONTADO',
-  alerta?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA'
+  modalidad?: 'FINANCIADA' | 'CONTADO'
 ): Promise<CrmBuyer[]> {
   const fechaDesde = filtros.desde.slice(0, 10);
   const fechaHasta = new Date(Date.parse(filtros.hastaExclusivo.slice(0, 10) + 'T00:00:00Z') - 86400000)
@@ -406,7 +400,7 @@ async function consultarCompradoresExport(
   return consultarTodasLasPaginas(
     (pagina) => crmBackend.compradoresFiltrados({
       consulta, pagina, tamano: TAMANO_PAGINA_EXPORT,
-      idProyecto: filtros.idProyecto, modalidad, alerta, fechaDesde, fechaHasta
+      idProyecto: filtros.idProyecto, modalidad, fechaDesde, fechaHasta
     }),
     claveComprador,
     (act, tot, pag) => progreso?.(`Compradores: página ${pag} (${act}/${tot})`)
@@ -416,14 +410,14 @@ async function consultarCompradoresExport(
 export async function ejecutarExportacionExcelCompleta(
   opciones: OpcionesExportarCrm
 ): Promise<{ nombre: string; totalLeads: number; totalPotenciales: number; totalCompradores: number }> {
-  const { filtros, consultaCompradores, modalidadCompradores, alertaCompradores, notificarProgreso } = opciones;
+  const { filtros, consultaCompradores, modalidadCompradores, notificarProgreso } = opciones;
   notificarProgreso?.('Consultando leads...');
   const leads = await consultarLeadsExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando clientes potenciales...');
   const potenciales = await consultarPotencialesExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando compradores...');
   const compradores = await consultarCompradoresExport(
-    filtros, consultaCompradores, notificarProgreso, modalidadCompradores, alertaCompradores);
+    filtros, consultaCompradores, notificarProgreso, modalidadCompradores);
   notificarProgreso?.('Generando archivo Excel...');
   const blob = await generarExcelCrm({ leads, potenciales, compradores });
   const nombre = obtenerNombreArchivoExcel();
