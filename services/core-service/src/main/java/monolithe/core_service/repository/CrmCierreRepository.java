@@ -249,6 +249,13 @@ public class CrmCierreRepository {
             hastaExclusivo);
    }
 
+   public String fuentesHistorico(Long actor, Long proyecto) {
+       return jdbc.queryForObject("""
+             SELECT public.sp_crm_fuentes_historico_v1(
+                CAST(? AS bigint),CAST(? AS bigint))::text
+             """,String.class,actor,proyecto);
+   }
+
    public String fuentesPeriodoProyecto(Long actor,
           java.time.OffsetDateTime desde,java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
       return jdbc.queryForObject("""
