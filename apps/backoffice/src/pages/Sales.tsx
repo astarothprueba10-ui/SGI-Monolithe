@@ -2605,6 +2605,8 @@ export function Sales() {
         lote={datosVentaValidados?.codigoLote ?? ''}
         proyecto={availableProjects.find((p) => p.idProyecto === Number(formProjectId))?.nombre ?? ''}
         idProyectoVenta={Number(formProjectId)}
+        compradorExistente={(prospectsList.find(p => p.id_prospecto === selectedProspectId)
+          ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO'}
         modalidad={datosVentaValidados?.datos.modalidad ?? 'CONTADO'}
         puedeReasignar={puedeReasignarComprador}
         asesorNombre={prospectsList.find((p) => p.id_prospecto === selectedProspectId)?.asesor_nombre ?? ''}
