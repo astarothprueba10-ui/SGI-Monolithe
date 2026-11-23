@@ -521,6 +521,19 @@ public class CrmVentaController {
         }
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
+        /** Cobros de venta no verificados por Finanzas: consulta sin efectos contables. */
+        @GetMapping("/finanzas/ventas/cobros-pendientes")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarCobrosVentaPendientes(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required = false) String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarCobrosVentaPendientes(
+                            obtenerActor(jwt),busqueda,pagina,tamano));
+        }
+
         @GetMapping("/finanzas/movimientos")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<JsonNode> movimientosFinanzas(
