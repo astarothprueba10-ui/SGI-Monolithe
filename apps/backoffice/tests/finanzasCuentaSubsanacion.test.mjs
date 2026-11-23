@@ -10,6 +10,7 @@ const controller=leer('../../../services/core-service/src/main/java/monolithe/co
 const storage=leer('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmSeparacionStorageService.java');
 const sql140=leer('../../../database/migrations/140_fin_alta_cuentas_receptoras_gerencia_v1.sql');
 const sql141=leer('../../../database/migrations/141_fin_subsanar_venta_sin_comprobante_v1.sql');
+const sql142=leer('../../../database/migrations/142_fin_listar_comprobantes_multiples_venta_v1.sql');
 
 test('Cuentas receptoras solo Gerencia con finance.edit y datos protegidos',()=>{
   assert.match(finance,/id:'cuentas_receptoras'/);
@@ -47,4 +48,15 @@ test('Subsanación añade evidencia existente en Storage y no acredita dinero',(
   assert.match(sql141,/dineroConfirmado',FALSE/);
   assert.match(sql141,/REVOKE ALL ON FUNCTION/);
   assert.doesNotMatch(sql141,/UPDATE public\.pag_pagos/);
+});
+
+test('Comprobantes múltiples se pueden ver pero no atribuir a un pago único',()=>{
+  assert.match(cobros,/Ver \{item\.comprobantes\} comprobantes/);
+  assert.match(cobros,/archivosAbiertos\?\.archivos\.map/);
+  assert.match(cobros,/Revisión de importes bloqueada hasta desglose bancario/);
+  assert.match(cobros,/no se permitirá aprobar ni conciliar el total/);
+  assert.match(sql142,/jsonb_agg\(jsonb_build_object/);
+  assert.match(sql142,/idComprobante/);
+  assert.match(sql142,/REVOKE ALL ON FUNCTION/);
+  assert.doesNotMatch(sql142,/INSERT INTO public\.pag_pagos/);
 });
