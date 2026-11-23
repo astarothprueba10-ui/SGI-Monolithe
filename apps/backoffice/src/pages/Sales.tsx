@@ -1018,6 +1018,14 @@ export function Sales() {
       if (!solicitud.datos.datosComprador) {
         throw new Error('Revise primero los datos del comprador.');
       }
+      // Una venta derivada de negociación no puede cambiar comprador, lote
+      // ni modalidad y quedar vinculada incorrectamente.
+      if(asociacionAgrupadaPendiente
+        &&(solicitud.datos.idProspecto!==asociacionAgrupadaPendiente.idProspecto
+          ||solicitud.datos.idLote!==asociacionAgrupadaPendiente.idLote
+          ||solicitud.datos.modalidad!==asociacionAgrupadaPendiente.modalidad)){
+        throw new Error('La venta no coincide con el comprador, lote y modalidad de la compra agrupada. Revisa la selección antes de registrar.');
+      }
       const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
       if (errorPago) throw new Error(errorPago);
       const cargados: CrmVoucherVenta[] = [];
