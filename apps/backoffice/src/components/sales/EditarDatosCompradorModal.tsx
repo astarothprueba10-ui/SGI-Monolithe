@@ -15,6 +15,7 @@ interface Props {
   lote: string;
   proyecto: string;
   idProyectoVenta: number;
+  compradorExistente: boolean;
   modalidad: 'CONTADO' | 'FINANCIADA';
   puedeReasignar: boolean;
   asesorNombre: string;
@@ -29,7 +30,7 @@ const VACIO: LeadFormValues = {
 };
 
 export function EditarDatosCompradorModal({
-  open, idProspecto, lote, proyecto, idProyectoVenta, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
+  open, idProspecto, lote, proyecto, idProyectoVenta, compradorExistente, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
 }: Props) {
   const [form, setForm] = useState<LeadFormValues>(VACIO);
   const [estadoCivil, setEstadoCivil] = useState<EstadoCivilReniec | ''>('');
@@ -315,12 +316,18 @@ export function EditarDatosCompradorModal({
             <p className="mt-1 text-[11px] text-brand-500">
               El proyecto está asociado al lote elegido. Para comprar en otro, cambia el lote antes de validar.
             </p>
-            {campo('origenCodigo', 'Canal de origen *', <Select value={form.origenCodigo}
+            {campo('origenCodigo', 'Canal de origen original *', <Select value={form.origenCodigo}
+              disabled={compradorExistente}
               onChange={e => setForm(p => ({...p,origenCodigo:e.target.value}))}
               {...propsError('origenCodigo')}>
               <option value="">Selecciona un canal...</option>
               {catalogos?.origenes.map(o => <option value={o.codigo} key={o.codigo}>{o.nombre}</option>)}
             </Select>)}
+            {compradorExistente && (
+              <p className="mt-1 text-[11px] text-brand-500">
+                Es una recompra: se conserva la fuente de captación original del cliente.
+              </p>
+            )}
             {campo('tipoDocumento', 'Tipo de documento *', <Select value={form.tipoDocumento}
               onChange={e => {
                 setIdentidadVerificada(false);
