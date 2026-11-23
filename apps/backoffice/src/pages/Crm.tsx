@@ -43,6 +43,7 @@ import {
   crmBackend,
   type CrmAdvisor,
   type CrmBuyer,
+  type CrmBuyerFilters,
   type CrmCatalogs,
   type CrmDetail,
   type CrmFollowUpCreate,
@@ -289,6 +290,10 @@ export function Crm() {
   const [buyersTotal, setBuyersTotal] = useState(0);
   const [buyersPage, setBuyersPage] = useState(1);
   const [buyersQuery, setBuyersQuery] = useState('');
+  const [buyersModalidad, setBuyersModalidad] = useState<'' | 'CONTADO' | 'FINANCIADA'>('');
+  const [buyersAlerta, setBuyersAlerta] = useState<'' | 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA'>('');
+  const [buyersFechaDesde, setBuyersFechaDesde] = useState('');
+  const [buyersFechaHasta, setBuyersFechaHasta] = useState('');
   const [buyersLoading, setBuyersLoading] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -479,7 +484,8 @@ export function Crm() {
         puedeVerGestionGlobal && rangoPeriodo
           ? crmBackend.resumenPeriodo(
             rangoPeriodo.desde,
-            rangoPeriodo.hastaExclusivo
+            rangoPeriodo.hastaExclusivo,
+            projectFilter === '' ? undefined : projectFilter
           )
           : Promise.resolve(null)
       ]);
@@ -502,7 +508,7 @@ export function Crm() {
 
       setErrorMsg(msg);
     }
-  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
+  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor, projectFilter]);
 
   // El período global solo entra en consultas de Visitas; Leads y Potenciales
   // dependen únicamente de las fechas propias de sus tablas.
@@ -513,7 +519,15 @@ export function Crm() {
     sinAsignar: puedeVerGestionGlobal ? onlyUnassigned || undefined : undefined,
     idProyecto: projectFilter === '' ? undefined : projectFilter
   }), [query, stage, origin, advisorFilter, onlyUnassigned, projectFilter, puedeVerGestionGlobal]);
-  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyersQuery);
+  const buyerFilters = useMemo<CrmBuyerFilters>(() => ({
+    consulta: buyersQuery.trim() || undefined,
+    idProyecto: projectFilter === '' ? undefined : projectFilter,
+    modalidad: buyersModalidad || undefined,
+    alerta: buyersAlerta || undefined,
+    fechaDesde: buyersFechaDesde || undefined,
+    fechaHasta: buyersFechaHasta || undefined,
+  }), [buyersQuery, projectFilter, buyersModalidad, buyersAlerta, buyersFechaDesde, buyersFechaHasta]);
+  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyerFilters);
   const leadRequest = useRef(0); const buyerRequest = useRef(0);
 
   const loadLeads = useCallback(async () => {
@@ -568,9 +582,7 @@ export function Crm() {
 
     try {
       // La tabla de compradores tampoco hereda el período global.
-      const res = await crmBackend.compradores(
-        buyersQuery.trim(),buyersPage,15
-      );
+      const res = await crmBackend.compradoresFiltrados({ ...buyerFilters, pagina: buyersPage, tamano: 15 });
 
       if (request !== buyerRequest.current) return;
       setBuyersList(res.items ?? []);
@@ -593,7 +605,7 @@ export function Crm() {
     } finally {
       if (request === buyerRequest.current) setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage, refreshTableCounts]
+  }, [buyerFilters, buyersPage, refreshTableCounts]
   );
 
 
@@ -625,7 +637,8 @@ export function Crm() {
 
       const res = await crmBackend.fuentesPeriodo(
         rangoPeriodo.desde,
-        rangoPeriodo.hastaExclusivo
+        rangoPeriodo.hastaExclusivo,
+        projectFilter === '' ? undefined : projectFilter
       );
 
       setFuentesData(res);
@@ -644,7 +657,7 @@ export function Crm() {
     } finally {
       setIsLoadingPortfolio(false);
     }
-  }, [rangoPeriodo]);
+  }, [rangoPeriodo, projectFilter]);
 
 
   useEffect(() => {
@@ -745,7 +758,8 @@ export function Crm() {
 
     crmBackend.evolucionMensual(
       rangoEvolucion.desde,
-      rangoEvolucion.hastaExclusivo
+      rangoEvolucion.hastaExclusivo,
+      projectFilter === '' ? undefined : projectFilter
     )
       .then((resultado) => {
         if (activo) {
@@ -769,7 +783,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [rangoEvolucion, puedeVerGestionGlobal]);
+  }, [rangoEvolucion, puedeVerGestionGlobal, projectFilter]);
 
 
   useEffect(() => {
@@ -787,7 +801,8 @@ export function Crm() {
 
     void crmBackend.asesoresPeriodo(
       rangoPeriodo.desde,
-      rangoPeriodo.hastaExclusivo
+      rangoPeriodo.hastaExclusivo,
+      projectFilter === '' ? undefined : projectFilter
     )
       .then((res) => {
         if (activo) {
@@ -816,7 +831,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [tab, rangoPeriodo]);
+  }, [tab, rangoPeriodo, projectFilter]);
 
   const handleOpenNewLead = () => {
     setSolicitudId(crypto.randomUUID());
@@ -1251,7 +1266,35 @@ export function Crm() {
         }
       />
 
+      <section className="mb-4 rounded-xl border border-brand-100 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-brand-900">Proyecto inmobiliario</h2>
+            <p className="mt-1 text-xs text-brand-500">
+              Segmenta los indicadores, gráficos y carteras. Por defecto se muestran todos.
+            </p>
+          </div>
+          <Select
+            aria-label="Proyecto global del CRM"
+            value={projectFilter}
+            onChange={(e) => {
+              setProjectFilter(e.target.value ? Number(e.target.value) : '');
+              setPage(1);
+              setBuyersPage(1);
+              setAgendaPage(1);
+            }}
+            className="w-full sm:w-80"
+          >
+            <option value="">Todos los proyectos</option>
+            {(catalogs?.proyectos ?? []).map((proyecto) => (
+              <option key={proyecto.id} value={proyecto.id}>{proyecto.nombre}</option>
+            ))}
+          </Select>
+        </div>
+      </section>
+
       <CrmPeriodoGlobal
+        descripcion="Actualiza indicadores y gráficos; las tablas conservan sus fechas propias."
         modo={periodoModo}
         onModoChange={(modo) => {
           setPeriodoModo(modo);
@@ -1521,30 +1564,6 @@ export function Crm() {
                 )}
 
 
-                {/* Proyecto */}
-                <div className="w-full sm:w-52">
-                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
-                    Proyecto
-                  </label>
-                  <Select
-                    aria-label="Filtrar por proyecto"
-                    value={projectFilter}
-                    onChange={(e) => {
-                      setProjectFilter(
-                        e.target.value ? Number(e.target.value) : ''
-                      );
-                      setPage(1);
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Todos los proyectos</option>
-                    {(catalogs?.proyectos ?? []).map((proyecto) => (
-                      <option key={proyecto.id} value={proyecto.id}>
-                        {proyecto.nombre}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
               </div>
 
               {/* FILA 2: Fechas y limpieza de filtros */}
