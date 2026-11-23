@@ -140,6 +140,15 @@ public class CrmCierreController {
                 idProyecto,modalidad,fechaDesde,fechaHasta);
     }
 
+    /** Ficha única y compras accesibles, agrupables por proyecto. */
+    @GetMapping("/compradores/{idCliente}/expediente")
+    @PreAuthorize("hasAuthority('crm.view')")
+    public JsonNode expedienteMaestroComprador(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long idCliente) {
+        return service.expedienteMaestroComprador(actor(jwt),idCliente);
+    }
+
     @GetMapping("/compradores/periodo")
     @PreAuthorize("hasAuthority('crm.view')")
     public JsonNode compradoresPeriodo(
