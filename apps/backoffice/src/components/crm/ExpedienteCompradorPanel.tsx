@@ -73,29 +73,6 @@ export function ExpedienteCompradorPanel({buyer}:{buyer:CrmBuyer}) {
        <UserCheck className="h-3.5 w-3.5"/>Los datos personales y pagos se muestran desde el expediente seguro de la venta.
      </p>
    </section>
-   {(buyer.modalidad==='FINANCIADA'||detalle?.modalidad==='FINANCIADA')&&
-     <section className="rounded-xl border border-brand-100 bg-white p-4 sm:p-5">
-       <h3 className="text-sm font-bold text-brand-900">Evaluación y riesgo crediticio</h3>
-       <p className="mt-1 text-xs text-brand-500">
-         Indicador externo informativo. La aprobación o revisión es responsabilidad del personal autorizado.
-       </p>
-       <dl className="mt-3 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-         <Campo etiqueta="Alerta financiera" valor={
-           buyer.alerta_financiera==='SI'?'Sí — requiere revisión':
-           buyer.alerta_financiera==='NO'?'Sin alerta en la evaluación vigente':
-           buyer.alerta_financiera==='SIN_DATOS'?'Sin datos concluyentes':
-           'Pendiente de evaluación'
-         }/>
-         <Campo etiqueta="Proveedor" valor={buyer.proveedor_evaluacion||'No consultado'}/>
-         <Campo etiqueta="Última consulta" valor={buyer.fecha_evaluacion
-           ? new Date(buyer.fecha_evaluacion).toLocaleString('es-PE',{timeZone:'America/Lima'})
-           : 'No registrada'}/>
-       </dl>
-       <p className="mt-3 text-xs text-brand-500">
-         El seguimiento de cuotas se realiza en el cronograma; cualquier medida contractual
-         requiere el procedimiento y la revisión legal previstos en el sistema.
-       </p>
-     </section>}
    <DetalleVentaAmpliadoPanel idVenta={idVenta}/>
    {detalle?.modalidad==='FINANCIADA'&&<CronogramaVentaPanel idVenta={idVenta}/>}
    <section className="rounded-xl border border-brand-100 bg-white p-3 sm:p-5">
