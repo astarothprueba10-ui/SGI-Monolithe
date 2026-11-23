@@ -430,6 +430,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/crm_compradores_unicos_131_extension.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/131_crm_compradores_unicos_expediente_maestro_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/crm_compradores_unicos_131_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/132_crm_fuentes_captacion_historico_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_fuentes_historico_132_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
