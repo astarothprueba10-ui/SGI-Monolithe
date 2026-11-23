@@ -22,6 +22,8 @@ import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
 import monolithe.core_service.dto.ConciliarCobroVentaRequest;
 import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
 import monolithe.core_service.dto.CrearOperacionAgrupadaRequest;
+import monolithe.core_service.dto.ConfigurarDesgloseVentaRequest;
+import monolithe.core_service.dto.ConciliarDesgloseVentaRequest;
 import monolithe.core_service.dto.PrepararSubsanacionVentaRequest;
 import monolithe.core_service.dto.ConfirmarSubsanacionVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
@@ -557,6 +559,33 @@ public class CrmVentaController {
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
         /** Evidencia de venta firmada por Storage, solo para Finanzas. */
+        @PostMapping("/finanzas/ventas/{idVenta}/desglose")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> configurarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ConfigurarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.configurarDesgloseVenta(obtenerActor(jwt),idVenta,request));
+        }
+
+        @PutMapping("/finanzas/ventas/desgloses/{idDesglose}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idDesglose,
+                @Valid @RequestBody RevisarComprobanteVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarDesgloseVenta(obtenerActor(jwt),idDesglose,request));
+        }
+
+        @PostMapping("/finanzas/ventas/desgloses/{idDesglose}/conciliar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> conciliarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idDesglose,
+                @Valid @RequestBody ConciliarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.conciliarDesgloseVenta(obtenerActor(jwt),idDesglose,request));
+        }
+
         @GetMapping("/finanzas/ventas/{idVenta}/comprobantes/{idComprobante}/url-firmada")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteVentaFinanzas(
