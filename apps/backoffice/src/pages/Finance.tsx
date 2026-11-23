@@ -17,6 +17,7 @@ import { VouchersCuotasPanel } from '../components/finance/VouchersCuotasPanel';
 import { AplicacionesPagosPanel } from '../components/finance/AplicacionesPagosPanel';
 import { ConciliacionIntegralPanel } from '../components/finance/ConciliacionIntegralPanel';
 import { ConciliacionesSeparacionPanel } from '../components/finance/ConciliacionesSeparacionPanel';
+import { CobrosVentasPendientesPanel } from '../components/finance/CobrosVentasPendientesPanel';
 
 const money=(n:number|undefined|null)=>currency(Number(n??0));
 const estadoLabel=(estado:string)=>({
@@ -59,6 +60,7 @@ export function Finance() {
   const items=[
     {id:'movimientos',label:'Movimientos registrados',count:datos?.total??null},
     ...(can('finance.view')?[
+      {id:'cobros_ventas',label:'Cobros de ventas por revisar'},
       {id:'vouchers_cuotas',label:'Vouchers de cuotas e inicial'},
       {id:'vouchers_separaciones',label:'Vouchers de separaciones'},
       {id:'imputaciones',label:'Aplicación de pagos'},
@@ -133,6 +135,7 @@ export function Finance() {
         </div>
       </div>}
     </Card>}
+    {tab==='cobros_ventas'&&<Gate permission="finance.view"><CobrosVentasPendientesPanel /></Gate>}
     {tab==='vouchers_cuotas'&&<Gate permission="finance.view"><VouchersCuotasPanel /></Gate>}
     {tab==='vouchers_separaciones'&&<Gate permission="finance.view"><SeparacionVouchersPanel /></Gate>}
     {tab==='imputaciones'&&<Gate permission="finance.view"><AplicacionesPagosPanel /></Gate>}
