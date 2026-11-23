@@ -281,7 +281,7 @@ export function CobrosVentasPendientesPanel() {
           </div>
           <Button variant="secondary" size="sm" icon={EyeIcon}
             disabled={abriendo!==null}
-            onClick={()=>void abrirArchivo(archivosAbiertos,archivo.idComprobante)}>
+            onClick={()=>{if(archivosAbiertos)void abrirArchivo(archivosAbiertos,archivo.idComprobante);}}>
             Ver original
           </Button>
         </div>)}
