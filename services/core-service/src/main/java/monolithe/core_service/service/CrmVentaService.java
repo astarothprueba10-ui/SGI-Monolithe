@@ -1147,6 +1147,20 @@ public class CrmVentaService {
     }
 
     /** No acredita dinero ni altera la contabilidad; acceso restringido. */
+    /** Gerencia puede reiniciar revisiones no conciliadas conservando auditoría. */
+    @Transactional
+    public JsonNode reiniciarDesgloseVenta(Long actor,Long venta,String motivo) {
+        validarActor(actor);
+        if(venta==null||venta<=0||motivo==null||motivo.trim().length()<10
+            ||motivo.length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indique venta y motivo verificable de 10 a 500 caracteres.");
+        return ejecutar("""
+                SELECT public.sp_fin_reiniciar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar))::text
+                """,actor,venta,motivo.trim());
+    }
+
     /** Distribuye el importe pendiente entre todos los comprobantes de una venta. */
     @Transactional
     public JsonNode configurarDesgloseVenta(Long actor,Long idVenta,
