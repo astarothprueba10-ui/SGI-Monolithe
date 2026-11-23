@@ -201,7 +201,10 @@ export function Sales() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
   const [preseleccionAgrupada,setPreseleccionAgrupada] = useState<{
-    idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
+    idOperacion:number;idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
+  }|null>(null);
+  const [asociacionAgrupadaPendiente,setAsociacionAgrupadaPendiente] = useState<{
+    idOperacion:number;idLote:number;
   }|null>(null);
   const [origenPlano, setOrigenPlano] = useState<{
     idProyecto:number; idEtapa:number; idLote:number; operacion:'Separacion'|'Venta'
@@ -607,6 +610,7 @@ export function Sales() {
 
     setIsModalOpen(false);
     setPreseleccionAgrupada(null);
+    setAsociacionAgrupadaPendiente(null);
     setOrigenPlano(null);
     setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
@@ -1053,6 +1057,28 @@ export function Sales() {
         duration: 10000
       });
 
+      // El registro ya se confirmó; un error de agrupación nunca debe ocultar
+      // ni reintentar la venta recién creada.
+      if (asociacionAgrupadaPendiente
+          &&asociacionAgrupadaPendiente.idLote===resultado.idLote) {
+        try {
+          await crmBackend.vincularVentaAgrupada(
+            asociacionAgrupadaPendiente.idOperacion,resultado.idVenta
+          );
+          toast.success('Venta vinculada a su negociación agrupada',{
+            description:'El contrato y cronograma permanecen individuales por lote.'
+          });
+        }catch(e){
+          toast.warning('Venta creada, pero sin asociar a la negociación',{
+            description:(e instanceof Error?e.message:'Error de vinculación.')
+              +' Abre Compras agrupadas para vincularla sin registrar otra venta.',
+            duration:12000
+          });
+        }finally{
+          setAsociacionAgrupadaPendiente(null);
+        }
+      }
+
       await fetchSalesData();
     } catch (err: unknown) {
       setConfirmacionVenta(null);
@@ -1463,6 +1489,9 @@ export function Sales() {
               idLote:datos.idLote,operacion:'Venta'
             });
             setPreseleccionAgrupada(datos);
+            setAsociacionAgrupadaPendiente({
+              idOperacion:datos.idOperacion,idLote:datos.idLote
+            });
             setTab('Venta');
             handleOpenModal();
             toast.info('Formaliza el lote de la negociación',{
