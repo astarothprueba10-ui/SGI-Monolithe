@@ -521,6 +521,11 @@ export interface CrmCobroVentaPendiente {
   idComprobante:number|null;
   ultimaDecision:'APROBADO'|'OBSERVADO'|null;
   observacion:string|null;
+  archivos:Array<{
+    idComprobante:number;nombreArchivo:string;
+    estadoRevision:'PENDIENTE'|'APROBADO'|'RECHAZADO';
+    tipoMime:string;tamanioBytes:number;
+  }>;
   estadoVenta:string;
   codigoContrato:string|null;
   estadoContrato:string|null;
