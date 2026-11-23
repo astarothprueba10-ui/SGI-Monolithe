@@ -517,7 +517,10 @@ export interface CrmCobroVentaPendiente {
   metodoPago:string;
   numeroOperacion:string|null;
   montoPendiente:number;
-  estadoRevision:'PENDIENTE';
+  estadoRevision:'PENDIENTE'|'APROBADO';
+  idComprobante:number|null;
+  ultimaDecision:'APROBADO'|'OBSERVADO'|null;
+  observacion:string|null;
   estadoVenta:string;
   codigoContrato:string|null;
   estadoContrato:string|null;
@@ -530,6 +533,49 @@ export interface CrmCobrosVentasPendientesPage {
   tamano:number;
   paginas:number;
   items:CrmCobroVentaPendiente[];
+  porVerificar:number;
+  porConciliar:number;
+  requiereAprobacionYConciliacion:true;
+}
+export interface CrmRevisionComprobanteVenta {
+  idRevision:number;
+  idVenta:number;
+  idComprobante:number;
+  decision:'APROBADO'|'OBSERVADO';
+  estadoCobro:'PENDIENTE'|'APROBADO';
+  dineroConfirmado:false;
+  requiereConciliacion:boolean;
+}
+export interface CrmConciliacionCobroVenta {
+  estado:'CONCILIADO';
+  idVenta:number;
+  idPago:number;
+  idVoucher:number;
+  idMovimiento:number;
+  idAplicacionInicial:number|null;
+  monto:number;
+  codigoCategoria:string;
+}
+export interface CrmCuentasVenta {
+  cuentas:Array<{idCuenta:number;codigo:string;nombre:string;tipo:string;idMoneda:number}>;
+  categorias:Array<{codigo:string;nombre:string}>;
+}
+export interface CrmReservaVencidaRevision {
+  idReserva:number;
+  codigo:string;
+  fechaVencimiento:string;
+  estadoReserva:string;
+  estadoLote:string;
+  codigoLote:string;
+  proyecto:string;
+  montoReserva:number;
+  montoConfirmado:number;
+  pagosEnRevision:number;
+  requiereRevision:boolean;
+  fechaReserva:string;
+}
+export interface CrmReservasVencidasRevision {
+  items:CrmReservaVencidaRevision[];
   soloConsulta:true;
 }
 export interface CrmMovimientoFinanzasReal {
@@ -1726,6 +1772,33 @@ export const crmBackend = {
     coreApi.get<CrmCobrosVentasPendientesPage>(
       `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
     ),
+
+  revisarComprobanteVenta: (idVenta:number,idComprobante:number,body:{
+    aprobar:boolean;motivo?:string|null
+  }) => coreApi.put<CrmRevisionComprobanteVenta>(
+    `/crm/finanzas/ventas/${idVenta}/comprobantes/${idComprobante}/revision`,
+    {aprobar:body.aprobar,motivo:body.aprobar?null:body.motivo?.trim()??null}
+  ),
+
+  obtenerComprobanteVentaFinanzas: (idVenta:number,idComprobante:number) =>
+    coreApi.get<CrmVoucherReadUrl>(
+      `/crm/finanzas/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
+    ),
+
+  conciliarCobroVenta: (idVenta:number,body:{
+    idCuentaFinanciera:number;fechaOperacion:string;numeroOperacion:string|null;
+    observaciones?:string|null
+  }) => coreApi.post<CrmConciliacionCobroVenta>(
+    `/crm/finanzas/ventas/${idVenta}/conciliar`,body
+  ),
+
+  cuentasReceptorasVenta: () => coreApi.get<CrmCuentasVenta>(
+    '/crm/finanzas/ventas/cuentas-receptoras'
+  ),
+
+  reservasVencidasRevision: () => coreApi.get<CrmReservasVencidasRevision>(
+    '/crm/finanzas/separaciones/vencidas-revision'
+  ),
 
   listarMovimientosFinanzasReal: (params: {
     busqueda?:string;pagina?:number;tamano?:number;
