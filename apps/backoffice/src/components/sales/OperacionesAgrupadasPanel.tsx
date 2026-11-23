@@ -23,7 +23,7 @@ type ItemDraft={
   proyecto:string;modalidad:Modalidad;
 };
 type Preseleccion={
-  idProspecto:number;idLote:number;idProyecto:number;idEtapa:number;
+  idOperacion:number;idProspecto:number;idLote:number;idProyecto:number;idEtapa:number;
 };
 
 const fecha=(v:string)=>new Date(v).toLocaleDateString('es-PE',{timeZone:'America/Lima'});
@@ -352,6 +352,7 @@ export function OperacionesAgrupadasPanel({onPrepararVenta}:{
                       </span>:<div className="flex min-w-[130px] flex-wrap justify-end gap-2">
                         {can('sales.create')&&<Button size="sm" variant="primary"
                           onClick={()=>onPrepararVenta({
+                            idOperacion:operacion.idOperacion,
                             idProspecto:operacion.idProspecto,idLote:lote.idLote,
                             idProyecto:lote.idProyecto,idEtapa:lote.idEtapa
                           })}>Registrar venta</Button>}
