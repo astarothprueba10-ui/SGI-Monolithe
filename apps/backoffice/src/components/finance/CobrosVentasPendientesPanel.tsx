@@ -54,6 +54,9 @@ export function CobrosVentasPendientesPanel() {
   const [editarDesglose,setEditarDesglose] = useState(false);
   const [confirmarDesglose,setConfirmarDesglose] = useState(false);
   const [revisadosDocumentos,setRevisadosDocumentos] = useState<number[]>([]);
+  const [reinicio,setReinicio] = useState<CrmCobroVentaPendiente|null>(null);
+  const [motivoReinicio,setMotivoReinicio] = useState('');
+  const [confirmarReinicio,setConfirmarReinicio] = useState(false);
 
   useEffect(()=>{
     const timer = window.setTimeout(()=>{setPagina(1);setConsulta(busqueda.trim());},350);
@@ -204,6 +207,23 @@ export function CobrosVentasPendientesPanel() {
       setDetalleDocumento(null);setRevision(n=>n+1);
     }catch(e){toast.error('No se completó la decisión financiera',{description:mensajeError(e)});}
     finally{setProcesando(false);}
+  };
+
+  /** Gerencia restablece solo evidencia no conciliada, preservando registro histórico. */
+  const ejecutarReinicio=async()=>{
+    if(!reinicio||procesando||!cuentas?.puedeConfigurar||!can('finance.edit')
+       ||motivoReinicio.trim().length<10||!confirmarReinicio)return;
+    setProcesando(true);
+    try{
+      await crmBackend.reiniciarDesgloseVenta(reinicio.idVenta,motivoReinicio);
+      toast.success('Revisión documental reiniciada',{
+        description:'El evento quedó auditado. No se anularon ingresos ni contratos.'
+      });
+      setReinicio(null);setArchivosAbiertos(null);
+      setMotivoReinicio('');setRevision(x=>x+1);
+    }catch(e){
+      toast.error('No se pudo reiniciar el desglose',{description:mensajeError(e)});
+    }finally{setProcesando(false);}
   };
 
   const empezar=(item:CrmCobroVentaPendiente,tipo:Accion)=>{
@@ -466,6 +486,15 @@ export function CobrosVentasPendientesPanel() {
             onClick={()=>{setEditarDesglose(true);setConfirmarDesglose(false);}}>
             Corregir distribución (con auditoría)
           </Button>}
+        {archivosAbiertos&&cuentas?.puedeConfigurar&&can('finance.edit')
+          &&archivosAbiertos.desgloses.length>1
+          &&archivosAbiertos.desgloses.some(d=>d.estado==='APROBADO'||d.estado==='OBSERVADO')
+          &&archivosAbiertos.desgloses.every(d=>d.estado!=='CONCILIADO'&&!d.idPago)
+          &&<Button variant="secondary" size="sm" onClick={()=>{
+            setMotivoReinicio('');setConfirmarReinicio(false);setReinicio(archivosAbiertos);
+          }}>
+            Reiniciar revisión de comprobantes (Gerencia)
+          </Button>}
         {editarDesglose&&archivosAbiertos&&<div className="space-y-3 rounded-lg bg-brand-50 p-4">
           <p className="text-xs font-semibold text-brand-900">
             Total digitado: {currency(archivosAbiertos.archivos.reduce((total,archivo)=>
@@ -481,6 +510,38 @@ export function CobrosVentasPendientesPanel() {
             Confirmo que contrasté los importes y las referencias con cada comprobante original.
           </label>
         </div>}
+      </div>
+    </Modal>
+
+    <Modal open={reinicio!==null} onClose={()=>{if(!procesando)setReinicio(null);}}
+      title="Reiniciar revisión documental" width="max-w-lg"
+      description={reinicio?.codigoVenta}
+      footer={<>
+        <Button variant="secondary" disabled={procesando} onClick={()=>setReinicio(null)}>
+          Cancelar
+        </Button>
+        <Button variant="primary" disabled={procesando||!confirmarReinicio
+          ||motivoReinicio.trim().length<10} onClick={()=>void ejecutarReinicio()}>
+          Reiniciar con auditoría
+        </Button>
+      </>}>
+      <div className="space-y-4">
+        <Alert tone="warning" title="Acción exclusiva de Gerencia">
+          Solo se permite cuando ningún comprobante de la venta fue conciliado.
+          Se conservan el motivo y los estados anteriores en el historial de auditoría.
+          Los contratos, pagos y movimientos históricos no se eliminan.
+        </Alert>
+        <label className="block text-xs font-semibold text-brand-700">
+          Motivo obligatorio (entre 10 y 500 caracteres)
+          <textarea className="mt-2 min-h-24 w-full rounded-lg border border-brand-200 p-3 text-sm"
+            value={motivoReinicio} maxLength={500} onChange={e=>setMotivoReinicio(e.target.value)}
+            placeholder="Justifica por qué se requiere corregir la documentación…"/>
+        </label>
+        <label className="flex gap-2 text-xs text-brand-700">
+          <input type="checkbox" checked={confirmarReinicio}
+            onChange={e=>setConfirmarReinicio(e.target.checked)}/>
+          He verificado que no existen pagos conciliados y autorizo reiniciar la revisión.
+        </label>
       </div>
     </Modal>
 
