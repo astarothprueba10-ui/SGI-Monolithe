@@ -756,4 +756,18 @@ BEGIN
  RETURN v_resultado||jsonb_build_object('datosCompradorRevisados',true,'identidadVerificada',true);
 END $function$
 
+-- Mantener acceso por backend exclusivamente; los clientes REST no invocan estos procedimientos.
+REVOKE ALL ON FUNCTION public.sp_crm_validar_formalizacion_v6(
+ bigint,bigint,bigint,character varying,numeric,numeric,integer
+) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.sp_crm_registrar_venta_pendiente_v14(
+ bigint,bigint,bigint,character varying,numeric,numeric,integer,numeric,text,jsonb,jsonb
+) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.sp_crm_validar_formalizacion_v6(
+ bigint,bigint,bigint,character varying,numeric,numeric,integer
+) TO sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_registrar_venta_pendiente_v14(
+ bigint,bigint,bigint,character varying,numeric,numeric,integer,numeric,text,jsonb,jsonb
+) TO sigi_app_user;
+
 COMMIT;
