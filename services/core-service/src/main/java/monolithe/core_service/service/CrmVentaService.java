@@ -1035,6 +1035,26 @@ public class CrmVentaService {
     }
 
     /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
+    /** No acredita dinero ni altera la contabilidad; acceso restringido. */
+    @Transactional(readOnly = true)
+    public JsonNode listarCobrosVentaPendientes(
+            Long actor,String busqueda,Integer pagina,Integer tamano) {
+        validarActor(actor);
+        final int p = pagina == null ? 1 : pagina;
+        final int t = tamano == null ? 20 : tamano;
+        if (p < 1 || p > 10000 || t < 1 || t > 100
+                || (busqueda != null && busqueda.length() > 120)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de cobros de ventas inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_ventas_cobros_pendientes_v1(
+                    CAST(? AS bigint),CAST(? AS varchar),
+                    CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """,actor,busqueda,p,t);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode movimientosFinancierosReales(Long actor, String busqueda,
             Integer pagina, Integer tamano) {
