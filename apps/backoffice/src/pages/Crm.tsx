@@ -1214,6 +1214,8 @@ export function Crm() {
     const res = await ejecutarExportacionExcelCompleta({
       filtros: construirFiltrosExportacion(rango),
       consultaCompradores: qComp,
+      modalidadCompradores: tab === 'compradores' ? buyersModalidad || undefined : undefined,
+      alertaCompradores: tab === 'compradores' ? buyersAlerta || undefined : undefined,
       notificarProgreso: (msg) => {
         setExportStatus(msg);
         toast.loading(msg, { id: 'crm-export' });
