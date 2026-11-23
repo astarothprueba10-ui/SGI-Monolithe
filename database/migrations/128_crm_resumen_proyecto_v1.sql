@@ -759,7 +759,19 @@ BEGIN
             a.email,
             a.telefono,
             a.activo,
-            a.leads_activos,
+            CASE WHEN p_id_proyecto IS NULL THEN a.leads_activos
+                 ELSE (
+                     SELECT COUNT(DISTINCT aa.id_prospecto)::BIGINT
+                     FROM public.com_asignaciones_prospecto aa
+                     JOIN public.crm_prospectos_intereses pi
+                       ON pi.id_prospecto=aa.id_prospecto
+                     JOIN public.crm_prospectos cp
+                       ON cp.id_prospecto=aa.id_prospecto
+                     WHERE aa.id_asesor=a.id_asesor
+                       AND aa.fecha_fin IS NULL AND cp.activo AND pi.activo
+                       AND pi.id_proyecto=p_id_proyecto
+                 )
+            END AS leads_activos,
             COALESCE(
                 ap.asignaciones_periodo, 0
             ) AS asignaciones_periodo
