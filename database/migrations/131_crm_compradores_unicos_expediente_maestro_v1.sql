@@ -133,6 +133,56 @@ REVOKE ALL ON FUNCTION public.sp_crm_compradores_unicos_v1(BIGINT,VARCHAR,INTEGE
  FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.sp_crm_compradores_unicos_v1(BIGINT,VARCHAR,INTEGER,INTEGER,BIGINT,VARCHAR,DATE,DATE) TO sigi_app_user;
 
+-- Detalle paginado para exportaciones: conserva cada contrato/lote sin repetir
+-- a las personas en el listado principal. Mismo alcance estricto por venta.
+CREATE OR REPLACE FUNCTION public.sp_crm_compradores_operaciones_v1(
+ p_actor BIGINT, p_busqueda VARCHAR DEFAULT NULL, p_pagina INTEGER DEFAULT 1,
+ p_tamano INTEGER DEFAULT 100, p_proyecto BIGINT DEFAULT NULL,
+ p_modalidad VARCHAR DEFAULT NULL, p_desde DATE DEFAULT NULL, p_hasta DATE DEFAULT NULL
+) RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $function$
+DECLARE v_result JSONB;
+BEGIN
+ IF p_pagina IS NULL OR p_pagina < 1 OR p_pagina > 100000
+   OR p_tamano IS NULL OR p_tamano < 1 OR p_tamano > 100
+   OR length(COALESCE(p_busqueda,'')) > 120
+   OR (p_proyecto IS NOT NULL AND p_proyecto <= 0)
+   OR (p_modalidad IS NOT NULL AND p_modalidad NOT IN ('CONTADO','FINANCIADA'))
+   OR (p_desde IS NOT NULL AND p_hasta IS NOT NULL AND p_desde > p_hasta)
+ THEN RAISE EXCEPTION 'DATOS_INVALIDOS|Filtros de operaciones invalidos'; END IF;
+ WITH visibles AS (
+   SELECT * FROM public.fn_crm_compras_visibles_v1(p_actor)
+   WHERE (p_proyecto IS NULL OR id_proyecto=p_proyecto)
+     AND (p_modalidad IS NULL OR modalidad=p_modalidad)
+     AND (p_desde IS NULL OR (fecha_formalizacion AT TIME ZONE 'America/Lima')::date >= p_desde)
+     AND (p_hasta IS NULL OR (fecha_formalizacion AT TIME ZONE 'America/Lima')::date <= p_hasta)
+ ), coincidencias AS (
+   SELECT * FROM visibles v
+   WHERE NULLIF(BTRIM(p_busqueda),'') IS NULL
+     OR v.nombre_completo ILIKE '%'||BTRIM(p_busqueda)||'%'
+     OR v.codigo_cliente ILIKE '%'||BTRIM(p_busqueda)||'%'
+     OR v.codigo_venta ILIKE '%'||BTRIM(p_busqueda)||'%'
+     OR v.codigo_contrato ILIKE '%'||BTRIM(p_busqueda)||'%'
+     OR v.codigo_lote ILIKE '%'||BTRIM(p_busqueda)||'%'
+     OR v.proyecto_nombre ILIKE '%'||BTRIM(p_busqueda)||'%'
+ ), pagina AS (
+   SELECT * FROM coincidencias
+   ORDER BY fecha_formalizacion DESC,id_venta DESC,id_contrato DESC
+   LIMIT p_tamano OFFSET (p_pagina::BIGINT-1)*p_tamano
+ )
+ SELECT jsonb_build_object(
+   'items',COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.fecha_formalizacion DESC,p.id_venta DESC,p.id_contrato DESC) FROM pagina p),'[]'::jsonb),
+   'total',(SELECT COUNT(*) FROM coincidencias),'pagina',p_pagina,'tamano',p_tamano,
+   'paginas',CEIL((SELECT COUNT(*)::numeric FROM coincidencias)/p_tamano)::INTEGER
+ ) INTO v_result;
+ RETURN v_result;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.sp_crm_compradores_operaciones_v1(BIGINT,VARCHAR,INTEGER,INTEGER,BIGINT,VARCHAR,DATE,DATE)
+ FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.sp_crm_compradores_operaciones_v1(BIGINT,VARCHAR,INTEGER,INTEGER,BIGINT,VARCHAR,DATE,DATE) TO sigi_app_user;
+
 CREATE OR REPLACE FUNCTION public.sp_crm_comprador_expediente_v1(
  p_actor BIGINT,p_cliente BIGINT
 ) RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER
