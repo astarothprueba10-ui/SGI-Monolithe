@@ -131,7 +131,7 @@ jobs:
           node-version: 20
       - name: Test CRM form rules
         working-directory: apps/backoffice
-        run: node --test tests/crm_bloque4.test.mjs tests/crm_unit.test.mjs tests/ventasRecompra.test.mjs tests/finanzasCobrosVentas.test.mjs tests/separacionesVencidas.test.mjs tests/finanzasCobrosConciliacion.test.mjs tests/finanzasCuentaSubsanacion.test.mjs
+        run: node --test tests/crm_bloque4.test.mjs tests/crm_unit.test.mjs tests/ventasRecompra.test.mjs tests/finanzasCobrosVentas.test.mjs tests/separacionesVencidas.test.mjs tests/finanzasCobrosConciliacion.test.mjs tests/finanzasCuentaSubsanacion.test.mjs tests/ventasAgrupadas.test.mjs tests/finanzasDesgloseVenta.test.mjs
 
   mfa-login-browser-tests:
     name: MFA login - Backoffice y Portal Cliente
