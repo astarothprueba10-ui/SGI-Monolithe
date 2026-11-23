@@ -839,7 +839,7 @@ export function Crm() {
     setLeadCamposVisitados({});
     setForm({
       ...INITIAL_FORM,
-      idProyecto: catalogs?.proyectos?.[0]?.id ?? ''
+      idProyecto: projectFilter !== '' ? projectFilter : (catalogs?.proyectos?.[0]?.id ?? '')
     });
     setIsNewLeadOpen(true);
   };
