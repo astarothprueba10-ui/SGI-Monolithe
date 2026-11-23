@@ -339,7 +339,7 @@ BEGIN
             'Validacion comercial preliminar satisfactoria.'
     );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.sp_crm_registrar_venta_pendiente_v14(p_actor bigint, p_prospecto bigint, p_lote bigint, p_modalidad character varying, p_monto_total numeric, p_monto_inicial numeric, p_numero_cuotas integer, p_tasa_mensual_pct numeric, p_observaciones text, p_datos jsonb, p_pago jsonb)
  RETURNS jsonb
@@ -754,7 +754,7 @@ BEGIN
    'idVenta',v_id_venta,'tipoDocumento',v_tipo)
  );
  RETURN v_resultado||jsonb_build_object('datosCompradorRevisados',true,'identidadVerificada',true);
-END $function$
+END $function$;
 
 -- Mantener acceso por backend exclusivamente; los clientes REST no invocan estos procedimientos.
 REVOKE ALL ON FUNCTION public.sp_crm_validar_formalizacion_v6(
