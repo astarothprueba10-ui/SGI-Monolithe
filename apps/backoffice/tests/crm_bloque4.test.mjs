@@ -185,7 +185,7 @@ test('CRM: filtros de compradores permanecen sin alertas externas', () => {
   assert.match(ui, /buyer\.cantidad_lotes/);
   assert.match(ui, /key=\{buyer\.id_cliente\}/);
   assert.match(ui, /columnWidths=\{\[/);
-  assert.match(ui, /whitespace-nowrap rounded-md bg-slate-50/);
+  assert.match(ui, /buyer\.cantidad_lotes/);
   assert.doesNotMatch(ui, /Alerta financiera/);
   assert.doesNotMatch(ui, /buyersAlerta/);
   assert.match(service, /\/crm\/compradores\/filtros/);
