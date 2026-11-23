@@ -89,8 +89,12 @@ public class CrmSeparacionStorageService {
                 ||!MIMES_PERMITIDOS.contains(req.tipoMime()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Solicitud de subsanación inválida.");
-        return firmarCargaFinanciada(
+        var firma=firmarCargaFinanciada(
                 ventaService.prepararSubsanacionVenta(actor,idVenta,req),req.tipoMime());
+        // La autorización SQL vence a los 15 minutos, antes que otros tipos de carga.
+        return new EnlaceCargaVoucherCuotaResponse(
+                firma.idCarga(),firma.bucket(),firma.claveArchivo(),
+                firma.urlCarga(),firma.tipoMime(),firma.maxBytes(),900);
     }
 
     /** 5.4.4: reutiliza firma Storage; la preautorización privada ocurre
