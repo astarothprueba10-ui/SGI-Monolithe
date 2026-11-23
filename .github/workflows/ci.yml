@@ -423,6 +423,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/128_crm_resumen_proyecto_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/129_crm_avisos_alerta_crediticia_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/crm_cartera_riesgo_127_129_pg_test.sql
+          # Los tres resultados de riesgo anteriores son solo datos ficticios.
+          psql -v ON_ERROR_STOP=1 -c "TRUNCATE TABLE public.crm_evaluaciones_crediticias"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/130_crm_retirar_riesgo_externo_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_sin_riesgo_externo_130_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
