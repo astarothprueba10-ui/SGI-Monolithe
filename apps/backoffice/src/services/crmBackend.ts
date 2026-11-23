@@ -557,8 +557,20 @@ export interface CrmConciliacionCobroVenta {
   codigoCategoria:string;
 }
 export interface CrmCuentasVenta {
-  cuentas:Array<{idCuenta:number;codigo:string;nombre:string;tipo:string;idMoneda:number}>;
+  puedeConfigurar:boolean;
+  cuentas:Array<{
+    idCuenta:number;codigo:string;nombre:string;tipo:string;idMoneda:number;
+    banco?:string|null;terminaEn?:string;moneda?:'PEN'|'USD';
+  }>;
   categorias:Array<{codigo:string;nombre:string}>;
+}
+export interface CrmCuentaReceptoraCreada {
+  idCuenta:number;codigo:string;nombre:string;banco:string;
+  terminaEn:string;moneda:'PEN'|'USD';auditoriaRegistrada:true;
+}
+export interface CrmComprobanteSubsanado {
+  idVenta:number;idComprobante:number;
+  estadoRevision:'PENDIENTE';reutilizado:boolean;dineroConfirmado?:false;
 }
 export interface CrmReservaVencidaRevision {
   idReserva:number;
@@ -1795,6 +1807,42 @@ export const crmBackend = {
   cuentasReceptorasVenta: () => coreApi.get<CrmCuentasVenta>(
     '/crm/finanzas/ventas/cuentas-receptoras'
   ),
+
+  crearCuentaReceptora: (datos:{
+    nombre:string;banco:string;titular:string;numeroCuenta:string;cci:string|null;
+    moneda:'PEN'|'USD'
+  })=>coreApi.post<CrmCuentaReceptoraCreada>(
+    '/crm/finanzas/ventas/cuentas-receptoras',datos
+  ),
+
+  /** La evidencia debe existir en Storage privado antes de registrarse en la venta. */
+  subirComprobanteFaltanteVenta: async (idVenta:number,archivo:File):
+    Promise<CrmComprobanteSubsanado> => {
+    const mimes=['application/pdf','image/jpeg','image/png','image/webp'];
+    if(!Number.isSafeInteger(idVenta)||idVenta<=0
+      ||!archivo||archivo.size<1||archivo.size>5242880
+      ||!archivo.name.trim()||archivo.name.length>255
+      ||!mimes.includes(archivo.type)) {
+      throw new Error('Selecciona un PDF o imagen de hasta 5 MB.');
+    }
+    const firma=await coreApi.post<CrmCargaVoucherCuota>(
+      `/crm/finanzas/ventas/${idVenta}/subsanacion/preparar-carga`,
+      {nombreArchivo:archivo.name,tipoMime:archivo.type,tamanioBytes:archivo.size}
+    );
+    const token=new URL(firma.urlCarga).searchParams.get('token');
+    if(!token||firma.bucket!=='vouchers-ventas-private'
+      ||firma.tipoMime!==archivo.type||!firma.idCarga) {
+      throw new Error('La autorización de carga no es válida.');
+    }
+    const {error}=await supabase.storage.from(firma.bucket)
+      .uploadToSignedUrl(firma.claveArchivo,token,archivo,{
+        contentType:firma.tipoMime,upsert:false
+      });
+    if(error) throw new Error('Error al subir evidencia privada: '+error.message);
+    return coreApi.post<CrmComprobanteSubsanado>(
+      '/crm/finanzas/ventas/subsanacion/confirmar',{idCarga:firma.idCarga}
+    );
+  },
 
   reservasVencidasRevision: () => coreApi.get<CrmReservasVencidasRevision>(
     '/crm/finanzas/separaciones/vencidas-revision'
