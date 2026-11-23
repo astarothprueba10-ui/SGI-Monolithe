@@ -23,7 +23,7 @@ SET search_path TO pg_catalog,public,pg_temp
 AS $fn$
 DECLARE
  v_m RECORD; v_comp RECORD; v_rev RECORD; v_cta RECORD;
- v_plan RECORD; v_tipo VARCHAR; v_codigo_categoria VARCHAR; v_metodo VARCHAR;
+ v_plan RECORD; v_plan_id BIGINT; v_tipo VARCHAR; v_codigo_categoria VARCHAR; v_metodo VARCHAR;
  v_est_pago INT;v_est_voucher INT;v_est_mov INT;v_categoria BIGINT;
  v_pago BIGINT;v_voucher BIGINT;v_mov BIGINT;v_credito NUMERIC:=0;
  v_ref TEXT:=nullif(btrim(p_referencia),'');
@@ -130,6 +130,7 @@ BEGIN
    SELECT pp.id_plan_pago,pp.monto_inicial,pp.id_moneda,pp.es_vigente
    INTO v_plan FROM public.pag_planes_pago pp
    WHERE pp.id_venta=p_venta AND pp.es_vigente FOR UPDATE;
+   v_plan_id:=v_plan.id_plan_pago;
    IF NOT FOUND OR NOT v_plan.es_vigente OR v_plan.id_moneda<>v_m.id_moneda
      OR v_plan.monto_inicial<>v_m.monto_pendiente_revision
    THEN RAISE EXCEPTION 'INICIAL_INCONSISTENTE|El plan y la inicial no cuadran.'; END IF;
@@ -170,7 +171,7 @@ BEGIN
    codigo,monto,fecha_operacion,numero_operacion,observaciones,id_usuario_registro,
    id_usuario_confirmacion,fecha_confirmacion
  ) VALUES(
-   NULL,p_venta,CASE WHEN v_m.tipo_abono='INICIAL' THEN v_plan.id_plan_pago ELSE NULL END,
+   NULL,p_venta,v_plan_id,
    v_est_pago,v_m.id_metodo_pago,v_m.id_moneda,
    v_codigo,v_m.monto_pendiente_revision,
    (p_fecha_operacion::TIMESTAMP AT TIME ZONE 'America/Lima'),v_ref,
