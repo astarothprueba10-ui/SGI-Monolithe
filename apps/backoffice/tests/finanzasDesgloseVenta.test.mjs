@@ -41,3 +41,14 @@ test('Conciliación registra una sola operación por evidencia y aplica la inici
  assert.match(sql147,/idDesglose/);
  assert.match(sql147,/WHERE d\.id_venta=v\.id_venta AND d\.estado<>'CONCILIADO'/);
 });
+
+test('Gerencia puede reiniciar evidencias no conciliadas sin tocar pagos',()=>{
+ const reset=src('../../../database/migrations/148_fin_reiniciar_desglose_auditado_v1.sql');
+ assert.match(reset,/sp_fin_reiniciar_desglose_venta_v1/);
+ assert.match(reset,/fn_fin_gerencia_configura_cuentas_v1/);
+ assert.match(reset,/DINERO_CONFIRMADO/);
+ assert.match(reset,/REVOCAR_REVISIONES_SIN_DINERO/);
+ assert.match(panel,/Reiniciar revisión de comprobantes \(Gerencia\)/);
+ assert.match(panel,/crmBackend\.reiniciarDesgloseVenta/);
+ assert.doesNotMatch(reset,/DELETE FROM public\.pag_pagos/);
+});
