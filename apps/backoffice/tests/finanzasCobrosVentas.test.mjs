@@ -11,8 +11,9 @@ const db=readFileSync(new URL('../../../database/migrations/135_fin_cobros_pendi
 test('Finanzas muestra bandeja protegida de cobros pendientes',()=>{
   assert.match(page,/id:'cobros_ventas'/);
   assert.match(page,/Gate permission="finance.view"><CobrosVentasPendientesPanel/);
-  assert.match(panel,/solo[ -]consulta|exclusivamente de consulta/i);
-  assert.match(panel,/Firmado · cobro sin validar/);
+  assert.match(panel,/Aprobar soporte/);
+  assert.match(panel,/Conciliar/);
+  assert.match(panel,/Soporte aprobado/);
   assert.match(api,/listarCobrosVentasPendientes/);
   assert.match(api,/\/crm\/finanzas\/ventas\/cobros-pendientes/);
   assert.match(backend,/hasAuthority\('finance.view'\)/);
