@@ -1119,6 +1119,33 @@ public class CrmVentaService {
                 """,actor);
     }
 
+    /** Solicitud de carga asociada a una venta formalizada sin comprobante. */
+    @Transactional
+    public JsonNode prepararSubsanacionVenta(Long actor,Long venta,
+            monolithe.core_service.dto.PrepararSubsanacionVentaRequest req) {
+        validarActor(actor);
+        if(venta==null||venta<=0||req==null||req.tamanioBytes()==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos de subsanación incompletos.");
+        return ejecutar("""
+                SELECT public.sp_fin_preparar_subsanacion_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS bigint))::text
+                """,actor,venta,req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Confirma el registro únicamente si Storage contiene el objeto autorizado. */
+    @Transactional
+    public JsonNode confirmarSubsanacionVenta(Long actor,java.util.UUID idCarga) {
+        validarActor(actor);
+        if(idCarga==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Carga inválida.");
+        return ejecutar("""
+                SELECT public.sp_fin_confirmar_subsanacion_venta_v1(
+                  CAST(? AS bigint),CAST(? AS uuid))::text
+                """,actor,idCarga);
+    }
+
     /** No acredita dinero ni altera la contabilidad; acceso restringido. */
     @Transactional(readOnly = true)
     public JsonNode listarCobrosVentaPendientes(
