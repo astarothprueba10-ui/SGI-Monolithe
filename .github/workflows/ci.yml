@@ -390,6 +390,40 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/126_planos_grants_core_service_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_core_grants_v1_pg_test.sql
 
+  crm-postgres-validation:
+    name: CRM cartera y riesgo - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: crm_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: crm_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d crm_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: crm_ci_password
+      PGDATABASE: crm_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar migraciones 127, 128 y 129 sobre base sintetica
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/crm_cartera_riesgo_127_129_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/127_crm_cartera_filtros_riesgo_crediticio_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/128_crm_resumen_proyecto_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/129_crm_avisos_alerta_crediticia_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_cartera_riesgo_127_129_pg_test.sql
+
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: [frontend-validation, backend-validation, database-validation]
