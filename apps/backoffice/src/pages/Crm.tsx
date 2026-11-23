@@ -2110,20 +2110,65 @@ export function Crm() {
       {/* PESTANA 4: Compradores */}
       {tab === 'compradores' && (
         <Card>
-          <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="border-b border-brand-100 p-4">
             <CardHeader
               title="Compradores en cartera"
-              description="Clientes con contrato o separacion formal registrada."
+              description="Operaciones con contrato vigente o finalizado. Cada lote adquirido se muestra por separado."
             />
-            <SearchInput
-              placeholder="Buscar comprador o contrato..."
-              value={buyersQuery}
-              onValueChange={(val) => {
-                setBuyersQuery(val);
-                setBuyersPage(1);
-              }}
-              className="w-full md:w-72"
-            />
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <div className="w-full sm:w-72">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Buscar comprador o contrato</label>
+                <SearchInput
+                  placeholder="Nombre, cliente, contrato o lote..."
+                  value={buyersQuery}
+                  onValueChange={(value) => { setBuyersQuery(value); setBuyersPage(1); }}
+                  className="w-full"
+                />
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Modalidad</label>
+                <Select aria-label="Modalidad de venta" value={buyersModalidad}
+                  onChange={(e) => {
+                    setBuyersModalidad(e.target.value as '' | 'CONTADO' | 'FINANCIADA');
+                    setBuyersPage(1);
+                  }} className="w-full">
+                  <option value="">Todas</option>
+                  <option value="FINANCIADA">Financiado</option>
+                  <option value="CONTADO">Contado</option>
+                </Select>
+              </div>
+              <div className="w-full sm:w-44">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Alerta financiera</label>
+                <Select aria-label="Filtrar alerta financiera" value={buyersAlerta}
+                  onChange={(e) => {
+                    setBuyersAlerta(e.target.value as typeof buyersAlerta);
+                    setBuyersPage(1);
+                  }} className="w-full">
+                  <option value="">Todas</option>
+                  <option value="SI">Sí</option>
+                  <option value="NO">No</option>
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="SIN_DATOS">Sin datos</option>
+                  <option value="NO_APLICA">No aplica</option>
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Formalización desde</label>
+                <Input type="date" aria-label="Formalización desde" value={buyersFechaDesde}
+                  max={buyersFechaHasta || undefined}
+                  onChange={(e) => { setBuyersFechaDesde(e.target.value); setBuyersPage(1); }} />
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Formalización hasta</label>
+                <Input type="date" aria-label="Formalización hasta" value={buyersFechaHasta}
+                  min={buyersFechaDesde || undefined}
+                  onChange={(e) => { setBuyersFechaHasta(e.target.value); setBuyersPage(1); }} />
+              </div>
+              <Button icon={RefreshCw} size="sm" onClick={() => {
+                setBuyersQuery(''); setBuyersModalidad(''); setBuyersAlerta('');
+                setBuyersFechaDesde(''); setBuyersFechaHasta(''); setBuyersPage(1);
+              }}>Limpiar filtros</Button>
+            </div>
           </div>
 
           {buyersLoading ? (
@@ -2141,18 +2186,30 @@ export function Crm() {
               <Table
                 head={
                   <>
-                    <TH>Codigo Cliente</TH>
+                    <TH>Código cliente</TH>
                     <TH>Cliente</TH>
                     <TH>Lote adjudicado</TH>
                     <TH>Contrato / Estado</TH>
+                    <TH>Modalidad</TH>
                     <TH align="right">Monto venta</TH>
-                    <TH>Fecha formalizacion</TH>
+                    <TH>Fecha formalización</TH>
+                    <TH>Alerta financiera</TH>
                     <TH align="right">Expediente</TH>
                   </>
                 }
               >
-                {buyersList.map((buyer) => (
-                  <TR key={buyer.id_cliente}>
+                {buyersList.map((buyer) => {
+                  const alerta = buyer.modalidad === 'CONTADO'
+                    ? 'NO_APLICA' : buyer.alerta_financiera ?? 'PENDIENTE';
+                  const estilosAlerta = alerta === 'SI'
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : alerta === 'NO' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : alerta === 'PENDIENTE' ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-600';
+                  const etiquetaAlerta = alerta === 'SI' ? 'Sí'
+                    : alerta === 'NO' ? 'No' : alerta === 'NO_APLICA' ? 'No aplica'
+                    : alerta === 'SIN_DATOS' ? 'Sin datos' : 'Pendiente';
+                  return <TR key={`${buyer.id_venta ?? buyer.id_cliente}-${buyer.id_contrato ?? 0}`}>
                     <TD className="font-mono text-[12px] text-brand-500">{buyer.codigo_cliente}</TD>
                     <TD className="font-medium text-brand-900">{buyer.nombre_completo}</TD>
                     <TD className="text-brand-700 font-semibold">{buyer.codigo_lote}</TD>
@@ -2162,21 +2219,34 @@ export function Crm() {
                         <Badge tone="brand">{buyer.estado_contrato}</Badge>
                       </div>
                     </TD>
+                    <TD><Badge tone={buyer.modalidad === 'FINANCIADA' ? 'info' : 'neutral'}>
+                      {buyer.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado'}
+                    </Badge></TD>
                     <TD align="right" className="font-semibold text-brand-900">
                       {currency(buyer.precio_venta)}
                     </TD>
-                    <TD className="text-brand-500 tabular text-[12px]">{formatDateLima(buyer.fecha_venta)}</TD>
+                    <TD className="text-brand-500 tabular text-[12px]">
+                      {formatDateLima(buyer.fecha_formalizacion ?? buyer.fecha_venta)}
+                    </TD>
+                    <TD>
+                      <span className={`inline-flex whitespace-nowrap rounded border px-2 py-1 text-xs font-semibold ${estilosAlerta}`}
+                        title={buyer.fecha_evaluacion
+                          ? `Última evaluación: ${formatDateLima(buyer.fecha_evaluacion)}`
+                          : 'No existe evaluación vigente registrada'}>
+                        {etiquetaAlerta}
+                      </span>
+                    </TD>
                     <TD align="right">
                       <Gate permission="sales.view">
                         <Button size="sm" variant="ghost" icon={EyeIcon}
-                          onClick={()=>setCompradorExpediente(buyer)}
+                          onClick={() => setCompradorExpediente(buyer)}
                           className="font-semibold text-brand-700 hover:text-brand-900">
                           Expediente
                         </Button>
                       </Gate>
                     </TD>
-                  </TR>
-                ))}
+                  </TR>;
+                })}
               </Table>
               <Pagination
                 page={buyersPage}
