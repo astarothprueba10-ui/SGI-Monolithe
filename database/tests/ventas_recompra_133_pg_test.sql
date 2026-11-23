@@ -14,7 +14,7 @@ BEGIN
   IF v_regla IS NULL OR v_registro IS NULL THEN
     RAISE EXCEPTION 'VEN-133-01: faltan los procedimientos del flujo.';
   END IF;
-  IF position('CON_RESERVA'', ''CONVERTIDO' in v_regla)=0
+  IF position('''CONVERTIDO''' in v_regla)=0
     OR position('v_estado=''CONVERTIDO'' AND NOT EXISTS' in v_regla)=0
     OR position('YA_COMPRADOR' in v_regla)>0 THEN
     RAISE EXCEPTION 'VEN-133-02: la recompra no está habilitada correctamente.';
