@@ -1147,6 +1147,57 @@ public class CrmVentaService {
     }
 
     /** No acredita dinero ni altera la contabilidad; acceso restringido. */
+    /** Distribuye el importe pendiente entre todos los comprobantes de una venta. */
+    @Transactional
+    public JsonNode configurarDesgloseVenta(Long actor,Long idVenta,
+            monolithe.core_service.dto.ConfigurarDesgloseVentaRequest req) {
+        validarActor(actor);
+        if(idVenta==null||idVenta<=0||req==null||req.items()==null
+                ||!req.items().isArray()||req.items().size()<2||req.items().size()>8)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El desglose debe incluir de 2 a 8 comprobantes.");
+        return ejecutar("""
+                SELECT public.sp_fin_configurar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS jsonb))::text
+                """,actor,idVenta,req.items().toString());
+    }
+
+    /** La evidencia revisada aún no constituye un abono confirmado. */
+    @Transactional
+    public JsonNode revisarDesgloseVenta(Long actor,Long idDesglose,
+            monolithe.core_service.dto.RevisarComprobanteVentaRequest req) {
+        validarActor(actor);
+        if(idDesglose==null||idDesglose<=0||req==null||req.aprobar()==null
+          ||(req.motivo()!=null&&req.motivo().length()>500)
+          ||(req.aprobar()&&req.motivo()!=null&&!req.motivo().isBlank())
+          ||(!req.aprobar()&&(req.motivo()==null||req.motivo().trim().length()<10)))
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                  "Decisión o motivo del soporte inválidos.");
+        return ejecutar("""
+                SELECT public.sp_fin_revisar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS boolean),
+                  CAST(? AS varchar))::text
+                """,actor,idDesglose,req.aprobar(),req.motivo());
+    }
+
+    /** Un pago físico, voucher y movimiento por cada documento validado. */
+    @Transactional
+    public JsonNode conciliarDesgloseVenta(Long actor,Long idDesglose,
+            monolithe.core_service.dto.ConciliarDesgloseVentaRequest req) {
+        validarActor(actor);
+        if(idDesglose==null||idDesglose<=0||req==null||req.idCuentaFinanciera()==null
+          ||req.idCuentaFinanciera()<=0||req.fechaOperacion()==null
+          ||(req.observaciones()!=null&&req.observaciones().length()>300))
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                  "Cuenta y fecha de conciliación inválidas.");
+        return ejecutar("""
+                SELECT public.sp_fin_conciliar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS date),CAST(? AS varchar))::text
+                """,actor,idDesglose,req.idCuentaFinanciera(),req.fechaOperacion(),
+                   req.observaciones());
+    }
+
     /** Planificación multílote: valida comprador, lote y modalidad, pero no crea contratos. */
     @Transactional
     public JsonNode crearOperacionAgrupada(
