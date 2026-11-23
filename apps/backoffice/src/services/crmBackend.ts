@@ -65,6 +65,7 @@ export interface CrmAsesoresPeriodo {
 export interface CrmBuyer {
   id_cliente: number;
   id_venta?: number;
+  id_lote?: number;
   id_contrato?: number;
   id_prospecto?: number;
   codigo_cliente: string;
@@ -1458,6 +1459,15 @@ export const crmBackend = {
     coreApi.get<CrmPage<CrmBuyerPortfolio>>(
       `/crm/compradores/filtros${qs({
         consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 15,
+        idProyecto: f.idProyecto, modalidad: f.modalidad,
+        fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
+      })}`
+    ),
+
+  compradoresOperaciones: (f: CrmBuyerFilters) =>
+    coreApi.get<CrmPage<CrmBuyer>>(
+      `/crm/compradores/operaciones${qs({
+        consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 100,
         idProyecto: f.idProyecto, modalidad: f.modalidad,
         fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
       })}`
