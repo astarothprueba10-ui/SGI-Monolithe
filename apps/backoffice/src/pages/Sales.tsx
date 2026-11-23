@@ -2294,7 +2294,7 @@ export function Sales() {
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
                   <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
                   <p>Monto reglamentario: <span className="font-bold">S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'} PEN</span></p>
-                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (vence automáticamente si no se formaliza venta).</p>
+                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (al vencer requiere revisión; no libera el lote ni anula pagos automáticamente).</p>
                   <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
                   <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
                 </div>
