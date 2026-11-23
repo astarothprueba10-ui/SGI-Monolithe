@@ -251,6 +251,15 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode expedienteMaestroComprador(Long actor,Long cliente) {
+        validarActor(actor);
+        if (cliente == null || cliente <= 0) {
+            throw badRequest("Cliente invalido.");
+        }
+        return ejecutar(() -> repository.expedienteMaestroComprador(actor,cliente),false);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode compradoresPeriodo(
             Long actor,
             String consulta,
