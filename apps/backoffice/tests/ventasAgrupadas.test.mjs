@@ -40,3 +40,13 @@ test('Backend preserva identidad, cartera, contrato y financiamiento individual'
  assert.doesNotMatch(db143,/INSERT INTO public\.pag_pagos/);
  assert.doesNotMatch(db143,/INSERT INTO public\.ven_ventas\b/);
 });
+
+test('la venta se asocia después de registrar, sin recrearla si la vinculación falla',()=>{
+ assert.match(sales,/asociacionAgrupadaPendiente/);
+ assert.match(sales,/resultado\.idLote/);
+ assert.match(sales,/resultado\.idProspecto/);
+ assert.match(sales,/resultado\.modalidad/);
+ assert.match(sales,/crmBackend\.vincularVentaAgrupada\(/);
+ assert.match(sales,/Venta creada, pero sin asociar a la negociación/);
+ assert.match(panel,/modalidad:lote\.modalidad/);
+});
