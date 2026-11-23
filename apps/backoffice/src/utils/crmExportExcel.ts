@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { crmBackend, type CrmProspect, type CrmBuyer, type CrmPage } from '../services/crmBackend';
+import { crmBackend, type CrmProspect, type CrmBuyer, type CrmBuyerPortfolio, type CrmPage } from '../services/crmBackend';
 
 export const TAMANO_PAGINA_EXPORT = 100;
 const MAX_PAGINAS_EXPORT = 1000;
@@ -30,14 +30,26 @@ const PROSPECT_COLS = [
 ];
 
 const BUYER_COLS = [
+  { header: 'Código cliente' },
+  { header: 'Nombre completo' },
+  { header: 'Cantidad de compras' },
+  { header: 'Lotes adquiridos' },
+  { header: 'Proyectos' },
+  { header: 'Modalidades' },
+  { header: 'Última compra' }
+];
+
+const OPERATION_COLS = [
   { header: 'Codigo cliente' },
   { header: 'Nombre completo' },
   { header: 'Codigo venta' },
   { header: 'Codigo contrato' },
   { header: 'Estado contrato' },
   { header: 'Lote' },
+  { header: 'Proyecto' },
+  { header: 'Modalidad' },
   { header: 'Precio venta (S/)' },
-  { header: 'Fecha venta' }
+  { header: 'Fecha formalización' }
 ];
 
 function sanitizeText(value: unknown): string {
@@ -198,7 +210,22 @@ function buildProspectSheet(wb: ExcelJS.Workbook, name: string, items: CrmProspe
   autoFitColumns(ws);
 }
 
-function renderBuyerRow(ws: ExcelJS.Worksheet, b: CrmBuyer, rowNum: number, isAlt: boolean): void {
+function renderBuyerRow(ws: ExcelJS.Worksheet, b: CrmBuyerPortfolio, rowNum: number, isAlt: boolean): void {
+  const row = ws.getRow(rowNum);
+  row.getCell(1).numFmt = '@';
+  row.getCell(1).value = sanitizeText(b.codigo_cliente);
+  row.getCell(2).value = sanitizeText(b.nombre_completo);
+  row.getCell(3).value = b.cantidad_compras;
+  row.getCell(4).value = b.cantidad_lotes;
+  row.getCell(5).value = b.cantidad_proyectos;
+  row.getCell(6).value = b.modalidad_resumen === 'MIXTA' ? 'Mixta'
+    : b.modalidad_resumen === 'FINANCIADA' ? 'Financiado' : 'Contado';
+  row.getCell(7).value = formatDateLimaExcel(b.fecha_ultima_compra);
+  row.getCell(7).numFmt = 'dd/mm/yyyy';
+  styleDataRow(ws, rowNum, isAlt);
+}
+
+function renderOperacionRow(ws: ExcelJS.Worksheet, b: CrmBuyer, rowNum: number, isAlt: boolean): void {
   const row = ws.getRow(rowNum);
   row.getCell(1).numFmt = '@';
   row.getCell(1).value = sanitizeText(b.codigo_cliente);
@@ -210,15 +237,17 @@ function renderBuyerRow(ws: ExcelJS.Worksheet, b: CrmBuyer, rowNum: number, isAl
   row.getCell(5).value = sanitizeText(b.estado_contrato);
   row.getCell(6).numFmt = '@';
   row.getCell(6).value = sanitizeText(b.codigo_lote);
-  row.getCell(7).value = typeof b.precio_venta === 'number' ? b.precio_venta : Number(b.precio_venta) || 0;
-  row.getCell(7).numFmt = '#,##0.00';
-  row.getCell(7).alignment = { horizontal: 'right' };
-  row.getCell(8).value = formatDateLimaExcel(b.fecha_venta);
-  row.getCell(8).numFmt = 'dd/mm/yyyy';
+  row.getCell(7).value = sanitizeText(b.proyecto_nombre ?? '');
+  row.getCell(8).value = b.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado';
+  row.getCell(9).value = typeof b.precio_venta === 'number' ? b.precio_venta : Number(b.precio_venta) || 0;
+  row.getCell(9).numFmt = '#,##0.00';
+  row.getCell(9).alignment = { horizontal: 'right' };
+  row.getCell(10).value = formatDateLimaExcel(b.fecha_formalizacion ?? b.fecha_venta);
+  row.getCell(10).numFmt = 'dd/mm/yyyy';
   styleDataRow(ws, rowNum, isAlt);
 }
 
-function buildBuyerSheet(wb: ExcelJS.Workbook, items: CrmBuyer[]): void {
+function buildBuyerSheet(wb: ExcelJS.Workbook, items: CrmBuyerPortfolio[]): void {
   const name = 'Compradores';
   const ws = wb.addWorksheet(name);
   const cols = BUYER_COLS.length;
@@ -237,10 +266,27 @@ function buildBuyerSheet(wb: ExcelJS.Workbook, items: CrmBuyer[]): void {
   autoFitColumns(ws);
 }
 
+function buildOperacionesSheet(wb: ExcelJS.Workbook, items: CrmBuyer[]): void {
+  const name = 'Adquisiciones';
+  const ws = wb.addWorksheet(name);
+  const cols = OPERATION_COLS.length;
+  addSheetTitle(ws, name, cols);
+  addSheetMeta(ws, items.length, cols);
+  const HROW = 5;
+  ws.getRow(HROW).values = OPERATION_COLS.map(c => c.header);
+  styleHeaderRow(ws, HROW);
+  ws.autoFilter = { from: { row: HROW, column: 1 }, to: { row: HROW, column: cols } };
+  ws.views = [{ state: 'frozen', ySplit: HROW }];
+  if (items.length === 0) renderEmptyRow(ws, HROW + 1, cols);
+  else items.forEach((b, i) => renderOperacionRow(ws, b, HROW + 1 + i, i % 2 === 1));
+  autoFitColumns(ws);
+}
+
 export interface CrmExcelPayload {
   leads:       CrmProspect[];
   potenciales: CrmProspect[];
-  compradores: CrmBuyer[];
+  compradores: CrmBuyerPortfolio[];
+  adquisiciones: CrmBuyer[];
 }
 
 export async function generarExcelCrm(payload: CrmExcelPayload): Promise<Blob> {
@@ -251,6 +297,7 @@ export async function generarExcelCrm(payload: CrmExcelPayload): Promise<Blob> {
   buildProspectSheet(wb, 'Leads', payload.leads);
   buildProspectSheet(wb, 'Clientes potenciales', payload.potenciales);
   buildBuyerSheet(wb, payload.compradores);
+  buildOperacionesSheet(wb, payload.adquisiciones);
   const buffer = await wb.xlsx.writeBuffer();
   return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -313,6 +360,10 @@ export function claveProspecto(p: CrmProspect): number {
   return p.id_prospecto;
 }
 
+export function claveCompradorUnico(b: CrmBuyerPortfolio): number {
+  return b.id_cliente;
+}
+
 export function claveComprador(b: CrmBuyer): string {
   return `${b.id_cliente}_${b.codigo_venta || ''}_${b.codigo_lote || ''}`;
 }
@@ -348,6 +399,7 @@ export interface ParametrosFiltroCrm {
 export interface OpcionesExportarCrm {
   filtros: ParametrosFiltroCrm;
   consultaCompradores?: string;
+  modalidadCompradores?: 'FINANCIADA' | 'CONTADO';
   notificarProgreso?: (mensaje: string) => void;
 }
 
@@ -386,33 +438,57 @@ async function consultarPotencialesExport(
 async function consultarCompradoresExport(
   filtros: ParametrosFiltroCrm,
   consulta?: string,
-  progreso?: (msg: string) => void
-): Promise<CrmBuyer[]> {
+  progreso?: (msg: string) => void,
+  modalidad?: 'FINANCIADA' | 'CONTADO'
+): Promise<CrmBuyerPortfolio[]> {
+  const fechaDesde = filtros.desde.slice(0, 10);
+  const fechaHasta = new Date(Date.parse(filtros.hastaExclusivo.slice(0, 10) + 'T00:00:00Z') - 86400000)
+    .toISOString().slice(0, 10);
   return consultarTodasLasPaginas(
-    (pagina) => crmBackend.compradoresPeriodo(
-      consulta,
-      pagina,
-      TAMANO_PAGINA_EXPORT,
-      filtros.desde,
-      filtros.hastaExclusivo
-    ),
-    claveComprador,
+    (pagina) => crmBackend.compradoresFiltrados({
+      consulta, pagina, tamano: TAMANO_PAGINA_EXPORT,
+      idProyecto: filtros.idProyecto, modalidad, fechaDesde, fechaHasta
+    }),
+    claveCompradorUnico,
     (act, tot, pag) => progreso?.(`Compradores: página ${pag} (${act}/${tot})`)
+  );
+}
+
+async function consultarAdquisicionesExport(
+  filtros: ParametrosFiltroCrm,
+  consulta?: string,
+  progreso?: (msg: string) => void,
+  modalidad?: 'FINANCIADA' | 'CONTADO'
+): Promise<CrmBuyer[]> {
+  const fechaDesde = filtros.desde.slice(0, 10);
+  const fechaHasta = new Date(Date.parse(filtros.hastaExclusivo.slice(0, 10) + 'T00:00:00Z') - 86400000)
+    .toISOString().slice(0, 10);
+  return consultarTodasLasPaginas(
+    pagina => crmBackend.compradoresOperaciones({
+      consulta, pagina, tamano: TAMANO_PAGINA_EXPORT,
+      idProyecto: filtros.idProyecto, modalidad, fechaDesde, fechaHasta
+    }),
+    claveComprador,
+    (act, tot, pag) => progreso?.(`Adquisiciones: página ${pag} (${act}/${tot})`)
   );
 }
 
 export async function ejecutarExportacionExcelCompleta(
   opciones: OpcionesExportarCrm
 ): Promise<{ nombre: string; totalLeads: number; totalPotenciales: number; totalCompradores: number }> {
-  const { filtros, consultaCompradores, notificarProgreso } = opciones;
+  const { filtros, consultaCompradores, modalidadCompradores, notificarProgreso } = opciones;
   notificarProgreso?.('Consultando leads...');
   const leads = await consultarLeadsExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando clientes potenciales...');
   const potenciales = await consultarPotencialesExport(filtros, notificarProgreso);
   notificarProgreso?.('Consultando compradores...');
-  const compradores = await consultarCompradoresExport(filtros, consultaCompradores, notificarProgreso);
+  const compradores = await consultarCompradoresExport(
+    filtros, consultaCompradores, notificarProgreso, modalidadCompradores);
+  notificarProgreso?.('Consultando adquisiciones por lote...');
+  const adquisiciones = await consultarAdquisicionesExport(
+    filtros, consultaCompradores, notificarProgreso, modalidadCompradores);
   notificarProgreso?.('Generando archivo Excel...');
-  const blob = await generarExcelCrm({ leads, potenciales, compradores });
+  const blob = await generarExcelCrm({ leads, potenciales, compradores, adquisiciones });
   const nombre = obtenerNombreArchivoExcel();
   descargarBlobExcel(blob, nombre);
   return { nombre, totalLeads: leads.length, totalPotenciales: potenciales.length, totalCompradores: compradores.length };

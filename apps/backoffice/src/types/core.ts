@@ -12,8 +12,6 @@ export interface ProyectoResponse {
   provincia?: string;
   departamento?: string;
   pais?: string;
-  latitud?: number;
-  longitud?: number;
   areaTotalM2?: number;
   fechaInicio?: string;
   fechaFinEstimada?: string;
@@ -22,7 +20,6 @@ export interface ProyectoResponse {
 
 export type ProyectoRequest = {
   codigoEstadoProyecto: string;
-  codigo: string;
   nombre: string;
   descripcion?: string | null;
   direccion?: string | null;
@@ -31,8 +28,6 @@ export type ProyectoRequest = {
   provincia?: string | null;
   departamento?: string | null;
   pais?: string | null;
-  latitud?: number | null;
-  longitud?: number | null;
   areaTotalM2?: number | null;
   fechaInicio?: string | null;
   fechaFinEstimada?: string | null;

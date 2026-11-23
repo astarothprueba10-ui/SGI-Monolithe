@@ -11,10 +11,6 @@ public record ProyectoRequest(
         String codigoEstadoProyecto,
 
         @NotBlank
-        @Size(max = 30)
-        String codigo,
-
-        @NotBlank
         @Size(max = 150)
         String nombre,
 
@@ -37,16 +33,6 @@ public record ProyectoRequest(
 
         @Size(max = 100)
         String pais,
-
-        @DecimalMin(value = "-90.0000000")
-        @DecimalMax(value = "90.0000000")
-        @Digits(integer = 3, fraction = 7)
-        BigDecimal latitud,
-
-        @DecimalMin(value = "-180.0000000")
-        @DecimalMax(value = "180.0000000")
-        @Digits(integer = 3, fraction = 7)
-        BigDecimal longitud,
 
         @DecimalMin(value = "0.00", inclusive = false)
         @Digits(integer = 12, fraction = 2)

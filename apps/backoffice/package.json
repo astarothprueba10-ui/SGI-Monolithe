@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "test:financing": "node --require ./tests/register-types.cjs --test tests/financiamientoFrances.test.cjs",
-    "test:projects": "node --test tests/projectForm.test.mjs",
+    "test:projects": "node --require ./tests/register-types.cjs --test tests/projectForm.test.mjs tests/projectImport.test.cjs tests/projectTariffMatrix.test.cjs tests/projectConfigurationUX.test.cjs tests/projectLotSearch.test.cjs tests/projectCommercialPresentation.test.cjs tests/projectSvg.test.cjs tests/lotMapUX.test.cjs tests/projectCadStorageUX.test.cjs",
     "test:workers": "node --require ./tests/register-types.cjs --test tests/workers.test.cjs tests/newWorkerPolicy.test.cjs tests/editWorkerPolicy.test.cjs",
     "test:users": "node --require ./tests/register-types.cjs --test tests/editUserEmail.test.cjs",
     "test:session": "node --require ./tests/register-types.cjs --test tests/inactivitySession.test.cjs",

@@ -11,7 +11,6 @@ import { ProjectLocationFields } from './ProjectLocationFields';
 type TextField = { name: Exclude<keyof ProjectFormValues, 'activo'>; label: string; full?: boolean;
   input?: InputHTMLAttributes<HTMLInputElement> };
 const GENERAL: TextField[] = [
-  { name: 'codigo', label: 'Código', input: { required: true, minLength: 5, maxLength: 12, placeholder: 'Ej. PROJ-001' } },
   { name: 'nombre', label: 'Nombre', input: { required: true, maxLength: 150, placeholder: 'Nombre del proyecto' } }
 ];
 const ADDRESS: TextField[] = [
@@ -20,9 +19,7 @@ const ADDRESS: TextField[] = [
     input: { maxLength: 255, placeholder: 'Ej. Frente al mercado central' } }
 ];
 const DIMENSIONS: TextField[] = [
-  { name: 'areaTotalM2', label: 'Área total (m²)', full: true, input: { inputMode: 'decimal', placeholder: 'Ej. 50000' } },
-  { name: 'latitud', label: 'Latitud', input: { inputMode: 'text', placeholder: '-90 a 90' } },
-  { name: 'longitud', label: 'Longitud', input: { inputMode: 'text', placeholder: '-180 a 180' } }
+  { name: 'areaTotalM2', label: 'Área total (m²)', full: true, input: { inputMode: 'decimal', placeholder: 'Ej. 50000' } }
 ];
 
 function SectionLabel({ children }: { children: string }) {
@@ -39,6 +36,13 @@ function TextFields({ model, fields }: { model: ProjectFormModel; fields: TextFi
   )}</>;
 }
 
+function CodeField({ model }: { model: ProjectFormModel }) {
+  return <ProjectField model={model} name="codigo" label="Código (automático)">
+    <Input id="codigo" name="codigo" value={model.isEdit ? model.form.codigo : 'Se genera al guardar'}
+      readOnly aria-readonly="true" className="cursor-not-allowed bg-brand-50 text-brand-600" />
+  </ProjectField>;
+}
+
 function StatusFields({ model }: { model: ProjectFormModel }) {
   return <>
     <ProjectField model={model} name="codigoEstadoProyecto" label="Estado" required>
@@ -47,10 +51,14 @@ function StatusFields({ model }: { model: ProjectFormModel }) {
         {model.catalogs.statuses.map((status) => <option key={status.codigo} value={status.codigo}>{status.nombre}</option>)}
       </Select>
     </ProjectField>
-    {model.isEdit && <ProjectField model={model} name="activo" label="Registro habilitado">
+    {model.isEdit && <ProjectField model={model} name="activo" label="Habilitado en el sistema">
       <Select id="activo" value={String(model.form.activo)} onChange={(event) => model.change('activo', event.target.value === 'true')}>
         <option value="true">Sí</option><option value="false">No</option>
       </Select>
+      <p className="mt-1 text-[11px] text-brand-500">
+        Si seleccionas No, el registro queda inhabilitado para operaciones activas.
+        No cambia el estado comercial y requiere no tener etapas, zonas, manzanas ni lotes activos.
+      </p>
     </ProjectField>}
   </>;
 }
@@ -81,14 +89,13 @@ function DateFields({ model }: { model: ProjectFormModel }) {
 export function ProjectFormFields({ model }: { model: ProjectFormModel }) {
   return <>
     <SectionLabel>Información general</SectionLabel>
-    <TextFields model={model} fields={GENERAL} /><StatusFields model={model} /><DescriptionField model={model} />
+    <CodeField model={model} /><TextFields model={model} fields={GENERAL} /><StatusFields model={model} /><DescriptionField model={model} />
     <SectionLabel>Ubicación</SectionLabel>
     <TextFields model={model} fields={ADDRESS} /><ProjectLocationFields model={model} />
-    <SectionLabel>Dimensiones y coordenadas</SectionLabel>
+    <SectionLabel>Dimensiones</SectionLabel>
     <TextFields model={model} fields={DIMENSIONS} />
     <p className="col-span-full text-[11px] text-brand-500">
-      Máximo 10 dígitos, sin contar signo ni separador decimal. Área: 2 decimales; coordenadas: 7.
-      Usa punto o coma decimal, sin separadores de miles.
+      Área: máximo 10 dígitos y 2 decimales. Usa punto o coma decimal, sin separadores de miles.
     </p>
     <SectionLabel>Fechas</SectionLabel><DateFields model={model} />
   </>;

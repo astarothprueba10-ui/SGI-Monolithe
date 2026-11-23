@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   DownloadIcon,
@@ -20,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { coreService } from '../services/coreService';
 import { ProjectFormModal } from '../components/projects/ProjectFormModal';
 import { number } from '../utils/format';
+import { generarExcelProyectos, descargarExcelProyectos, nombreArchivoProyectos } from '../utils/projectExportExcel';
 import type { ProyectoResponse } from '../types/core';
 
 export function Projects() {
@@ -30,6 +32,7 @@ export function Projects() {
 
   const [projects, setProjects] = useState<ProyectoResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Project Modal state
@@ -73,6 +76,21 @@ export function Projects() {
     await loadProjects();
   }, [loadProjects]);
 
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const todos = await coreService.getProjects();
+      const archivo = await generarExcelProyectos(todos);
+      descargarExcelProyectos(archivo, nombreArchivoProyectos());
+      toast.success(`Se exportaron ${todos.length} proyectos correctamente.`);
+    } catch {
+      toast.error('No se pudo exportar el listado de proyectos.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleCardClick = (idProyecto: number) => {
     navigate(`/proyectos/${idProyecto}`);
   };
@@ -98,8 +116,9 @@ export function Projects() {
                 </Button>
               </Link>
               <Gate permission="projects.export">
-                <Button icon={DownloadIcon} className="border-brand-200 text-brand-800 hover:bg-brand-50">
-                  Exportar
+                <Button icon={DownloadIcon} disabled={loading || exporting} onClick={handleExport}
+                  className="border-brand-200 text-brand-800 hover:bg-brand-50">
+                  {exporting ? "Exportando..." : "Exportar"}
                 </Button>
               </Gate>
               {canCreate && (

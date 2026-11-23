@@ -33,6 +33,11 @@ public class LoteService {
     private final LotePrecioService lotePrecioService;
 
     @Transactional(readOnly = true)
+    public List<Long> listarComercializables(Long proyecto) {
+        return loteRepository.listarComercializables(proyecto);
+    }
+
+    @Transactional(readOnly = true)
     public List<LoteResponse> listarPorManzana(Long idManzana) {
         obtenerManzana(idManzana);
         return loteRepository.findByManzana_IdManzanaOrderByNumeroAsc(idManzana)

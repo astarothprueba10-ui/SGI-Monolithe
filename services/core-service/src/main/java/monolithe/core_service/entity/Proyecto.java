@@ -51,12 +51,6 @@ public class Proyecto {
     @Column(name = "pais", nullable = false, length = 100)
     private String pais = "Perú";
 
-    @Column(name = "latitud", precision = 10, scale = 7)
-    private BigDecimal latitud;
-
-    @Column(name = "longitud", precision = 10, scale = 7)
-    private BigDecimal longitud;
-
     @Column(name = "area_total_m2", precision = 14, scale = 2)
     private BigDecimal areaTotalM2;
 

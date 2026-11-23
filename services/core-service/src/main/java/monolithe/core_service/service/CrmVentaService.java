@@ -71,7 +71,7 @@ public class CrmVentaService {
                     "Datos obligatorios de venta incompletos.");
         }
 
-        return ejecutar("""
+        JsonNode validacion = ejecutar("""
                 SELECT public.sp_crm_validar_formalizacion_v10(
                     CAST(? AS bigint),
                     CAST(? AS bigint),
@@ -91,6 +91,8 @@ public class CrmVentaService {
                 req.montoInicial(),
                 req.numeroCuotas(),
                 req.tasaInteresMensualPct());
+        validarPoliticaComercialNueva(req.idLote(),req.idProspecto(),true);
+        return validacion;
     }
 
     @Transactional(readOnly = true)
@@ -258,6 +260,25 @@ public class CrmVentaService {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "No autorizado para preparar el comprobante.");
+        }
+        validarPoliticaComercialNueva(idLote,idProspecto,false);
+    }
+
+    private void validarPoliticaComercialNueva(Long lote,Long prospecto,boolean conversion) {
+        try {
+            jdbc.queryForObject("""
+                SELECT CASE WHEN ? AND EXISTS(
+                    SELECT 1 FROM public.ven_reservas r
+                    JOIN public.cfg_estados_reserva er USING(id_estado_reserva)
+                    JOIN public.crm_prospectos p ON p.id_persona=r.id_persona
+                    WHERE p.id_prospecto=? AND p.activo AND r.id_lote=?
+                      AND er.codigo IN ('PENDIENTE','VIGENTE') AND r.fecha_vencimiento>now()
+                ) THEN NULL ELSE public.fn_inm_comercial_snapshot_v1(?,(
+                   SELECT id_moneda FROM public.cfg_monedas WHERE codigo='PEN' AND activo
+                ))::text END
+                """,String.class,conversion,prospecto,lote,lote);
+        } catch (DataAccessException ex) {
+            throw traducirError(ex);
         }
     }
 
@@ -1895,6 +1916,15 @@ public class CrmVentaService {
         }
 
         String mensaje = errores.toString();
+
+        if (mensaje.contains("COMERCIAL_NO_DISPONIBLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El lote no está habilitado por la política comercial vigente.", ex);
+        }
+        if (mensaje.contains("COMERCIAL_PRECIO_CAMBIO|") || mensaje.contains("COMERCIAL_INMUTABLE|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Las condiciones comerciales cambiaron. Actualice el precio y consulte a Gerencia.", ex);
+        }
 
         ResponseStatusException errorSep = mapearErrorSeparacion(mensaje, ex);
         if (errorSep != null) {

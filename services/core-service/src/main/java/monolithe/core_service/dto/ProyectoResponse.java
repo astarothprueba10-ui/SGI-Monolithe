@@ -17,8 +17,6 @@ public record ProyectoResponse(
         String provincia,
         String departamento,
         String pais,
-        BigDecimal latitud,
-        BigDecimal longitud,
         BigDecimal areaTotalM2,
         LocalDate fechaInicio,
         LocalDate fechaFinEstimada,

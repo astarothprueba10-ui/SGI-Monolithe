@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   LayersIcon,
   MapPinIcon,
   SaveIcon,
-  SearchIcon,
   Settings2Icon,
-  XIcon
+  XIcon,
+  MapIcon,
+  Grid2X2Icon,
+  FileImageIcon
 } from 'lucide-react';
 
 import { PageHeader } from '../components/ui/PageHeader';
-import { Card, CardHeader } from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
+import { LotMapDetailCard } from '../components/projects/detail/LotMapDetailCard';
+import { ProjectSvgPanel } from '../components/projects/detail/ProjectSvgPanel';
+import { PlanSvgShapes } from '../components/projects/detail/PlanSvgShapes';
+import { projectSvgService } from '../services/projectSvgService';
+import type { PlanoSvgDocumento } from '../types/projectSvg';
 import { SearchInput, Select } from '../components/ui/Field';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -75,18 +83,18 @@ const REAL_STATUSES: StatusFilter[] = [
   {
     code: 'VENDIDO',
     label: 'Vendidos',
-    dotColor: 'bg-slate-800',
-    badgeStyle: 'bg-slate-100 border-slate-400 text-slate-800 hover:bg-slate-200',
-    polygonFill: '#1e293b',
-    polygonStroke: '#0f172a'
+    dotColor: 'bg-red-500',
+    badgeStyle: 'bg-red-50 border-red-300 text-red-800 hover:bg-red-100',
+    polygonFill: '#ef4444',
+    polygonStroke: '#b91c1c'
   },
   {
     code: 'BLOQUEADO',
     label: 'Bloqueados',
-    dotColor: 'bg-rose-500',
-    badgeStyle: 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100',
-    polygonFill: '#f43f5e',
-    polygonStroke: '#be123c'
+    dotColor: 'bg-orange-500',
+    badgeStyle: 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100',
+    polygonFill: '#f97316',
+    polygonStroke: '#c2410c'
   },
   {
     code: 'NO_DISPONIBLE',
@@ -354,6 +362,7 @@ function buildDisplayGeometries(
 
 export function LotMap() {
   const { can } = useAuth();
+  const navigate = useNavigate();
   const canConfigurePlan = can('lots.configure');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [draftGeometries, setDraftGeometries] = useState<DisplayGeometria[]>([]);
@@ -367,6 +376,12 @@ export function LotMap() {
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
   const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
+  const [svgDocument, setSvgDocument] = useState<PlanoSvgDocumento | null>(null);
+  const [commercializable, setCommercializable] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<'matriz' | 'svg'>('matriz');
+  const [layoutMode, setLayoutMode] = useState<'manzanas' | 'general'>('manzanas');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [blockFilter, setBlockFilter] = useState('all');
 
   const [query, setQuery] = useState('');
   const [activeStatuses, setActiveStatuses] = useState<string[]>(
@@ -434,9 +449,11 @@ export function LotMap() {
 
     Promise.allSettled([
       coreService.searchLots({ idProyecto: projectId, activo: true }),
-      coreService.getCurrentPlanDetail(projectId),
-      coreService.getProjectLotPrices(projectId)
-    ]).then(([lotsResult, planResult, pricesResult]) => {
+      coreService.getOptionalCurrentPlanDetail(projectId),
+      coreService.getProjectLotPrices(projectId),
+      projectSvgService.obtener(projectId),
+      coreService.getCommercializableLots(projectId)
+    ]).then(([lotsResult, planResult, pricesResult, svgResult, commercialResult]) => {
       if (!isMounted) return;
       handleLoadLotsResult(lotsResult);
       if (planResult.status === 'fulfilled') {
@@ -445,6 +462,10 @@ export function LotMap() {
         setPlanDetail(null);
       }
       handleLoadPricesResult(pricesResult);
+      setSvgDocument(svgResult.status === 'fulfilled' && svgResult.value && svgResult.value.documento
+        ? svgResult.value.documento : null);
+      setCommercializable(commercialResult.status === 'fulfilled'
+        ? new Set(commercialResult.value) : new Set());
       setLoadingPlan(false);
     });
 
@@ -459,8 +480,13 @@ export function LotMap() {
       setLots([]);
       setPlanDetail(null);
       setPricesMap(new Map());
+      setSvgDocument(null);
+      setCommercializable(new Set());
       return;
     }
+    setViewMode('matriz');
+    setStageFilter('all');
+    setBlockFilter('all');
     const cleanup = loadProjectData(selectedProjectId, false);
     return cleanup;
   }, [selectedProjectId, loadProjectData]);
@@ -716,7 +742,7 @@ export function LotMap() {
 
   const canvasDimensions = useMemo(() => {
     let maxX = 920;
-    let maxY = 720;
+    let maxY = 510;
 
     renderedGeometries.forEach((g) => {
       g.puntos.forEach((p) => {
@@ -734,7 +760,7 @@ export function LotMap() {
 
     return {
       width: Math.max(920, maxX),
-      height: Math.max(720, maxY)
+      height: Math.max(510, maxY)
     };
   }, [renderedGeometries, planDetail]);
 
@@ -801,6 +827,14 @@ export function LotMap() {
     );
   };
 
+  const stageOptions = useMemo(() => Array.from(new Map(lots
+    .filter(l => l.idEtapa != null)
+    .map(l => [String(l.idEtapa), l.nombreEtapa || l.codigoEtapa || `Etapa ${l.idEtapa}`])).entries()), [lots]);
+  const blockOptions = useMemo(() => Array.from(new Map(lots
+    .filter(l => l.idManzana != null && (stageFilter === 'all' || String(l.idEtapa) === stageFilter))
+    .map(l => [String(l.idManzana), l.nombreManzana || l.codigoManzana || `Manzana ${l.idManzana}`])).entries()), [lots]);
+  const totalArea = useMemo(() => lots.reduce((acc,l) => acc + (Number(l.areaM2) || 0),0),[lots]);
+  const allBlocksCount = useMemo(() => new Set(lots.map(l=>l.idManzana).filter(v=>v!=null)).size,[lots]);
   const filteredLotIds = useMemo(() => {
     const q = query.trim().toLowerCase();
     const matches = lots.filter((l) => {
@@ -815,15 +849,28 @@ export function LotMap() {
       const st = l.codigoEstadoLote || 'NO_DISPONIBLE';
       const matchStatus = activeStatuses.includes(st);
 
-      return matchQuery && matchStatus;
+      const matchEtapa = stageFilter === 'all' || String(l.idEtapa) === stageFilter;
+      const matchManzana = blockFilter === 'all' || String(l.idManzana) === blockFilter;
+      return matchQuery && matchStatus && matchEtapa && matchManzana;
     });
     return new Set(matches.map((l) => l.idLote));
-  }, [lots, query, activeStatuses]);
+  }, [lots, query, activeStatuses, stageFilter, blockFilter]);
 
   const selectedLot = useMemo(() => {
     if (selectedLotId === null) return null;
     return lots.find((l) => l.idLote === selectedLotId) ?? null;
   }, [lots, selectedLotId]);
+  const canOperate = Boolean(selectedLot && can('sales.create') && selectedLot.activo
+    && selectedLot.codigoEstadoLote === 'DISPONIBLE' && pricesMap.has(selectedLot.idLote)
+    && commercializable.has(selectedLot.idLote));
+  const openCommercialFlow = (operacion: 'Separacion' | 'Venta') => {
+    if(!selectedLot || !canOperate || !selectedLot.idEtapa || !selectedProjectId) return;
+    const params = new URLSearchParams({
+      origen: 'plano', operacion, idProyecto: String(selectedProjectId),
+      idEtapa: String(selectedLot.idEtapa), idLote: String(selectedLot.idLote)
+    });
+    navigate(`/ventas?${params.toString()}`);
+  };
 
   if (loadingProjects) {
     return (
@@ -890,149 +937,135 @@ export function LotMap() {
     );
   }
 
+
   return (
-    <div>
-      <PageHeader
-        title="Plano interactivo"
-        description="Consulta la disponibilidad del inventario por etapa y manzana. Selecciona un lote para ver su información comercial."
-        meta={
-          currentProject ? (
-            <>
-              <Badge tone="brand">{currentProject.nombre}</Badge>
-              <span className="text-[12px] text-brand-400">
-                {number(lots.length)} lotes · {currentProject.distrito || currentProject.provincia || 'Ubicación n/d'}
-              </span>
-            </>
-          ) : undefined
-        }
-        actions={
-          canConfigurePlan ? (
-            isEditingPlan ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  icon={XIcon}
-                  onClick={handleCancelPlanEditing}
-                  disabled={savingPlan}
-                  className="border-brand-200 text-brand-700 hover:bg-brand-50"
-                >
-                  Cancelar
-                </Button>
-
-                <Button
-                  icon={SaveIcon}
-                  onClick={handleSavePlan}
-                  disabled={savingPlan}
-                  className="bg-brand-900 text-white hover:bg-brand-800"
-                >
-                  {savingPlan ? 'Guardando...' : 'Guardar cambios'}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                icon={Settings2Icon}
-                onClick={() => setIsEditingPlan(true)}
-                className="border-brand-200 text-brand-800 hover:bg-brand-50"
-              >
-                Configurar plano
-              </Button>
-            )
-          ) : undefined
-        }
-      />
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3.5">
-            <Select
-              value={selectedProjectId ?? ''}
-              onChange={(e) => setSelectedProjectId(Number(e.target.value))}
-              disabled={isEditingPlan || savingPlan}
-              aria-label="Proyecto"
-              className="w-[220px]"
-            >
-              {projects.map((p) => (
-                <option key={p.idProyecto} value={p.idProyecto}>
-                  {p.nombre}
-                </option>
-              ))}
-            </Select>
-
-            <SearchInput
-              value={query}
-              onValueChange={setQuery}
-              placeholder="Buscar por lote, manzana o etapa..."
-              label="Buscar lote"
-              className="w-full sm:w-64"
-            />
-
-            <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              {REAL_STATUSES.map((st) => {
-                const on = activeStatuses.includes(st.code);
-                const count = counts[st.code] ?? 0;
-
-                return (
-                  <button
-                    key={st.code}
-                    type="button"
-                    onClick={() => toggleStatus(st.code)}
-                    aria-pressed={on}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 ease-smooth',
-                      on
-                        ? st.badgeStyle
-                        : 'border-brand-200 bg-white text-brand-300 hover:text-brand-500'
-                    )}
-                  >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', st.dotColor)} />
-                    {st.label}
-                    <span className="tabular">{count}</span>
-                  </button>
-                );
-              })}
+    <div className="space-y-5">
+      <PageHeader title="Plano interactivo"
+        description="Explora el inventario por manzana, consulta la ficha de cada lote y visualiza el plano SVG del proyecto."
+        actions={canConfigurePlan ? (isEditingPlan
+          ? <div className="flex items-center gap-2">
+              <Button icon={XIcon} onClick={handleCancelPlanEditing} disabled={savingPlan}>Cancelar</Button>
+              <Button icon={SaveIcon} variant="primary" onClick={()=>void handleSavePlan()}
+                disabled={savingPlan}>{savingPlan?'Guardando…':'Guardar posiciones'}</Button>
+            </div>
+          : <Button icon={Settings2Icon} onClick={()=>{setViewMode('matriz');setIsEditingPlan(true);}}>
+              Configurar posiciones
+            </Button>) : undefined}/>
+      {currentProject && <section className="overflow-hidden rounded-2xl border border-brand-200 bg-white p-4 shadow-sm lg:p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(240px,1.1fr)_180px] lg:items-center">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-brand-400">Proyecto</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-brand-900">{currentProject.nombre}</h2>
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-brand-500">
+              <MapPinIcon className="h-4 w-4 shrink-0 text-emerald-600"/>
+              {[currentProject.distrito,currentProject.provincia].filter(Boolean).join(', ') ||
+                currentProject.ubicacionReferencia || 'Ubicación sin especificar'}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800">{allBlocksCount} manzanas</span>
+              <span className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800">{number(lots.length)} lotes</span>
+              <span className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800">{fmtArea(totalArea)} de lotes</span>
+            </div>
+            <div className="mt-4">
+              <label className="mb-1 block text-[11px] font-semibold text-brand-500" htmlFor="plano-proyecto">Cambiar proyecto</label>
+              <Select id="plano-proyecto" value={selectedProjectId??''}
+                onChange={e=>setSelectedProjectId(Number(e.target.value))}
+                disabled={isEditingPlan || savingPlan} className="w-full max-w-xs">
+                {projects.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+              </Select>
             </div>
           </div>
-
-          <div className="p-5">
-            {loadingPlan ? (
-              <div className="flex h-80 items-center justify-center">
-                <p className="text-brand-400 text-sm">Cargando plano interactivo...</p>
+          <div className="h-44 overflow-hidden rounded-xl border border-brand-100 bg-brand-50/70">
+            {svgDocument ? <PlanSvgShapes documento={svgDocument} lotes={lots} seleccionado={selectedLotId} miniatura/>
+              : <svg viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`} preserveAspectRatio="xMidYMid meet"
+                  className="h-full w-full" role="img" aria-label="Vista previa automática del inventario del proyecto">
+                  <rect width={canvasDimensions.width} height={canvasDimensions.height} rx="18" fill="#eef5f8"/>
+                  {displayGeometries.map(g=>{
+                    const lote=lots.find(l=>l.idLote===g.idLote);
+                    return <polygon key={g.idLote} points={g.puntos.map(p=>`${p.x},${p.y}`).join(' ')}
+                      fill={selectedLotId===g.idLote ? '#2563eb' : getPolygonColors(lote?.codigoEstadoLote).fill}
+                      stroke="#ffffff" strokeWidth="3"/>;
+                  })}
+                </svg>}
+          </div>
+          <div className="flex flex-col items-start gap-3 lg:items-center lg:text-center">
+            <FileImageIcon className="h-8 w-8 text-emerald-600"/>
+            <div><p className="text-sm font-bold text-brand-900">Plano del proyecto</p>
+              <p className="mt-1 text-xs text-brand-500">{svgDocument ? svgDocument.nombreArchivo : 'DWG original o SVG interactivo'}</p></div>
+            <Button size="sm" onClick={()=>{setViewMode('svg');if(isEditingPlan)handleCancelPlanEditing();}}>
+              {svgDocument?'Ver plano SVG':'Importar DWG / SVG'}
+            </Button>
+          </div>
+        </div>
+      </section>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-brand-200 bg-white p-1 shadow-sm" role="tablist" aria-label="Vista del plano">
+          <button type="button" role="tab" aria-selected={viewMode==='matriz'} onClick={()=>setViewMode('matriz')}
+            className={cn('inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold',
+              viewMode==='matriz'?'bg-brand-900 text-white':'text-brand-600 hover:bg-brand-50')}>
+            <Grid2X2Icon className="h-4 w-4"/> Matriz
+          </button>
+          <button type="button" role="tab" aria-selected={viewMode==='svg'}
+            onClick={()=>{if(isEditingPlan)handleCancelPlanEditing();setViewMode('svg');}}
+            className={cn('inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold',
+              viewMode==='svg'?'bg-brand-900 text-white':'text-brand-600 hover:bg-brand-50')}>
+            <MapIcon className="h-4 w-4"/> Plano SVG
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select aria-label="Filtrar por etapa" value={stageFilter}
+            onChange={e=>{setStageFilter(e.target.value);setBlockFilter('all');}}
+            className="w-48">
+            <option value="all">Todas las etapas</option>
+            {stageOptions.map(([id,nombre])=><option key={id} value={id}>{nombre}</option>)}
+          </Select>
+          <Select aria-label="Filtrar por manzana" value={blockFilter}
+            onChange={e=>setBlockFilter(e.target.value)} className="w-48">
+            <option value="all">Todas las manzanas</option>
+            {blockOptions.map(([id,nombre])=><option key={id} value={id}>{nombre}</option>)}
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
+        <Card className="min-w-0 overflow-hidden rounded-2xl shadow-sm">
+          {viewMode==='matriz' ? <>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-1 pt-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-emerald-50 p-2.5"><MapIcon className="h-5 w-5 text-emerald-700"/></div>
+                <div><h3 className="text-lg font-bold text-brand-900">Mapa de Lotes</h3>
+                  <p className="text-xs text-brand-500">Selecciona un lote para consultar su ficha</p></div>
               </div>
-            ) : lots.length === 0 ? (
-              <EmptyState
-                title="Proyecto sin lotes"
-                description="Este proyecto todavía no tiene lotes registrados."
-                icon={MapPinIcon}
-              />
-            ) : (
-              <div className="space-y-3">
-                {isEditingPlan && (
-                  <div className="flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-[12px] font-medium text-brand-800">
-                    <Settings2Icon className="h-4 w-4 text-brand-600 shrink-0" />
-                    <span>
-                      Modo configuración · Arrastra los lotes para cambiar su posición · Ajuste a cuadrícula: 10
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between border-b border-brand-100 pb-3 text-[13px]">
-                  <div className="flex items-center gap-2 font-medium text-brand-700">
-                    <LayersIcon className="h-4 w-4 text-brand-400" />
-                    <span>
-                      {planDetail?.plano
-                        ? `Plano V${planDetail.plano.numeroVersion}`
-                        : 'Distribución automática'}
-                    </span>
-                  </div>
-                  <span className="text-brand-500 font-medium">{planSubtitleText}</span>
-                </div>
-
-                <div className="overflow-auto rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
+              <div className="inline-flex rounded-lg border border-brand-200 bg-white p-1 text-xs font-semibold">
+                <button type="button" onClick={()=>setLayoutMode('manzanas')}
+                  className={cn('rounded-md px-3 py-2',layoutMode==='manzanas'?'bg-brand-900 text-white':'text-brand-500')}>
+                  Vista por manzanas
+                </button>
+                <button type="button" onClick={()=>setLayoutMode('general')}
+                  className={cn('rounded-md px-3 py-2',layoutMode==='general'?'bg-brand-900 text-white':'text-brand-500')}>
+                  Vista general
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 border-b border-brand-100 px-5 py-3">
+              <SearchInput value={query} onValueChange={setQuery}
+                placeholder="Buscar lote, manzana o etapa..." label="Buscar lote"
+                className="w-full sm:max-w-xs"/>
+              <span className="ml-auto text-xs font-medium text-brand-500">{planSubtitleText}</span>
+            </div>
+            <div className="p-4">
+              {loadingPlan ? <div className="p-20 text-center text-sm text-brand-500">Cargando lotes…</div>
+                : lots.length===0 ? <EmptyState title="Proyecto sin lotes" description="Registra lotes antes de visualizar el plano." icon={MapPinIcon}/>
+                : <div className="space-y-3">
+                  {isEditingPlan && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+                    Modo configuración: arrastra los lotes para cambiar su posición. Ajuste a cuadrícula: 10.
+                  </div>}
+                  <div className="overflow-auto rounded-xl border border-brand-100 bg-[#f2f6fa] p-2 sm:p-3">
                   <svg
                     ref={svgRef}
                     style={{ touchAction: 'none' }}
                     viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`}
                     preserveAspectRatio="xMidYMid meet"
-                    className="w-full h-auto min-h-[620px] max-h-[720px] select-none"
+                    className="w-full h-auto min-h-[450px] max-h-[740px] select-none"
                   >
                     <defs>
                       <filter
@@ -1073,7 +1106,7 @@ export function LotMap() {
                       width={canvasDimensions.width}
                       height={canvasDimensions.height}
                       rx="18"
-                      fill={isEditingPlan ? 'url(#editor-grid)' : '#f8fafc'}
+                      fill={isEditingPlan ? 'url(#editor-grid)' : '#f1f5f9'}
                     />
 
                     {/* Línea horizontal de separación entre bloques de manzanas si aplica */}
@@ -1088,25 +1121,25 @@ export function LotMap() {
                     />
 
                     {/* Leyendas de manzanas a la izquierda */}
-                    {manzanaLabels.map((row) => (
+                    {layoutMode === 'manzanas' && manzanaLabels.map((row) => (
                       <g key={row.codigo}>
                         <rect
-                          x="22"
+                          x="12"
                           y={row.y - 19}
-                          width="64"
+                          width="94"
                           height="38"
                           rx="11"
-                          fill="#ffffff"
-                          stroke="#cbd5e1"
+                          fill="#e7f5f1"
+                          stroke="#c6e5df"
                           strokeWidth="1.5"
                         />
 
                         <text
-                          x="54"
+                          x="59"
                           y={row.y}
                           textAnchor="middle"
                           dominantBaseline="central"
-                          fontSize="13"
+                          fontSize="11"
                           fontWeight="700"
                           fill="#334155"
                           pointerEvents="none"
@@ -1129,9 +1162,9 @@ export function LotMap() {
                         <g key={geom.idLoteGeometria} className="cursor-pointer">
                           <polygon
                             points={pointsStr}
-                            fill={colors.fill}
-                            stroke={isSelected ? '#2563eb' : colors.stroke}
-                            strokeWidth={isSelected ? 3 : 1.75}
+                            fill={isSelected ? '#2563eb' : colors.fill}
+                            stroke={isSelected ? '#1d4ed8' : colors.stroke}
+                            strokeWidth={isSelected ? 3.5 : 1.5}
                             strokeLinejoin="round"
                             filter="url(#lot-shadow)"
                             opacity={isMatch ? (isSelected ? 1 : 0.9) : 0.18}
@@ -1174,105 +1207,35 @@ export function LotMap() {
                       );
                     })}
                   </svg>
-                </div>
-              </div>
-            )}
+                  </div>
+                </div>}
+            </div>
+          </> : <div className="p-4 sm:p-5">
+            {selectedProjectId && <ProjectSvgPanel key={selectedProjectId} proyecto={selectedProjectId}
+              lotes={lots} documento={svgDocument} onSave={setSvgDocument}
+              seleccionado={selectedLotId} onSelect={setSelectedLotId} puedeConfigurar={canConfigurePlan}/>}
+          </div>}
+          <div className="flex flex-wrap items-center gap-2 border-t border-brand-100 px-4 py-3">
+            <span className="text-xs font-bold text-brand-800">Leyenda:</span>
+            {REAL_STATUSES.map(st=>{
+              const checked=activeStatuses.includes(st.code);
+              return <button key={st.code} type="button" aria-pressed={checked}
+                onClick={()=>toggleStatus(st.code)}
+                className={cn('inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium',
+                  checked?'bg-brand-50 text-brand-700':'bg-white text-brand-300 line-through')}>
+                <span className={cn('h-2.5 w-2.5 rounded-[3px]',st.dotColor)}/>{st.label}
+                <span className="text-brand-400">{counts[st.code]??0}</span>
+              </button>;
+            })}
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] text-blue-800">
+              <span className="h-2.5 w-2.5 rounded-[2px] border border-blue-700 bg-blue-500"/>Seleccionado
+            </span>
+            <span className="ml-auto text-xs font-bold text-brand-900">Total: {lots.length} lotes</span>
           </div>
         </Card>
-
-        {/* Panel lateral de lote seleccionado */}
-        <Card className="h-fit xl:sticky xl:top-6">
-          <CardHeader
-            title={selectedLot ? `Lote ${selectedLot.codigo}` : 'Detalle del lote'}
-            description={
-              selectedLot
-                ? `${selectedLot.nombreManzana || selectedLot.codigoManzana || ''} · ${selectedLot.nombreEtapa || selectedLot.codigoEtapa || ''}`
-                : undefined
-            }
-          />
-
-          {!selectedLot ? (
-            <EmptyState
-              title="Selecciona un lote"
-              description="Haz clic en cualquier polígono del plano para ver la ficha del lote."
-              icon={SearchIcon}
-            />
-          ) : (
-            <dl className="divide-y divide-brand-50">
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Código</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.codigo}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Número</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.numero || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Etapa</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.nombreEtapa || selectedLot.codigoEtapa || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Manzana</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.nombreManzana || selectedLot.codigoManzana || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Zona</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.nombreZona || selectedLot.codigoZona || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Tipo</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.nombreTipoLote || selectedLot.codigoTipoLote || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Área</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.areaM2 != null ? fmtArea(selectedLot.areaM2) : '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Precio</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {pricesMap.has(selectedLot.idLote)
-                    ? new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(pricesMap.get(selectedLot.idLote)!)
-                    : <span className="text-brand-400 text-xs">Sin precio</span>}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Estado</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.nombreEstadoLote || selectedLot.codigoEstadoLote || '-'}
-                </dd>
-              </div>
-
-              <div className="flex items-baseline justify-between gap-3 px-5 py-2.5">
-                <dt className="text-[12px] text-brand-400">Activo</dt>
-                <dd className="text-right text-[13px] font-medium text-brand-800">
-                  {selectedLot.activo ? 'Sí' : 'No'}
-                </dd>
-              </div>
-            </dl>
-          )}
-        </Card>
+        <LotMapDetailCard lote={selectedLot} precio={selectedLot?pricesMap.get(selectedLot.idLote)??null:null}
+          puedeOperar={canOperate} onSeparar={()=>openCommercialFlow('Separacion')}
+          onVender={()=>openCommercialFlow('Venta')}/>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { useCrmTableCounts } from '../hooks/useCrmTableCounts';
 import { toast } from 'sonner';
 import {
   CalendarIcon,
+  Building2,
   CheckCircleIcon,
   DownloadIcon,
   EyeIcon,
@@ -42,7 +43,8 @@ import type { CrmRetrocesoMotivo } from '../services/crmBackend';
 import {
   crmBackend,
   type CrmAdvisor,
-  type CrmBuyer,
+  type CrmBuyerPortfolio,
+  type CrmBuyerFilters,
   type CrmCatalogs,
   type CrmDetail,
   type CrmFollowUpCreate,
@@ -65,7 +67,7 @@ import {
 import { CrmEvolucionChart } from '../components/crm/CrmEvolucionChart';
 import { EditarDatosPersonalesModal } from '../components/crm/EditarDatosPersonalesModal';
 import { CrmHistorialDatosPersonalesPanel } from '../components/crm/CrmHistorialDatosPersonalesPanel';
-import { ExpedienteCompradorPanel } from '../components/crm/ExpedienteCompradorPanel';
+import { ExpedienteCompradorMaestroPanel } from '../components/crm/ExpedienteCompradorMaestroPanel';
 import type { CrmEvolucionMes } from '../services/crmBackend';
 import {
   sanitizarLead, validarNuevoLead,
@@ -285,10 +287,13 @@ export function Crm() {
   const [agendaError, setAgendaError] = useState<string | null>(null);
   const [agendaRefreshKey, setAgendaRefreshKey] = useState(0);
 
-  const [buyersList, setBuyersList] = useState<CrmBuyer[]>([]);
+  const [buyersList, setBuyersList] = useState<CrmBuyerPortfolio[]>([]);
   const [buyersTotal, setBuyersTotal] = useState(0);
   const [buyersPage, setBuyersPage] = useState(1);
   const [buyersQuery, setBuyersQuery] = useState('');
+  const [buyersModalidad, setBuyersModalidad] = useState<'' | 'CONTADO' | 'FINANCIADA'>('');
+  const [buyersFechaDesde, setBuyersFechaDesde] = useState('');
+  const [buyersFechaHasta, setBuyersFechaHasta] = useState('');
   const [buyersLoading, setBuyersLoading] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -410,7 +415,7 @@ export function Crm() {
   const [leadDetail, setLeadDetail] = useState<CrmDetail | null>(null);
   const [personalLead, setPersonalLead] = useState<CrmProspect | null>(null);
   const [revisionHistorialPersonal, setRevisionHistorialPersonal] = useState(0);
-  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyer | null>(null);
+  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyerPortfolio | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
@@ -465,6 +470,9 @@ export function Crm() {
 
   const [fuentesData, setFuentesData] = useState<CrmFuentesPeriodo | null>(null);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
+  const [fuentesModo, setFuentesModo] = useState<'historico' | 'periodo'>('historico');
+  const [fuentesError, setFuentesError] = useState<string | null>(null);
+  const fuentesRequest = useRef(0);
 
 
   const loadCatalogsAndAdvisors = useCallback(async () => {
@@ -479,7 +487,8 @@ export function Crm() {
         puedeVerGestionGlobal && rangoPeriodo
           ? crmBackend.resumenPeriodo(
             rangoPeriodo.desde,
-            rangoPeriodo.hastaExclusivo
+            rangoPeriodo.hastaExclusivo,
+            projectFilter === '' ? undefined : projectFilter
           )
           : Promise.resolve(null)
       ]);
@@ -502,7 +511,7 @@ export function Crm() {
 
       setErrorMsg(msg);
     }
-  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor]);
+  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor, projectFilter]);
 
   // El período global solo entra en consultas de Visitas; Leads y Potenciales
   // dependen únicamente de las fechas propias de sus tablas.
@@ -513,7 +522,14 @@ export function Crm() {
     sinAsignar: puedeVerGestionGlobal ? onlyUnassigned || undefined : undefined,
     idProyecto: projectFilter === '' ? undefined : projectFilter
   }), [query, stage, origin, advisorFilter, onlyUnassigned, projectFilter, puedeVerGestionGlobal]);
-  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyersQuery);
+  const buyerFilters = useMemo<CrmBuyerFilters>(() => ({
+    consulta: buyersQuery.trim() || undefined,
+    idProyecto: projectFilter === '' ? undefined : projectFilter,
+    modalidad: buyersModalidad || undefined,
+    fechaDesde: buyersFechaDesde || undefined,
+    fechaHasta: buyersFechaHasta || undefined,
+  }), [buyersQuery, projectFilter, buyersModalidad, buyersFechaDesde, buyersFechaHasta]);
+  const { counts: tableCounts, loading: countingTables, refresh: refreshTableCounts } = useCrmTableCounts(tableFilters, rangoTabla, buyerFilters);
   const leadRequest = useRef(0); const buyerRequest = useRef(0);
 
   const loadLeads = useCallback(async () => {
@@ -568,9 +584,7 @@ export function Crm() {
 
     try {
       // La tabla de compradores tampoco hereda el período global.
-      const res = await crmBackend.compradores(
-        buyersQuery.trim(),buyersPage,15
-      );
+      const res = await crmBackend.compradoresFiltrados({ ...buyerFilters, pagina: buyersPage, tamano: 15 });
 
       if (request !== buyerRequest.current) return;
       setBuyersList(res.items ?? []);
@@ -593,7 +607,7 @@ export function Crm() {
     } finally {
       if (request === buyerRequest.current) setBuyersLoading(false);
     }
-  }, [buyersQuery, buyersPage, refreshTableCounts]
+  }, [buyerFilters, buyersPage, refreshTableCounts]
   );
 
 
@@ -615,37 +629,34 @@ export function Crm() {
 
 
   const loadPortfolioLeads = useCallback(async () => {
+    const request = ++fuentesRequest.current;
     setIsLoadingPortfolio(true);
+    setFuentesError(null);
+    setFuentesData(null);
 
     try {
-      if (!rangoPeriodo) {
-        setFuentesData(null);
-        return;
-      }
+      if (fuentesModo === 'periodo' && !rangoPeriodo) return;
 
-      const res = await crmBackend.fuentesPeriodo(
-        rangoPeriodo.desde,
-        rangoPeriodo.hastaExclusivo
-      );
-
-      setFuentesData(res);
-
+      const idProyecto = projectFilter === '' ? undefined : projectFilter;
+      const res = fuentesModo === 'historico'
+        ? await crmBackend.fuentesHistorico(idProyecto)
+        : await crmBackend.fuentesPeriodo(
+            rangoPeriodo!.desde,
+            rangoPeriodo!.hastaExclusivo,
+            idProyecto
+          );
+      if (request === fuentesRequest.current) setFuentesData(res);
     } catch (err: unknown) {
+      if (request !== fuentesRequest.current) return;
       const msg = err instanceof Error
         ? err.message
         : 'No se pudieron cargar las fuentes de captación.';
-
-      toast.error('Error en fuentes de captación', {
-        description: msg
-      });
-
-      setFuentesData(null);
-
+      setFuentesError(msg);
+      toast.error('Error en fuentes de captación', { description: msg });
     } finally {
-      setIsLoadingPortfolio(false);
+      if (request === fuentesRequest.current) setIsLoadingPortfolio(false);
     }
-  }, [rangoPeriodo]);
-
+  }, [fuentesModo, rangoPeriodo, projectFilter]);
 
   useEffect(() => {
     void loadCatalogsAndAdvisors();
@@ -745,7 +756,8 @@ export function Crm() {
 
     crmBackend.evolucionMensual(
       rangoEvolucion.desde,
-      rangoEvolucion.hastaExclusivo
+      rangoEvolucion.hastaExclusivo,
+      projectFilter === '' ? undefined : projectFilter
     )
       .then((resultado) => {
         if (activo) {
@@ -769,7 +781,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [rangoEvolucion, puedeVerGestionGlobal]);
+  }, [rangoEvolucion, puedeVerGestionGlobal, projectFilter]);
 
 
   useEffect(() => {
@@ -787,7 +799,8 @@ export function Crm() {
 
     void crmBackend.asesoresPeriodo(
       rangoPeriodo.desde,
-      rangoPeriodo.hastaExclusivo
+      rangoPeriodo.hastaExclusivo,
+      projectFilter === '' ? undefined : projectFilter
     )
       .then((res) => {
         if (activo) {
@@ -816,7 +829,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [tab, rangoPeriodo]);
+  }, [tab, rangoPeriodo, projectFilter]);
 
   const handleOpenNewLead = () => {
     setSolicitudId(crypto.randomUUID());
@@ -824,7 +837,7 @@ export function Crm() {
     setLeadCamposVisitados({});
     setForm({
       ...INITIAL_FORM,
-      idProyecto: catalogs?.proyectos?.[0]?.id ?? ''
+      idProyecto: projectFilter !== '' ? projectFilter : (catalogs?.proyectos?.[0]?.id ?? '')
     });
     setIsNewLeadOpen(true);
   };
@@ -1199,6 +1212,7 @@ export function Crm() {
     const res = await ejecutarExportacionExcelCompleta({
       filtros: construirFiltrosExportacion(rango),
       consultaCompradores: qComp,
+      modalidadCompradores: tab === 'compradores' ? buyersModalidad || undefined : undefined,
       notificarProgreso: (msg) => {
         setExportStatus(msg);
         toast.loading(msg, { id: 'crm-export' });
@@ -1251,7 +1265,40 @@ export function Crm() {
         }
       />
 
+      <section className="mb-4 overflow-hidden rounded-xl border border-brand-800 bg-brand-900 px-4 py-4 text-white shadow-sm sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+              <Building2 className="h-5 w-5 text-white" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Proyecto inmobiliario</h2>
+              <p className="mt-1 text-xs text-brand-200">
+                Filtra indicadores, gráficos y carteras. Por defecto se muestran todos.
+              </p>
+            </div>
+          </div>
+          <Select
+            aria-label="Proyecto global del CRM"
+            value={projectFilter}
+            onChange={(e) => {
+              setProjectFilter(e.target.value ? Number(e.target.value) : '');
+              setPage(1);
+              setBuyersPage(1);
+              setAgendaPage(1);
+            }}
+            className="w-full border-white/20 bg-white font-medium text-brand-900 shadow-sm focus:border-accent-400 sm:w-80"
+          >
+            <option value="">Todos los proyectos</option>
+            {(catalogs?.proyectos ?? []).map((proyecto) => (
+              <option key={proyecto.id} value={proyecto.id}>{proyecto.nombre}</option>
+            ))}
+          </Select>
+        </div>
+      </section>
+
       <CrmPeriodoGlobal
+        descripcion="Actualiza indicadores y gráficos; las tablas conservan sus fechas propias."
         modo={periodoModo}
         onModoChange={(modo) => {
           setPeriodoModo(modo);
@@ -1521,30 +1568,6 @@ export function Crm() {
                 )}
 
 
-                {/* Proyecto */}
-                <div className="w-full sm:w-52">
-                  <label className="mb-1.5 block text-xs font-medium text-brand-600">
-                    Proyecto
-                  </label>
-                  <Select
-                    aria-label="Filtrar por proyecto"
-                    value={projectFilter}
-                    onChange={(e) => {
-                      setProjectFilter(
-                        e.target.value ? Number(e.target.value) : ''
-                      );
-                      setPage(1);
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">Todos los proyectos</option>
-                    {(catalogs?.proyectos ?? []).map((proyecto) => (
-                      <option key={proyecto.id} value={proyecto.id}>
-                        {proyecto.nombre}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
               </div>
 
               {/* FILA 2: Fechas y limpieza de filtros */}
@@ -2091,20 +2114,50 @@ export function Crm() {
       {/* PESTANA 4: Compradores */}
       {tab === 'compradores' && (
         <Card>
-          <div className="flex flex-col gap-3 border-b border-brand-100 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="border-b border-brand-100 p-4">
             <CardHeader
               title="Compradores en cartera"
-              description="Clientes con contrato o separacion formal registrada."
+              description="Cada comprador aparece una sola vez; las compras y contratos se consultan en su expediente único."
             />
-            <SearchInput
-              placeholder="Buscar comprador o contrato..."
-              value={buyersQuery}
-              onValueChange={(val) => {
-                setBuyersQuery(val);
-                setBuyersPage(1);
-              }}
-              className="w-full md:w-72"
-            />
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <div className="w-full sm:w-72">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Buscar comprador o contrato</label>
+                <SearchInput
+                  placeholder="Nombre, cliente, contrato o lote..."
+                  value={buyersQuery}
+                  onValueChange={(value) => { setBuyersQuery(value); setBuyersPage(1); }}
+                  className="w-full"
+                />
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Modalidad</label>
+                <Select aria-label="Modalidad de venta" value={buyersModalidad}
+                  onChange={(e) => {
+                    setBuyersModalidad(e.target.value as '' | 'CONTADO' | 'FINANCIADA');
+                    setBuyersPage(1);
+                  }} className="w-full">
+                  <option value="">Todas</option>
+                  <option value="FINANCIADA">Financiado</option>
+                  <option value="CONTADO">Contado</option>
+                </Select>
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Formalización desde</label>
+                <Input type="date" aria-label="Formalización desde" value={buyersFechaDesde}
+                  max={buyersFechaHasta || undefined}
+                  onChange={(e) => { setBuyersFechaDesde(e.target.value); setBuyersPage(1); }} />
+              </div>
+              <div className="w-full sm:w-40">
+                <label className="mb-1.5 block text-xs font-medium text-brand-600">Formalización hasta</label>
+                <Input type="date" aria-label="Formalización hasta" value={buyersFechaHasta}
+                  min={buyersFechaDesde || undefined}
+                  onChange={(e) => { setBuyersFechaHasta(e.target.value); setBuyersPage(1); }} />
+              </div>
+              <Button icon={RefreshCw} size="sm" onClick={() => {
+                setBuyersQuery(''); setBuyersModalidad('');
+                setBuyersFechaDesde(''); setBuyersFechaHasta(''); setBuyersPage(1);
+              }}>Limpiar filtros</Button>
+            </div>
           </div>
 
           {buyersLoading ? (
@@ -2119,38 +2172,57 @@ export function Crm() {
             />
           ) : (
             <>
-              <Table
-                head={
-                  <>
-                    <TH>Codigo Cliente</TH>
-                    <TH>Cliente</TH>
-                    <TH>Lote adjudicado</TH>
-                    <TH>Contrato / Estado</TH>
-                    <TH align="right">Monto venta</TH>
-                    <TH>Fecha formalizacion</TH>
-                    <TH align="right">Expediente</TH>
-                  </>
-                }
+              <div className="border-b border-brand-100 px-4 py-2 text-xs text-brand-500">
+                La cantidad refleja las adquisiciones que coinciden con el proyecto, modalidad y fechas seleccionados.
+              </div>
+              <Table columnWidths={[165, 285, 165, 150, 160, 185, 155]}
+                head={<>
+                  <TH>Código cliente</TH>
+                  <TH>Comprador</TH>
+                  <TH align="center">Lotes adquiridos</TH>
+                  <TH align="center">Proyectos</TH>
+                  <TH>Modalidades</TH>
+                  <TH>Última compra</TH>
+                  <TH align="right">Expediente</TH>
+                </>}
               >
-                {buyersList.map((buyer) => (
-                  <TR key={buyer.id_cliente}>
-                    <TD className="font-mono text-[12px] text-brand-500">{buyer.codigo_cliente}</TD>
-                    <TD className="font-medium text-brand-900">{buyer.nombre_completo}</TD>
-                    <TD className="text-brand-700 font-semibold">{buyer.codigo_lote}</TD>
-                    <TD>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[12px]">{buyer.codigo_contrato}</span>
-                        <Badge tone="brand">{buyer.estado_contrato}</Badge>
+                {buyersList.map(buyer => (
+                  <TR key={buyer.id_cliente}
+                    className="odd:bg-white even:bg-brand-50/20 hover:bg-brand-50/70">
+                    <TD className="whitespace-nowrap">
+                      <span className="rounded-md bg-brand-50 px-2.5 py-1.5 font-mono text-xs font-semibold text-brand-700">
+                        {buyer.codigo_cliente}
+                      </span>
+                    </TD>
+                    <TD className="whitespace-nowrap font-semibold text-brand-900">
+                      {buyer.nombre_completo}
+                    </TD>
+                    <TD align="center">
+                      <div className="inline-flex items-center gap-2">
+                        <span className="inline-flex min-w-9 items-center justify-center rounded-lg bg-brand-50 px-2.5 py-1.5 font-bold text-brand-900">
+                          {buyer.cantidad_lotes}
+                        </span>
+                        <span className="text-xs text-brand-500">
+                          {buyer.cantidad_lotes === 1 ? 'lote' : 'lotes'}
+                        </span>
                       </div>
                     </TD>
-                    <TD align="right" className="font-semibold text-brand-900">
-                      {currency(buyer.precio_venta)}
+                    <TD align="center" className="font-semibold text-brand-700">
+                      {buyer.cantidad_proyectos}
                     </TD>
-                    <TD className="text-brand-500 tabular text-[12px]">{formatDateLima(buyer.fecha_venta)}</TD>
-                    <TD align="right">
+                    <TD className="whitespace-nowrap">
+                      <Badge tone={buyer.modalidad_resumen === 'FINANCIADA' ? 'info' : 'neutral'}>
+                        {buyer.modalidad_resumen === 'MIXTA' ? 'Mixta'
+                          : buyer.modalidad_resumen === 'FINANCIADA' ? 'Financiado' : 'Contado'}
+                      </Badge>
+                    </TD>
+                    <TD className="whitespace-nowrap text-xs text-brand-600">
+                      {formatDateLima(buyer.fecha_ultima_compra)}
+                    </TD>
+                    <TD align="right" className="whitespace-nowrap">
                       <Gate permission="sales.view">
                         <Button size="sm" variant="ghost" icon={EyeIcon}
-                          onClick={()=>setCompradorExpediente(buyer)}
+                          onClick={() => setCompradorExpediente(buyer)}
                           className="font-semibold text-brand-700 hover:text-brand-900">
                           Expediente
                         </Button>
@@ -2174,9 +2246,59 @@ export function Crm() {
       {tab === 'fuentes' && (
         <Card>
           <CardHeader
-            title="Fuentes de captacion oficiales"
-            description="Estadisticas reales de canal de origen calculadas sobre la cartera completa del Core Service."
+            title="Fuentes de captación oficiales"
+            description={fuentesModo === 'historico'
+              ? 'Historial de prospectos por canal de origen dentro de la cartera accesible.'
+              : 'Captación por canal durante el período global seleccionado.'}
           />
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 px-4 pb-4">
+            <p className="text-xs text-brand-500">
+              {fuentesModo === 'historico'
+                ? 'Acumulado histórico · cambia a período para analizar fechas específicas.'
+                : 'Período seleccionado · cambia a histórico para ver la cartera acumulada.'}
+            </p>
+            <div role="group" aria-label="Alcance temporal de fuentes de captación"
+              className="inline-flex rounded-lg border border-brand-200 bg-brand-50/60 p-1">
+              <button type="button" aria-pressed={fuentesModo === 'historico'}
+                onClick={() => setFuentesModo('historico')}
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  fuentesModo === 'historico'
+                    ? 'bg-brand-900 text-white shadow-sm'
+                    : 'text-brand-700 hover:bg-white'
+                }`}>
+                Histórico completo
+              </button>
+              <button type="button" aria-pressed={fuentesModo === 'periodo'}
+                onClick={() => setFuentesModo('periodo')}
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                  fuentesModo === 'periodo'
+                    ? 'bg-brand-900 text-white shadow-sm'
+                    : 'text-brand-700 hover:bg-white'
+                }`}>
+                Período seleccionado
+              </button>
+            </div>
+          </div>
+          {fuentesData && !isLoadingPortfolio && <p className="px-4 pt-3 text-xs text-brand-500">
+            {fuentesData.total} prospectos en la cartera consultada
+          </p>}
+          {fuentesError && !isLoadingPortfolio && (
+            <Alert tone="danger" title="No se pudieron cargar las fuentes" className="mx-4 my-3">
+              {fuentesError}
+            </Alert>
+          )}
+          {fuentesModo === 'periodo' && !rangoPeriodo && !isLoadingPortfolio && (
+            <p className="mx-4 my-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              Selecciona un rango de fechas completo para consultar este período.
+            </p>
+          )}
+          {fuentesData?.total === 0 && !isLoadingPortfolio && !fuentesError && (
+            <p className="mx-4 my-3 rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-600">
+              No hay prospectos registrados en {fuentesModo === 'historico'
+                ? 'la cartera accesible para este proyecto.'
+                : 'el período seleccionado. Puedes consultar el histórico completo.'}
+            </p>
+          )}
           {isLoadingPortfolio ? (
             <div className="flex items-center justify-center p-12 text-brand-500">
               <RefreshCw className="h-6 w-6 animate-spin mr-2" />
@@ -2255,13 +2377,14 @@ export function Crm() {
 
       <Modal open={Boolean(compradorExpediente)}
         onClose={()=>setCompradorExpediente(null)}
-        title={compradorExpediente ? `Expediente del cliente ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
+        title={compradorExpediente ? `Expediente único del comprador ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
         description={compradorExpediente?.nombre_completo??''}
-        width="max-w-5xl"
-        footer={<Button onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
+        width="max-w-6xl"
+        footer={<Button variant="primary" className="bg-brand-900 hover:bg-brand-800" onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
         {compradorExpediente&&
-          <ExpedienteCompradorPanel key={compradorExpediente.id_venta??compradorExpediente.id_cliente}
-            buyer={compradorExpediente}/>}
+          <ExpedienteCompradorMaestroPanel key={compradorExpediente.id_cliente}
+            buyer={compradorExpediente}
+            projectFocus={projectFilter === '' ? undefined : projectFilter}/>}
       </Modal>
 
       <EditarDatosPersonalesModal

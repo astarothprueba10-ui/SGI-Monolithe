@@ -12,14 +12,26 @@ function columns(head: React.ReactNode): number {
 }
 
 /** Tabla con anchos legibles y desplazamiento confinado a su propio contenedor. */
-export function Table({ head, children, className }: { head: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function Table({ head, children, className, columnWidths }: {
+  head: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  /** Explicit widths for tables with many columns; scroll stays inside table. */
+  columnWidths?: number[];
+}) {
   const { ref, overflow } = useHorizontalOverflow();
+  const minWidth = columnWidths?.reduce((sum, width) => sum + width, 0)
+    ?? Math.max(22, columns(head) * 8) * 16;
   return <div className={cn('w-full min-w-0 max-w-full', className)}>
     {overflow && <p className="px-4 py-2 text-[11px] text-brand-500">Desplaza la tabla horizontalmente para ver todas las columnas.</p>}
     <div ref={ref} className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
       role="region" aria-label="Tabla de datos: desplázate horizontalmente para ver todas las columnas" tabIndex={0}>
-      <table className="w-full min-w-[var(--table-min-width)] table-auto border-collapse text-left text-[13px]"
-        style={{ '--table-min-width': `${Math.max(22, columns(head) * 8)}rem` } as React.CSSProperties}>
+      <table className={cn('w-full min-w-[var(--table-min-width)] border-collapse text-left text-[13px]',
+        columnWidths ? 'table-fixed' : 'table-auto')}
+        style={{ '--table-min-width': `${minWidth}px` } as React.CSSProperties}>
+        {columnWidths && <colgroup>
+          {columnWidths.map((width, index) => <col key={index} style={{ width: `${width}px` }} />)}
+        </colgroup>}
         <thead className="bg-brand-50/60"><tr className="border-b border-brand-100">{head}</tr></thead>
         <tbody className="divide-y divide-brand-50">{children}</tbody>
       </table>

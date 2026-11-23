@@ -198,6 +198,20 @@ export function Sales() {
   const [, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
+  const [origenPlano, setOrigenPlano] = useState<{
+    idProyecto:number; idEtapa:number; idLote:number; operacion:'Separacion'|'Venta'
+  } | null>(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('origen') !== 'plano') return null;
+    const idProyecto=Number(q.get('idProyecto')), idEtapa=Number(q.get('idEtapa')),
+      idLote=Number(q.get('idLote'));
+    const operacion=q.get('operacion');
+    if (![idProyecto,idEtapa,idLote].every(Number.isSafeInteger) ||
+      [idProyecto,idEtapa,idLote].some(n=>n<=0) ||
+      (operacion!=='Venta' && operacion!=='Separacion')) return null;
+    return {idProyecto,idEtapa,idLote,operacion};
+  });
   // El formulario pertenece a la pestaña; no se cambia el tipo dentro del modal.
   const opType: 'Separacion' | 'Venta' = tab === 'Venta' ? 'Venta' : 'Separacion';
   const [availableLots, setAvailableLots] = useState<LoteResponse[]>([]);
@@ -508,13 +522,21 @@ export function Sales() {
 
       const reserva = (consultaReservas.reservas ?? [])
         .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
-      if (reserva) {
+      const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
+        ? origenPlano : null;
+      if (destino) {
+        setAutoseleccionPendiente({idProyecto:destino.idProyecto,
+          idEtapa:destino.idEtapa,idLote:destino.idLote});
+        setFormProjectId(String(destino.idProyecto));
+      } else if (reserva) {
         setAutoseleccionPendiente({
           idProyecto: reserva.idProyecto,
           idEtapa: reserva.idEtapa,
           idLote: reserva.idLote
         });
         setFormProjectId(String(reserva.idProyecto));
+      } else if (origenPlano) {
+        toast.info('Este prospecto no tiene interés registrado en el proyecto del plano.');
       }
     } catch (err: unknown) {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
@@ -547,6 +569,15 @@ export function Sales() {
     setIsModalOpen(true);
   };
 
+  useEffect(() => {
+    if(!origenPlano || !can('sales.create')) return;
+    setTab(origenPlano.operacion === 'Venta' ? 'Venta' : 'Separación');
+    handleOpenModal();
+    window.history.replaceState(window.history.state,'',window.location.pathname);
+    // Solo al entrar desde el plano; no reiniciar el formulario mientras se edita.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cerrarModalOperacion = () => {
     if (
       registroSeparacionEnCursoRef.current ||
@@ -555,6 +586,8 @@ export function Sales() {
     ) return;
 
     setIsModalOpen(false);
+    setOrigenPlano(null);
+    setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
     setEditandoComprador(false);
   };
@@ -1158,7 +1191,7 @@ export function Sales() {
 
     const cargarLotes = async () => {
       try {
-        const [lotes, reservas] = await Promise.all([
+        const [lotes, reservas, comercializables] = await Promise.all([
           coreService.searchLots({
             idProyecto,
             idEtapa,
@@ -1169,7 +1202,8 @@ export function Sales() {
             ? crmBackend.listarLotesReservadosDelProspecto(
               Number(selectedProspectId)
             )
-            : Promise.resolve({ idLotes: [] as number[] })
+            : Promise.resolve({ idLotes: [] as number[] }),
+          coreService.getCommercializableLots(idProyecto)
         ]);
 
         if (!vigente) return;
@@ -1180,6 +1214,7 @@ export function Sales() {
           )
         );
 
+        const idsComerciales = new Set(comercializables);
         const lotesPermitidos = (lotes ?? []).filter((lote) => {
           if (
             lote.activo !== true ||
@@ -1192,7 +1227,7 @@ export function Sales() {
           const estado = lote.codigoEstadoLote?.toUpperCase();
 
           if (estado === 'DISPONIBLE') {
-            return true;
+            return idsComerciales.has(lote.idLote);
           }
 
           return (
@@ -1203,12 +1238,11 @@ export function Sales() {
         });
 
         setAvailableLots(lotesPermitidos);
-        if (opType === 'Venta' && autoseleccionPendiente &&
+        if (autoseleccionPendiente &&
             autoseleccionPendiente.idProyecto === idProyecto &&
             autoseleccionPendiente.idEtapa === idEtapa &&
             lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
           setFormLotId(String(autoseleccionPendiente.idLote));
-          setAutoseleccionPendiente(null);
         }
       } catch (err: unknown) {
         if (!vigente) return;

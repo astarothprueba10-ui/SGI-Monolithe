@@ -153,6 +153,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode indicadoresPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return indicadoresPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.indicadoresPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode indicadoresPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -178,6 +190,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode evolucionMensual(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return evolucionMensual(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(3))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.evolucionMensualProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode evolucionMensual(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -208,6 +232,47 @@ public class CrmCierreService {
         validarPagina(pagina, tamano);
         validarTexto(consulta, 120, "busqueda");
         return ejecutar(() -> repository.compradores(actor, consulta, pagina, tamano), false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode compradoresFiltrados(Long actor,String consulta,Integer pagina,Integer tamano,
+            Long proyecto,String modalidad,
+            java.time.LocalDate fechaDesde,java.time.LocalDate fechaHasta) {
+        validarActor(actor);
+        validarPagina(pagina,tamano);
+        validarTexto(consulta,120,"busqueda");
+        if ((proyecto != null && proyecto <= 0)
+                || (modalidad != null && !java.util.Set.of("CONTADO","FINANCIADA").contains(modalidad))
+                || (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta))) {
+            throw badRequest("Filtros de compradores invalidos.");
+        }
+        return ejecutar(() -> repository.compradoresFiltrados(actor,consulta,pagina,tamano,
+                proyecto,modalidad,fechaDesde,fechaHasta),false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode operacionesComprador(Long actor,String consulta,Integer pagina,Integer tamano,
+            Long proyecto,String modalidad,
+            java.time.LocalDate fechaDesde,java.time.LocalDate fechaHasta) {
+        validarActor(actor);
+        validarPagina(pagina,tamano);
+        validarTexto(consulta,120,"busqueda");
+        if ((proyecto != null && proyecto <= 0)
+                || (modalidad != null && !java.util.Set.of("CONTADO","FINANCIADA").contains(modalidad))
+                || (fechaDesde != null && fechaHasta != null && fechaDesde.isAfter(fechaHasta))) {
+            throw badRequest("Filtros de operaciones invalidos.");
+        }
+        return ejecutar(() -> repository.operacionesComprador(actor,consulta,pagina,tamano,
+                proyecto,modalidad,fechaDesde,fechaHasta),false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode expedienteMaestroComprador(Long actor,Long cliente) {
+        validarActor(actor);
+        if (cliente == null || cliente <= 0) {
+            throw badRequest("Cliente invalido.");
+        }
+        return ejecutar(() -> repository.expedienteMaestroComprador(actor,cliente),false);
     }
 
     @Transactional(readOnly = true)
@@ -244,6 +309,27 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode fuentesHistorico(Long actor,Long proyecto) {
+        validarActor(actor);
+        if (proyecto != null && proyecto <= 0) {
+            throw badRequest("Proyecto inmobiliario invalido.");
+        }
+        return ejecutar(() -> repository.fuentesHistorico(actor,proyecto),false);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode fuentesPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return fuentesPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.fuentesPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode fuentesPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -269,6 +355,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode asesoresPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return asesoresPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.asesoresPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode asesoresPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,

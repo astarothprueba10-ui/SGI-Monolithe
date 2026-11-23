@@ -3,7 +3,7 @@ import type { ProyectoRequest, ProyectoResponse } from './core';
 /** Valores editables del formulario de proyectos antes de convertirlos a la API. */
 export type ProjectFormValues = {
   [Key in Exclude<keyof ProyectoRequest, 'activo'>]-?: string;
-} & { activo: boolean };
+} & { codigo: string; activo: boolean };
 
 /** Errores por campo, incluidos los errores generales de la API. */
 export type ProjectFormErrors = Partial<Record<keyof ProjectFormValues | 'general', string>>;

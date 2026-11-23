@@ -48,6 +48,11 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd25ucm9xamx0b2FxenB4bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NTU0ODUsImV4cCI6MjEwNDEzMTQ4NX0.p8EnRBwYdrJgvuTnfljwj1JRLCinG9qPoKXCbMNb5h0' }}
         run: npm run build
 
+      - name: Verify project form regression tests
+        if: matrix.app == 'apps/backoffice'
+        working-directory: apps/backoffice
+        run: npm run test:projects
+
       - name: Verify account permissions for RRHH
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
@@ -345,6 +350,88 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/99_portal_documentos_alertas_privadas_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/portal_documentos_alertas_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/portal_integracion_end_to_end_546_pg_test.sql
+
+  commercial-postgres-validation:
+    name: Politicas comerciales - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: comercial_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: comercial_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comercial_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: comercial_ci_password
+      PGDATABASE: comercial_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar publicacion y proteccion de operaciones
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/publicacion_comercial_v1_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/122_proyectos_configuracion_comercial_borradores_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/123_proyectos_publicacion_comercial_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/publicacion_comercial_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/124_planos_svg_proyecto_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_svg_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/125_planos_cad_storage_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_cad_storage_v1_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/126_planos_grants_core_service_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_core_grants_v1_pg_test.sql
+
+  crm-postgres-validation:
+    name: CRM cartera y riesgo - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: crm_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: crm_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d crm_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: crm_ci_password
+      PGDATABASE: crm_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar migraciones 127, 128 y 129 sobre base sintetica
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/crm_cartera_riesgo_127_129_pg_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/127_crm_cartera_filtros_riesgo_crediticio_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/128_crm_resumen_proyecto_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/129_crm_avisos_alerta_crediticia_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_cartera_riesgo_127_129_pg_test.sql
+          # Los tres resultados de riesgo anteriores son solo datos ficticios.
+          psql -v ON_ERROR_STOP=1 -c "TRUNCATE TABLE public.crm_evaluaciones_crediticias"
+          psql -v ON_ERROR_STOP=1 -f database/migrations/130_crm_retirar_riesgo_externo_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_sin_riesgo_externo_130_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/crm_compradores_unicos_131_extension.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/131_crm_compradores_unicos_expediente_maestro_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_compradores_unicos_131_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/132_crm_fuentes_captacion_historico_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_fuentes_historico_132_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud

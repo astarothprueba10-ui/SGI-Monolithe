@@ -6,7 +6,6 @@ import monolithe.core_service.dto.ProyectoResponse;
 import monolithe.core_service.dto.UbigeoResponse;
 import monolithe.core_service.entity.EstadoProyecto;
 import monolithe.core_service.entity.Proyecto;
-import monolithe.core_service.exception.ConflictoNegocioException;
 import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.EstadoProyectoRepository;
@@ -62,12 +61,9 @@ public class ProyectoService {
     @Transactional
     public ProyectoResponse crear(ProyectoRequest request) {
         validacionProyectoService.validarAlta(request);
-        String codigo = normalizarCodigo(request.codigo());
-        if (proyectoRepository.existsByCodigo(codigo)) {
-            throw new ConflictoNegocioException("Ya existe un proyecto con el código: " + codigo);
-        }
         Proyecto p = new Proyecto();
         aplicarDatos(p, request);
+        p.setCodigo(generarCodigo());
         p.setActivo(request.activo() != null ? request.activo() : true);
         return toResponse(proyectoRepository.save(p));
     }
@@ -77,10 +73,6 @@ public class ProyectoService {
     public ProyectoResponse actualizar(Long idProyecto, ProyectoRequest request) {
         Proyecto p = proyectoRepository.findById(idProyecto)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Proyecto no encontrado con id: " + idProyecto));
-        String codigo = normalizarCodigo(request.codigo());
-        if (proyectoRepository.existsByCodigoAndIdProyectoNot(codigo, idProyecto)) {
-            throw new ConflictoNegocioException("Ya existe otro proyecto con el código: " + codigo);
-        }
         aplicarDatos(p, request);
         if (Boolean.TRUE.equals(p.getActivo()) && Boolean.FALSE.equals(request.activo())) {
             validarDesactivacionProyecto(idProyecto);
@@ -92,12 +84,9 @@ public class ProyectoService {
     private void aplicarDatos(Proyecto proyecto, ProyectoRequest request) {
         UbigeoResponse ubicacion = validacionProyectoService.validar(request);
         proyecto.setEstadoProyecto(obtenerEstadoActivo(request.codigoEstadoProyecto()));
-        proyecto.setCodigo(normalizarCodigo(request.codigo()));
         proyecto.setNombre(normalizarTexto(request.nombre()));
         proyecto.setDescripcion(request.descripcion());
         aplicarUbicacion(proyecto, request, ubicacion);
-        proyecto.setLatitud(request.latitud());
-        proyecto.setLongitud(request.longitud());
         proyecto.setAreaTotalM2(request.areaTotalM2());
         proyecto.setFechaInicio(request.fechaInicio());
         proyecto.setFechaFinEstimada(request.fechaFinEstimada());
@@ -155,12 +144,17 @@ public class ProyectoService {
                 proyecto.getProvincia(),
                 proyecto.getDepartamento(),
                 proyecto.getPais(),
-                proyecto.getLatitud(),
-                proyecto.getLongitud(),
                 proyecto.getAreaTotalM2(),
                 proyecto.getFechaInicio(),
                 proyecto.getFechaFinEstimada(),
                 proyecto.getActivo());
+    }
+
+    /** Evita colisiones incluso cuando dos personas crean proyectos simultáneamente. */
+    private String generarCodigo() {
+        Long numero = proyectoRepository.nextProjectCodeNumber();
+        if (numero == null) throw new IllegalStateException("No se pudo generar el código del proyecto");
+        return String.format(Locale.ROOT, "PROY-%03d", numero);
     }
 
     private String normalizarCodigo(String codigo) {

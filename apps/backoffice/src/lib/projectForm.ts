@@ -6,7 +6,7 @@ import { canChangeProjectNumber, isProjectNumberField, normalizeProjectNumber } 
 
 const DEFAULTS: ProjectFormValues = {
   codigoEstadoProyecto: '', codigo: '', nombre: '', descripcion: '', direccion: '', ubicacionReferencia: '',
-  departamento: '', provincia: '', distrito: '', pais: 'Perú', latitud: '', longitud: '', areaTotalM2: '',
+  departamento: '', provincia: '', distrito: '', pais: 'Perú', areaTotalM2: '',
   fechaInicio: '', fechaFinEstimada: '', activo: true
 };
 const OPTIONAL_TEXT = ['descripcion', 'direccion', 'ubicacionReferencia', 'departamento', 'provincia',
@@ -31,10 +31,8 @@ export function projectRequest(form: ProjectFormValues, rows: Ubigeo[]): Proyect
   const values = { ...form, ...location };
   const optional = Object.fromEntries(OPTIONAL_TEXT.map((field) => [field, values[field].trim() || null]));
   return {
-    ...optional, codigoEstadoProyecto: form.codigoEstadoProyecto.trim(), codigo: form.codigo.trim(),
+    ...optional, codigoEstadoProyecto: form.codigoEstadoProyecto.trim(),
     nombre: form.nombre.trim(), pais: 'Perú', activo: form.activo,
-    latitud: form.latitud.trim() ? Number(form.latitud) : null,
-    longitud: form.longitud.trim() ? Number(form.longitud) : null,
     areaTotalM2: form.areaTotalM2.trim() ? Number(form.areaTotalM2) : null
   };
 }

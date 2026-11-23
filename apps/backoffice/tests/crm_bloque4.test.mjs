@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 // Logica de validacion espejo del componente Crm.tsx
 function validateFollowUp(form) {
@@ -173,4 +174,91 @@ test('Visitas: transiciones validas entre estados (PROGRAMADA -> CONFIRMADA -> R
   assert.equal(visitStateMachine('CONFIRMADA', 'CANCELADA'), true);
   assert.equal(visitStateMachine('REALIZADA', 'CONFIRMADA'), false);
   assert.equal(visitStateMachine('CANCELADA', 'PROGRAMADA'), false);
+});
+
+
+test('CRM: filtros de compradores permanecen sin alertas externas', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url), 'utf8');
+  const service = readFileSync(new URL('../src/services/crmBackend.ts', import.meta.url), 'utf8');
+  assert.match(ui, /Proyecto global del CRM/);
+  assert.match(ui, /compradoresFiltrados\(\{ \.\.\.buyerFilters/);
+  assert.match(ui, /buyer\.cantidad_lotes/);
+  assert.match(ui, /key=\{buyer\.id_cliente\}/);
+  assert.match(ui, /columnWidths=\{\[/);
+  assert.match(ui, /buyer\.cantidad_lotes/);
+  assert.doesNotMatch(ui, /Alerta financiera/);
+  assert.doesNotMatch(ui, /buyersAlerta/);
+  assert.match(service, /\/crm\/compradores\/filtros/);
+  assert.doesNotMatch(service, /alerta_financiera\?/);
+});
+
+test('CRM: se elimina el riesgo externo pero permanecen las ventas financiadas', () => {
+  const sql = readFileSync(
+    new URL('../../../database/migrations/130_crm_retirar_riesgo_externo_v1.sql', import.meta.url),
+    'utf8'
+  );
+  assert.match(sql, /sp_crm_compradores_filtros_v2/);
+  assert.match(sql, /DROP TABLE IF EXISTS public\.crm_evaluaciones_crediticias/);
+  assert.match(sql, /IF EXISTS \(SELECT 1 FROM public\.crm_evaluaciones_crediticias\)/);
+  assert.doesNotMatch(sql, /DROP TABLE IF EXISTS public\.ven_ventas/);
+  assert.doesNotMatch(sql, /DROP TABLE IF EXISTS public\.pag_cuotas/);
+});
+
+test('CRM: expediente conserva cronograma y no solicita central de riesgos', () => {
+  const panel = readFileSync(
+    new URL('../src/components/crm/ExpedienteCompradorPanel.tsx', import.meta.url), 'utf8'
+  );
+  assert.match(panel, /<CronogramaVentaPanel/);
+  assert.doesNotMatch(panel, /Evaluación y riesgo crediticio/);
+  assert.doesNotMatch(panel, /proveedor_evaluacion/);
+});
+
+test('CRM: expediente maestro agrupa proyectos y conserva detalle por operación', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(
+    new URL('../src/components/crm/ExpedienteCompradorMaestroPanel.tsx', import.meta.url), 'utf8'
+  );
+  const excel = readFileSync(new URL('../src/utils/crmExportExcel.ts', import.meta.url), 'utf8');
+  const sql = readFileSync(
+    new URL('../../../database/migrations/131_crm_compradores_unicos_expediente_maestro_v1.sql', import.meta.url), 'utf8'
+  );
+  assert.match(ui, /ExpedienteCompradorMaestroPanel/);
+  assert.match(ui, /Lotes adquiridos/);
+  assert.match(ui, /buyer\.cantidad_proyectos/);
+  assert.match(panel, /crmBackend\.expedienteMaestroComprador/);
+  assert.match(panel, /Adquisiciones por proyecto/);
+  assert.match(panel, /Ficha personal única/);
+  assert.match(panel, /Historial cronológico de adquisiciones/);
+  assert.match(panel, /<ExpedienteCompradorPanel/);
+  assert.match(excel, /'Adquisiciones'/);
+  assert.match(excel, /claveCompradorUnico/);
+  assert.match(sql, /COUNT\(DISTINCT id_lote\)/);
+  assert.match(sql, /fn_crm_compras_visibles_v1/);
+  assert.match(sql, /va\.id_venta=v\.id_venta/);
+  assert.match(sql, /ur\.fecha_revocacion IS NULL/);
+  assert.match(sql, /sp_crm_comprador_expediente_v1/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.sp_crm_comprador_expediente_v1/);
+});
+
+test('CRM: histórico de fuentes muestra cartera y mantiene selección de período', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url),'utf8');
+  const backend = readFileSync(new URL('../src/services/crmBackend.ts', import.meta.url),'utf8');
+  const sql = readFileSync(
+    new URL('../../../database/migrations/132_crm_fuentes_captacion_historico_v1.sql', import.meta.url),'utf8'
+  );
+  const master = readFileSync(
+    new URL('../src/components/crm/ExpedienteCompradorMaestroPanel.tsx', import.meta.url),'utf8'
+  );
+  assert.match(ui, /fuentesHistorico\(idProyecto\)/);
+  assert.match(ui, /Histórico completo/);
+  assert.match(ui, /Período seleccionado/);
+  assert.match(ui, /fuentesModo === 'historico'/);
+  assert.match(ui, /bg-brand-900/);
+  assert.match(ui, /Proyecto global del CRM/);
+  assert.match(ui, /Cerrar expediente<\/Button>/);
+  assert.match(master, /Volver a las adquisiciones/);
+  assert.match(master, /border-brand-900 bg-brand-900/);
+  assert.match(backend, /\/crm\/fuentes\/historico/);
+  assert.match(sql, /sp_crm_fuentes_historico_v1/);
+  assert.doesNotMatch(sql, /x\.fecha_registro >= p_desde/);
 });

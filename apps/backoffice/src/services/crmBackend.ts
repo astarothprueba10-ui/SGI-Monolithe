@@ -65,6 +65,7 @@ export interface CrmAsesoresPeriodo {
 export interface CrmBuyer {
   id_cliente: number;
   id_venta?: number;
+  id_lote?: number;
   id_contrato?: number;
   id_prospecto?: number;
   codigo_cliente: string;
@@ -75,6 +76,56 @@ export interface CrmBuyer {
   codigo_lote: string;
   precio_venta: number;
   fecha_venta: string;
+  /** Fecha de firma, o creación del contrato cuando aún no tiene firma. */
+  fecha_formalizacion?: string | null;
+  id_proyecto?: number;
+  proyecto_nombre?: string;
+  modalidad?: 'FINANCIADA' | 'CONTADO';
+}
+export interface CrmBuyerPortfolio {
+  id_cliente: number;
+  codigo_cliente: string;
+  nombre_completo: string;
+  /** Operaciones de compra que coinciden con los filtros actuales. */
+  cantidad_compras: number;
+  cantidad_lotes: number;
+  cantidad_proyectos: number;
+  modalidad_resumen: 'CONTADO' | 'FINANCIADA' | 'MIXTA';
+  fecha_ultima_compra: string;
+}
+
+export interface CrmCompradorExpediente {
+  cliente: {
+    id_cliente: number;
+    codigo_cliente: string;
+    nombre_completo: string;
+    tipo_documento: string | null;
+    numero_documento: string | null;
+    telefono: string | null;
+    correo: string | null;
+    estado_civil: string | null;
+    direccion: string | null;
+    distrito: string | null;
+    provincia: string | null;
+    departamento: string | null;
+    pais: string | null;
+  };
+  totales: {
+    cantidad_compras: number;
+    cantidad_lotes: number;
+    cantidad_proyectos: number;
+  };
+  operaciones: CrmBuyer[];
+}
+
+export interface CrmBuyerFilters {
+  consulta?: string;
+  pagina?: number;
+  tamano?: number;
+  idProyecto?: number;
+  modalidad?: 'FINANCIADA' | 'CONTADO';
+  fechaDesde?: string;
+  fechaHasta?: string;
 }
 export interface CrmSummary {
   total: number;
@@ -1331,19 +1382,21 @@ export const crmBackend = {
   catalogos: () => coreApi.get<CrmCatalogs>('/crm/catalogos'),
   resumen: () => coreApi.get<CrmSummary>('/crm/resumen'),
 
-  resumenPeriodo: (desde: string, hastaExclusivo: string) =>
+  resumenPeriodo: (desde: string, hastaExclusivo: string, idProyecto?: number) =>
     coreApi.get<CrmSummary>(
       `/crm/resumen/periodo${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
-  evolucionMensual: (desde: string, hastaExclusivo: string) =>
+  evolucionMensual: (desde: string, hastaExclusivo: string, idProyecto?: number) =>
     coreApi.get<CrmEvolucionMensual>(
       `/crm/evolucion-mensual${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
@@ -1402,6 +1455,27 @@ export const crmBackend = {
   compradores: (consulta: string, pagina: number, tamano: number) =>
     coreApi.get<CrmPage<CrmBuyer>>(`/crm/compradores${qs({ consulta, pagina, tamano })}`),
 
+  compradoresFiltrados: (f: CrmBuyerFilters) =>
+    coreApi.get<CrmPage<CrmBuyerPortfolio>>(
+      `/crm/compradores/filtros${qs({
+        consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 15,
+        idProyecto: f.idProyecto, modalidad: f.modalidad,
+        fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
+      })}`
+    ),
+
+  compradoresOperaciones: (f: CrmBuyerFilters) =>
+    coreApi.get<CrmPage<CrmBuyer>>(
+      `/crm/compradores/operaciones${qs({
+        consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 100,
+        idProyecto: f.idProyecto, modalidad: f.modalidad,
+        fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
+      })}`
+    ),
+
+  expedienteMaestroComprador: (idCliente: number) =>
+    coreApi.get<CrmCompradorExpediente>(`/crm/compradores/${idCliente}/expediente`),
+
   compradoresPeriodo: (
     consulta: string | undefined,
     pagina: number,
@@ -1419,25 +1493,34 @@ export const crmBackend = {
       })}`
     ),
 
+  fuentesHistorico: (idProyecto?: number) =>
+    coreApi.get<CrmFuentesPeriodo>(
+      `/crm/fuentes/historico${qs({ idProyecto })}`
+    ),
+
   fuentesPeriodo: (
     desde: string,
-    hastaExclusivo: string
+    hastaExclusivo: string,
+    idProyecto?: number
   ) =>
     coreApi.get<CrmFuentesPeriodo>(
       `/crm/fuentes/periodo${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
   asesoresPeriodo: (
     desde: string,
-    hastaExclusivo: string
+    hastaExclusivo: string,
+    idProyecto?: number
   ) =>
     coreApi.get<CrmAsesoresPeriodo>(
       `/crm/asesores/periodo${qs({
         desde,
-        hastaExclusivo
+        hastaExclusivo,
+        idProyecto
       })}`
     ),
 
