@@ -21,6 +21,7 @@ import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
 import monolithe.core_service.dto.ConciliarCobroVentaRequest;
 import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
+import monolithe.core_service.dto.CrearOperacionAgrupadaRequest;
 import monolithe.core_service.dto.PrepararSubsanacionVentaRequest;
 import monolithe.core_service.dto.ConfirmarSubsanacionVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
@@ -106,6 +107,35 @@ public class CrmVentaController {
                 return service.verificarComprador(
                                 obtenerActor(jwt),
                                 idProspecto);
+        }
+
+        @PostMapping("/ventas/operaciones-agrupadas")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> crearOperacionAgrupada(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody CrearOperacionAgrupadaRequest request) {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(service.crearOperacionAgrupada(obtenerActor(jwt),request));
+        }
+
+        @GetMapping("/ventas/operaciones-agrupadas")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> listarOperacionesAgrupadas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarOperacionesAgrupadas(obtenerActor(jwt),pagina,tamano));
+        }
+
+        @PostMapping("/ventas/operaciones-agrupadas/{idOperacion}/vinculos/{idVenta}")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> vincularVentaAgrupada(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idOperacion,@PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.vincularVentaAgrupada(obtenerActor(jwt),idOperacion,idVenta));
         }
 
         @PostMapping("/ventas/pendientes")
