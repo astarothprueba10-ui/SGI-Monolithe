@@ -176,6 +176,17 @@ public class CrmCierreRepository {
             """, String.class, actor, consulta, pagina, tamano);
    }
 
+   public String compradoresFiltrados(Long actor,String consulta,int pagina,int tamano,
+         Long proyecto,String modalidad,String alerta,
+         java.time.LocalDate fechaDesde,java.time.LocalDate fechaHasta) {
+      return jdbc.queryForObject("""
+            SELECT public.sp_crm_compradores_filtros_v1(
+               CAST(? AS bigint),CAST(? AS varchar),CAST(? AS integer),CAST(? AS integer),
+               CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+               CAST(? AS date),CAST(? AS date))::text
+            """,String.class,actor,consulta,pagina,tamano,proyecto,modalidad,alerta,fechaDesde,fechaHasta);
+   }
+
    public String compradoresPeriodo(
          Long actor,
          String consulta,
