@@ -1891,6 +1891,15 @@ export const crmBackend = {
       `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
     ),
 
+  reiniciarDesgloseVenta: (idVenta:number,motivo:string) =>
+    coreApi.post<{
+      idVenta:number;estado:'PENDIENTE_DESGLOSE';
+      comprobantesARevisar:number;dineroConfirmado:false;auditoria:true;
+    }>(
+      `/crm/finanzas/ventas/${idVenta}/desglose/reiniciar`,
+      {motivo:motivo.trim()}
+    ),
+
   configurarDesgloseVenta: (idVenta:number,items:Array<{
     idComprobante:number;monto:number;numeroOperacion:string|null
   }>) => coreApi.post<CrmDesgloseVentaResultado>(
