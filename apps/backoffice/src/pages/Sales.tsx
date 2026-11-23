@@ -472,7 +472,7 @@ export function Sales() {
       const prospects = await crmBackend.prospectos();
 
       const elegibles = (prospects ?? []).filter((p) =>
-        ['INTERESADO', 'NEGOCIACION', 'CON_RESERVA'].includes(
+        ['INTERESADO', 'NEGOCIACION', 'CON_RESERVA', 'CONVERTIDO'].includes(
           p.estado_codigo?.toUpperCase() ?? ''
         )
       );
@@ -516,7 +516,12 @@ export function Sales() {
       ]);
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
-      const elegibles = proyectos.filter((p) => p.activo && intereses.has(p.idProyecto));
+      // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
+      const compradorExistente = (prospectsList.find(p => p.id_prospecto === id)
+        ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
+      const elegibles = proyectos.filter((p) =>
+        p.activo && (compradorExistente || intereses.has(p.idProyecto))
+      );
       setAvailableProjects(elegibles);
       setReservasVigentes(consultaReservas.reservas ?? []);
 
@@ -2021,7 +2026,7 @@ export function Sales() {
                 !loadingProjects &&
                 availableProjects.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    Este potencial no tiene proyectos de interés activos.
+                    No hay proyectos habilitados para este comprador.
                   </p>
                 )}
             </div>
@@ -2599,6 +2604,7 @@ export function Sales() {
         idProspecto={datosVentaValidados?.datos.idProspecto ?? 0}
         lote={datosVentaValidados?.codigoLote ?? ''}
         proyecto={availableProjects.find((p) => p.idProyecto === Number(formProjectId))?.nombre ?? ''}
+        idProyectoVenta={Number(formProjectId)}
         modalidad={datosVentaValidados?.datos.modalidad ?? 'CONTADO'}
         puedeReasignar={puedeReasignarComprador}
         asesorNombre={prospectsList.find((p) => p.id_prospecto === selectedProspectId)?.asesor_nombre ?? ''}
