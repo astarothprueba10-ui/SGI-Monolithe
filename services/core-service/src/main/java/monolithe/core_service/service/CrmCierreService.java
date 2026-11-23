@@ -153,6 +153,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode indicadoresPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return indicadoresPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.indicadoresPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode indicadoresPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -178,6 +190,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode evolucionMensual(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return evolucionMensual(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(3))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.evolucionMensualProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode evolucionMensual(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -261,6 +285,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode fuentesPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return fuentesPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.fuentesPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode fuentesPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,
@@ -286,6 +322,18 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode asesoresPeriodo(Long actor,java.time.OffsetDateTime desde,
+            java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+        if (proyecto == null) return asesoresPeriodo(actor,desde,hastaExclusivo);
+        validarActor(actor);
+        if (proyecto <= 0 || desde == null || hastaExclusivo == null
+                || !hastaExclusivo.isAfter(desde) || hastaExclusivo.isAfter(desde.plusYears(10))) {
+            throw badRequest("Proyecto o periodo comercial invalido.");
+        }
+        return ejecutar(() -> repository.asesoresPeriodoProyecto(actor,desde,hastaExclusivo,proyecto),false);
+    }
+
+        @Transactional(readOnly = true)
     public JsonNode asesoresPeriodo(
             Long actor,
             java.time.OffsetDateTime desde,
