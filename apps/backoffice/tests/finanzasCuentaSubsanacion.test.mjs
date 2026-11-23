@@ -41,9 +41,9 @@ test('Subsanación añade evidencia existente en Storage y no acredita dinero',(
   assert.match(storage,/firma\.maxBytes\(\),900/);
   assert.match(sql141,/ven_ventas_comprobantes/);
   assert.match(sql141,/fin_cargas_subsanacion_venta_v1/);
-  assert.match(sql141,/p_actor<>/);
+  assert.match(sql141,/v_pre\.id_actor<>p_actor/);
   assert.match(sql141,/storage\.objects/);
-  assert.match(sql141,/estado_revision='PENDIENTE'/);
+  assert.match(sql141,/v_estado<>'PENDIENTE'/);
   assert.match(sql141,/dineroConfirmado',FALSE/);
   assert.match(sql141,/REVOKE ALL ON FUNCTION/);
   assert.doesNotMatch(sql141,/UPDATE public\.pag_pagos/);
