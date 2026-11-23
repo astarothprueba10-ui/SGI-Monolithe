@@ -20,6 +20,7 @@ import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
 import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
 import monolithe.core_service.dto.ConciliarCobroVentaRequest;
+import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.service.CrmSeparacionStorageService;
@@ -556,6 +557,16 @@ public class CrmVentaController {
                     service.conciliarCobroVenta(obtenerActor(jwt),idVenta,
                             request.idCuentaFinanciera(),request.fechaOperacion(),
                             request.numeroOperacion(),request.observaciones()));
+        }
+
+        @PostMapping("/finanzas/ventas/cuentas-receptoras")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> crearCuentaReceptora(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody CrearCuentaReceptoraRequest request) {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(service.crearCuentaReceptora(obtenerActor(jwt),request));
         }
 
         @GetMapping("/finanzas/ventas/cuentas-receptoras")
