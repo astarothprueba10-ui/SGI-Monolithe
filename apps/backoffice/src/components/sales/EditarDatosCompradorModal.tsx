@@ -14,6 +14,7 @@ interface Props {
   idProspecto: number;
   lote: string;
   proyecto: string;
+  idProyectoVenta: number;
   modalidad: 'CONTADO' | 'FINANCIADA';
   puedeReasignar: boolean;
   asesorNombre: string;
@@ -28,7 +29,7 @@ const VACIO: LeadFormValues = {
 };
 
 export function EditarDatosCompradorModal({
-  open, idProspecto, lote, proyecto, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
+  open, idProspecto, lote, proyecto, idProyectoVenta, modalidad, puedeReasignar, asesorNombre, onClose, onGuardar
 }: Props) {
   const [form, setForm] = useState<LeadFormValues>(VACIO);
   const [estadoCivil, setEstadoCivil] = useState<EstadoCivilReniec | ''>('');
@@ -131,7 +132,7 @@ export function EditarDatosCompradorModal({
         maternalSurname: datos.apellidoMaterno ?? '',
         phone: sanitizarLead('phone', datos.telefono ?? ''),
         email: datos.correo ?? '',
-        idProyecto: datos.idProyectoInteres || '',
+        idProyecto: idProyectoVenta,
         origenCodigo: datos.origenCodigo ?? 'WEB',
         motivoContacto: datos.motivoContacto ?? '',
         mensaje: datos.mensaje ?? '',
@@ -144,7 +145,7 @@ export function EditarDatosCompradorModal({
       if (activo) setErrorCarga(e instanceof Error ? e.message : 'No se pudieron consultar los datos.');
     }).finally(() => { if (activo) setCargando(false); });
     return () => { activo = false; };
-  }, [open, idProspecto, puedeReasignar]);
+  }, [open, idProspecto, idProyectoVenta, puedeReasignar]);
 
   useEffect(() => {
     if (!open || !geo.idPais) return;
@@ -304,12 +305,16 @@ export function EditarDatosCompradorModal({
               value={form.phone} onChange={e => actualizar('phone', e.target.value)} {...propsError('phone')} />)}
             {campo('email', 'Correo electrónico *', <Input required type="email" maxLength={180}
               value={form.email} onChange={e => actualizar('email', e.target.value)} {...propsError('email')} />)}
-            {campo('idProyecto', 'Proyecto de interés *', <Select value={form.idProyecto}
-              onChange={e => setForm(p => ({...p,idProyecto:e.target.value ? Number(e.target.value) : ''}))}
+            {campo('idProyecto', 'Proyecto del lote seleccionado *', <Select value={form.idProyecto}
+              disabled
+              aria-label="Proyecto del lote seleccionado, no editable"
               {...propsError('idProyecto')}>
               <option value="">Selecciona un proyecto...</option>
               {catalogos?.proyectos.map(p => <option value={p.id} key={p.id}>{p.nombre}</option>)}
             </Select>)}
+            <p className="mt-1 text-[11px] text-brand-500">
+              El proyecto está asociado al lote elegido. Para comprar en otro, cambia el lote antes de validar.
+            </p>
             {campo('origenCodigo', 'Canal de origen *', <Select value={form.origenCodigo}
               onChange={e => setForm(p => ({...p,origenCodigo:e.target.value}))}
               {...propsError('origenCodigo')}>
