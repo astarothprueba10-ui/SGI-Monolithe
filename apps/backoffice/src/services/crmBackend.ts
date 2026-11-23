@@ -506,6 +506,56 @@ export interface CrmCarteraReal {
   resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
     saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
 }
+export interface CrmOperacionAgrupadaLote {
+  idItem:number;
+  idLote:number;
+  codigoLote:string;
+  idProyecto:number;
+  idEtapa:number;
+  proyecto:string;
+  modalidad:'CONTADO'|'FINANCIADA';
+  idVenta:number|null;
+  codigoVenta:string|null;
+  estadoVenta:string|null;
+  precioVenta:number|null;
+  monedaVenta:string|null;
+  codigoContrato:string|null;
+  estadoContrato:string|null;
+  codigoPlan:string|null;
+}
+export interface CrmOperacionAgrupada {
+  idOperacion:number;
+  codigo:string;
+  idProspecto:number;
+  idPersona:number;
+  codigoCliente:string|null;
+  comprador:string;
+  fechaCreacion:string;
+  observaciones:string|null;
+  cantidadLotes:number;
+  cantidadVentas:number;
+  lotes:CrmOperacionAgrupadaLote[];
+}
+export interface CrmOperacionesAgrupadasPage {
+  total:number;pagina:number;tamano:number;paginas:number;
+  items:CrmOperacionAgrupada[];
+}
+export interface CrmOperacionAgrupadaCreada {
+  idOperacion:number;
+  codigo:string;
+  idProspecto:number;
+  cantidadLotes:number;
+  estado:'PLANIFICADA';
+  ventasCreadas:0;
+  dineroConfirmado:false;
+  advertencia:string;
+}
+export interface CrmOperacionAgrupadaVinculada {
+  idOperacion:number;
+  idVenta:number;
+  idLote?:number;
+  reutilizado:boolean;
+}
 export interface CrmCobroVentaPendiente {
   idVenta:number;
   codigoVenta:string;
@@ -1785,6 +1835,25 @@ export const crmBackend = {
   ),
 
   /** FINANZAS: pagos realmente registrados, sin movimientos ficticios. */
+  crearOperacionAgrupada: (body:{
+    idProspecto:number;
+    lotes:Array<{idLote:number;modalidad:'CONTADO'|'FINANCIADA'}>;
+    observaciones?:string|null;
+  }) => coreApi.post<CrmOperacionAgrupadaCreada>(
+    '/crm/ventas/operaciones-agrupadas',body
+  ),
+
+  listarOperacionesAgrupadas: (pagina=1,tamano=20) =>
+    coreApi.get<CrmOperacionesAgrupadasPage>(
+      `/crm/ventas/operaciones-agrupadas${qs({pagina,tamano})}`
+    ),
+
+  vincularVentaAgrupada: (idOperacion:number,idVenta:number) =>
+    coreApi.post<CrmOperacionAgrupadaVinculada>(
+      `/crm/ventas/operaciones-agrupadas/${idOperacion}/vinculos/${idVenta}`,
+      {}
+    ),
+
   listarCobrosVentasPendientes: (f: {busqueda?:string; pagina?:number; tamano?:number} = {}) =>
     coreApi.get<CrmCobrosVentasPendientesPage>(
       `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
