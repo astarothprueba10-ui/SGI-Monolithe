@@ -41,6 +41,7 @@ export function CobrosVentasPendientesPanel() {
   const [revisados,setRevisados] = useState<number[]>([]);
   const [procesando,setProcesando] = useState(false);
   const [abriendo,setAbriendo] = useState<number|null>(null);
+  const [subsanando,setSubsanando] = useState<number|null>(null);
 
   useEffect(()=>{
     const timer = window.setTimeout(()=>{setPagina(1);setConsulta(busqueda.trim());},350);
@@ -82,6 +83,20 @@ export function CobrosVentasPendientesPanel() {
       ventana.close();
       toast.error('No se pudo abrir la evidencia',{description:mensajeError(e)});
     } finally {setAbriendo(null);}
+  };
+
+  /** Solo añade soporte documental a una venta sin evidencia; nunca acredita fondos. */
+  const subsanar=async(item:CrmCobroVentaPendiente,archivo:File)=>{
+    if(subsanando!==null||item.comprobantes!==0||!can('finance.edit'))return;
+    setSubsanando(item.idVenta);
+    try{
+      await crmBackend.subirComprobanteFaltanteVenta(item.idVenta,archivo);
+      toast.success('Comprobante incorporado al expediente',
+        {description:'Permanece pendiente de revisión financiera. No se confirmó dinero.'});
+      setRevision(x=>x+1);
+    }catch(e){
+      toast.error('No se pudo subsanar el comprobante',{description:mensajeError(e)});
+    }finally{setSubsanando(null);}
   };
 
   const empezar=(item:CrmCobroVentaPendiente,tipo:Accion)=>{
@@ -209,8 +224,20 @@ export function CobrosVentasPendientesPanel() {
                     disabled={!cuentas?.cuentas.length} onClick={()=>empezar(item,'CONCILIAR')}>
                     Conciliar
                   </Button>}
-                {item.comprobantes!==1&&<span className="text-xs text-amber-700">
-                  Requiere completar o desglosar evidencia
+                {can('finance.edit')&&item.estadoRevision==='PENDIENTE'&&item.comprobantes===0&&
+                  <label className="block max-w-[220px] text-left text-xs font-semibold text-brand-700">
+                    {subsanando===item.idVenta?'Cargando evidencia…':'Adjuntar evidencia faltante'}
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      className="mt-1 block w-full max-w-[210px] text-[11px] text-brand-600"
+                      disabled={subsanando!==null}
+                      onChange={e=>{
+                        const input=e.currentTarget;
+                        const file=input.files?.[0];
+                        if(file)void subsanar(item,file).finally(()=>{input.value='';});
+                      }}/>
+                  </label>}
+                {item.comprobantes>1&&<span className="text-xs text-amber-700">
+                  Evidencia múltiple: desglose de importes pendiente
                 </span>}
               </div>
             </TD>
