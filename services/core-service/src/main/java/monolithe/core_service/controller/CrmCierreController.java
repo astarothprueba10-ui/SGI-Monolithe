@@ -140,6 +140,26 @@ public class CrmCierreController {
                 idProyecto,modalidad,fechaDesde,fechaHasta);
     }
 
+    /** Operaciones separadas por contrato: exportación y trazabilidad. */
+    @GetMapping("/compradores/operaciones")
+    @PreAuthorize("hasAuthority('crm.view')")
+    public JsonNode operacionesComprador(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String consulta,
+            @RequestParam(defaultValue = "1") Integer pagina,
+            @RequestParam(defaultValue = "100") Integer tamano,
+            @RequestParam(required = false) Long idProyecto,
+            @RequestParam(required = false) String modalidad,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate fechaDesde,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate fechaHasta) {
+        return service.operacionesComprador(actor(jwt),consulta,pagina,tamano,
+                idProyecto,modalidad,fechaDesde,fechaHasta);
+    }
+
     /** Ficha única y compras accesibles, agrupables por proyecto. */
     @GetMapping("/compradores/{idCliente}/expediente")
     @PreAuthorize("hasAuthority('crm.view')")
