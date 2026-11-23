@@ -128,7 +128,7 @@ export function ExpedienteCompradorMaestroPanel({
 
     {seleccion ? <>
       <button type="button" onClick={() => setSeleccion(null)}
-        className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+        className="inline-flex items-center gap-2 rounded-lg border border-brand-900 bg-brand-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:border-brand-800 hover:bg-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400">
         <ArrowLeft className="h-4 w-4"/> Volver a las adquisiciones
       </button>
       <section className="rounded-xl border border-brand-100 bg-brand-50/50 p-4">
