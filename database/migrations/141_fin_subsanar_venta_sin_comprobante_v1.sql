@@ -32,7 +32,7 @@ BEGIN
  THEN RAISE EXCEPTION 'DENEGADO|Se requieren permisos financieros para subsanar.'; END IF;
  IF p_venta IS NULL OR p_venta<=0 OR length(btrim(coalesce(p_nombre,''))) NOT BETWEEN 1 AND 255
    OR p_tamanio IS NULL OR p_tamanio NOT BETWEEN 1 AND 5242880
-   OR p_mime NOT IN('application/pdf','image/jpeg','image/png','image/webp')
+   OR p_mime IS NULL OR p_mime NOT IN('application/pdf','image/jpeg','image/png','image/webp')
  THEN RAISE EXCEPTION 'DATOS_INVALIDOS|El comprobante debe ser PDF o imagen de hasta 5 MB.'; END IF;
  SELECT v.id_venta,v.id_lote,m.estado_revision,ev.codigo AS estado_venta
  INTO v_venta
