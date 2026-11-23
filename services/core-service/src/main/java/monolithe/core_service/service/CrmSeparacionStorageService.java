@@ -81,6 +81,18 @@ public class CrmSeparacionStorageService {
             ventaService.prepararCargaVoucherInicial(actor,req),req.tipoMime());
     }
 
+    /** Reutiliza URL firmada existente; la clave viene de SQL y no del navegador. */
+    public EnlaceCargaVoucherCuotaResponse prepararCargaSubsanacionVenta(
+            Long actor,Long idVenta,
+            monolithe.core_service.dto.PrepararSubsanacionVentaRequest req) {
+        if(actor==null||actor<=0||req==null||req.tipoMime()==null
+                ||!MIMES_PERMITIDOS.contains(req.tipoMime()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solicitud de subsanación inválida.");
+        return firmarCargaFinanciada(
+                ventaService.prepararSubsanacionVenta(actor,idVenta,req),req.tipoMime());
+    }
+
     /** 5.4.4: reutiliza firma Storage; la preautorización privada ocurre
      * previamente en PortalClienteService y está asociada al JWT.
      */
