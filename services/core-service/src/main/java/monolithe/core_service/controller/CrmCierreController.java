@@ -118,6 +118,27 @@ public class CrmCierreController {
         return service.compradores(actor(jwt), consulta, pagina, tamano);
     }
 
+    /** Cartera contractual: filtros de proyecto, modalidad, alerta y firma. */
+    @GetMapping("/compradores/filtros")
+    @PreAuthorize("hasAuthority('crm.view')")
+    public JsonNode compradoresFiltrados(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String consulta,
+            @RequestParam(defaultValue = "1") Integer pagina,
+            @RequestParam(defaultValue = "15") Integer tamano,
+            @RequestParam(required = false) Long idProyecto,
+            @RequestParam(required = false) String modalidad,
+            @RequestParam(required = false) String alerta,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate fechaDesde,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate fechaHasta) {
+        return service.compradoresFiltrados(actor(jwt),consulta,pagina,tamano,
+                idProyecto,modalidad,alerta,fechaDesde,fechaHasta);
+    }
+
     @GetMapping("/compradores/periodo")
     @PreAuthorize("hasAuthority('crm.view')")
     public JsonNode compradoresPeriodo(
