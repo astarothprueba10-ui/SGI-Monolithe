@@ -239,3 +239,26 @@ test('CRM: expediente maestro agrupa proyectos y conserva detalle por operación
   assert.match(sql, /sp_crm_comprador_expediente_v1/);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.sp_crm_comprador_expediente_v1/);
 });
+
+test('CRM: histórico de fuentes muestra cartera y mantiene selección de período', () => {
+  const ui = readFileSync(new URL('../src/pages/Crm.tsx', import.meta.url),'utf8');
+  const backend = readFileSync(new URL('../src/services/crmBackend.ts', import.meta.url),'utf8');
+  const sql = readFileSync(
+    new URL('../../../database/migrations/132_crm_fuentes_captacion_historico_v1.sql', import.meta.url),'utf8'
+  );
+  const master = readFileSync(
+    new URL('../src/components/crm/ExpedienteCompradorMaestroPanel.tsx', import.meta.url),'utf8'
+  );
+  assert.match(ui, /fuentesHistorico\(idProyecto\)/);
+  assert.match(ui, /Histórico completo/);
+  assert.match(ui, /Período seleccionado/);
+  assert.match(ui, /fuentesModo === 'historico'/);
+  assert.match(ui, /bg-brand-900/);
+  assert.match(ui, /Proyecto global del CRM/);
+  assert.match(ui, /Cerrar expediente<\/Button>/);
+  assert.match(master, /Volver a las adquisiciones/);
+  assert.match(master, /border-brand-900 bg-brand-900/);
+  assert.match(backend, /\/crm\/fuentes\/historico/);
+  assert.match(sql, /sp_crm_fuentes_historico_v1/);
+  assert.doesNotMatch(sql, /x\.fecha_registro >= p_desde/);
+});
