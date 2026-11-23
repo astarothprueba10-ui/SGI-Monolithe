@@ -309,6 +309,15 @@ public class CrmCierreService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode fuentesHistorico(Long actor,Long proyecto) {
+        validarActor(actor);
+        if (proyecto != null && proyecto <= 0) {
+            throw badRequest("Proyecto inmobiliario invalido.");
+        }
+        return ejecutar(() -> repository.fuentesHistorico(actor,proyecto),false);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode fuentesPeriodo(Long actor,java.time.OffsetDateTime desde,
             java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
         if (proyecto == null) return fuentesPeriodo(actor,desde,hastaExclusivo);
