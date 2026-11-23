@@ -10,7 +10,7 @@ import { Table, TD, TH, TR } from '../ui/Table';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   crmBackend, type CrmCobrosVentasPendientesPage, type CrmCobroVentaPendiente,
-  type CrmCuentasVenta,
+  type CrmCuentasVenta, type CrmDesgloseComprobanteVenta,
 } from '../../services/crmBackend';
 import { currency } from '../../utils/format';
 
@@ -43,6 +43,17 @@ export function CobrosVentasPendientesPanel() {
   const [abriendo,setAbriendo] = useState<number|null>(null);
   const [subsanando,setSubsanando] = useState<number|null>(null);
   const [archivosAbiertos,setArchivosAbiertos] = useState<CrmCobroVentaPendiente|null>(null);
+  const [detalleDocumento,setDetalleDocumento] = useState<{
+    venta:CrmCobroVentaPendiente;
+    desglose:CrmDesgloseComprobanteVenta;
+    accion:Accion;
+  }|null>(null);
+  const [desgloseImportes,setDesgloseImportes] = useState<
+    Record<number,{monto:string;numeroOperacion:string}>
+  >({});
+  const [editarDesglose,setEditarDesglose] = useState(false);
+  const [confirmarDesglose,setConfirmarDesglose] = useState(false);
+  const [revisadosDocumentos,setRevisadosDocumentos] = useState<number[]>([]);
 
   useEffect(()=>{
     const timer = window.setTimeout(()=>{setPagina(1);setConsulta(busqueda.trim());},350);
@@ -80,6 +91,7 @@ export function CobrosVentasPendientesPanel() {
       if(!res.urlDescarga) throw new Error('No se recibió enlace de lectura.');
       ventana.location.replace(res.urlDescarga);
       setRevisados(old=>old.includes(item.idVenta)?old:[...old,item.idVenta]);
+      setRevisadosDocumentos(old=>old.includes(idComprobante)?old:[...old,idComprobante]);
     } catch(e) {
       ventana.close();
       toast.error('No se pudo abrir la evidencia',{description:mensajeError(e)});
@@ -98,6 +110,100 @@ export function CobrosVentasPendientesPanel() {
     }catch(e){
       toast.error('No se pudo subsanar el comprobante',{description:mensajeError(e)});
     }finally{setSubsanando(null);}
+  };
+
+  /** Total exacto en centavos; se evita redondear importes de banco implícitamente. */
+  const montoCentavos=(value:string):number=>{
+    if(!/^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,2})?$/.test(value.trim()))return NaN;
+    return Math.round(Number(value)*100);
+  };
+  const abrirDesglose=(venta:CrmCobroVentaPendiente)=>{
+    const guardados=new Map(venta.desgloses.map(d=>[d.idComprobante,d] as const));
+    setDesgloseImportes(Object.fromEntries(venta.archivos.map(archivo=>{
+      const valor=guardados.get(archivo.idComprobante);
+      return [archivo.idComprobante,{
+        monto:valor?Number(valor.monto).toFixed(2):'',
+        numeroOperacion:valor?.numeroOperacion??''
+      }];
+    })));
+    setArchivosAbiertos(venta);
+    setEditarDesglose(venta.desgloses.length===0);
+    setConfirmarDesglose(false);
+  };
+  const guardarDesglose=async()=>{
+    const venta=archivosAbiertos;
+    if(!venta||procesando||!can('finance.edit')||!confirmarDesglose)return;
+    if(venta.desgloses.some(d=>d.estado==='APROBADO'||d.estado==='CONCILIADO')){
+      toast.error('No se puede cambiar una distribución ya aprobada o conciliada.');return;
+    }
+    const detalles=venta.archivos.map(archivo=>{
+      const valor=desgloseImportes[archivo.idComprobante];
+      return {idComprobante:archivo.idComprobante,
+        monto:valor?.monto??'',numeroOperacion:valor?.numeroOperacion?.trim()??''};
+    });
+    const centavos=detalles.map(x=>montoCentavos(x.monto));
+    if(centavos.some(x=>!Number.isSafeInteger(x)||x<=0)
+       ||centavos.reduce((acc,n)=>acc+n,0)!==Math.round(Number(venta.montoOriginal)*100)){
+      toast.error('Los importes deben ser positivos y sumar exactamente '+currency(venta.montoOriginal));return;
+    }
+    if(venta.metodoPago!=='Efectivo'&&detalles.some(x=>x.numeroOperacion.length<4)){
+      toast.error('Identifica la referencia de cada transferencia o depósito.');return;
+    }
+    setProcesando(true);
+    try{
+      await crmBackend.configurarDesgloseVenta(venta.idVenta,detalles.map(x=>({
+        idComprobante:x.idComprobante,monto:Number(x.monto),
+        numeroOperacion:x.numeroOperacion||null
+      })));
+      toast.success('Desglose guardado para revisión',{
+        description:'Cada comprobante se aprobará y conciliará individualmente. Aún no se confirma dinero.'
+      });
+      setArchivosAbiertos(null);
+      setRevision(n=>n+1);
+    }catch(e){toast.error('No se pudo guardar el desglose',{description:mensajeError(e)});}
+    finally{setProcesando(false);}
+  };
+  const empezarDetalle=(
+    venta:CrmCobroVentaPendiente,desglose:CrmDesgloseComprobanteVenta,accion:Accion
+  )=>{
+    setDetalleDocumento({venta,desglose,accion});setArchivosAbiertos(null);
+    setMotivo('');setConfirmado(false);setIdCuenta('');
+    setFechaOperacion('');setObservaciones('');setReferencia(desglose.numeroOperacion??'');
+  };
+  const enviarDetalle=async()=>{
+    if(!detalleDocumento||procesando||!confirmado||!can('finance.edit'))return;
+    const {venta,desglose,accion}=detalleDocumento;
+    if(accion==='APROBAR'&&!revisadosDocumentos.includes(desglose.idComprobante)){
+      toast.error('Debes abrir y revisar este comprobante original antes de aprobar.');return;
+    }
+    if(accion==='OBSERVAR'&&motivo.trim().length<10){
+      toast.error('La observación requiere un motivo de al menos 10 caracteres.');return;
+    }
+    if(accion==='CONCILIAR'&&(!idCuenta||!fechaOperacion||(
+      venta.metodoPago!=='Efectivo'&&!desglose.numeroOperacion
+    ))){
+      toast.error('Se requiere cuenta, fecha y referencia bancaria configurada.');return;
+    }
+    setProcesando(true);
+    try{
+      if(accion==='CONCILIAR'){
+        const result=await crmBackend.conciliarDesgloseVenta(desglose.idDesglose,{
+          idCuentaFinanciera:Number(idCuenta),fechaOperacion,observaciones:observaciones.trim()||null
+        });
+        toast.success('Comprobante conciliado contra cuenta real',{
+          description:`Pago #${result.idPago} · ${currency(result.monto)} · ${result.comprobantesRestantes} comprobantes restantes`
+        });
+      }else{
+        const result=await crmBackend.revisarDesgloseVenta(desglose.idDesglose,{
+          aprobar:accion==='APROBAR',motivo:accion==='OBSERVAR'?motivo.trim():null
+        });
+        toast.success(result.estado==='APROBADO'?'Evidencia individual aprobada':'Observación registrada',{
+          description:'La revisión documental no acredita dinero.'
+        });
+      }
+      setDetalleDocumento(null);setRevision(n=>n+1);
+    }catch(e){toast.error('No se completó la decisión financiera',{description:mensajeError(e)});}
+    finally{setProcesando(false);}
   };
 
   const empezar=(item:CrmCobroVentaPendiente,tipo:Accion)=>{
@@ -239,12 +345,15 @@ export function CobrosVentasPendientesPanel() {
                   </label>}
                 {item.comprobantes>1&&<>
                   <Button size="sm" variant="secondary" icon={EyeIcon}
-                    onClick={()=>setArchivosAbiertos(item)}>
-                    Ver {item.comprobantes} comprobantes
+                    onClick={()=>abrirDesglose(item)}>
+                    Gestionar {item.comprobantes} comprobantes
                   </Button>
-                  <span className="text-xs text-amber-700">
-                    Revisión de importes bloqueada hasta desglose bancario
+                  <span className="block whitespace-nowrap text-xs text-brand-600">
+                    {item.comprobantesConciliados}/{item.comprobantes} conciliados
                   </span>
+                  {item.desgloses.length===0&&<span className="text-xs text-amber-700">
+                    Requiere desglose por importe y transferencia
+                  </span>}
                 </>}
               </div>
             </TD>
@@ -261,30 +370,182 @@ export function CobrosVentasPendientesPanel() {
     </Card>
 
     <Modal open={archivosAbiertos!==null}
-      onClose={()=>setArchivosAbiertos(null)}
-      width="max-w-xl"
-      title="Comprobantes asociados a una venta"
-      description={archivosAbiertos?.codigoVenta}>
-      <div className="space-y-3">
-        <Alert tone="warning" title="Varios comprobantes no equivalen a un solo pago">
-          Estos archivos pueden representar transferencias distintas. Hasta que se
-          registre el importe y la referencia correspondientes a cada uno,
-          no se permitirá aprobar ni conciliar el total como si fuera una única operación.
+      onClose={()=>{if(!procesando)setArchivosAbiertos(null);}}
+      width="max-w-3xl" title="Detalle de comprobantes y pagos individuales"
+      description={archivosAbiertos?.codigoVenta}
+      footer={editarDesglose&&archivosAbiertos&&can('finance.edit')?<>
+        <Button variant="secondary" disabled={procesando}
+          onClick={()=>setArchivosAbiertos(null)}>Cancelar</Button>
+        <Button variant="primary" disabled={procesando||!confirmarDesglose}
+          onClick={()=>void guardarDesglose()}>
+          {procesando?'Guardando…':'Guardar distribución de importes'}
+        </Button>
+      </>:undefined}>
+      <div className="space-y-4">
+        <Alert tone="warning" title="Un comprobante = un abono identificable">
+          La suma del desglose debe coincidir con el importe pendiente original.
+          Cada evidencia se revisará y conciliará con una referencia y cuenta real.
+          No se permite atribuir el mismo abono bancario a varios contratos.
         </Alert>
-        {archivosAbiertos?.archivos.map(archivo=><div key={archivo.idComprobante}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 p-3">
-          <div className="min-w-0">
-            <p className="break-all text-xs font-semibold text-brand-900">{archivo.nombreArchivo}</p>
-            <p className="mt-1 text-[11px] text-brand-500">
-              {archivo.tipoMime} · {archivo.estadoRevision}
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" icon={EyeIcon}
-            disabled={abriendo!==null}
-            onClick={()=>{if(archivosAbiertos)void abrirArchivo(archivosAbiertos,archivo.idComprobante);}}>
-            Ver original
-          </Button>
-        </div>)}
+        {archivosAbiertos&&<div className="flex flex-wrap gap-4 rounded-lg bg-brand-50 px-4 py-3 text-xs text-brand-800">
+          <span>Venta: <strong>{currency(archivosAbiertos.montoOriginal)}</strong></span>
+          <span>Sin confirmar: <strong>{currency(archivosAbiertos.montoPendiente)}</strong></span>
+          <span>Conciliados: <strong>{archivosAbiertos.comprobantesConciliados}/{archivosAbiertos.comprobantes}</strong></span>
+        </div>}
+        {archivosAbiertos?.archivos.map(archivo=>{
+          const d=archivosAbiertos.desgloses.find(x=>x.idComprobante===archivo.idComprobante);
+          const val=desgloseImportes[archivo.idComprobante];
+          return <div key={archivo.idComprobante}
+            className="space-y-3 rounded-xl border border-brand-200 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="break-all text-xs font-semibold text-brand-900">{archivo.nombreArchivo}</p>
+                <p className="mt-1 text-xs text-brand-500">
+                  Estado: {d?.estado??archivo.estadoRevision} · {archivo.tipoMime}
+                </p>
+                {d?.motivo&&<p className="mt-1 text-xs text-amber-700">Observación: {d.motivo}</p>}
+                {d?.idPago&&<p className="mt-1 text-xs text-emerald-700">
+                  Conciliado · Pago #{d.idPago}
+                </p>}
+              </div>
+              <Button size="sm" variant="secondary" icon={EyeIcon}
+                disabled={abriendo!==null}
+                onClick={()=>{if(archivosAbiertos)void abrirArchivo(archivosAbiertos,archivo.idComprobante);}}>
+                Ver evidencia privada
+              </Button>
+            </div>
+            {editarDesglose? <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-brand-700">
+                Importe de este comprobante *
+                <Input type="number" min="0.01" step="0.01" className="mt-1"
+                  value={val?.monto??''}
+                  onChange={e=>setDesgloseImportes(old=>({
+                    ...old,[archivo.idComprobante]:{
+                      monto:e.target.value,
+                      numeroOperacion:old[archivo.idComprobante]?.numeroOperacion??''
+                    }
+                  }))}/>
+              </label>
+              <label className="text-xs font-semibold text-brand-700">
+                Referencia de operación bancaria
+                <Input className="mt-1" maxLength={100}
+                  value={val?.numeroOperacion??''}
+                  onChange={e=>setDesgloseImportes(old=>({
+                    ...old,[archivo.idComprobante]:{
+                      monto:old[archivo.idComprobante]?.monto??'',
+                      numeroOperacion:e.target.value
+                    }
+                  }))}/>
+              </label>
+            </div>: d&& <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              <p className="font-medium text-brand-900">
+                {currency(d.monto)} · Referencia: {d.numeroOperacion||'Efectivo sin referencia'}
+              </p>
+              {can('finance.edit')&&d.estado==='PENDIENTE'&&<>
+                <Button size="sm" variant="secondary" icon={CheckCircle2Icon}
+                  onClick={()=>empezarDetalle(archivosAbiertos!,d,'APROBAR')}>
+                  Aprobar evidencia
+                </Button>
+                <Button size="sm" variant="ghost"
+                  onClick={()=>empezarDetalle(archivosAbiertos!,d,'OBSERVAR')}>
+                  Observar
+                </Button>
+              </>}
+              {can('finance.edit')&&d.estado==='APROBADO'&&
+                <Button size="sm" variant="primary" disabled={!cuentas?.cuentas.length}
+                  onClick={()=>empezarDetalle(archivosAbiertos!,d,'CONCILIAR')}>
+                  Conciliar este abono
+                </Button>}
+            </div>}
+          </div>;
+        })}
+        {archivosAbiertos&&can('finance.edit')
+          &&archivosAbiertos.desgloses.length>0
+          &&archivosAbiertos.desgloses.every(d=>d.estado==='PENDIENTE'||d.estado==='OBSERVADO')
+          &&<Button variant="secondary" size="sm"
+            onClick={()=>{setEditarDesglose(true);setConfirmarDesglose(false);}}>
+            Corregir distribución (con auditoría)
+          </Button>}
+        {editarDesglose&&archivosAbiertos&&<div className="space-y-3 rounded-lg bg-brand-50 p-4">
+          <p className="text-xs font-semibold text-brand-900">
+            Total digitado: {currency(archivosAbiertos.archivos.reduce((total,archivo)=>
+              total+Math.max(0,montoCentavos(desgloseImportes[archivo.idComprobante]?.monto??'')||0)/100,0))}
+          </p>
+          <p className="text-xs text-brand-600">
+            Debe coincidir con {currency(archivosAbiertos.montoOriginal)}. La distribución
+            aún no acredita pagos ni modifica los contratos.
+          </p>
+          <label className="flex items-start gap-2 text-xs text-brand-700">
+            <input type="checkbox" checked={confirmarDesglose}
+              onChange={e=>setConfirmarDesglose(e.target.checked)}/>
+            Confirmo que contrasté los importes y las referencias con cada comprobante original.
+          </label>
+        </div>}
+      </div>
+    </Modal>
+
+    <Modal open={detalleDocumento!==null} onClose={()=>{if(!procesando)setDetalleDocumento(null);}}
+      width="max-w-xl"
+      title={detalleDocumento?.accion==='CONCILIAR'?'Conciliar abono individual':
+        detalleDocumento?.accion==='APROBAR'?'Aprobar evidencia individual':'Observar evidencia'}
+      description={detalleDocumento
+        ?`${detalleDocumento.venta.codigoVenta} · ${currency(detalleDocumento.desglose.monto)}`
+        :undefined}
+      footer={<>
+        <Button variant="secondary" disabled={procesando}
+          onClick={()=>setDetalleDocumento(null)}>Cancelar</Button>
+        <Button variant="primary" disabled={procesando||!confirmado}
+          onClick={()=>void enviarDetalle()}>
+          {procesando?'Procesando…':'Confirmar decisión'}
+        </Button>
+      </>}>
+      <div className="space-y-4">
+        {detalleDocumento?.accion==='CONCILIAR'?<>
+          <Alert tone="warning" title="Esta operación confirmará dinero">
+            Verifica el abono individual y su referencia bancaria. Se creará un pago,
+            movimiento y voucher solo por este importe. La inicial financiada se imputará
+            al plan de este lote, no a otros lotes.
+          </Alert>
+          <p className="text-xs font-semibold text-brand-800">
+            Referencia: {detalleDocumento.desglose.numeroOperacion||'Efectivo'}
+          </p>
+          <label className="block text-xs font-semibold text-brand-700">
+            Cuenta receptora real
+            <Select className="mt-1" value={idCuenta}
+              onChange={e=>setIdCuenta(e.target.value)}>
+              <option value="">Seleccionar cuenta…</option>
+              {cuentas?.cuentas.map(c=><option key={c.idCuenta} value={c.idCuenta}>
+                {c.nombre} · {c.codigo} ({c.tipo})
+              </option>)}
+            </Select>
+          </label>
+          <label className="block text-xs font-semibold text-brand-700">
+            Fecha efectiva de operación
+            <Input className="mt-1" type="date" value={fechaOperacion}
+              max={new Date().toISOString().slice(0,10)}
+              onChange={e=>setFechaOperacion(e.target.value)}/>
+          </label>
+          <label className="block text-xs font-semibold text-brand-700">
+            Observaciones
+            <Input className="mt-1" value={observaciones} maxLength={300}
+              onChange={e=>setObservaciones(e.target.value)}/>
+          </label>
+        </>:detalleDocumento?.accion==='OBSERVAR'?<label className="block text-xs font-semibold text-brand-700">
+          Motivo de la observación (mínimo 10 caracteres)
+          <textarea className="mt-2 min-h-24 w-full rounded-lg border border-brand-200 p-3 text-sm"
+            maxLength={500} value={motivo} onChange={e=>setMotivo(e.target.value)}
+            placeholder="Indica el importe, referencia u otro dato a corregir…"/>
+        </label>:<Alert tone="info" title="Aprobación documental">
+          Aprueba únicamente esta evidencia. El dinero no quedará confirmado hasta
+          que se ejecute la conciliación individual con su cuenta receptora real.
+        </Alert>}
+        <label className="flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-700">
+          <input type="checkbox" checked={confirmado}
+            onChange={e=>setConfirmado(e.target.checked)}/>
+          {detalleDocumento?.accion==='CONCILIAR'
+            ?'Confirmo haber cotejado el abono y su referencia en la cuenta bancaria real.'
+            :'Confirmo que revisé el comprobante y la decisión que estoy registrando.'}
+        </label>
       </div>
     </Modal>
 
