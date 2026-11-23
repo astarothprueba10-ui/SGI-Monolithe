@@ -42,7 +42,7 @@ import type { CrmRetrocesoMotivo } from '../services/crmBackend';
 import {
   crmBackend,
   type CrmAdvisor,
-  type CrmBuyer,
+  type CrmBuyerPortfolio,
   type CrmBuyerFilters,
   type CrmCatalogs,
   type CrmDetail,
@@ -66,7 +66,7 @@ import {
 import { CrmEvolucionChart } from '../components/crm/CrmEvolucionChart';
 import { EditarDatosPersonalesModal } from '../components/crm/EditarDatosPersonalesModal';
 import { CrmHistorialDatosPersonalesPanel } from '../components/crm/CrmHistorialDatosPersonalesPanel';
-import { ExpedienteCompradorPanel } from '../components/crm/ExpedienteCompradorPanel';
+import { ExpedienteCompradorMaestroPanel } from '../components/crm/ExpedienteCompradorMaestroPanel';
 import type { CrmEvolucionMes } from '../services/crmBackend';
 import {
   sanitizarLead, validarNuevoLead,
@@ -286,7 +286,7 @@ export function Crm() {
   const [agendaError, setAgendaError] = useState<string | null>(null);
   const [agendaRefreshKey, setAgendaRefreshKey] = useState(0);
 
-  const [buyersList, setBuyersList] = useState<CrmBuyer[]>([]);
+  const [buyersList, setBuyersList] = useState<CrmBuyerPortfolio[]>([]);
   const [buyersTotal, setBuyersTotal] = useState(0);
   const [buyersPage, setBuyersPage] = useState(1);
   const [buyersQuery, setBuyersQuery] = useState('');
@@ -414,7 +414,7 @@ export function Crm() {
   const [leadDetail, setLeadDetail] = useState<CrmDetail | null>(null);
   const [personalLead, setPersonalLead] = useState<CrmProspect | null>(null);
   const [revisionHistorialPersonal, setRevisionHistorialPersonal] = useState(0);
-  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyer | null>(null);
+  const [compradorExpediente, setCompradorExpediente] = useState<CrmBuyerPortfolio | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
@@ -2112,7 +2112,7 @@ export function Crm() {
           <div className="border-b border-brand-100 p-4">
             <CardHeader
               title="Compradores en cartera"
-              description="Operaciones con contrato vigente o finalizado. Cada lote adquirido se muestra por separado."
+              description="Cada comprador aparece una sola vez; las compras y contratos se consultan en su expediente único."
             />
             <div className="mt-4 flex flex-wrap items-end gap-3">
               <div className="w-full sm:w-72">
@@ -2167,54 +2167,52 @@ export function Crm() {
             />
           ) : (
             <>
-              <Table columnWidths={[155, 235, 165, 280, 145, 155, 180, 155]}
-                head={
-                  <>
-                    <TH>Código cliente</TH>
-                    <TH>Cliente</TH>
-                    <TH>Lote adjudicado</TH>
-                    <TH>Contrato / Estado</TH>
-                    <TH>Modalidad</TH>
-                    <TH align="right">Monto venta</TH>
-                    <TH>Fecha formalización</TH>
-                    <TH align="right">Expediente</TH>
-                  </>
-                }
+              <div className="border-b border-brand-100 px-4 py-2 text-xs text-brand-500">
+                La cantidad refleja las adquisiciones que coinciden con el proyecto, modalidad y fechas seleccionados.
+              </div>
+              <Table columnWidths={[165, 285, 165, 150, 160, 185, 155]}
+                head={<>
+                  <TH>Código cliente</TH>
+                  <TH>Comprador</TH>
+                  <TH align="center">Lotes adquiridos</TH>
+                  <TH align="center">Proyectos</TH>
+                  <TH>Modalidades</TH>
+                  <TH>Última compra</TH>
+                  <TH align="right">Expediente</TH>
+                </>}
               >
-                {buyersList.map((buyer) => (
-                  <TR
-                    key={`${buyer.id_venta ?? buyer.id_cliente}-${buyer.id_contrato ?? 0}`}
-                    className="odd:bg-white even:bg-brand-50/20 hover:bg-brand-50/70"
-                  >
+                {buyersList.map(buyer => (
+                  <TR key={buyer.id_cliente}
+                    className="odd:bg-white even:bg-brand-50/20 hover:bg-brand-50/70">
                     <TD className="whitespace-nowrap">
                       <span className="rounded-md bg-brand-50 px-2.5 py-1.5 font-mono text-xs font-semibold text-brand-700">
                         {buyer.codigo_cliente}
                       </span>
                     </TD>
-                    <TD className="whitespace-nowrap font-medium text-brand-900">
+                    <TD className="whitespace-nowrap font-semibold text-brand-900">
                       {buyer.nombre_completo}
                     </TD>
-                    <TD className="whitespace-nowrap font-semibold text-brand-800">
-                      {buyer.codigo_lote}
-                    </TD>
-                    <TD>
-                      <div className="flex min-w-0 flex-col items-start gap-2">
-                        <span className="whitespace-nowrap rounded-md bg-slate-50 px-2.5 py-1 font-mono text-xs font-semibold tracking-tight text-brand-900">
-                          {buyer.codigo_contrato}
+                    <TD align="center">
+                      <div className="inline-flex items-center gap-2">
+                        <span className="inline-flex min-w-9 items-center justify-center rounded-lg bg-brand-50 px-2.5 py-1.5 font-bold text-brand-900">
+                          {buyer.cantidad_lotes}
                         </span>
-                        <Badge tone="brand">{buyer.estado_contrato}</Badge>
+                        <span className="text-xs text-brand-500">
+                          {buyer.cantidad_lotes === 1 ? 'lote' : 'lotes'}
+                        </span>
                       </div>
                     </TD>
+                    <TD align="center" className="font-semibold text-brand-700">
+                      {buyer.cantidad_proyectos}
+                    </TD>
                     <TD className="whitespace-nowrap">
-                      <Badge tone={buyer.modalidad === 'FINANCIADA' ? 'info' : 'neutral'}>
-                        {buyer.modalidad === 'FINANCIADA' ? 'Financiado' : 'Contado'}
+                      <Badge tone={buyer.modalidad_resumen === 'FINANCIADA' ? 'info' : 'neutral'}>
+                        {buyer.modalidad_resumen === 'MIXTA' ? 'Mixta'
+                          : buyer.modalidad_resumen === 'FINANCIADA' ? 'Financiado' : 'Contado'}
                       </Badge>
                     </TD>
-                    <TD align="right" className="whitespace-nowrap font-semibold text-brand-900">
-                      {currency(buyer.precio_venta)}
-                    </TD>
-                    <TD className="whitespace-nowrap text-xs tabular text-brand-600">
-                      {formatDateLima(buyer.fecha_formalizacion ?? buyer.fecha_venta)}
+                    <TD className="whitespace-nowrap text-xs text-brand-600">
+                      {formatDateLima(buyer.fecha_ultima_compra)}
                     </TD>
                     <TD align="right" className="whitespace-nowrap">
                       <Gate permission="sales.view">
@@ -2324,13 +2322,14 @@ export function Crm() {
 
       <Modal open={Boolean(compradorExpediente)}
         onClose={()=>setCompradorExpediente(null)}
-        title={compradorExpediente ? `Expediente del cliente ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
+        title={compradorExpediente ? `Expediente único del comprador ${compradorExpediente.codigo_cliente}` : 'Expediente del comprador'}
         description={compradorExpediente?.nombre_completo??''}
-        width="max-w-5xl"
+        width="max-w-6xl"
         footer={<Button onClick={()=>setCompradorExpediente(null)}>Cerrar expediente</Button>}>
         {compradorExpediente&&
-          <ExpedienteCompradorPanel key={compradorExpediente.id_venta??compradorExpediente.id_cliente}
-            buyer={compradorExpediente}/>}
+          <ExpedienteCompradorMaestroPanel key={compradorExpediente.id_cliente}
+            buyer={compradorExpediente}
+            projectFocus={projectFilter === '' ? undefined : projectFilter}/>}
       </Modal>
 
       <EditarDatosPersonalesModal
