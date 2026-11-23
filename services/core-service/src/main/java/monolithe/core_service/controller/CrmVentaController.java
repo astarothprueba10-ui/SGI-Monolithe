@@ -18,6 +18,8 @@ import monolithe.core_service.dto.PrepararCargaVoucherInicialRequest;
 import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
+import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
+import monolithe.core_service.dto.ConciliarCobroVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.service.CrmSeparacionStorageService;
@@ -521,6 +523,57 @@ public class CrmVentaController {
         }
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
+        /** Evidencia de venta firmada por Storage, solo para Finanzas. */
+        @GetMapping("/finanzas/ventas/{idVenta}/comprobantes/{idComprobante}/url-firmada")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @PathVariable Long idComprobante) {
+            var enlace=separacionStorageService.prepararLecturaComprobanteVentaFinanzas(
+                    obtenerActor(jwt),idVenta,idComprobante);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(enlace);
+        }
+
+        /** Aprobar soporte documental jamás equivale a acreditar fondos. */
+        @PutMapping("/finanzas/ventas/{idVenta}/comprobantes/{idComprobante}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarComprobanteVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @PathVariable Long idComprobante,
+                @Valid @RequestBody RevisarComprobanteVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.revisarComprobanteVenta(obtenerActor(jwt),idVenta,
+                            idComprobante,request.aprobar(),request.motivo()));
+        }
+
+        /** Contabilización atómica solo con cuenta real y referencia de banco. */
+        @PostMapping("/finanzas/ventas/{idVenta}/conciliar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> conciliarCobroVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ConciliarCobroVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.conciliarCobroVenta(obtenerActor(jwt),idVenta,
+                            request.idCuentaFinanciera(),request.fechaOperacion(),
+                            request.numeroOperacion(),request.observaciones()));
+        }
+
+        @GetMapping("/finanzas/ventas/cuentas-receptoras")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> cuentasReceptorasVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.cuentasReceptorasVenta(obtenerActor(jwt)));
+        }
+
+        @GetMapping("/finanzas/separaciones/vencidas-revision")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> reservasVencidasParaRevision(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.reservasVencidasParaRevision(obtenerActor(jwt)));
+        }
+
         /** Cobros de venta no verificados por Finanzas: consulta sin efectos contables. */
         @GetMapping("/finanzas/ventas/cobros-pendientes")
         @PreAuthorize("hasAuthority('finance.view')")
