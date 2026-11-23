@@ -427,6 +427,9 @@ jobs:
           psql -v ON_ERROR_STOP=1 -c "TRUNCATE TABLE public.crm_evaluaciones_crediticias"
           psql -v ON_ERROR_STOP=1 -f database/migrations/130_crm_retirar_riesgo_externo_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/crm_sin_riesgo_externo_130_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/crm_compradores_unicos_131_extension.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/131_crm_compradores_unicos_expediente_maestro_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/crm_compradores_unicos_131_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
