@@ -133,6 +133,15 @@ public class CrmCierreRepository {
             String.class, actor);
    }
 
+   public String indicadoresPeriodoProyecto(Long actor,
+          java.time.OffsetDateTime desde,java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+      return jdbc.queryForObject("""
+            SELECT public.sp_crm_indicadores_periodo_v7(
+               CAST(? AS bigint),CAST(? AS timestamptz),
+               CAST(? AS timestamptz),CAST(? AS bigint))::text
+            """,String.class,actor,desde,hastaExclusivo,proyecto);
+   }
+
    public String indicadoresPeriodo(
          Long actor,
          java.time.OffsetDateTime desde,
@@ -149,6 +158,15 @@ public class CrmCierreRepository {
             actor,
             desde,
             hastaExclusivo);
+   }
+
+   public String evolucionMensualProyecto(Long actor,
+          java.time.OffsetDateTime desde,java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+      return jdbc.queryForObject("""
+            SELECT public.sp_crm_evolucion_mensual_v7(
+               CAST(? AS bigint),CAST(? AS timestamptz),
+               CAST(? AS timestamptz),CAST(? AS bigint))::text
+            """,String.class,actor,desde,hastaExclusivo,proyecto);
    }
 
    public String evolucionMensual(
@@ -214,6 +232,15 @@ public class CrmCierreRepository {
             hastaExclusivo);
    }
 
+   public String fuentesPeriodoProyecto(Long actor,
+          java.time.OffsetDateTime desde,java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+      return jdbc.queryForObject("""
+            SELECT public.sp_crm_fuentes_periodo_v7(
+               CAST(? AS bigint),CAST(? AS timestamptz),
+               CAST(? AS timestamptz),CAST(? AS bigint))::text
+            """,String.class,actor,desde,hastaExclusivo,proyecto);
+   }
+
    public String fuentesPeriodo(
          Long actor,
          java.time.OffsetDateTime desde,
@@ -230,6 +257,15 @@ public class CrmCierreRepository {
             actor,
             desde,
             hastaExclusivo);
+   }
+
+   public String asesoresPeriodoProyecto(Long actor,
+          java.time.OffsetDateTime desde,java.time.OffsetDateTime hastaExclusivo,Long proyecto) {
+      return jdbc.queryForObject("""
+            SELECT public.sp_crm_asesores_periodo_v7(
+               CAST(? AS bigint),CAST(? AS timestamptz),
+               CAST(? AS timestamptz),CAST(? AS bigint))::text
+            """,String.class,actor,desde,hastaExclusivo,proyecto);
    }
 
    public String asesoresPeriodo(
