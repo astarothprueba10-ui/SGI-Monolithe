@@ -80,9 +80,6 @@ export interface CrmBuyer {
   id_proyecto?: number;
   proyecto_nombre?: string;
   modalidad?: 'FINANCIADA' | 'CONTADO';
-  alerta_financiera?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
-  proveedor_evaluacion?: string | null;
-  fecha_evaluacion?: string | null;
 }
 export interface CrmBuyerFilters {
   consulta?: string;
@@ -90,7 +87,6 @@ export interface CrmBuyerFilters {
   tamano?: number;
   idProyecto?: number;
   modalidad?: 'FINANCIADA' | 'CONTADO';
-  alerta?: 'SI' | 'NO' | 'PENDIENTE' | 'SIN_DATOS' | 'NO_APLICA';
   fechaDesde?: string;
   fechaHasta?: string;
 }
@@ -1427,7 +1423,7 @@ export const crmBackend = {
       `/crm/compradores/filtros${qs({
         consulta: f.consulta?.trim(), pagina: f.pagina ?? 1, tamano: f.tamano ?? 15,
         idProyecto: f.idProyecto, modalidad: f.modalidad,
-        alerta: f.alerta, fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
+        fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta
       })}`
     ),
 
