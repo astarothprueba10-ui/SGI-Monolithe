@@ -2482,7 +2482,7 @@ export function Sales() {
                 <Select
                   aria-label="Proyecto de interés registrado"
                   value={formProjectId}
-                  disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres}
+                  disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
                   onChange={e=>{
                     setAutoseleccionPendiente(null);
                     setFormStageId('');
@@ -2506,7 +2506,7 @@ export function Sales() {
               {selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
                 proyectosSinInteres.length > 0 && !editorInteres && (
                 <Button type="button" variant="secondary" className="mt-2 w-full sm:w-auto"
-                  disabled={registrandoInteres || guardandoAsesorOperacion || submitting}
+                  disabled={registrandoInteres || guardandoAsesorOperacion || submitting || guardandoLote || cargandoAdicional}
                   onClick={abrirEditorInteres}>
                   {compradorOperacion ? 'Registrar interés para nueva compra'
                     : esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar proyecto de interés'}
@@ -2615,7 +2615,7 @@ export function Sales() {
 
               {opType==='Separacion' ? <div className="space-y-2">
                 <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
-                  <p className="text-xs text-brand-600">{preferenciaLote?.id?'Lote de interés en CRM':'Lote principal'}</p>
+                  <p className="text-xs text-brand-600">{preferenciaLote?.id&&Number(formLotId)===preferenciaLote.id?'Lote de interés en CRM':'Lote principal'}</p>
                   <p className="mt-1 text-sm font-semibold text-brand-900">{availableLots.find(l=>l.idLote===Number(formLotId))?.codigo
                     ??preferenciaLote?.codigo??'Sin lote identificado'}</p>
                   {preferenciaLote?.comentario&&!preferenciaLote.id&&<p className="mt-1 text-xs text-brand-500">Referencia anterior en CRM: {preferenciaLote.comentario}. Confirme el lote exacto.</p>}
@@ -2623,7 +2623,7 @@ export function Sales() {
                 </div>
                 {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
                   disabled={!formStageId||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional}
-                  onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?'Cambiar lote de interés':'Seleccionar lote'}</Button>}
+                  onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?(puedeEditarInteres?'Cambiar lote de interés':'Elegir otro lote para esta operación'):'Seleccionar lote'}</Button>}
                 {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
                   <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
                   <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>

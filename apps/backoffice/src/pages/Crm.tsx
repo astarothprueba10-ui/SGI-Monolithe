@@ -1,3 +1,4 @@
+import { CrmLoteInteresPanel } from '../components/crm/CrmLoteInteresPanel';
 import { LeadPhoneField } from '../components/crm/LeadPhoneField';
 import { serializeLeadPhone } from '../lib/leadPhone';
 import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
@@ -2641,13 +2642,9 @@ export function Crm() {
               )}
             </div>
 
-            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
-              <h4 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-brand-700">Intereses comerciales activos</h4>
-              {(leadDetail.intereses??[]).map(i=><div key={i.idInteres} className="mb-2 rounded-lg bg-brand-50/40 p-2 text-xs">
-                <strong>{i.proyecto}</strong><p>Lote de interés: {i.codigoLoteInteres??'Sin lote identificado'}</p>
-                {i.comentario&&<p className="text-brand-500">{i.comentario}</p>}
-              </div>)}
-            </div>
+            <CrmLoteInteresPanel key={leadDetail.prospecto.id_prospecto}
+              detalle={leadDetail} puedeEditar={can('crm.edit') && can('lots.view')}
+              onSaved={()=>refreshFollowUpsAndLeads(leadDetail.prospecto.id_prospecto)}/>
             {/* Visitas guiadas en el Expediente */}
             <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
