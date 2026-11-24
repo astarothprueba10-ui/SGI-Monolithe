@@ -303,7 +303,7 @@ export function Sales() {
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
-    idProyecto: number; idEtapa: number; idLote: number;
+    idProyecto: number; idLote: number;
   } | null>(null);
   const etapaConsulta = opType === 'Venta' ? formStageId : '';
   const destinoConsulta = opType === 'Venta' ? autoseleccionPendiente : null;
@@ -627,12 +627,11 @@ export function Sales() {
         ? origenPlano : null;
       if (destino && intereses.has(destino.idProyecto)) {
         setAutoseleccionPendiente({idProyecto:destino.idProyecto,
-          idEtapa:destino.idEtapa,idLote:destino.idLote});
+          idLote:destino.idLote});
         setFormProjectId(String(destino.idProyecto));
       } else if (reserva) {
         setAutoseleccionPendiente({
           idProyecto: reserva.idProyecto,
-          idEtapa: reserva.idEtapa,
           idLote: reserva.idLote
         });
         setFormProjectId(String(reserva.idProyecto));
@@ -708,7 +707,7 @@ export function Sales() {
         });
         // Cambiar el proyecto operativo solo tras la confirmación del CRM.
         const destino = origenPlano?.idProyecto === idProyecto ? origenPlano : null;
-        setAutoseleccionPendiente(destino ? {idProyecto: destino.idProyecto, idEtapa: destino.idEtapa, idLote: destino.idLote} : null);
+        setAutoseleccionPendiente(destino ? {idProyecto: destino.idProyecto, idLote: destino.idLote} : null);
         setFormStageId('');
         setAvailableStages([]);
         setFormLotId('');
@@ -891,7 +890,7 @@ export function Sales() {
       if(solicitud!==seleccionProspectoPeticionRef.current) return;
       const etapaNueva=availableStages.find(e=>e.idLotes.includes(candidato.idLote));
       if(opType==='Venta' && etapaNueva && etapaNueva.codigo!==formStageId){
-        setAutoseleccionPendiente({idProyecto:proyecto,idEtapa:candidato.idEtapa,idLote:candidato.idLote});
+        setAutoseleccionPendiente({idProyecto:proyecto,idLote:candidato.idLote});
         setFormStageId(etapaNueva.codigo);
       }
       handleSelectLot(String(candidato.idLote));
@@ -2439,7 +2438,7 @@ export function Sales() {
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting || (opType==='Separacion'&&Boolean(formLotId))}
+                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
