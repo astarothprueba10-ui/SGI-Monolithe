@@ -2323,6 +2323,23 @@ public class CrmVentaService {
 
         String mensaje = errores.toString();
 
+        // Rechazos explícitos de la formalización: nunca reportarlos como caída del servicio.
+        if (mensaje.contains("UBICACION_INVALIDA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione país, departamento, provincia y distrito válidos en la ficha contractual.",ex);
+        if (mensaje.contains("ESTADO_CIVIL_INVALIDO|") || mensaje.contains("CONYUGE_REQUERIDO|") || mensaje.contains("CONYUGE_INVALIDO|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise el estado civil y los datos del cónyuge en la ficha contractual.",ex);
+        if (mensaje.contains("DATOS_COMPRADOR_INVALIDOS|") || mensaje.contains("DATOS_COMPRADOR_REQUERIDOS|") || mensaje.contains("IDENTIDAD_NO_VERIFICADA|") || mensaje.contains("IDENTIDAD_NO_APTA|") || mensaje.contains("DOCUMENTO_INVALIDO|") || mensaje.contains("CATALOGO_INVALIDO|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise los datos personales, documento, contacto y cotejo de identidad del comprador.",ex);
+        if (mensaje.contains("DOCUMENTO_VERIFICADO|") || mensaje.contains("CORREO_VERIFICADO|") || mensaje.contains("TELEFONO_VERIFICADO|"))
+            return new ResponseStatusException(HttpStatus.CONFLICT,"Los datos verificados no pueden modificarse sin su procedimiento de verificación.",ex);
+        if (mensaje.contains("CONDICIONES_CAMBIO|") || mensaje.contains("RESERVA_PENDIENTE|") || mensaje.contains("RESERVA_CAMBIO|") || mensaje.contains("VENTA_NO_APTA|"))
+            return new ResponseStatusException(HttpStatus.CONFLICT,"La reserva o las condiciones de venta cambiaron. Actualice las reservas y vuelva a validar.",ex);
+        if (mensaje.contains("VOUCHER_REQUERIDO|") || mensaje.contains("VOUCHER_NO_CARGADO|") || mensaje.contains("ARCHIVOS_INVALIDOS|") || mensaje.contains("PAGO_INVALIDO|") || mensaje.contains("METODO_PAGO_INVALIDO|") || mensaje.contains("OPERACION_REQUERIDA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise el método de pago, número de operación y comprobante individual de cada lote.",ex);
+        if (mensaje.contains("LOTE_DUPLICADO|") || mensaje.contains("INICIAL_INVALIDA|") || mensaje.contains("TASA_FIJA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise los lotes y las condiciones de financiamiento.",ex);
+
+
         if (mensaje.contains("COMERCIAL_NO_DISPONIBLE|")) {
             return new ResponseStatusException(HttpStatus.CONFLICT,
                     "El lote no está habilitado por la política comercial vigente.", ex);

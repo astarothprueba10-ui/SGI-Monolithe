@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { ApiError } from '../../lib/apiClient';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Field';
 import { Modal } from '../ui/Modal';
@@ -111,7 +112,10 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,proyectos,compr
    toast.success('Venta registrada',{description:r.ventas.length+' lote(s), cada uno con su contrato y pago pendiente de revisión.'});
    setConfirmar(null);onCompleted();
   }catch(e){
-   if(enviado){setIncierto(true);setConfirmar(null);setError(mensaje(e)+' Consulte el listado de ventas antes de intentar nuevamente.');}
+   if(enviado && e instanceof ApiError && [400,403,404,409,422].includes(e.status)){
+    // El servidor rechazó la transacción. Permitir corregir y revisar la ficha sin perder el borrador.
+    setConfirmar(null);setError(mensaje(e));
+   }else if(enviado){setIncierto(true);setConfirmar(null);setError(mensaje(e)+' Consulte el listado de ventas antes de intentar nuevamente.');}
    else setError(mensaje(e));
   }finally{enCurso.current=false;setBusy(false);onBusy(false);}
  };
