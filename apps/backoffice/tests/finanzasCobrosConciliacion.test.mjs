@@ -42,6 +42,16 @@ test('SQL preserva auditoría, segregación de funciones y coherencia bancaria',
   assert.match(fin137,/sp_fin_aplicar_pago_confirmado_v1/);
   assert.match(fin138,/sp_fin_cuentas_venta_receptoras_v1/);
   assert.match(fin138,/sp_fin_reservas_vencidas_revision_v1/);
-  assert.match(reservas,/no puede liberar/);
+  assert.match(reservas,/libera el lote automáticamente/);
+  assert.match(reservas,/Los pagos y comprobantes se conservan/);
+  const fin156=read('../../../database/migrations/156_separaciones_anulacion_plazo_vencido.sql');
+  assert.match(fin156,/ANULACION_PLAZO_VENCIDO/);
+  assert.match(fin156,/pagosConservados',true/);
+  const caducidad=fin156.split('AS $expire
+  assert.doesNotMatch(reservas,/sp_caducar_separaciones_vencidas\(/);
+});
+)[1].split('$expire$;')[0];
+  assert.doesNotMatch(caducidad,/UPDATE public\.pag_(pagos|vouchers)/i);
+  assert.match(caducidad,/UPDATE public\.inm_lotes SET id_estado_lote=v_disponible/);
   assert.doesNotMatch(reservas,/sp_caducar_separaciones_vencidas\(/);
 });
