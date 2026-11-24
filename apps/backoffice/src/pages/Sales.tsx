@@ -20,7 +20,6 @@ import {
   type CrmProspect,
   type CrmAdvisor,
   type CrmEtapaOperacion,
-  type CrmSeparacionInput,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
@@ -52,12 +51,14 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
+import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
+import { crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
-const SEPARACION_ENVIO_DESHABILITADO = false;
+// Fase 2: no enviar pagos globales al contrato antiguo (un comprobante por lote).
+const SEPARACION_ENVIO_DESHABILITADO = true;
 type LoteAdicionalSeparacion = {
   idLote:number; codigo:string; precio:number; monto:number; dias:number;
-  metodo:CrmSeparacionInput['metodoPago']; referencia:string; archivo:File|null;
 };
 
 
@@ -306,7 +307,9 @@ export function Sales() {
   const etapaConsulta = opType === 'Venta' ? formStageId : '';
   const destinoConsulta = opType === 'Venta' ? autoseleccionPendiente : null;
   const seleccionProspectoPeticionRef = React.useRef(0);
-  const [voucherFile, setVoucherFile] = useState<File | null>(null);
+  const [pagosSeparacion,setPagosSeparacion]=useState<PagoSeparacionBorrador[]>(()=>[crearPagoSeparacion(1)]);
+  const secuenciaPagoSeparacion=React.useRef(1);
+  const reiniciarPagosSeparacion=()=>setPagosSeparacion([crearPagoSeparacion(++secuenciaPagoSeparacion.current)]);
   const [comprobantesVenta, setComprobantesVenta] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
@@ -793,7 +796,7 @@ export function Sales() {
     setFormSaleDownPayment('');
     setFormSaleInstallments('12');
     setFormOperationNumber('');
-    setVoucherFile(null);
+    reiniciarPagosSeparacion();
     setComprobantesVenta([]);
     setFormObservations('');
     setDatosVentaValidados(null);
@@ -913,15 +916,11 @@ export function Sales() {
         !Number.isInteger(politica.diasVencimientoSeparacion)||politica.diasVencimientoSeparacion<1)
         throw new Error('No se pudieron verificar el precio y la política del lote.');
       setLotesAdicionales(prev=>[...prev,{idLote:lote.idLote,codigo:lote.codigo,precio:Number(precio.precio),
-        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion,metodo:'TRANSFERENCIA',referencia:'',archivo:null}]);
+        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion}]);
       setCandidatoAdicional('');setEditorAdicional(false);
     }catch(err:unknown){
       if(revision===revisionLotesAdicionales.current)setErrorAdicional(err instanceof Error?err.message:'No se pudo añadir el lote.');
     }finally{if(revision===revisionLotesAdicionales.current)setCargandoAdicional(false);}
-  };
-
-  const editarPagoAdicional=(id:number,cambio:Partial<LoteAdicionalSeparacion>)=>{
-    setLotesAdicionales(prev=>prev.map(l=>l.idLote===id?{...l,...cambio}:l));
   };
 
   const handleSelectLot = (lotIdStr: string) => {
@@ -960,7 +959,7 @@ export function Sales() {
   }, [isModalOpen, selectedProspectId, formLotId, revisionPolitica]);
 
   useEffect(() => {
-    setVoucherFile(null);
+    reiniciarPagosSeparacion();
     setFormOperationNumber('');
     setComprobantesVenta([]);
   }, [
@@ -969,52 +968,6 @@ export function Sales() {
     formStageId,
     formLotId
   ]);
-
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0] ?? null;
-
-    // Permite volver a seleccionar el mismo archivo.
-    e.target.value = '';
-
-    // Evita conservar un comprobante anterior.
-    setVoucherFile(null);
-
-    if (!file) return;
-
-    const allowed = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/webp'
-    ];
-    if (!allowed.includes(file.type)) {
-      toast.error('Formato no permitido', {
-        description: 'Utilice archivos PDF, JPG, PNG o WebP.'
-      });
-      return;
-    }
-    if (file.size <= 0) {
-      toast.error('Archivo vacío', {
-        description: 'El comprobante debe contener información.'
-      });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Archivo demasiado grande', {
-        description: 'El comprobante no debe superar 5 MB.'
-      });
-      return;
-    }
-    if (!file.name.trim() || file.name.length > 255) {
-      toast.error('Nombre de archivo inválido', {
-        description: 'El nombre del comprobante no debe superar 255 caracteres.'
-      });
-      return;
-    }
-    setVoucherFile(file);
-  };
 
   const archivosVentaObligatorios = formPaymentMethod !== 'EFECTIVO';
   const requiereNumeroOperacionVenta = ['TRANSFERENCIA','DEPOSITO','YAPE_PLIN']
@@ -1039,170 +992,16 @@ export function Sales() {
 
   const validarFormularioSeparacion = (): boolean => {
     setFormTouched(true);
-    if (!condicionesVenta || consultandoPolitica) {
-      toast.error('Las condiciones financieras no están verificadas. Selecciona nuevamente el lote.');
+    if (!separacionCondicionesVerificadas || !lotePrincipal || cargandoAdicional) {
+      toast.error('Verifica los lotes y las condiciones financieras antes de continuar.');
       return false;
     }
-    if (!selectedProspectId) {
-      toast.error('Debe seleccionar un prospecto del CRM.');
-      return false;
-    }
-    if (!formLotId) {
-      toast.error('Debe seleccionar un lote disponible.');
-      return false;
-    }
-    if (estadoPrecio !== 'disponible' || !precioLote) {
-      toast.error(
-        'No se puede continuar sin un precio oficial vigente.'
-      );
-      return false;
-    }
-
-    const requiereNumeroOperacion = [
-      'TRANSFERENCIA',
-      'DEPOSITO',
-      'YAPE_PLIN'
-    ].includes(formPaymentMethod);
-
-    if (requiereNumeroOperacion && !formOperationNumber.trim()) {
-      toast.error(
-        'El número de operación es obligatorio para el método de pago seleccionado.'
-      );
-      return false;
-    }
-
-    for(const l of lotesAdicionales){
-      if(!l.archivo || (['TRANSFERENCIA','DEPOSITO','YAPE_PLIN'].includes(l.metodo)&&!l.referencia.trim())){
-        toast.error(`Complete el pago y comprobante de ${l.codigo}.`);return false;
-      }
-    }
-    const refs=[formPaymentMethod==='EFECTIVO'?'':formOperationNumber,...lotesAdicionales.map(l=>l.metodo==='EFECTIVO'?'':l.referencia)]
-      .map(x=>x.trim().toUpperCase()).filter(Boolean);
-    if(new Set(refs).size!==refs.length){
-      toast.error('Cada lote debe tener una referencia de pago distinta.');return false;
-    }
-    if (!voucherFile) {
-      toast.error(`Debe adjuntar el comprobante de S/ ${condicionesVenta.montoSeparacion.toFixed(2)}.`);
+    if (!validacionPagosSeparacion.valido) {
+      toast.error('Completa los comprobantes y verifica que los abonos coincidan con el total de separación.');
       return false;
     }
     return true;
   };
-
-
-
-  const ejecutarRegistroSeparacion = async () => {
-    if (registroSeparacionEnCursoRef.current) {
-      return;
-    }
-
-    registroSeparacionEnCursoRef.current = true;
-    setSubmitting(true);
-
-    let comprobanteCargado = false;
-
-    try {
-      if (!voucherFile) {
-        throw new Error('Comprobante requerido.');
-      }
-      if (!condicionesVenta) {
-        throw new Error('No se han confirmado las condiciones de separación.');
-      }
-
-      const prospectId = Number(selectedProspectId);
-      const lotIdNum = Number(formLotId);
-
-      if(lotesAdicionales.length){
-        const pagos=[{idLote:lotIdNum,monto:condicionesVenta.montoSeparacion,metodo:formPaymentMethod,
-          referencia:formPaymentMethod==='EFECTIVO'?'':formOperationNumber,archivo:voucherFile},
-          ...lotesAdicionales.map(l=>({...l,referencia:l.metodo==='EFECTIVO'?'':l.referencia}))];
-        const hashes=new Set<string>();
-        const entradas:CrmSeparacionInput[]=[];
-        for(const pago of pagos){
-          if(!pago.archivo)throw new Error('Cada lote requiere un comprobante propio.');
-          const digest=await crypto.subtle.digest('SHA-256',await pago.archivo.arrayBuffer());
-          const hashSha256=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
-          if(hashes.has(hashSha256))throw new Error('No se puede utilizar el mismo comprobante para dos lotes. Adjunte pagos independientes.');
-          hashes.add(hashSha256);
-          const carga=await crmBackend.subirComprobanteSeparacion(prospectId,pago.idLote,pago.archivo);
-          comprobanteCargado=true;
-          entradas.push({idProspecto:prospectId,idLote:pago.idLote,metodoPago:pago.metodo,
-            numeroOperacion:pago.referencia.trim()||null,monto:pago.monto,observaciones:formObservations.trim()||null,
-            ...carga,hashSha256});
-        }
-        const resultados=await crmBackend.registrarSeparacionesMultiples(entradas);
-        toast.success(`${resultados.length} separaciones registradas`,{
-          description:`Total: ${formatSoles(entradas.reduce((t,l)=>t+l.monto,0))}. Comprobantes pendientes de revisión.`
-        });
-        setIsModalOpen(false);await fetchSalesData();return;
-      }
-      // 1. Subir comprobante al Storage privado.
-      const carga = await crmBackend.subirComprobanteSeparacion(
-        prospectId,
-        lotIdNum,
-        voucherFile
-      );
-
-      comprobanteCargado = true;
-
-      // 2. Registrar la separación mediante Core Service.
-      const res = await crmBackend.registrarSeparacion({
-        idProspecto: prospectId,
-        idLote: lotIdNum,
-        metodoPago: formPaymentMethod,
-        numeroOperacion: formOperationNumber.trim() || null,
-        monto: condicionesVenta.montoSeparacion,
-        observaciones: formObservations.trim() || null,
-        claveArchivo: carga.claveArchivo,
-        nombreArchivo: carga.nombreArchivo,
-        tipoMime: carga.tipoMime,
-        tamanioBytes: carga.tamanioBytes
-      });
-
-      const vencimiento = res.fecha_vencimiento
-        ? new Date(res.fecha_vencimiento).toLocaleDateString(
-          'es-PE',
-          { timeZone: 'America/Lima' }
-        )
-        : 'Fecha pendiente de confirmar';
-
-      toast.success('Separación registrada exitosamente', {
-        description:
-          `Código: ${res.codigo_reserva || res.id_reserva}. ` +
-          `Monto: S/ ${condicionesVenta.montoSeparacion.toFixed(2)} PEN. ` +
-          `Vence: ${vencimiento}. ` +
-          'Comprobante pendiente de revisión por Finanzas.'
-      });
-
-      setIsModalOpen(false);
-      await fetchSalesData();
-
-    } catch (err: unknown) {
-      const mensaje = err instanceof Error
-        ? err.message
-        : 'Error inesperado durante la operación.';
-
-      if (comprobanteCargado) {
-        toast.error('No se pudo confirmar la separación', {
-          description:
-            'El comprobante fue cargado, pero el registro ' +
-            'comercial no pudo confirmarse. ' +
-            'Verifica las operaciones existentes antes ' +
-            'de intentar nuevamente. Detalle: ' + mensaje,
-          duration: 10000
-        });
-      } else {
-        toast.error('No se confirmó la carga del comprobante', {
-          description: mensaje,
-          duration: 8000
-        });
-      }
-
-    } finally {
-      registroSeparacionEnCursoRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
 
   const validarVentaAntesDeRevisarComprador = async () => {
     if (submitting || registroVentaEnCursoRef.current) return;
@@ -1342,11 +1141,11 @@ export function Sales() {
     if (!validarFormularioSeparacion()) return;
 
     if (SEPARACION_ENVIO_DESHABILITADO) {
-      toast.info('El registro de separaciones está deshabilitado.');
+      toast.info('El registro del pago acumulado requiere la integración financiera de la fase 3.');
       return;
     }
-
-    await ejecutarRegistroSeparacion();
+    // No se admite el contrato anterior. La fase 3 conectará el nuevo registro transaccional.
+    toast.error('El servicio de pagos acumulados aún no está conectado.');
   };
 
   const confirmarRegistroVentaPendiente = async () => {
@@ -1504,6 +1303,8 @@ export function Sales() {
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
   const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
   const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
+  const pagosSeparacionResueltos = resolverPagosSeparacion(pagosSeparacion,totalSeparacionSeleccion);
+  const validacionPagosSeparacion = validarPagosSeparacion(pagosSeparacionResueltos,totalSeparacionSeleccion);
   const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
     ? Number(condicionesVenta.inicialFija)
     : Number(condicionesVenta?.inicialMinima ?? 0);
@@ -2419,14 +2220,14 @@ export function Sales() {
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
-                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO))
+                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO || !validacionPagosSeparacion.valido))
               }
               onClick={handleProcessOperation}
             >
               {submitting
                 ? 'Procesando…'
                 : opType === 'Separacion'
-                  ? (lotesAdicionales.length ? `Registrar ${1+lotesAdicionales.length} separaciones` : 'Registrar separación')
+                  ? 'Registrar separación'
                   : 'Validar Venta'}
             </Button>
 
@@ -2675,7 +2476,7 @@ export function Sales() {
                       onChange={e=>setMotivoLote(e.target.value)} placeholder="Preferencia expresada por el cliente"/>
                     <span className="block font-normal text-brand-500">Se guardará en CRM y en el expediente.</span>
                   </label>}
-                  {lotesAdicionales.length>0&&<p className="text-xs text-amber-700">Al cambiar el lote principal se reiniciará la selección de lotes adicionales y sus comprobantes.</p>}
+                  {lotesAdicionales.length>0&&<p className="text-xs text-amber-700">Al cambiar el lote principal se reiniciará la selección de lotes adicionales y los datos del pago.</p>}
                   {errorLote&&<Alert tone="danger" title="No se pudo actualizar el lote">{errorLote}</Alert>}
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={guardandoLote} onClick={()=>setEditorLote(false)}>Cancelar</Button>
@@ -2851,113 +2652,20 @@ export function Sales() {
                     : 'Según el detalle de lotes'}</strong></div>
                   <div className="flex justify-between gap-3 border-t border-brand-100 pt-3"><strong>Total a pagar</strong><strong className="text-lg tabular-nums text-brand-900">{formatSoles(totalSeparacionSeleccion)}</strong></div>
                 </div>
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-2">
-                  <p className="font-semibold text-emerald-950">Condiciones de separación</p>
-                  <p>Proyecto: <strong>{availableProjects.find(p=>p.idProyecto===Number(formProjectId))?.nombre}</strong></p>
-                  <p>Monto reglamentario: <strong>{formatSoles(condicionesVenta.montoSeparacion)} PEN</strong></p>
-                  <p>Plazo de vigencia: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong> (al vencer requiere revisión; no libera el lote ni anula pagos automáticamente).</p>
-                  <p>Los lotes registrados cambiarán a estado <strong>RESERVADO</strong> en el mapa interactivo.</p>
-                  <p>El pago ingresará en estado <strong>REGISTRADO</strong> y el comprobante quedará <strong>PENDIENTE</strong> de auditoría por Finanzas.</p>
+                <PagoSeparacionPanel pagos={pagosSeparacion} total={totalSeparacionSeleccion}
+                  validacion={validacionPagosSeparacion} disabled={submitting||editorInteres||editorLote||editorAdicional||guardandoLote||cargandoAdicional}
+                  onChange={setPagosSeparacion} nuevoId={()=>++secuenciaPagoSeparacion.current}/>
+                <div className="rounded-lg border border-brand-100 bg-brand-50/40 p-3 text-xs text-brand-700 space-y-1">
+                  <p className="font-semibold">Condiciones de separación</p>
+                  <p>Vigencia del lote principal: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong>.</p>
+                  {lotesAdicionales.some(l=>l.dias!==condicionesVenta.diasVencimientoSeparacion)&&
+                    <p>Los lotes adicionales tienen plazos propios según sus políticas.</p>}
+                  <p>El vencimiento requiere revisión; no libera el lote ni anula pagos automáticamente.</p>
+                  <p>Finanzas revisará los comprobantes antes de acreditar los pagos. Los lotes registrados quedarán reservados.</p>
                 </div>
-                <h4 className="text-sm font-semibold text-brand-900">Pago del lote principal · {lotePrincipal?.codigo}</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Método de pago ({formatSoles(condicionesVenta.montoSeparacion)}) *
-                    </label>
-                    <Select
-                      value={formPaymentMethod}
-                      onChange={(e) => setFormPaymentMethod(e.target.value as any)}
-                    >
-                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                      <option value="DEPOSITO">Depósito en Cuenta</option>
-                      <option value="YAPE_PLIN">Billetera (Yape / Plin)</option>
-                      <option value="EFECTIVO">Efectivo en Caja</option>
-                      <option value="OTRO">Otro Medio</option>
-                    </Select>
-                  </div>
-
-                  {formPaymentMethod !== 'EFECTIVO' ? (
-                    <div>
-                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                        N° de Operación {formPaymentMethod === 'OTRO' ? '(Opcional)' : '*'}
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="Ej: 00982341..."
-                        value={formOperationNumber}
-                        onChange={(e) => setFormOperationNumber(e.target.value)}
-                      />
-                      {formPaymentMethod !== 'OTRO' &&
-                        !formOperationNumber.trim() &&
-                        formTouched && (
-                          <p className="mt-1 text-[11px] font-medium text-rose-600">
-                            Número de operación obligatorio.
-                          </p>
-                        )}
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                        Caja / Modalidad
-                      </label>
-                      <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                        Pago directo en efectivo ({formatSoles(condicionesVenta.montoSeparacion)})
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                    Comprobante de pago * (PDF, JPG, PNG o WebP - Máx. 5 MB)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id="voucher-input"
-                      accept=".pdf,image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <label
-                      htmlFor="voucher-input"
-                      className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-brand-300 rounded-md bg-white hover:bg-brand-50 text-brand-800"
-                    >
-                      <FileTextIcon className="w-3.5 h-3.5 text-brand-600" />
-                      {voucherFile ? 'Cambiar comprobante' : 'Adjuntar comprobante'}
-                    </label>
-                    {voucherFile && (
-                      <span className="text-xs text-brand-700 font-medium truncate max-w-[220px]">
-                        {voucherFile.name} ({(voucherFile.size / 1024).toFixed(0)} KB)
-                      </span>
-                    )}
-                  </div>
-                  {!voucherFile && formTouched && (
-                    <p className="mt-1 text-[11px] font-medium text-rose-600">
-                      Debe adjuntar el comprobante o voucher de {formatSoles(condicionesVenta.montoSeparacion)}.
-                    </p>
-                  )}
-                </div>
-
-                {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-xl border border-brand-100 p-3 space-y-2">
-                  <div className="flex justify-between gap-2 text-sm"><strong>Pago · {l.codigo}</strong><strong>{formatSoles(l.monto)}</strong></div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="text-xs font-medium">Método de pago<Select value={l.metodo} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{metodo:e.target.value as CrmSeparacionInput['metodoPago'],referencia:''})}>
-                        <option value="TRANSFERENCIA">Transferencia bancaria</option><option value="DEPOSITO">Depósito</option><option value="YAPE_PLIN">Yape / Plin</option><option value="EFECTIVO">Efectivo</option><option value="OTRO">Otro</option>
-                      </Select></label>
-                      {l.metodo!=='EFECTIVO'&&<label className="text-xs font-medium">N° de operación<Input value={l.referencia} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{referencia:e.target.value})}/></label>}
-                    </div>
-                    <label className="block text-xs font-medium">Comprobante propio (máx. 5 MB)<input type="file" accept=".pdf,image/jpeg,image/png,image/webp" disabled={submitting}
-                      className="mt-1 block w-full text-xs" onChange={e=>{
-                        const archivo=e.target.files?.[0]??null;e.target.value='';
-                        if(archivo&&(!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.size<1||archivo.size>5242880)){
-                          toast.error('Archivo no permitido o mayor de 5 MB.');return;
-                        }
-                        editarPagoAdicional(l.idLote,{archivo});
-                      }}/><span className="block text-brand-500">{l.archivo?.name??'Sin comprobante'}</span></label>
-
-                </div>)}
+                {SEPARACION_ENVIO_DESHABILITADO&&<Alert tone="warning" title="Registro temporalmente no disponible">
+                  La interfaz de pagos acumulados está preparada. La conexión con Finanzas se habilitará al terminar la integración.
+                </Alert>}
               </> : (
                 <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-700" role="status">
                   <p className="font-semibold">Condiciones de separación y pago</p>

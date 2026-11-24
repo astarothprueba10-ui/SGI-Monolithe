@@ -69,7 +69,7 @@ test('separación oculta importes y pago hasta verificar política y precio del 
   assert.match(sales,/const separacionCondicionesVerificadas = Boolean/);
   assert.match(sales,/precioLote\?\.idLote === Number\(formLotId\)/);
   assert.match(sales,/separacionCondicionesVerificadas && condicionesVenta \? <>/);
-  assert.match(sales,/Método de pago \(\{formatSoles\(condicionesVenta\.montoSeparacion\)\}\)/);
+  assert.match(sales,/<PagoSeparacionPanel pagos=\{pagosSeparacion\}/);
   assert.match(sales,/condicionesVenta\.diasVencimientoSeparacion\} días calendario/);
   assert.match(sales,/Reintentar consulta de condiciones/);
   assert.match(sales,/!separacionCondicionesVerificadas \|\| SEPARACION_ENVIO_DESHABILITADO/);
@@ -85,8 +85,8 @@ test('separaciones tienen lote de interés persistido y registro múltiple trans
   assert.match(sales,/crmBackend\.cambiarLoteInteres/);
   assert.match(sales,/lotesDisponiblesProyecto\.filter/);
   assert.match(sales,/Agregar otro lote/);
-  assert.match(sales,/crmBackend\.registrarSeparacionesMultiples\(entradas\)/);
-  assert.match(sales,/crypto\.subtle\.digest/);
+  assert.doesNotMatch(sales,/crmBackend\.registrarSeparacionesMultiples\(entradas\)/);
+  assert.match(sales,/const SEPARACION_ENVIO_DESHABILITADO = true/);
   assert.match(backend,/@Transactional\s+public JsonNode registrarSeparacionesMultiples/);
   assert.match(backend,/resultados\.add\(registrarSeparacion\(actor,req\)\)/);
 });
@@ -102,4 +102,15 @@ test('fase 1: preferencia CRM sin dependencia de etapa y detalle de lotes separa
   assert.match(detalle,/formatSoles\(l\.precio\)/);
   assert.doesNotMatch(detalle,/type="file"|Método de pago/);
   assert.match(sales,/Total a pagar/);
+});
+
+
+test('fase 2 separa el pago acumulado de los lotes y bloquea el contrato anterior',()=>{
+  const panel=readFileSync(new URL('../src/components/sales/PagoSeparacionPanel.tsx',import.meta.url),'utf8');
+  assert.match(sales,/validarPagosSeparacion\(pagosSeparacionResueltos,totalSeparacionSeleccion\)/);
+  assert.match(sales,/SEPARACION_ENVIO_DESHABILITADO \|\| !validacionPagosSeparacion\.valido/);
+  assert.doesNotMatch(sales,/Pago del lote principal|Comprobante propio|crmBackend\.registrarSeparacion\(/);
+  assert.match(panel,/Agregar otro abono/);
+  assert.match(panel,/crypto\.subtle\.digest/);
+  assert.match(panel,/Total declarado en abonos/);
 });

@@ -114,7 +114,7 @@ jobs:
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
-        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs
+        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs tests/pagosSeparacion.test.cjs
 
       - name: Validate French financing and down-payment rules
         if: matrix.app == 'apps/backoffice'
