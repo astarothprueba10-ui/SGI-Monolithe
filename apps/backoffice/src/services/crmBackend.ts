@@ -2022,6 +2022,8 @@ export const crmBackend = {
     );
   },
 
+  avisosComerciales: () => coreApi.get<{items:{id:string;titulo:string;mensaje:string;fecha:string}[]}>('/crm/avisos-comerciales'),
+
   reservasVencidasRevision: () => coreApi.get<CrmReservasVencidasRevision>(
     '/crm/finanzas/separaciones/vencidas-revision'
   ),

@@ -756,6 +756,13 @@ public class CrmVentaController {
                     .body(service.cuentasReceptorasVenta(obtenerActor(jwt)));
         }
 
+        @GetMapping("/avisos-comerciales")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> avisosComerciales(@AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.avisosComerciales(obtenerActor(jwt)));
+        }
+
         @GetMapping("/finanzas/separaciones/vencidas-revision")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<JsonNode> reservasVencidasParaRevision(

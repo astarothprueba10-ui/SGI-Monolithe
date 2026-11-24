@@ -12,7 +12,7 @@ function readSeen(userId: string): string[] {
     const saved: unknown = JSON.parse(localStorage.getItem(seenKey(userId)) ?? '[]');
     return Array.isArray(saved)
       ? saved.filter((x): x is string =>
-          typeof x === 'string' && /^cuota:\d+:CUOTA_(?:VENCIDA|PROXIMA)$/.test(x)
+          typeof x === 'string' && /^(?:cuota:\d+:CUOTA_(?:VENCIDA|PROXIMA)|reserva:\d+)$/.test(x)
         ).slice(-10000)
       : [];
   } catch { return []; }
@@ -31,7 +31,9 @@ function saveSeen(userId: string, seen: string[]) {
  */
 export function useFinanceAlertsBell() {
   const {user,can}=useAuth();
-  const autorizado=can('financing.view') && can('sales.view');
+  const puedeFinanzas=can('financing.view') && can('sales.view');
+  const puedeComercial=can('sales.view');
+  const autorizado=puedeFinanzas || puedeComercial;
   const [notifications,setNotifications]=useState<Notification[]>([]);
   const [seen,setSeen]=useState<string[]>(()=>readSeen(user.id));
   const [loading,setLoading]=useState(false);
@@ -44,9 +46,10 @@ export function useFinanceAlertsBell() {
     setLoading(true);
     setError(null);
     try {
-      const first=await crmBackend.listarAlertasCuotas({
+      const avisos=puedeComercial ? await crmBackend.avisosComerciales() : {items:[]};
+      const first=puedeFinanzas ? await crmBackend.listarAlertasCuotas({
         tipo:'TODAS',pagina:1,tamano:PAGINA_TAMANO
-      });
+      }) : {items:[],paginas:0};
       const all=[...first.items];
       // Leer todas las páginas para que una cuota nueva no quede oculta en la campana.
       // Limitar a 4 consultas concurrentes para no saturar Core Service.
@@ -65,6 +68,11 @@ export function useFinanceAlertsBell() {
         const notification=notificationFromFinancialAlert(alert);
         unique.set(notification.id,notification);
       }
+      for(const aviso of avisos.items) unique.set(aviso.id,{
+        id:aviso.id,title:aviso.titulo,description:aviso.mensaje,
+        time:new Date(aviso.fecha).toLocaleString('es-PE',{timeZone:'America/Lima'}),
+        module:'sales',to:'/ventas',tone:'warning'
+      });
       const active=[...unique.values()];
       setNotifications(active);
       // Si una cuota fue pagada o dejó de estar en alerta, eliminar el acuse
@@ -82,7 +90,7 @@ export function useFinanceAlertsBell() {
     }finally{
       if(current===requestId.current)setLoading(false);
     }
-  },[autorizado,user.id]);
+  },[autorizado,puedeFinanzas,puedeComercial,user.id]);
 
   useEffect(()=>{
     if(!autorizado)return;

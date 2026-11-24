@@ -1243,6 +1243,12 @@ public class CrmVentaService {
     }
 
     @Transactional(readOnly = true)
+    public JsonNode avisosComerciales(Long actor) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_avisos_comerciales_v1(CAST(? AS bigint))::text",actor);
+    }
+
+    @Transactional(readOnly = true)
     public JsonNode reservasVencidasParaRevision(Long actor) {
         validarActor(actor);
         return ejecutar("""

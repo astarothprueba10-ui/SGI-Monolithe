@@ -627,7 +627,7 @@ export function Sales() {
         .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
       const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
         ? origenPlano : null;
-      if (destino && intereses.has(destino.idProyecto)) {
+      if (destino && intereses.has(destino.idProyecto) && !reserva) {
         setAutoseleccionPendiente({idProyecto:destino.idProyecto,
           idLote:destino.idLote});
         setFormProjectId(String(destino.idProyecto));
@@ -1382,9 +1382,7 @@ export function Sales() {
   const lotesVencidos = (s: Sale) => s.groupedLots?.length
     ? s.groupedLots.filter(l => l.estado === 'VENCIDA').map(l => l.lote)
     : s.status === 'VENCIDA' ? [s.lot] : [];
-  const operacionesVencidas = salesList.filter(s => s.type === 'Separación' && lotesVencidos(s).length > 0);
-  const separacionesPlazoVencido = operacionesVencidas.length;
-  const codigosLotesLiberados = Array.from(new Set(operacionesVencidas.flatMap(lotesVencidos)));
+
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
@@ -1691,13 +1689,6 @@ export function Sales() {
           }
         ]}
       />
-
-      {tab === 'Separación' && separacionesPlazoVencido > 0 && (
-        <div role="status" className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Hay {separacionesPlazoVencido} {separacionesPlazoVencido === 1 ? 'separación con fecha vencida' : 'separaciones con fecha vencida'} dentro de tu cartera. {codigosLotesLiberados.length === 1 ? 'El lote' : 'Los lotes'} {codigosLotesLiberados.join(', ')} {codigosLotesLiberados.length === 1 ? 'ha sido liberado' : 'han sido liberados'}.</span>
-        </div>
-      )}
 
       {tab === 'Agrupadas' && (
         <Gate permission="sales.view">
@@ -2246,7 +2237,7 @@ export function Sales() {
       <Modal
         open={isModalOpen}
         onClose={cerrarModalOperacion}
-        width={opType==='Separacion'?'max-w-3xl':'max-w-lg'}
+        width="max-w-3xl"
         title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
           ? 'Selecciona los lotes y revisa sus importes antes de registrar el pago.'
@@ -2295,7 +2286,7 @@ export function Sales() {
           </div>
         ) : (
           <form onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
-            {opType==='Separacion' && <header className="flex items-start gap-3 pb-1">
+            {<header className="flex items-start gap-3 pb-1">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
               <div><h3 className="text-sm font-semibold text-brand-900">Cliente y proyecto</h3>
                 <p className="text-xs text-brand-500">Verifica los datos registrados en CRM.</p></div>
@@ -2444,10 +2435,10 @@ export function Sales() {
                 )}
             </div>
 
-            {opType==='Separacion' && <header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+            {<header className="flex items-start gap-3 border-t border-brand-100 pt-5">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">2</span>
               <div><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
-                <p className="text-xs text-brand-500">Revisa el lote de interés y añade otros si el cliente lo solicita.</p></div>
+                <p className="text-xs text-brand-500">{opType==='Venta' ? 'Revisa el lote reservado y sus condiciones comerciales.' : 'Revisa el lote de interés y añade otros si el cliente lo solicita.'}</p></div>
             </header>}
             {opType==='Venta' && <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
