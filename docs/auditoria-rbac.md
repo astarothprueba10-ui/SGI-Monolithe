@@ -17,3 +17,8 @@
 - Nuevo rol con crm.operate_advisor asignado a trabajador activo previamente no asesor: se incorpora al listado de asesores; al retirar el rol deja de aparecer. No se conservan roles de prueba.
 - Las migraciones 163 y 165 incluyen comparaciones de alcances y catálogo de asesores antes y después.
 - Los avisos generales de Supabase (RLS sin políticas, funciones con search_path mutable y funciones security definer ejecutables por roles públicos) requieren revisión separada de la migración comercial; no se ampliaron permisos públicos ni se desactivó RLS.
+
+## Endurecimiento de exposición SQL (166)
+- Se fijó search_path en las 19 rutinas que carecían de configuración explícita y se restringieron cinco rutinas privilegiadas internas (incluida la actualización de acceso exitoso). Los permisos de backend permanecen.
+- Las tres funciones booleanas de visibilidad CMS son deliberadamente ejecutables por anon/authenticated porque se utilizan en políticas RLS públicas. No contienen datos privados ni mutaciones.
+- Las 171 tablas de public tienen RLS; 87 sin políticas deniegan el acceso directo a filas por defecto. No agregar políticas de acceso general para silenciar avisos informativos.
