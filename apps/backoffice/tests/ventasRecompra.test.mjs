@@ -75,3 +75,18 @@ test('separación oculta importes y pago hasta verificar política y precio del 
   assert.match(sales,/!separacionCondicionesVerificadas \|\| SEPARACION_ENVIO_DESHABILITADO/);
   assert.doesNotMatch(sales,/montoSeparacion\.toFixed\(2\) \?\? '—'/);
 });
+
+
+test('separaciones tienen lote de interés persistido y registro múltiple transaccional',()=>{
+  const sql=readFileSync(new URL('../../../database/migrations/153_crm_lote_interes_v1.sql',import.meta.url),'utf8');
+  const backend=readFileSync(new URL('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmVentaService.java',import.meta.url),'utf8');
+  assert.match(sql,/ADD COLUMN id_lote_interes bigint REFERENCES/);
+  assert.match(sql,/INSERT INTO public\.crm_seguimientos/);
+  assert.match(sales,/crmBackend\.cambiarLoteInteres/);
+  assert.match(sales,/lotesDisponiblesProyecto\.filter/);
+  assert.match(sales,/Agregar otro lote/);
+  assert.match(sales,/crmBackend\.registrarSeparacionesMultiples\(entradas\)/);
+  assert.match(sales,/crypto\.subtle\.digest/);
+  assert.match(backend,/@Transactional\s+public JsonNode registrarSeparacionesMultiples/);
+  assert.match(backend,/resultados\.add\(registrarSeparacion\(actor,req\)\)/);
+});

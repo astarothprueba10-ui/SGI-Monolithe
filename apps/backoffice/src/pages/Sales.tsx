@@ -234,6 +234,7 @@ export function Sales() {
   // El formulario pertenece a la pestaña; no se cambia el tipo dentro del modal.
   const opType: 'Separacion' | 'Venta' = tab === 'Venta' ? 'Venta' : 'Separacion';
   const [availableLots, setAvailableLots] = useState<LoteResponse[]>([]);
+  const [lotesDisponiblesProyecto,setLotesDisponiblesProyecto]=useState<LoteResponse[]>([]);
   const [loadingLots, setLoadingLots] = useState(false); const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
   const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
   const [availableProjects, setAvailableProjects] = useState<ProyectoResponse[]>([]);
@@ -533,6 +534,7 @@ export function Sales() {
     setAvailableProjects([]);
     setFormProjectId('');
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
 
     try {
@@ -578,6 +580,7 @@ export function Sales() {
     setAvailableStages([]);
     setAvailableProjects([]);
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
     setReservasVigentes([]);
     setAutoseleccionPendiente(null);
@@ -697,6 +700,7 @@ export function Sales() {
         setAvailableStages([]);
         setFormLotId('');
         setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
         setFormProjectId(String(idProyecto));
         setEditorInteres(false);
         setProyectoInteresNuevo('');
@@ -854,7 +858,7 @@ export function Sales() {
   };
 
   const confirmarLoteInteres=async()=>{
-    const candidato=availableLots.find(l=>l.idLote===Number(loteCandidato));
+    const candidato=lotesDisponiblesProyecto.find(l=>l.idLote===Number(loteCandidato));
     if(!candidato||!selectedProspectId||guardandoLote||submitting) return;
     const solicitud=seleccionProspectoPeticionRef.current;
     const proyecto=Number(formProjectId);
@@ -871,6 +875,11 @@ export function Sales() {
         toast.success('Lote de interés actualizado en el expediente CRM.');
       }
       if(solicitud!==seleccionProspectoPeticionRef.current) return;
+      const etapaNueva=availableStages.find(e=>e.idLotes.includes(candidato.idLote));
+      if(etapaNueva && etapaNueva.codigo!==formStageId){
+        setAutoseleccionPendiente({idProyecto:proyecto,idEtapa:candidato.idEtapa,idLote:candidato.idLote});
+        setFormStageId(etapaNueva.codigo);
+      }
       handleSelectLot(String(candidato.idLote));
       setEditorLote(false);
     } catch(err:unknown) {
@@ -880,7 +889,7 @@ export function Sales() {
   };
 
   const agregarLoteAdicional=async()=>{
-    const lote=availableLots.find(l=>l.idLote===Number(candidatoAdicional));
+    const lote=lotesDisponiblesProyecto.find(l=>l.idLote===Number(candidatoAdicional));
     if(!lote||!selectedProspectId||cargandoAdicional||submitting||lotesAdicionales.length>=19||
       lote.idLote===Number(formLotId)||lotesAdicionales.some(l=>l.idLote===lote.idLote))return;
     const revision=revisionLotesAdicionales.current;
@@ -944,6 +953,7 @@ export function Sales() {
 
   useEffect(() => {
     setVoucherFile(null);
+    setFormOperationNumber('');
     setComprobantesVenta([]);
   }, [
     selectedProspectId,
@@ -1542,7 +1552,7 @@ export function Sales() {
         const etapaPreferida=opType==='Separacion'&&preferenciaLote?.id
           ? etapas.find(e=>e.idLotes.includes(preferenciaLote.id!)):undefined;
         if(etapaPreferida)setFormStageId(etapaPreferida.codigo);
-        else if (etapas.length === 1) setFormStageId(etapas[0].codigo);
+        else if (etapas.length === 1 || (opType==='Separacion'&&etapas.length>0)) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
         if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
@@ -1565,6 +1575,7 @@ export function Sales() {
     let vigente = true;
 
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
 
     if (!formProjectId || !formStageId || !selectedProspectId) {
@@ -1626,6 +1637,9 @@ export function Sales() {
           );
         });
 
+        const idsProyecto=new Set(availableStages.flatMap(e=>e.idLotes));
+        setLotesDisponiblesProyecto((lotes??[]).filter(l=>l.activo===true&&l.idProyecto===idProyecto
+          &&idsProyecto.has(l.idLote)&&l.codigoEstadoLote?.toUpperCase()==='DISPONIBLE'&&idsComerciales.has(l.idLote)));
         setAvailableLots(lotesPermitidos);
         if (autoseleccionPendiente &&
             autoseleccionPendiente.idProyecto === idProyecto &&
@@ -1638,6 +1652,7 @@ export function Sales() {
         if (!vigente) return;
 
         setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
 
         toast.error('No se pudieron consultar los lotes', {
           description:
@@ -2400,7 +2415,7 @@ export function Sales() {
             Cargando prospectos y lotes disponibles…
           </div>
         ) : (
-          <form onSubmit={handleProcessOperation} className="space-y-4">
+          <form onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
             {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">01 · Cliente y proyecto</p>
               <p className="mt-1 text-xs text-brand-500">Verifica el interés comercial antes de elegir los lotes.</p>
@@ -2474,6 +2489,7 @@ export function Sales() {
                     setAvailableStages([]);
                     setFormLotId('');
                     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
                     setFormProjectId(e.target.value);
                   }}>
                   <option value="">Seleccione un interés registrado</option>
@@ -2550,7 +2566,7 @@ export function Sales() {
 
             {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">02 · Selección de lotes</p>
-              <p className="mt-1 text-xs text-brand-500">Elige un lote principal y, si corresponde, añade otros de la etapa.</p>
+              <p className="mt-1 text-xs text-brand-500">Elige un lote principal y, si corresponde, añade otros lotes disponibles del proyecto.</p>
             </div>}
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
@@ -2559,12 +2575,13 @@ export function Sales() {
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
+                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting || (opType==='Separacion'&&Boolean(formLotId))}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
                   setFormLotId('');
                   setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
                 }}
               >
                 <option value="">
@@ -2605,19 +2622,20 @@ export function Sales() {
                   {preferenciaLote?.id&&!formLotId&&!loadingLots&&<p className="mt-1 text-xs text-amber-700">El lote registrado no está disponible en esta etapa. Seleccione uno disponible.</p>}
                 </div>
                 {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
-                  disabled={!formStageId||loadingLots||!availableLots.length||submitting||guardandoLote||cargandoAdicional}
+                  disabled={!formStageId||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional}
                   onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?'Cambiar lote de interés':'Seleccionar lote'}</Button>}
                 {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
                   <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
                   <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>
                     <option value="">Seleccione un lote</option>
-                    {availableLots.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m²</option>)}
+                    {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m²</option>)}
                   </Select>
                   {puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&<label className="block text-xs font-medium text-brand-700">Motivo del registro o cambio *
                     <textarea rows={2} maxLength={500} className="mt-1 w-full rounded-lg border border-brand-200 p-2" value={motivoLote} disabled={guardandoLote}
                       onChange={e=>setMotivoLote(e.target.value)} placeholder="Preferencia expresada por el cliente"/>
                     <span className="block font-normal text-brand-500">Se guardará en CRM y en el expediente.</span>
                   </label>}
+                  {lotesAdicionales.length>0&&<p className="text-xs text-amber-700">Al cambiar el lote principal se reiniciará la selección de lotes adicionales y sus comprobantes.</p>}
                   {errorLote&&<Alert tone="danger" title="No se pudo actualizar el lote">{errorLote}</Alert>}
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={guardandoLote} onClick={()=>setEditorLote(false)}>Cancelar</Button>
@@ -2770,12 +2788,12 @@ export function Sales() {
                         editarPagoAdicional(l.idLote,{archivo});
                       }}/><span className="block text-brand-500">{l.archivo?.name??'Sin comprobante'}</span></label>
                   </div>)}
-                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} disabled={submitting||lotesAdicionales.length>=19||!availableLots.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
+                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} disabled={submitting||lotesAdicionales.length>=19||!lotesDisponiblesProyecto.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
                     onClick={()=>setEditorAdicional(true)}>Agregar otro lote</Button>}
                   {editorAdicional&&<div className="space-y-2">
                     <Select value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
                       <option value="">Seleccione otro lote disponible</option>
-                      {availableLots.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m²</option>)}
+                      {lotesDisponiblesProyecto.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m²</option>)}
                     </Select>
                     {errorAdicional&&<Alert tone="danger" title="No se pudo añadir el lote">{errorAdicional}</Alert>}
                     <div className="flex flex-wrap justify-end gap-2">
@@ -3206,7 +3224,7 @@ export function Sales() {
                 onChange={(e) => setFormObservations(e.target.value)}
               />
             </div>
-          </form>
+          </fieldset></form>
         )}
       </Modal>
 
