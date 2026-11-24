@@ -71,7 +71,7 @@ export function useFinanceAlertsBell() {
       for(const aviso of avisos.items) unique.set(aviso.id,{
         id:aviso.id,title:aviso.titulo,description:aviso.mensaje,
         time:new Date(aviso.fecha).toLocaleString('es-PE',{timeZone:'America/Lima'}),
-        module:'sales',to:'/ventas',tone:'warning'
+        module:'sales',to:aviso.ruta==='/ventas?tab=cambios-reserva'?aviso.ruta:'/ventas',tone:'warning'
       });
       const active=[...unique.values()];
       setNotifications(active);

@@ -756,6 +756,25 @@ public class CrmVentaController {
                     .body(service.cuentasReceptorasVenta(obtenerActor(jwt)));
         }
 
+        @GetMapping("/cambios-reserva")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> listarCambiosReserva(@AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required = false) Long idProspecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarCambiosReserva(obtenerActor(jwt),idProspecto));
+        }
+        @PostMapping("/cambios-reserva")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> solicitarCambioReserva(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.CambioReservaRequest req) {
+            return ResponseEntity.ok(service.solicitarCambioReserva(obtenerActor(jwt),req));
+        }
+        @PostMapping("/cambios-reserva/{idSolicitud}/decision")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> decidirCambioReserva(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idSolicitud,@Valid @RequestBody monolithe.core_service.dto.DecisionCambioReservaRequest req) {
+            return ResponseEntity.ok(service.decidirCambioReserva(obtenerActor(jwt),idSolicitud,req));
+        }
         @GetMapping("/avisos-comerciales")
         @PreAuthorize("hasAuthority('sales.view')")
         public ResponseEntity<JsonNode> avisosComerciales(@AuthenticationPrincipal Jwt jwt) {

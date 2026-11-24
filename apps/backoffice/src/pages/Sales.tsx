@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
+import { CambiosReservaPanel, ReservasVentaPanel } from '../components/sales/CambiosReservaPanel';
 import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon, RotateCcwIcon, CreditCardIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
@@ -187,11 +189,15 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 export function Sales() {
   const { can, user } = useAuth();
+  const location = useLocation();
   const puedeReasignarComprador = can('crm.edit') && user.roles.some((r) =>
     r === 'Gerencia' || r === 'Supervisor comercial');
   const [tab, setTab] = useState<
-    'Separación' | 'Venta' | 'Agrupadas' | 'Contratos' | 'Anexos'
+    'Separación' | 'Venta' | 'Agrupadas' | 'Contratos' | 'Anexos' | 'CambiosReserva'
   >('Separación');
+  useEffect(()=>{
+    if(new URLSearchParams(location.search).get('tab')==='cambios-reserva') setTab('CambiosReserva');
+  },[location.search]);
   const [filtrosVenta, setFiltrosVenta] = useState<FiltrosVentas>(FILTROS_VENTAS_INICIALES);
   const [paginaVentas, setPaginaVentas] = useState(1);
   const tamanoPaginaVentas = 15;
@@ -304,6 +310,9 @@ export function Sales() {
   const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
+  const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
+  const reservaSeleccionada=reservasVigentes.find(r=>r.idLote===Number(formLotId));
+  const reservaPendienteVenta=tieneReservasVenta && reservaSeleccionada?.estado==='PENDIENTE';
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
     idProyecto: number; idLote: number;
   } | null>(null);
@@ -623,8 +632,8 @@ export function Sales() {
       setAvailableProjects(elegibles);
       setReservasVigentes(consultaReservas.reservas ?? []);
 
-      const reserva = (consultaReservas.reservas ?? [])
-        .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
+      const reservasElegibles=(consultaReservas.reservas ?? []).filter(r=>elegibles.some(p=>p.idProyecto===r.idProyecto));
+      const reserva=reservasElegibles.find(r=>r.idLote===origenPlano?.idLote) ?? reservasElegibles[0];
       const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
         ? origenPlano : null;
       if (destino && intereses.has(destino.idProyecto) && !reserva) {
@@ -1170,6 +1179,7 @@ export function Sales() {
     if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional) return;
 
     if (opType === 'Venta') {
+      if(reservaPendienteVenta){toast.error('Finanzas debe aprobar la separación antes de formalizar.');return;}
       setFormTouched(true);
       await validarVentaAntesDeRevisarComprador();
       return;
@@ -1680,6 +1690,10 @@ export function Sales() {
             label: 'Compras agrupadas'
           },
           {
+            id: 'CambiosReserva',
+            label: 'Solicitudes de cambio'
+          },
+          {
             id: 'Contratos',
             label: 'Contratos pendientes de firma'
           },
@@ -1689,6 +1703,8 @@ export function Sales() {
           }
         ]}
       />
+
+      {tab === 'CambiosReserva' && <CambiosReservaPanel />}
 
       {tab === 'Agrupadas' && (
         <Gate permission="sales.view">
@@ -2264,7 +2280,7 @@ export function Sales() {
                 submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional ||
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
-                ventaFinanciadaInvalida ||
+                ventaFinanciadaInvalida || reservaPendienteVenta ||
                 (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO || !validacionPagosSeparacion.valido || resultadoSeparacionIncierto))
               }
               onClick={handleProcessOperation}
@@ -2338,8 +2354,7 @@ export function Sales() {
               )}
               {opType === 'Venta' && reservasVigentes.length > 0 && (
                 <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  Reserva vigente detectada. Se preseleccionó el proyecto, etapa y lote reservado.
-                  Puedes cambiar cualquiera de ellos; el abono se aplicará solo al lote con reserva confirmada.
+                  {reservasVigentes.length} reserva(s) detectada(s). Se precarga el proyecto, etapa y lote; cualquier traslado requiere aprobación de Gerencia o Supervisión.
                 </p>
               )}
             </div>
@@ -2353,7 +2368,7 @@ export function Sales() {
                 <Select
                   aria-label="Proyecto de interés registrado"
                   value={formProjectId}
-                  disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
+                  disabled={tieneReservasVenta || !selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
                   onChange={e=>{
                     setAutoseleccionPendiente(null);
                     setFormStageId('');
@@ -2374,7 +2389,7 @@ export function Sales() {
                 </div>
               )}
 
-              {selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
+              {!tieneReservasVenta && selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
                 proyectosSinInteres.length > 0 && !editorInteres && (
                 <Button type="button" variant="secondary" className="mt-2 w-full sm:w-auto"
                   disabled={registrandoInteres || guardandoAsesorOperacion || submitting || guardandoLote || cargandoAdicional}
@@ -2440,6 +2455,21 @@ export function Sales() {
               <div><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
                 <p className="text-xs text-brand-500">{opType==='Venta' ? 'Revisa el lote reservado y sus condiciones comerciales.' : 'Revisa el lote de interés y añade otros si el cliente lo solicita.'}</p></div>
             </header>}
+            {tieneReservasVenta && selectedProspectId && <ReservasVentaPanel
+              idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
+              idLoteSeleccionado={Number(formLotId)} disabled={submitting || loadingLots || loadingStages}
+              onSeleccionar={r=>{
+                setAutoseleccionPendiente({idProyecto:r.idProyecto,idLote:r.idLote});
+                if(r.idProyecto!==Number(formProjectId)){
+                  setFormProjectId(String(r.idProyecto));setFormStageId('');setFormLotId('');
+                }else{
+                  const etapa=availableStages.find(e=>e.idLotes.includes(r.idLote));
+                  if(etapa && etapa.codigo!==formStageId) setFormStageId(etapa.codigo);
+                  else setFormLotId(String(r.idLote));
+                }
+              }}
+              onActualizar={()=>void handleSelectProspect(selectedProspectId)}
+            />}
             {opType==='Venta' && <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Etapa comercial *
@@ -2447,7 +2477,7 @@ export function Sales() {
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
+                disabled={tieneReservasVenta || !formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
@@ -2567,7 +2597,7 @@ export function Sales() {
                 </>}
               </div> : <Select
                 value={formLotId}
-                disabled={!formProjectId || !formStageId || loadingLots}
+                disabled={tieneReservasVenta || !formProjectId || !formStageId || loadingLots}
                 onChange={(e) => handleSelectLot(e.target.value)}
               >
                 <option value="">
