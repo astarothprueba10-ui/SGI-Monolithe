@@ -597,7 +597,7 @@ CREATE TABLE public.ven_ventas (
 CREATE FUNCTION public.fn_usuario_tiene_permiso_seguridad(bigint,varchar) RETURNS boolean LANGUAGE sql AS $$SELECT $1=1$$;
 CREATE FUNCTION public.fn_crm_puede_consultar_prospecto(bigint,bigint) RETURNS boolean LANGUAGE sql AS $$SELECT $1=1 AND $2=1$$;
 CREATE FUNCTION public.sp_crm_etapas_operacion_v1(bigint,bigint,bigint,boolean) RETURNS jsonb LANGUAGE sql AS $$SELECT '[{"idLotes":[101,102,103,104,105,106,107,108,109]}]'::jsonb$$;
-CREATE FUNCTION public.fn_fin_politica_lote_v2(bigint) RETURNS jsonb LANGUAGE sql AS $$SELECT jsonb_build_object('idPolitica',1,'montoSeparacion',CASE WHEN $1=109 THEN 300 ELSE 500 END,'diasVencimientoSeparacion',7)$$;
+CREATE FUNCTION public.fn_fin_politica_lote_v2(bigint) RETURNS jsonb LANGUAGE sql AS $$SELECT jsonb_build_object('idPolitica',CASE WHEN $1=109 THEN 2 ELSE 1 END,'montoSeparacion',CASE WHEN $1=109 THEN 300 ELSE 500 END,'diasVencimientoSeparacion',7)$$;
 CREATE FUNCTION public.sp_crm_validar_preparacion_comprobante_v1(bigint,bigint,bigint) RETURNS jsonb LANGUAGE plpgsql AS $$
 BEGIN
  IF $1<>1 OR $2<>1 OR NOT EXISTS(SELECT 1 FROM public.inm_lotes WHERE id_lote=$3 AND id_estado_lote=1 AND activo) THEN RAISE EXCEPTION 'LOTE_NO_DISPONIBLE|No disponible'; END IF;
@@ -812,4 +812,4 @@ INSERT INTO public.fin_categorias(id_categoria,id_tipo_movimiento_financiero,cod
 INSERT INTO public.inm_lotes(id_lote,id_proyecto,id_estado_lote,codigo,activo) SELECT i,1,1,'LOTE-'||i,true FROM generate_series(101,109) i;
 INSERT INTO public.inm_lotes_precios(id_lote,id_moneda,precio,activo,fecha_desde) SELECT i,1,30000,true,now()-interval '1 day' FROM generate_series(101,109) i;
 CREATE TABLE public.cfg_fin_politicas_versiones(id_politica bigint PRIMARY KEY,monto_separacion numeric,dias_vencimiento_separacion integer);
-INSERT INTO public.cfg_fin_politicas_versiones(id_politica,monto_separacion,dias_vencimiento_separacion) VALUES(1,500,7);
+INSERT INTO public.cfg_fin_politicas_versiones(id_politica,monto_separacion,dias_vencimiento_separacion) VALUES(1,500,7),(2,300,5);

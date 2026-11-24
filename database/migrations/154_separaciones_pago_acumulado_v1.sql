@@ -180,7 +180,7 @@ END; $$;
 REVOKE ALL ON FUNCTION public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
 GRANT EXECUTE ON FUNCTION public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) TO sigi_app_user;
 CREATE FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(p_actor bigint,p_solicitud uuid,p_prospecto bigint,p_lotes jsonb,p_abonos jsonb,p_observaciones text)
-RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $$
 DECLARE r record;
 BEGIN
  IF p_actor IS NULL OR p_solicitud IS NULL OR NOT coalesce(public.fn_usuario_tiene_permiso_seguridad(p_actor,'sales.create'::varchar),false)
@@ -190,7 +190,7 @@ BEGIN
  IF r.id_actor<>p_actor OR r.solicitud IS DISTINCT FROM jsonb_build_object('prospecto',p_prospecto,'lotes',p_lotes,'abonos',p_abonos,'observaciones',p_observaciones)
  THEN RAISE EXCEPTION 'OPERACION_INVALIDA|Solicitud reutilizada con otros datos.'; END IF;
  RETURN jsonb_build_object('encontrado',true,'resultado',r.resultado);
-END; $;
+END; $$;
 REVOKE ALL ON FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
 GRANT EXECUTE ON FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) TO sigi_app_user;
 

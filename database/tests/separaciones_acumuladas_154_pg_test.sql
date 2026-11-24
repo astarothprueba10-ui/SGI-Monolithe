@@ -1,6 +1,6 @@
 -- Solo PostgreSQL aislado. Los objetos de storage son filas sintéticas de la fixture.
 BEGIN;
-CREATE FUNCTION pg_temp.lote(id bigint,monto numeric DEFAULT 500) RETURNS jsonb LANGUAGE sql AS $$SELECT jsonb_build_object('idLote',id,'monto',monto,'precio',30000,'idPolitica',1)$$;
+CREATE FUNCTION pg_temp.lote(id bigint,monto numeric DEFAULT 500) RETURNS jsonb LANGUAGE sql AS $$SELECT jsonb_build_object('idLote',id,'monto',monto,'precio',30000,'idPolitica',CASE WHEN id=109 THEN 2 ELSE 1 END)$$;
 CREATE FUNCTION pg_temp.abono(lote bigint,idx integer,monto numeric,metodo text DEFAULT 'TRANSFERENCIA') RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE ruta text;
 BEGIN
@@ -42,6 +42,12 @@ BEGIN
   PERFORM public.sp_crm_registrar_separacion_acumulada_v1(2,'00000000-0000-4000-8000-000000000004',1,jsonb_build_array(pg_temp.lote(105),pg_temp.lote(106)),jsonb_build_array(pg_temp.abono(105,5,1000)),NULL);
   RAISE EXCEPTION 'Actor no autorizado';
  EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'DENEGADO|%' THEN RAISE;END IF; END;
+ r:=public.sp_crm_registrar_separacion_acumulada_v1(1,'00000000-0000-4000-8000-000000000005',1,jsonb_build_array(pg_temp.lote(109,300)),jsonb_build_array(pg_temp.abono(109,6,300)),NULL);
+ pid:=(r->'abonos'->0->>'idPago')::bigint;vid:=(r->'abonos'->0->>'idVoucher')::bigint;
+ IF EXISTS(SELECT 1 FROM public.pag_separaciones_grupo_abonos_v1 WHERE id_pago=pid) THEN RAISE EXCEPTION 'Separación individual dejó de ser compatible';END IF;
+ PERFORM public.sp_finanzas_revisar_voucher_separacion_v1(1,vid,true,NULL,NULL);
+ rep:=public.sp_finanzas_conciliar_pago_confirmado_v1(1,pid,1,1);
+ IF (rep->>'monto')::numeric<>300 THEN RAISE EXCEPTION 'La conciliación sigue exigiendo S/500';END IF;
  IF has_function_privilege('anon','public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text)','EXECUTE') OR has_table_privilege('authenticated','public.pag_separaciones_grupo_distribucion_v1','SELECT') THEN RAISE EXCEPTION 'Privilegios indebidos';END IF;
 END $$;
 ROLLBACK;
