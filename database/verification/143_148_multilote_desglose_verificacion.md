@@ -33,6 +33,13 @@ Estado observado tras las pruebas:
 - **0 cuentas receptoras reales**. La única cuenta configurada anteriormente es de demostración; la conciliación positiva está bloqueada.
 - Ninguna venta histórica en la muestra tiene más de un comprobante. La ruta positiva de reparto y conciliación de múltiples comprobantes requiere fixtures locales controlados y un medio bancario válido. **No afirmar que ha sido probada con movimientos reales**.
 
+## Seguridad y aislamiento comprobados
+
+- Supabase confirmó que las siete funciones públicas de planificación, vinculación, listado, distribución, revisión, conciliación y reinicio **no otorgan `EXECUTE` a `anon` ni a `authenticated`**; el rol interno `sigi_app_user` sí puede ejecutarlas.
+- Las cuatro tablas nuevas de negociaciones y desgloses tienen **RLS activado** y niegan `SELECT` a `anon`/`authenticated`. El Advisor marca `rls_enabled_no_policy` con nivel INFO: se mantiene intencionalmente sin política de acceso directo; todos los accesos de usuario transitan por Core Service y las funciones con validación del actor.
+- Existen editores financieros distintos disponibles para separar preparación y revisión de evidencias. No se debe desactivar esta segregación solo por conveniencia.
+- Las migraciones 143–148 se aplicaron únicamente al Supabase original de pruebas. No se modificó un proyecto adicional ni se desplegaron servicios.
+
 ## Guía de pruebas locales
 
 1. Actualizar el repositorio local en `fix/correcciones-ventas-finanzas` sin sobrescribir modificaciones no guardadas; reconstruir `core-service` y `backoffice` con Docker.
