@@ -79,7 +79,8 @@ test('Backoffice obliga vista previa, doble confirmaciÃ³n y TOTP; no almacena cÃ
   const service=read('../src/services/financingPolicyPublicationService.ts');
   const parent=read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
   const estado=read('../../../database/migrations/115_financiamiento_consulta_estado_publicacion_v1.sql');
-  assert.match(parent,/PublicarPoliticaFinancieraPanel politica=\{datos\}/);
+  assert.match(parent,/PublicarPoliticaFinancieraPanel[^>]*politica=\{datos\}/);
+  assert.match(parent,/key=\{\x60\$\{datos\.idProyecto\?\?0\}:\$\{datos\.idPolitica\}:\$\{datos\.idPoliticaProyecto\?\?0\}\x60\}/);
   assert.match(estado,/cfg_fin_publicacion_control/);
   assert.match(ui,/!vista\.publicacionHabilitada/);
   assert.match(ui,/const \[confirmado, setConfirmado\]/);
