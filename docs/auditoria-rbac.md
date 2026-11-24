@@ -9,5 +9,5 @@
 ## Pendiente de auditoría y corrección
 - Aprovisionamiento del asesor (triggers de RRHH) y roles de sistema, administración de cuentas, reglas de protección de jerarquía y delegación: no convertir a permisos genéricos sin preservar restricciones anti-escalamiento.
 - Anulaciones: decisión gerencial, dictámenes legales/financieros y separación de funciones. No se cambian esas autorizaciones en esta migración.
-- Revisar las versiones anteriores de funciones, llamadas Java efectivas, políticas RLS, sesiones, menús y componentes restantes. No asumir que toda aparición de ROLE_* es una autorización (puede ser presentación o separación de portal).
+- Las rutas de retroceso del Core Service también se migraron a capacidades del catálogo. Las políticas RLS de public no contienen nombres de roles comerciales en sus expresiones (búsqueda estática). Revisar las versiones anteriores de funciones, llamadas Java efectivas, sesiones, menús y componentes restantes. No asumir que toda aparición de ROLE_* es una autorización (puede ser presentación o separación de portal).
 - Prueba integral en navegador creando un rol nuevo y asignándole alcances distintos, revocando permisos y comprobando el acceso directo a API.
