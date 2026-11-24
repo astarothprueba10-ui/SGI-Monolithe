@@ -312,7 +312,7 @@ export function Sales() {
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
   const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
-  const formalizacionMultiple=tieneReservasVenta && reservasVigentes.length>1 && !asociacionAgrupadaPendiente;
+  const formalizacionMultiple=tieneReservasVenta && !asociacionAgrupadaPendiente;
   const reservaSeleccionada=reservasVigentes.find(r=>r.idLote===Number(formLotId));
   const reservaPendienteVenta=tieneReservasVenta && reservaSeleccionada?.estado==='PENDIENTE';
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
@@ -984,14 +984,15 @@ export function Sales() {
     formLotId
   ]);
 
-  const archivosVentaObligatorios = formPaymentMethod !== 'EFECTIVO';
+  const archivosVentaObligatorios = formSaleModality === 'FINANCIADA' || formPaymentMethod !== 'EFECTIVO';
   const requiereNumeroOperacionVenta = ['TRANSFERENCIA','DEPOSITO','YAPE_PLIN']
     .includes(formPaymentMethod);
   const agregarComprobantesVenta = (e: React.ChangeEvent<HTMLInputElement>) => {
     const candidatos = Array.from(e.target.files ?? []);
     e.target.value = '';
     if (!candidatos.length) return;
-    if (comprobantesVenta.length + candidatos.length > 8) {
+    if(formSaleModality==='FINANCIADA' && candidatos.length!==1){toast.error('Adjunte un único comprobante para la inicial.');return;}
+    if (formSaleModality!=='FINANCIADA' && comprobantesVenta.length + candidatos.length > 8) {
       toast.error('Se permiten como máximo 8 comprobantes por venta.');
       return;
     }
@@ -1002,7 +1003,7 @@ export function Sales() {
       toast.error('Solo se admiten PDF, JPG, PNG o WebP, máximo 5 MB por archivo.');
       return;
     }
-    setComprobantesVenta(prev => [...prev, ...candidatos]);
+    setComprobantesVenta(prev => formSaleModality==='FINANCIADA'?candidatos:[...prev, ...candidatos]);
   };
 
   const validarFormularioSeparacion = (): boolean => {
@@ -1067,6 +1068,7 @@ export function Sales() {
       return;
     }
 
+    if(esFinanciada && montoInicial>reservaAplicable && comprobantesVenta.length!==1){toast.error('Adjunte un único comprobante para la inicial adicional.');return;}
     const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
     if (errorPago) {
       toast.error(errorPago);
@@ -3038,12 +3040,12 @@ export function Sales() {
                     Comprobantes de {formSaleModality === 'FINANCIADA' ? 'inicial' : 'pago'}
                     {archivosVentaObligatorios ? ' *' : ' (opcional en efectivo)'}
                   </label>
-                  <input id="comprobantes-venta" type="file" multiple
+                  <input id="comprobantes-venta" type="file" multiple={formSaleModality!=='FINANCIADA'}
                     accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                     onChange={agregarComprobantesVenta}
                     className="block w-full min-w-0 text-xs text-brand-700 file:mr-3 file:rounded-md file:border file:border-brand-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-800 hover:file:bg-brand-50" />
                   <p className="text-[11px] text-brand-500">
-                    Hasta 8 archivos. PDF, JPG, PNG o WebP; 5 MB por archivo. Al confirmar se cargarán al almacenamiento privado.
+                    {formSaleModality==='FINANCIADA'?'Un comprobante por inicial.':'Hasta 8 archivos.'} PDF, JPG, PNG o WebP; 5 MB por archivo. Al confirmar se cargarán al almacenamiento privado.
                   </p>
                   {comprobantesVenta.length > 0 && (
                     <ul className="space-y-1.5">
