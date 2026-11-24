@@ -236,6 +236,8 @@ export function Sales() {
   const [availableStages, setAvailableStages] = useState<CrmEtapaOperacion[]>([]);
   const [interesesOperacion, setInteresesOperacion] = useState<number[]>([]);
   const [registrandoInteres, setRegistrandoInteres] = useState(false);
+  const [editorInteres, setEditorInteres] = useState(false);
+  const [proyectoInteresNuevo, setProyectoInteresNuevo] = useState('');
   const [proyectoInteresAnterior, setProyectoInteresAnterior] = useState('');
   const [motivoCambioInteres, setMotivoCambioInteres] = useState('');
   const [errorCambioInteres, setErrorCambioInteres] = useState('');
@@ -253,6 +255,8 @@ export function Sales() {
   const esCambioInteres = !compradorOperacion && interesesOperacion.length > 0;
   const origenCambioInteres = interesesOperacion.length === 1
     ? interesesOperacion[0] : Number(proyectoInteresAnterior);
+  const proyectosConInteres = availableProjects.filter(p => interesesOperacion.includes(p.idProyecto));
+  const proyectosSinInteres = availableProjects.filter(p => !interesesOperacion.includes(p.idProyecto));
   const proyectoConInteres = interesesOperacion.includes(Number(formProjectId));
   const [formStageId, setFormStageId] = useState('');
   const [loadingStages, setLoadingStages] = useState(false);
@@ -501,6 +505,8 @@ export function Sales() {
     setErrorAsesorOperacion('');
     setSelectedProspectId('');
     setInteresesOperacion([]);
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
     setProyectoInteresAnterior('');
     setMotivoCambioInteres('');
     setErrorCambioInteres('');
@@ -540,6 +546,8 @@ export function Sales() {
     setAsesorOperacion('');
     setErrorAsesorOperacion('');
     setInteresesOperacion([]);
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
     setProyectoInteresAnterior('');
     setMotivoCambioInteres('');
     setErrorCambioInteres('');
@@ -567,8 +575,7 @@ export function Sales() {
       setInteresesOperacion([...intereses]);
       setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
       // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
-      const compradorExistente = (prospectsList.find(p => p.id_prospecto === id)
-        ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
+      const compradorExistente = (detalle.prospecto.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
       const elegibles = proyectos.filter((p) =>
         p.activo && (compradorExistente || intereses.has(p.idProyecto) || puedeEditarInteres)
       );
@@ -579,7 +586,7 @@ export function Sales() {
         .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
       const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
         ? origenPlano : null;
-      if (destino) {
+      if (destino && intereses.has(destino.idProyecto)) {
         setAutoseleccionPendiente({idProyecto:destino.idProyecto,
           idEtapa:destino.idEtapa,idLote:destino.idLote});
         setFormProjectId(String(destino.idProyecto));
@@ -590,8 +597,17 @@ export function Sales() {
           idLote: reserva.idLote
         });
         setFormProjectId(String(reserva.idProyecto));
-      } else if (origenPlano) {
-        toast.info('Este prospecto no tiene interés registrado en el proyecto del plano.');
+      } else {
+        const registrado = [...intereses].find(idProyecto => elegibles.some(p => p.idProyecto === idProyecto));
+        if (registrado !== undefined) setFormProjectId(String(registrado));
+        if (destino && (compradorExistente || puedeEditarInteres)) {
+          setProyectoInteresNuevo(String(destino.idProyecto));
+          setProyectoInteresAnterior(registrado === undefined ? '' : String(registrado));
+          setEditorInteres(true);
+          toast.info('Confirme el interés en el proyecto del plano antes de continuar.');
+        } else if (origenPlano) {
+          toast.info('Este prospecto no tiene interés registrado en el proyecto del plano.');
+        }
       }
     } catch (err: unknown) {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
@@ -603,13 +619,31 @@ export function Sales() {
     }
   };
 
+  const cerrarEditorInteres = () => {
+    if (registrandoInteres) return;
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
+  };
+
+  const abrirEditorInteres = () => {
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior(formProjectId);
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
+    setEditorInteres(true);
+  };
+
   const registrarInteresOperacion = async () => {
-    if (!selectedProspectId || !formProjectId || registrandoInteres) return;
+    if (!selectedProspectId || !proyectoInteresNuevo || registrandoInteres ||
+        !proyectosSinInteres.some(p => p.idProyecto === Number(proyectoInteresNuevo))) return;
     if (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) ||
-        origenCambioInteres === Number(formProjectId) || motivoCambioInteres.trim().length < 5)) return;
+        origenCambioInteres === Number(proyectoInteresNuevo) || motivoCambioInteres.trim().length < 5)) return;
     setErrorCambioInteres('');
     const idProspecto = selectedProspectId;
-    const idProyecto = Number(formProjectId);
+    const idProyecto = Number(proyectoInteresNuevo);
     const solicitud = seleccionProspectoPeticionRef.current;
     setRegistrandoInteres(true);
     try {
@@ -627,6 +661,16 @@ export function Sales() {
         setInteresesOperacion(prev => [...new Set([
           ...prev.filter(p => !esCambioInteres || p !== origenCambioInteres), idProyecto
         ])]);
+        // Cambiar el proyecto operativo solo tras la confirmación del CRM.
+        const destino = origenPlano?.idProyecto === idProyecto ? origenPlano : null;
+        setAutoseleccionPendiente(destino ? {idProyecto: destino.idProyecto, idEtapa: destino.idEtapa, idLote: destino.idLote} : null);
+        setFormStageId('');
+        setAvailableStages([]);
+        setFormLotId('');
+        setAvailableLots([]);
+        setFormProjectId(String(idProyecto));
+        setEditorInteres(false);
+        setProyectoInteresNuevo('');
         setProyectoInteresAnterior('');
         setMotivoCambioInteres('');
         setProspectsList(prev => prev.map(p => p.id_prospecto === idProspecto
@@ -1120,7 +1164,7 @@ export function Sales() {
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor) return;
+    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres) return;
 
     if (opType === 'Venta') {
       setFormTouched(true);
@@ -2169,7 +2213,7 @@ export function Sales() {
               variant="primary"
 
               disabled={
-                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor ||
+                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres ||
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
@@ -2252,39 +2296,43 @@ export function Sales() {
                 Proyecto inmobiliario *
               </label>
 
-              <Select
-                value={formProjectId}
-                disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion}
-                onChange={(e) => {
-                  setAutoseleccionPendiente(null);
-                  setFormProjectId(e.target.value);
-                  setProyectoInteresAnterior('');
-                  setMotivoCambioInteres('');
-                  setErrorCambioInteres('');
-                  setFormStageId('');
-                  setAvailableStages([]);
-                  setFormLotId('');
-                  setAvailableLots([]);
-                }}
-              >
-                <option value="">
-                  {loadingProjects
-                    ? 'Cargando proyectos...'
-                    : 'Seleccione un proyecto...'}
-                </option>
+              {proyectosConInteres.length > 1 ? (
+                <Select
+                  aria-label="Proyecto de interés registrado"
+                  value={formProjectId}
+                  disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres}
+                  onChange={e=>{
+                    setAutoseleccionPendiente(null);
+                    setFormStageId('');
+                    setAvailableStages([]);
+                    setFormLotId('');
+                    setAvailableLots([]);
+                    setFormProjectId(e.target.value);
+                  }}>
+                  <option value="">Seleccione un interés registrado</option>
+                  {proyectosConInteres.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+                </Select>
+              ) : (
+                <div className="min-h-11 rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-2.5 text-sm text-brand-800"
+                  aria-label="Proyecto de interés registrado">
+                  {loadingProjects ? 'Cargando proyecto…' : !selectedProspectId ? 'Seleccione un cliente primero'
+                    : proyectosConInteres.find(p=>p.idProyecto===Number(formProjectId))?.nombre ?? 'Sin proyecto de interés activo disponible'}
+                </div>
+              )}
 
-                {availableProjects.map((project) => (
-                  <option key={project.idProyecto} value={project.idProyecto}>
-                    {project.nombre}{interesesOperacion.includes(project.idProyecto) ? '' : ' — Sin interés registrado'}
-                  </option>
-                ))}
-              </Select>
-
-              {selectedProspectId && formProjectId && !loadingProjects && !proyectoConInteres && (
-                <div className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              {selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
+                proyectosSinInteres.length > 0 && !editorInteres && (
+                <Button type="button" variant="secondary" className="mt-2 w-full sm:w-auto"
+                  disabled={registrandoInteres || guardandoAsesorOperacion || submitting}
+                  onClick={abrirEditorInteres}>
+                  {compradorOperacion ? 'Registrar interés para nueva compra'
+                    : esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar proyecto de interés'}
+                </Button>
+              )}
+              {editorInteres && selectedProspectId && !loadingProjects && (
+                <div className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-800">
                   <p className="font-semibold">{esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar interés comercial'}</p>
-                  {esCambioInteres ? <>
-                    <p>El interés anterior pasará a histórico. El cambio quedará registrado en el expediente del cliente; no se modificarán separaciones ni ventas existentes.</p>
+                  {esCambioInteres && <>
                     {interesesOperacion.length > 1 ? <label className="block font-medium">
                       Proyecto de interés que se reemplazará *
                       <Select className="mt-1 w-full" value={proyectoInteresAnterior} disabled={registrandoInteres}
@@ -2294,8 +2342,16 @@ export function Sales() {
                           {availableProjects.find(p=>p.idProyecto===id)?.nombre ?? `Proyecto #${id}`}
                         </option>)}
                       </Select>
-                    </label> : <p>Interés anterior: <strong>{availableProjects.find(p=>p.idProyecto===origenCambioInteres)?.nombre ?? `Proyecto #${origenCambioInteres}`}</strong></p>}
-                    <p>Nuevo interés: <strong>{availableProjects.find(p=>p.idProyecto===Number(formProjectId))?.nombre}</strong></p>
+                    </label> : <p>Interés actual: <strong>{availableProjects.find(p=>p.idProyecto===origenCambioInteres)?.nombre ?? `Proyecto #${origenCambioInteres}`}</strong></p>}
+                  </>}
+                  <label className="block font-medium">Nuevo proyecto *
+                    <Select className="mt-1 w-full" value={proyectoInteresNuevo} disabled={registrandoInteres}
+                      onChange={e=>{setProyectoInteresNuevo(e.target.value);setErrorCambioInteres('');}}>
+                      <option value="">Seleccione un proyecto</option>
+                      {proyectosSinInteres.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+                    </Select>
+                  </label>
+                  {esCambioInteres ? <>
                     <label className="block font-medium">Motivo del cambio *
                       <textarea className="mt-1 w-full rounded-md border border-brand-200 bg-white p-2 text-brand-800"
                         rows={2} maxLength={500} value={motivoCambioInteres} disabled={registrandoInteres}
@@ -2303,13 +2359,17 @@ export function Sales() {
                         placeholder="Ej.: El cliente prefirió otro proyecto por su ubicación." />
                       <span className="block font-normal">De 5 a 500 caracteres.</span>
                     </label>
-                  </> : <p>{compradorOperacion ? 'Nueva adquisición: se conservarán los intereses y compras anteriores.' : 'El cliente aún no tiene un interés activo. Registra su primer interés para continuar.'}</p>}
+                    <p>El interés anterior quedará como histórico y el cambio se registrará en el expediente CRM.</p>
+                  </> : <p>{compradorOperacion ? 'Se conservarán los intereses y compras anteriores.' : 'Se registrará el primer interés comercial.'}</p>}
                   {errorCambioInteres && <div role="alert"><Alert tone="danger" title="No se pudo actualizar el interés">{errorCambioInteres}</Alert></div>}
-                  <Button type="button" variant="secondary" disabled={registrandoInteres || guardandoAsesorOperacion ||
-                    (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) || motivoCambioInteres.trim().length < 5))}
-                    onClick={() => void registrarInteresOperacion()}>
-                    {registrandoInteres ? 'Guardando…' : esCambioInteres ? 'Confirmar cambio de interés' : 'Registrar interés en este proyecto'}
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="secondary" disabled={registrandoInteres} onClick={cerrarEditorInteres}>Cancelar</Button>
+                    <Button type="button" variant="primary" disabled={!proyectoInteresNuevo || registrandoInteres || guardandoAsesorOperacion ||
+                      (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) || motivoCambioInteres.trim().length < 5))}
+                      onClick={() => void registrarInteresOperacion()}>
+                      {registrandoInteres ? 'Guardando…' : esCambioInteres ? 'Confirmar cambio de interés' : 'Registrar interés en este proyecto'}
+                    </Button>
+                  </div>
                 </div>
               )}
               {selectedProspectId &&
@@ -2328,7 +2388,7 @@ export function Sales() {
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || !proyectoConInteres || loadingStages}
+                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);

@@ -49,3 +49,17 @@ test('el cambio de interés del potencial es distinto de una recompra y conserva
   assert.match(sql,/fn_crm_puede_consultar_prospecto/);
   assert.match(sql,/sp_registrar_auditoria/);
 });
+
+
+test('proyecto registrado por defecto y selector de cambio separado del proyecto operativo',()=>{
+  assert.match(sales,/const registrado = \[\.\.\.intereses\]\.find/);
+  assert.match(sales,/setFormProjectId\(String\(registrado\)\)/);
+  assert.match(sales,/proyectosConInteres\.length > 1/);
+  assert.match(sales,/proyectosSinInteres\.map/);
+  assert.match(sales,/!editorInteres &&/);
+  assert.match(sales,/value=\{proyectoInteresNuevo\}/);
+  const guardar=sales.slice(sales.indexOf('const registrarInteresOperacion'),sales.indexOf('const abrirEditorAsesorOperacion'));
+  assert.ok(guardar.indexOf('await crmBackend.cambiarInteresProyecto') < guardar.indexOf('setFormProjectId(String(idProyecto))'));
+  const cancelar=sales.slice(sales.indexOf('const cerrarEditorInteres'),sales.indexOf('const abrirEditorInteres'));
+  assert.doesNotMatch(cancelar,/setFormProjectId|setFormLotId|crmBackend/);
+});
