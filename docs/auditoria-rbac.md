@@ -30,3 +30,7 @@
 ## RRHH y configuración financiera (168)
 - El alcance integral de expedientes protegidos, la aprobación de reincorporaciones y la revisión documental de jefatura se expresan mediante capacidades `hr.*`. Las tres rutinas que dependían del ID físico 25 ya no lo utilizan. Se mantienen la jefatura laboral vigente para revisión documental, los controles de autoaprobación, y la protección de contactos de recuperación.
 - La autorización financiera exclusiva de Gerencia y el TOTP son una regla de seguridad explícita en docs/financiamiento_mfa_bloque3.md y docs/financiamiento_publicacion_bloque4.md. Se impide conceder `financing.configure` a roles distintos de Gerencia; no se amplía esa regla ni se altera la publicación o las políticas pactadas.
+
+## Compatibilidad de rutinas anteriores (169)
+- Se alinearon nueve versiones CRM anteriores todavía ejecutables por el backend (búsqueda v6, indicadores v6, solicitudes v1 y ventas v11-v13). Se conservan firmas, reglas de negocio y privilegios; la autorización por rol comercial pasa a las capacidades de 163.
+- Permanecen comprobaciones por nombre exclusivamente para políticas protegidas: roles raíz, cuentas críticas, contactos de recuperación, Gerencia financiera y separación de responsabilidades. Las referencias a nombres en las semillas iniciales no son una lista de autorización en ejecución.
