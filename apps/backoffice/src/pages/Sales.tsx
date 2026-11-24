@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
+import { FormalizacionMultiplePanel } from '../components/sales/FormalizacionMultiplePanel';
 import { CambiosReservaPanel, ReservasVentaPanel } from '../components/sales/CambiosReservaPanel';
 import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon, RotateCcwIcon, CreditCardIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -311,6 +312,7 @@ export function Sales() {
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
   const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
+  const formalizacionMultiple=tieneReservasVenta && reservasVigentes.length>1 && !asociacionAgrupadaPendiente;
   const reservaSeleccionada=reservasVigentes.find(r=>r.idLote===Number(formLotId));
   const reservaPendienteVenta=tieneReservasVenta && reservaSeleccionada?.estado==='PENDIENTE';
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
@@ -1179,6 +1181,7 @@ export function Sales() {
     if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional) return;
 
     if (opType === 'Venta') {
+      if(formalizacionMultiple)return;
       if(reservaPendienteVenta){toast.error('Finanzas debe aprobar la separación antes de formalizar.');return;}
       setFormTouched(true);
       await validarVentaAntesDeRevisarComprador();
@@ -2273,7 +2276,7 @@ export function Sales() {
             >
               Cancelar
             </Button>
-            <Button
+            {!formalizacionMultiple && <Button
               variant="primary"
 
               disabled={
@@ -2290,7 +2293,7 @@ export function Sales() {
                 : opType === 'Separacion'
                   ? 'Registrar separación'
                   : 'Validar Venta'}
-            </Button>
+            </Button>}
 
 
           </div>
@@ -2735,7 +2738,7 @@ export function Sales() {
                   <p>Vigencia del lote principal: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong>.</p>
                   {lotesAdicionales.some(l=>l.dias!==condicionesVenta.diasVencimientoSeparacion)&&
                     <p>Los lotes adicionales tienen plazos propios según sus políticas.</p>}
-                  <p>El vencimiento requiere revisión; no libera el lote ni anula pagos automáticamente.</p>
+                  <p>Al vencer el plazo, el lote se libera automáticamente. Los pagos y comprobantes se conservan para revisión financiera.</p>
                   <p>Finanzas revisará los comprobantes antes de acreditar los pagos. Los lotes registrados quedarán reservados.</p>
                 </div>
                 {resultadoSeparacionIncierto&&<Alert tone="warning" title="Registro sin confirmar">Consulta el listado antes de volver a registrar la operación.</Alert>}
@@ -2754,6 +2757,11 @@ export function Sales() {
                 </div>
               )
 
+            ) : formalizacionMultiple && selectedProspectId ? (
+              <FormalizacionMultiplePanel key={selectedProspectId} idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
+                proyectos={availableProjects} compradorExistente={(prospectsList.find(p=>p.id_prospecto===selectedProspectId)?.estado_codigo??'').toUpperCase()==='CONVERTIDO'}
+                puedeReasignar={puedeReasignarComprador} asesorNombre={prospectsList.find(p=>p.id_prospecto===selectedProspectId)?.asesor_nombre??''}
+                observaciones={formObservations} onBusy={setSubmitting} onCompleted={()=>{setIsModalOpen(false);void fetchSalesData();}}/>
             ) : (
               <div className="space-y-4 rounded-2xl border border-brand-200 bg-gradient-to-b from-brand-50/90 to-white p-3 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2984,7 +2992,7 @@ export function Sales() {
               </div>
             )}
 
-            {opType === 'Venta' && (
+            {opType === 'Venta' && !formalizacionMultiple && (
               <section className="space-y-3 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm sm:p-5">
                 <div>
                   <h3 className="text-sm font-semibold text-brand-900">Pago y comprobantes</h3>
