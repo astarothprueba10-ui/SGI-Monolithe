@@ -236,6 +236,9 @@ export function Sales() {
   const [availableStages, setAvailableStages] = useState<CrmEtapaOperacion[]>([]);
   const [interesesOperacion, setInteresesOperacion] = useState<number[]>([]);
   const [registrandoInteres, setRegistrandoInteres] = useState(false);
+  const [proyectoInteresAnterior, setProyectoInteresAnterior] = useState('');
+  const [motivoCambioInteres, setMotivoCambioInteres] = useState('');
+  const [errorCambioInteres, setErrorCambioInteres] = useState('');
   const puedeEditarInteres = can('crm.edit');
   const puedeAsignarAsesorOperacion = can('crm.edit') && user.roles.some(r =>
     ['Administrador', 'Gerencia', 'Supervisor comercial', 'Administración'].includes(r));
@@ -247,6 +250,9 @@ export function Sales() {
   const [errorAsesorOperacion, setErrorAsesorOperacion] = useState('');
   const clienteOperacion = prospectsList.find(p => p.id_prospecto === selectedProspectId);
   const compradorOperacion = clienteOperacion?.estado_codigo?.toUpperCase() === 'CONVERTIDO';
+  const esCambioInteres = !compradorOperacion && interesesOperacion.length > 0;
+  const origenCambioInteres = interesesOperacion.length === 1
+    ? interesesOperacion[0] : Number(proyectoInteresAnterior);
   const proyectoConInteres = interesesOperacion.includes(Number(formProjectId));
   const [formStageId, setFormStageId] = useState('');
   const [loadingStages, setLoadingStages] = useState(false);
@@ -495,6 +501,9 @@ export function Sales() {
     setErrorAsesorOperacion('');
     setSelectedProspectId('');
     setInteresesOperacion([]);
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
     setAvailableProjects([]);
     setFormProjectId('');
     setAvailableLots([]);
@@ -531,6 +540,9 @@ export function Sales() {
     setAsesorOperacion('');
     setErrorAsesorOperacion('');
     setInteresesOperacion([]);
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
     setFormProjectId('');
     setFormStageId('');
     setAvailableStages([]);
@@ -593,6 +605,9 @@ export function Sales() {
 
   const registrarInteresOperacion = async () => {
     if (!selectedProspectId || !formProjectId || registrandoInteres) return;
+    if (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) ||
+        origenCambioInteres === Number(formProjectId) || motivoCambioInteres.trim().length < 5)) return;
+    setErrorCambioInteres('');
     const idProspecto = selectedProspectId;
     const idProyecto = Number(formProjectId);
     const solicitud = seleccionProspectoPeticionRef.current;
@@ -602,15 +617,26 @@ export function Sales() {
         await crmBackend.registrarInteresRecompra(idProspecto, idProyecto);
       } else {
         if (!puedeEditarInteres) return;
-        await crmBackend.actualizar(idProspecto, { idProyectoInteres: idProyecto });
+        if (esCambioInteres) {
+          await crmBackend.cambiarInteresProyecto(idProspecto, idProyecto, origenCambioInteres, motivoCambioInteres.trim());
+        } else {
+          await crmBackend.actualizar(idProspecto, { idProyectoInteres: idProyecto });
+        }
       }
       if (solicitud === seleccionProspectoPeticionRef.current) {
-        setInteresesOperacion(prev => [...new Set([...prev, idProyecto])]);
-        toast.success('Interés comercial registrado. Puedes continuar con la adquisición.');
+        setInteresesOperacion(prev => [...new Set([
+          ...prev.filter(p => !esCambioInteres || p !== origenCambioInteres), idProyecto
+        ])]);
+        setProyectoInteresAnterior('');
+        setMotivoCambioInteres('');
+        setProspectsList(prev => prev.map(p => p.id_prospecto === idProspecto
+          ? {...p,interes:availableProjects.find(proyecto => proyecto.idProyecto === idProyecto)?.nombre ?? p.interes} : p));
+        toast.success(esCambioInteres ? 'Interés actualizado y registrado en el expediente CRM.'
+          : 'Interés comercial registrado. Puedes continuar con la adquisición.');
       }
     } catch (err: unknown) {
       if (solicitud === seleccionProspectoPeticionRef.current)
-        toast.error(err instanceof Error ? err.message : 'No se pudo registrar el interés comercial.');
+        setErrorCambioInteres(err instanceof Error ? err.message : 'No se pudo actualizar el interés comercial.');
     } finally {
       setRegistrandoInteres(false);
     }
@@ -2232,6 +2258,9 @@ export function Sales() {
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormProjectId(e.target.value);
+                  setProyectoInteresAnterior('');
+                  setMotivoCambioInteres('');
+                  setErrorCambioInteres('');
                   setFormStageId('');
                   setAvailableStages([]);
                   setFormLotId('');
@@ -2253,10 +2282,33 @@ export function Sales() {
 
               {selectedProspectId && formProjectId && !loadingProjects && !proyectoConInteres && (
                 <div className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  <p>El cliente no tiene un interés activo en este proyecto. Confirma el nuevo interés para continuar. Se conservarán los intereses anteriores.</p>
-                  <Button type="button" variant="secondary" disabled={registrandoInteres || guardandoAsesorOperacion}
+                  <p className="font-semibold">{esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar interés comercial'}</p>
+                  {esCambioInteres ? <>
+                    <p>El interés anterior pasará a histórico. El cambio quedará registrado en el expediente del cliente; no se modificarán separaciones ni ventas existentes.</p>
+                    {interesesOperacion.length > 1 ? <label className="block font-medium">
+                      Proyecto de interés que se reemplazará *
+                      <Select className="mt-1 w-full" value={proyectoInteresAnterior} disabled={registrandoInteres}
+                        onChange={e=>setProyectoInteresAnterior(e.target.value)}>
+                        <option value="">Seleccione el interés anterior</option>
+                        {interesesOperacion.map(id=><option key={id} value={id}>
+                          {availableProjects.find(p=>p.idProyecto===id)?.nombre ?? `Proyecto #${id}`}
+                        </option>)}
+                      </Select>
+                    </label> : <p>Interés anterior: <strong>{availableProjects.find(p=>p.idProyecto===origenCambioInteres)?.nombre ?? `Proyecto #${origenCambioInteres}`}</strong></p>}
+                    <p>Nuevo interés: <strong>{availableProjects.find(p=>p.idProyecto===Number(formProjectId))?.nombre}</strong></p>
+                    <label className="block font-medium">Motivo del cambio *
+                      <textarea className="mt-1 w-full rounded-md border border-brand-200 bg-white p-2 text-brand-800"
+                        rows={2} maxLength={500} value={motivoCambioInteres} disabled={registrandoInteres}
+                        onChange={e=>setMotivoCambioInteres(e.target.value)}
+                        placeholder="Ej.: El cliente prefirió otro proyecto por su ubicación." />
+                      <span className="block font-normal">De 5 a 500 caracteres.</span>
+                    </label>
+                  </> : <p>{compradorOperacion ? 'Nueva adquisición: se conservarán los intereses y compras anteriores.' : 'El cliente aún no tiene un interés activo. Registra su primer interés para continuar.'}</p>}
+                  {errorCambioInteres && <div role="alert"><Alert tone="danger" title="No se pudo actualizar el interés">{errorCambioInteres}</Alert></div>}
+                  <Button type="button" variant="secondary" disabled={registrandoInteres || guardandoAsesorOperacion ||
+                    (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) || motivoCambioInteres.trim().length < 5))}
                     onClick={() => void registrarInteresOperacion()}>
-                    {registrandoInteres ? 'Registrando…' : 'Registrar interés en este proyecto'}
+                    {registrandoInteres ? 'Guardando…' : esCambioInteres ? 'Confirmar cambio de interés' : 'Registrar interés en este proyecto'}
                   </Button>
                 </div>
               )}

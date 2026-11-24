@@ -37,3 +37,15 @@ test('operación permite registrar interés y asignar asesor desde el formulario
   assert.match(sales,/puedeAsignarAsesorOperacion = can\('crm\.edit'\)/);
   assert.match(sales,/const tieneAsesor = \(prospect\.id_asesor \?\? 0\) > 0/);
 });
+
+
+test('el cambio de interés del potencial es distinto de una recompra y conserva seguimiento CRM',()=>{
+  const sql=readFileSync(new URL('../../../database/migrations/152_crm_cambio_interes_operacion_v1.sql',import.meta.url),'utf8');
+  assert.match(sales,/crmBackend\.cambiarInteresProyecto\(idProspecto, idProyecto, origenCambioInteres, motivoCambioInteres\.trim\(\)\)/);
+  assert.match(sales,/Confirmar cambio de interés/);
+  assert.match(sql,/SET activo=false/);
+  assert.match(sql,/INSERT INTO public\.crm_seguimientos/);
+  assert.match(sql,/INTERES_COMPROMETIDO/);
+  assert.match(sql,/fn_crm_puede_consultar_prospecto/);
+  assert.match(sql,/sp_registrar_auditoria/);
+});

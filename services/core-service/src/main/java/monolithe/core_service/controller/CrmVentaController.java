@@ -55,6 +55,17 @@ public class CrmVentaController {
         private final CrmSeparacionStorageService separacionStorageService;
         private final CrmAnulacionStorageService anulacionStorageService;
 
+        public record CambiarInteresOperacionRequest(Long idProyectoAnterior, String motivo) {}
+
+        @PostMapping("/prospectos/{idProspecto}/intereses/cambio/{idProyecto}")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view') and hasAuthority('crm.edit')")
+        public JsonNode cambiarInteresOperacion(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idProspecto, @PathVariable Long idProyecto,
+                @RequestBody CambiarInteresOperacionRequest request) {
+            return service.cambiarInteresOperacion(obtenerActor(jwt), idProspecto,
+                request.idProyectoAnterior(), idProyecto, request.motivo());
+        }
+
         @PostMapping("/prospectos/{idProspecto}/intereses/recompra/{idProyecto}")
         @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view')")
         public JsonNode registrarInteresRecompra(@AuthenticationPrincipal Jwt jwt,

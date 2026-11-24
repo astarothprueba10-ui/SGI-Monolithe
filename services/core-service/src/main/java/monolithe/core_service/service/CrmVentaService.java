@@ -956,6 +956,20 @@ public class CrmVentaService {
     }
 
     @Transactional
+    public JsonNode cambiarInteresOperacion(Long actor, Long prospecto, Long anterior, Long nuevo, String motivo) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || anterior == null || anterior <= 0
+                || nuevo == null || nuevo <= 0 || anterior.equals(nuevo)
+                || motivo == null || motivo.trim().length() < 5 || motivo.trim().length() > 500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione los proyectos e indique el motivo del cambio.");
+        return ejecutar("""
+            SELECT public.sp_crm_cambiar_interes_operacion_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint),
+                CAST(? AS bigint), CAST(? AS text))::text
+            """, actor, prospecto, anterior, nuevo, motivo.trim());
+    }
+
+    @Transactional
     public JsonNode registrarInteresRecompra(Long actor, Long prospecto, Long proyecto) {
         validarActor(actor);
         if (prospecto == null || prospecto <= 0 || proyecto == null || proyecto <= 0)
@@ -2306,6 +2320,14 @@ public class CrmVentaService {
                     ex);
         }
 
+        if (mensaje.contains("INTERES_CAMBIO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El interés anterior ya cambió o el nuevo ya está activo. Vuelva a seleccionar el cliente.", ex);
+        }
+        if (mensaje.contains("INTERES_COMPROMETIDO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El proyecto anterior tiene una separación o venta sin cerrar. Gestione esa operación antes de cambiar el interés.", ex);
+        }
         if (mensaje.contains("PROSPECTO_NO_ELEGIBLE|")
                 || mensaje.contains("YA_COMPRADOR|")
                 || mensaje.contains("ASESOR_INVALIDO|")

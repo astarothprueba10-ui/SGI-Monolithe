@@ -1851,6 +1851,9 @@ export const crmBackend = {
   },
 
   /** Política inmutable para esta venta: conserva la versión de una separación vigente. */
+  cambiarInteresProyecto: (idProspecto: number, idProyecto: number, idProyectoAnterior: number, motivo: string) =>
+    coreApi.post<{ idInteres: number; idSeguimiento: number }>(
+      `/crm/prospectos/${idProspecto}/intereses/cambio/${idProyecto}`, {idProyectoAnterior, motivo}),
   registrarInteresRecompra: (idProspecto: number, idProyecto: number) =>
     coreApi.post<{ idInteres: number; creado: boolean }>(
       `/crm/prospectos/${idProspecto}/intereses/recompra/${idProyecto}`, {}),
