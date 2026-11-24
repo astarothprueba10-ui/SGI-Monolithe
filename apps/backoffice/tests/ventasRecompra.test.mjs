@@ -86,7 +86,7 @@ test('separaciones tienen lote de interés persistido y registro múltiple trans
   assert.match(sales,/lotesDisponiblesProyecto\.filter/);
   assert.match(sales,/Agregar otro lote/);
   assert.doesNotMatch(sales,/crmBackend\.registrarSeparacionesMultiples\(entradas\)/);
-  assert.match(sales,/const SEPARACION_ENVIO_DESHABILITADO = true/);
+  assert.match(sales,/const SEPARACION_ENVIO_DESHABILITADO = false/);
   assert.match(backend,/@Transactional\s+public JsonNode registrarSeparacionesMultiples/);
   assert.match(backend,/resultados\.add\(registrarSeparacion\(actor,req\)\)/);
 });
@@ -105,7 +105,7 @@ test('fase 1: preferencia CRM sin dependencia de etapa y detalle de lotes separa
 });
 
 
-test('fase 2 separa el pago acumulado de los lotes y bloquea el contrato anterior',()=>{
+test('pago acumulado usa el contrato nuevo y valida la suma de abonos',()=>{
   const panel=readFileSync(new URL('../src/components/sales/PagoSeparacionPanel.tsx',import.meta.url),'utf8');
   assert.match(sales,/validarPagosSeparacion\(pagosSeparacionResueltos,totalSeparacionSeleccion\)/);
   assert.match(sales,/SEPARACION_ENVIO_DESHABILITADO \|\| !validacionPagosSeparacion\.valido/);

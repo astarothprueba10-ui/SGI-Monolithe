@@ -56,8 +56,8 @@ import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
 import { centavosImporte, crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
-// Fase 2: no enviar pagos globales al contrato antiguo (un comprobante por lote).
-const SEPARACION_ENVIO_DESHABILITADO = true;
+// Registro acumulado habilitado tras validar y aplicar la migración 154.
+const SEPARACION_ENVIO_DESHABILITADO = false;
 type LoteAdicionalSeparacion = {
   idLote:number; codigo:string; precio:number; monto:number; dias:number; idPolitica:number;
 };
