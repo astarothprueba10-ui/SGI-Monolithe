@@ -1091,6 +1091,9 @@ export function Sales() {
         }
       }
 
+      // Evita que la próxima venta herede el origen de plano/negociación anterior.
+      setOrigenPlano(null);
+      setAsociacionAgrupadaPendiente(null);
       await fetchSalesData();
     } catch (err: unknown) {
       setConfirmacionVenta(null);
