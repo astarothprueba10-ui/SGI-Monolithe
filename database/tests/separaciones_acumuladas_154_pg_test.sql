@@ -50,4 +50,43 @@ BEGIN
  IF (rep->>'monto')::numeric<>300 THEN RAISE EXCEPTION 'La conciliación sigue exigiendo S/500';END IF;
  IF has_function_privilege('anon','public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text)','EXECUTE') OR has_table_privilege('authenticated','public.pag_separaciones_grupo_distribucion_v1','SELECT') THEN RAISE EXCEPTION 'Privilegios indebidos';END IF;
 END $$;
+
+-- Convertir dos reservas distintas a modalidades distintas sin duplicar el abono original.
+DO $$
+DECLARE r1 bigint;r2 bigint;v1 bigint;v2 bigint;c1 bigint;c2 bigint;pl bigint;pg bigint;x jsonb;g uuid:='00000000-0000-4000-8000-000000000001';
+BEGIN
+ SELECT r.id_reserva INTO STRICT r1 FROM public.ven_reservas r WHERE r.id_lote=101;
+ SELECT r.id_reserva INTO STRICT r2 FROM public.ven_reservas r WHERE r.id_lote=102;
+ SELECT a.id_pago INTO STRICT pg FROM public.pag_separaciones_grupo_abonos_v1 a WHERE a.id_grupo=g;
+ IF public.fn_crm_reserva_acreditable_v1(r1)<>500 OR public.fn_crm_reserva_acreditable_v1(r2)<>500 THEN RAISE EXCEPTION 'Crédito individual incorrecto'; END IF;
+ INSERT INTO public.ven_ventas(id_lote,id_reserva,id_estado_venta,id_modalidad_venta,id_moneda,codigo,precio_venta,precio_lista,descuento)
+ VALUES(101,r1,1,1,1,'TEST-VTA-1',30000,30000,0) RETURNING id_venta INTO v1;
+ INSERT INTO public.ven_ventas_clientes(id_venta,id_cliente,titular) VALUES(v1,1,true);
+ UPDATE public.ven_reservas SET id_estado_reserva=5 WHERE id_reserva=r1;
+ INSERT INTO public.ven_contratos(id_venta,id_estado_contrato,codigo) VALUES(v1,2,'TEST-CON-1') RETURNING id_contrato INTO c1;
+ INSERT INTO public.ven_contratos_aprobaciones(id_contrato,firma_revisada) VALUES(c1,true);
+ UPDATE public.ven_ventas SET id_estado_venta=2 WHERE id_venta=v1;
+ x:=public.sp_crm_aplicar_separacion_a_venta_v1(1,v1);
+ IF (x->>'montoAplicado')::numeric<>500 OR (x->>'saldoPendienteVenta')::numeric<>29500 THEN RAISE EXCEPTION 'Saldo contado incorrecto'; END IF;
+ IF public.fn_sep_grupo_pago_aplicado_v1(pg)<>500 OR public.fn_crm_reserva_acreditable_v1(r2)<>500 THEN RAISE EXCEPTION 'La primera venta consume el segundo lote'; END IF;
+ IF public.sp_crm_aplicar_separacion_a_venta_v1(1,v1)->>'estado'<>'YA_APLICADO' THEN RAISE EXCEPTION 'Crédito no idempotente'; END IF;
+ INSERT INTO public.ven_ventas(id_lote,id_reserva,id_estado_venta,id_modalidad_venta,id_moneda,codigo,precio_venta,precio_lista,descuento)
+ VALUES(102,r2,1,2,1,'TEST-VTA-2',30000,30000,0) RETURNING id_venta INTO v2;
+ INSERT INTO public.ven_ventas_clientes(id_venta,id_cliente,titular) VALUES(v2,1,true);
+ UPDATE public.ven_reservas SET id_estado_reserva=5 WHERE id_reserva=r2;
+ INSERT INTO public.ven_contratos(id_venta,id_estado_contrato,codigo) VALUES(v2,2,'TEST-CON-2') RETURNING id_contrato INTO c2;
+ INSERT INTO public.ven_contratos_aprobaciones(id_contrato,firma_revisada) VALUES(c2,true);
+ INSERT INTO public.pag_planes_pago(id_venta,id_estado_plan_pago,monto_inicial,monto_reserva_aplicada,capital_financiado,es_vigente)
+ VALUES(v2,2,4500,500,25000,true) RETURNING id_plan_pago INTO pl;
+ UPDATE public.ven_ventas SET id_estado_venta=2 WHERE id_venta=v2;
+ x:=public.sp_crm_aplicar_separacion_a_venta_v1(1,v2);
+ IF (x->>'montoAplicado')::numeric<>500 OR (x->>'saldoPendienteInicial')::numeric<>4500 OR (x->>'capitalFinanciado')::numeric<>25000 THEN RAISE EXCEPTION 'Saldo financiado incorrecto'; END IF;
+ IF public.fn_sep_grupo_pago_aplicado_v1(pg)<>1000 OR public.fn_sep_credito_venta_confirmado_v1(v1,r1)<>500 OR public.fn_sep_credito_venta_confirmado_v1(v2,r2)<>500 THEN RAISE EXCEPTION 'Crédito total incorrecto'; END IF;
+ IF (SELECT count(*) FROM public.pag_pagos WHERE id_pago=pg AND monto=1000 AND id_venta IS NULL AND id_plan_pago IS NULL)<>1 OR (SELECT count(*) FROM public.fin_movimientos WHERE id_pago=pg AND monto=1000)<>1 THEN RAISE EXCEPTION 'Cobranza original alterada o duplicada'; END IF;
+ BEGIN
+  PERFORM public.sp_crm_aplicar_separacion_a_venta_v1(2,v2);
+  RAISE EXCEPTION 'Se admitió actor no autorizado';
+ EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'DENEGADO|%' THEN RAISE; END IF; END;
+ IF (public.fn_crm_resumen_financiero_anulacion_v1('VENTA',v2)->>'creditoDistribuido')::numeric<>500 THEN RAISE EXCEPTION 'La anulación no reconoce el crédito del lote'; END IF;
+END $$;
 ROLLBACK;
