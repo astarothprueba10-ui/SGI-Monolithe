@@ -9,7 +9,7 @@ export type ResultadoRevision = 'CONFORME' | 'OBSERVADA' | 'NO_PROCEDE';
 export type AccionGerencia =
   'INICIAR_REVISION' | 'DERIVAR_FINANZAS' | 'DERIVAR_LEGAL' | 'APROBAR' | 'RECHAZAR';
 export type CategoriaMotivo =
-  'DESISTIMIENTO_CLIENTE' | 'MUTUO_ACUERDO' | 'ERROR_COMERCIAL' | 'INCUMPLIMIENTO' | 'OTRO';
+  'DESISTIMIENTO_CLIENTE' | 'MUTUO_ACUERDO' | 'ERROR_COMERCIAL' | 'INCUMPLIMIENTO' | 'OTRO' | 'PLAZO_VENCIDO';
 export type TipoDocumentoLegal =
   'INFORME_LEGAL' | 'ACUERDO_RESOLUCION' | 'CARTA_NOTARIAL' | 'OTRO_SUSTENTO';
 
@@ -31,7 +31,7 @@ export interface SolicitudAnulacion {
   estado: EstadoSolicitud;
   requiereRevisionFinanciera: boolean;
   requiereRevisionLegal: boolean;
-  idUsuarioSolicitante: number;
+  idUsuarioSolicitante: number | null;
   idUsuarioDecision: number | null;
   idUsuarioEjecucion: number | null;
   justificacionDecision: string | null;

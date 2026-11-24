@@ -126,7 +126,7 @@ const ESTADOS_SEPARACION = {
     punto: 'bg-emerald-500'
   },
   VENCIDA: {
-    etiqueta: 'Vencida',
+    etiqueta: 'Anulada',
     estilo: 'bg-red-50 text-red-800 border-red-200',
     punto: 'bg-red-500'
   },
@@ -1379,10 +1379,12 @@ export function Sales() {
       || Number(formSaleInstallments) < cuotasMinimas
       || Number(formSaleInstallments) > cuotasMaximas);
 
-  const separacionesPlazoVencido = salesList.filter(s =>
-    s.type === 'Separación' &&
-    leyendaVencimiento(s.expiresAtIso, s.status, instanteActual) === 'Vencida'
-  ).length;
+  const lotesVencidos = (s: Sale) => s.groupedLots?.length
+    ? s.groupedLots.filter(l => l.estado === 'VENCIDA').map(l => l.lote)
+    : s.status === 'VENCIDA' ? [s.lot] : [];
+  const operacionesVencidas = salesList.filter(s => s.type === 'Separación' && lotesVencidos(s).length > 0);
+  const separacionesPlazoVencido = operacionesVencidas.length;
+  const codigosLotesLiberados = Array.from(new Set(operacionesVencidas.flatMap(lotesVencidos)));
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
@@ -1691,12 +1693,10 @@ export function Sales() {
       />
 
       {tab === 'Separación' && separacionesPlazoVencido > 0 && (
-        <Alert tone="warning" title="Separaciones con plazo vencido" className="mb-4">
-          Hay {separacionesPlazoVencido} {separacionesPlazoVencido === 1 ? 'separación' : 'separaciones'}
-          {' '}con fecha vencida dentro de tu cartera. El estado almacenado puede seguir siendo
-          Pendiente o Vigente; el lote no debe liberarse ni el pago anularse sin revisión
-          comercial y financiera documentada. Revisa la fecha en el detalle de cada separación.
-        </Alert>
+        <div role="status" className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Hay {separacionesPlazoVencido} {separacionesPlazoVencido === 1 ? 'separación con fecha vencida' : 'separaciones con fecha vencida'} dentro de tu cartera. {codigosLotesLiberados.length === 1 ? 'El lote' : 'Los lotes'} {codigosLotesLiberados.join(', ')} {codigosLotesLiberados.length === 1 ? 'ha sido liberado' : 'han sido liberados'}.</span>
+        </div>
       )}
 
       {tab === 'Agrupadas' && (
@@ -1984,7 +1984,11 @@ export function Sales() {
                     </TD>
                     <TD className="whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {(sale.groupedLots?.length?sale.groupedLots.map(l=>l.lote):[sale.lot||'—']).map(lote=><span key={lote} className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">{lote}</span>)}
+                        {sale.groupedLots && sale.groupedLots.length > 1 ? (
+                          <button type="button" onClick={() => setDetail(sale)} title="Ver todos los lotes" aria-label={`Ver los ${sale.groupedLots.length} lotes de ${sale.code}`} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-brand-800 hover:bg-brand-100">
+                            Varios ({sale.groupedLots.length}) <EyeIcon className="h-3.5 w-3.5" />
+                          </button>
+                        ) : <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">{sale.groupedLots?.[0]?.lote || sale.lot || '—'}</span>}
                       </div>
                     </TD>
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
@@ -2002,9 +2006,9 @@ export function Sales() {
                     <TD>
                       <div className="flex flex-col items-start gap-1.5">
                         <EstadoSeparacionBadge estado={sale.status} />
-                        {leyendaVencimiento(sale.expiresAtIso, sale.status, instanteActual) === 'Vencida' && (
+                        {lotesVencidos(sale).length > 0 && (
                           <span role="status" className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">
-                            Plazo vencido · revisar
+                            Plazo vencido
                           </span>
                         )}
                       </div>
@@ -2180,7 +2184,7 @@ export function Sales() {
                           {textoVencimientoDetalle && (
                             <span className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700"
                               role="status" aria-live="polite">
-                              {textoVencimientoDetalle}
+                              {detail.status === 'VENCIDA' ? 'Plazo vencido' : textoVencimientoDetalle}
                             </span>
                           )}
                         </div>

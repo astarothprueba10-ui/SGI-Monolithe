@@ -282,7 +282,7 @@ export function Anulaciones() {
       </div>} />
 
     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      Una solicitud o dictamen favorable no cancela pagos, ventas ni contratos, ni libera automáticamente el lote.
+      Las solicitudes manuales requieren revisión. Las separaciones vencidas se anulan automáticamente sin modificar pagos ni comprobantes.
     </div>
 
     <Tabs active={tab} className="mb-4" items={pestañas}
@@ -421,7 +421,7 @@ export function Anulaciones() {
           <ul className="max-h-48 space-y-2 overflow-y-auto text-xs text-brand-600">
             {historial.filter((h) => h.idSolicitud === seleccion.idSolicitud)
               .map((h) => <li key={h.idHistorial} className="border-b border-brand-100 pb-2">
-                {fecha(h.fechaEvento)} · {h.evento.replace(/_/g,' ')} · Usuario #{h.idUsuarioActor ?? '—'}
+                {fecha(h.fechaEvento)} · {h.evento.replace(/_/g,' ')} · {h.origen === 'SISTEMA' ? 'Sistema' : `Usuario #${h.idUsuarioActor ?? '—'}`}
               </li>)}
           </ul>
         </Card>}

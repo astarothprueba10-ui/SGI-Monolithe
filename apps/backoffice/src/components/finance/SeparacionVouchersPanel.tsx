@@ -325,7 +325,7 @@ export function SeparacionVouchersPanel() {
             <p><span className="font-semibold text-brand-950">Monto:</span> {currency(approvingItem.monto)} PEN</p>
             <p><span className="font-semibold text-brand-950">Metodo:</span> {approvingItem.nombre_metodo_pago || approvingItem.metodo_pago} {approvingItem.numero_operacion ? `(OP: ${approvingItem.numero_operacion})` : ''}</p>
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900">
-              {approvingItem.id_grupo?'Se confirma este abono. Las reservas pasan a VIGENTE cuando todos los abonos se aprueban y no han vencido.':'Al aprobar, el voucher pasa a APROBADO, el pago a CONFIRMADO y la reserva a VIGENTE.'}
+              {approvingItem.id_grupo?'Se confirma este abono. Las reservas pasan a VIGENTE cuando todos los abonos se aprueban y no han vencido.':'Al aprobar, se confirma el pago. Si la reserva venció, permanece anulada; en caso contrario pasa a VIGENTE.'}
             </div>
           </div>
         )}

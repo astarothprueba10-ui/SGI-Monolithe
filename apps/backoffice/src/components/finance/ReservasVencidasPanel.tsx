@@ -23,19 +23,17 @@ export function ReservasVencidasPanel(){
   },[revision]);
   return <div className="space-y-4">
     <Alert tone="warning" title="Protección de dinero y disponibilidad de lotes">
-      Una separación vencida con pago confirmado o pendiente de revisión no puede liberar
-      el lote ni anular dinero automáticamente. Debe resolverse formalmente por las áreas
-      Comercial y Finanzas, con evidencia y trazabilidad.
+      La separación vencida se anula y libera el lote automáticamente. Los pagos y comprobantes se conservan para su revisión financiera.
     </Alert>
     <Card>
       <CardHeader title="Separaciones con plazo vencido"
-        description="Diagnóstico de reservas aún registradas como Pendiente o Vigente, con evidencia de pagos."
+        description="Separaciones fuera de plazo y sus pagos registrados; la anulación comercial no revierte dinero."
         actions={<Button variant="secondary" icon={RefreshCwIcon}
           disabled={loading} onClick={()=>setRevision(n=>n+1)}>Actualizar</Button>}/>
       {error&&<div className="p-4"><Alert tone="danger" title="Error al consultar separaciones">{error}</Alert></div>}
       {loading&&<p className="p-5 text-sm text-brand-500">Consultando separaciones vencidas…</p>}
       {!loading&&!error&&datos?.items.length===0&&
-        <EmptyState title="Sin reservas vencidas" description="No existen separaciones abiertas fuera de plazo."/>}
+        <EmptyState title="Sin reservas vencidas" description="No existen separaciones fuera de plazo."/>}
       {!loading&&!error&&Boolean(datos?.items.length)&&<div className="overflow-x-auto">
         <Table head={<>
           <TH>Reserva</TH><TH>Proyecto / lote</TH><TH>Venció</TH>
@@ -49,15 +47,15 @@ export function ReservasVencidasPanel(){
               <span className="block text-xs text-brand-500">Lote: {item.estadoLote}</span>
             </TD>
             <TD className="whitespace-nowrap text-red-700">{fecha(item.fechaVencimiento)}</TD>
-            <TD>{item.estadoReserva}</TD>
+            <TD>{item.estadoReserva === 'VENCIDA' ? 'Anulada · Plazo vencido' : item.estadoReserva}</TD>
             <TD align="right" className="whitespace-nowrap">{currency(item.montoReserva)}</TD>
             <TD align="right" className="whitespace-nowrap">{currency(item.montoConfirmado)}</TD>
             <TD>
               {item.requiereRevision?
                 <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
-                  Retenida · requiere revisión
+                  Requiere revisión financiera
                 </span>:
-                <span className="text-xs text-brand-600">Sin pagos activos; pendiente de regularización</span>}
+                <span className="text-xs text-brand-600">Sin pagos activos</span>}
               {item.pagosEnRevision>0&&<p className="mt-1 text-xs text-amber-800">
                 {item.pagosEnRevision} pago(s) en revisión
               </p>}
