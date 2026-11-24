@@ -321,7 +321,7 @@ public class CrmVentaService {
     private void validarDatosSeparacion(RegistrarSeparacionCrmRequest req) {
         if (req == null || req.idProspecto() == null || req.idProspecto() <= 0
                 || req.idLote() == null || req.idLote() <= 0
-                || req.monto() == null || req.monto().compareTo(new java.math.BigDecimal("500.00")) != 0
+                || req.monto() == null || req.monto().signum() <= 0 || req.monto().stripTrailingZeros().scale() > 2
                 || req.metodoPago() == null || req.metodoPago().isBlank()
                 || req.claveArchivo() == null || req.claveArchivo().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de separacion invalidos.");

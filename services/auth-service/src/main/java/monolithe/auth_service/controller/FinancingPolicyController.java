@@ -44,6 +44,14 @@ public class FinancingPolicyController {
             .body(service.consultarActual(jwt));
     }
 
+    @GetMapping("/projects/{idProyecto}")
+    @PreAuthorize("hasAuthority('financing.configure')")
+    public ResponseEntity<JsonNode> consultarProyecto(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long idProyecto) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .body(service.consultarProyecto(jwt,idProyecto));
+    }
+
     @PostMapping("/preview")
     @PreAuthorize("hasAuthority('financing.configure')")
     public ResponseEntity<JsonNode> vistaPrevia(@AuthenticationPrincipal Jwt jwt,
