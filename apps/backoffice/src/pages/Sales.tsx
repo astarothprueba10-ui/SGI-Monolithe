@@ -13,7 +13,7 @@ import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
-import { currency } from '../utils/format';
+import { formatSoles } from '../utils/financeMoney';
 import { salesService } from '../services/salesService';
 import {
   crmBackend,
@@ -1173,12 +1173,12 @@ export function Sales() {
   }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
       formSaleDownPayment, formSaleInstallments, reservaAplicable, condicionesVenta, inicialMinimaVigente]);
 
-  const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
+  const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA' && condicionesVenta
     ? validarInicialTotal(
         formSaleDownPayment,
         precioLote ? Number(precioLote.precio) : null,
         reservaAplicable,
-        condicionesVenta ?? undefined
+        condicionesVenta
       )
     : null;
   const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
@@ -1785,7 +1785,7 @@ export function Sales() {
                       </span>
                     </TD>
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
-                      {currency(sale.amount)}
+                      {formatSoles(sale.amount)}
                     </TD>
                     <TD className="min-w-[155px]">
                       <span className="inline-flex items-center gap-1.5 text-xs text-brand-700">
@@ -1845,7 +1845,7 @@ export function Sales() {
                     </TD>
 
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
-                      {currency(sale.amount)}
+                      {formatSoles(sale.amount)}
                     </TD>
 
                     <TD className="whitespace-nowrap text-xs text-brand-700">
@@ -1931,7 +1931,7 @@ export function Sales() {
                 <p className="text-xs text-brand-500">
                   {detail.type === 'Separación' ? 'Monto de separación' : 'Monto de venta'}
                 </p>
-                <p className="text-2xl font-bold tabular-nums text-brand-900">{currency(detail.amount)}</p>
+                <p className="text-2xl font-bold tabular-nums text-brand-900">{formatSoles(detail.amount)}</p>
                 {detail.type === 'Separación'
                   ? <EstadoSeparacionBadge estado={detail.status} />
                   : <EstadoVentaBadge estado={detail.status} />}
@@ -2070,7 +2070,7 @@ export function Sales() {
           <form onSubmit={handleProcessOperation} className="space-y-4">
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Prospecto (CRM) *
+                Cliente (CRM) *
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
@@ -2080,10 +2080,10 @@ export function Sales() {
                   )
                 }
               >
-                <option value="">Seleccione un prospecto del CRM...</option>
+                <option value="">Seleccione un cliente del CRM...</option>
                 {prospectsList.map((prospect) => (
                   <option key={prospect.id_prospecto} value={prospect.id_prospecto}>
-                    {prospect.nombre_completo} ({prospect.codigo}) - {prospect.estado_nombre}
+                    {prospect.nombre_completo} ({prospect.codigo}) - {prospect.categoria === 'COMPRADOR' ? 'Comprador' : prospect.estado_nombre}
                   </option>
                 ))}
               </Select>
@@ -2238,7 +2238,7 @@ export function Sales() {
                       {opType === 'Venta' && reservaAplicable > 0 && (
                         <div className="mt-3 flex items-center justify-between border-t border-brand-200 pt-3 text-sm">
                           <span className="font-medium text-emerald-800">Pago de reserva acreditado</span>
-                          <span className="font-bold tabular-nums text-emerald-800">− {currency(reservaAplicable)}</span>
+                          <span className="font-bold tabular-nums text-emerald-800">− {formatSoles(reservaAplicable)}</span>
                         </div>
                       )}
                     </>
@@ -2284,7 +2284,7 @@ export function Sales() {
                   </p>
                 ) : errorPolitica ? (
                   <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                    No se pudieron cargar las condiciones financieras: {errorPolitica}. Selecciona nuevamente el lote.
+                    No se pudieron verificar las condiciones financieras: {errorPolitica}
                   </p>
                 ) : condicionesVenta ? (
                   <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
@@ -2421,7 +2421,7 @@ export function Sales() {
                   </Select>
                 </div>
 
-                {formSaleModality === 'FINANCIADA' && (
+                {formSaleModality === 'FINANCIADA' && condicionesVenta && (
                   <div className="space-y-3 rounded-xl border border-brand-100 bg-white p-3 sm:p-4">
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
                       <div className="min-w-0">
@@ -2495,7 +2495,7 @@ export function Sales() {
                       <div>
                         <p className="text-xs font-semibold text-sky-900">Interés nominal anual fijo</p>
                         <p className="mt-0.5 text-[11px] text-sky-700">
-                          Equivalente nominal mensual: {((condicionesVenta?.tasaNominalAnualPct ?? 0) / 12).toFixed(4)} %. No modificable por el asesor.
+                          Equivalente nominal mensual: {(condicionesVenta.tasaNominalAnualPct / 12).toFixed(4)} %. No modificable por el asesor.
                         </p>
                       </div>
                       <strong className="text-xl font-bold tabular-nums text-sky-900">
@@ -2514,14 +2514,14 @@ export function Sales() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <dt className="text-brand-600">Precio oficial</dt>
                         <dd className="font-semibold tabular-nums text-brand-900">
-                          {currency(resumenVenta.precioOficial)}
+                          {formatSoles(resumenVenta.precioOficial)}
                         </dd>
                       </div>
                       {resumenVenta.abonoReserva > 0 && (
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <dt className="text-emerald-700">Pago de reserva acreditado</dt>
                           <dd className="font-semibold tabular-nums text-emerald-800">
-                            − {currency(resumenVenta.abonoReserva)}
+                            − {formatSoles(resumenVenta.abonoReserva)}
                           </dd>
                         </div>
                       )}
@@ -2529,7 +2529,7 @@ export function Sales() {
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
                           <dt className="font-semibold text-brand-900">Saldo por pagar al contado</dt>
                           <dd className="text-lg font-bold tabular-nums text-brand-900">
-                            {currency(resumenVenta.saldoContado)}
+                            {formatSoles(resumenVenta.saldoContado)}
                           </dd>
                         </div>
                       ) : (
@@ -2537,33 +2537,33 @@ export function Sales() {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Inicial total pactada</dt>
                             <dd className="font-semibold tabular-nums text-brand-800">
-                              {currency(resumenVenta.inicialTotal)}
+                              {formatSoles(resumenVenta.inicialTotal)}
                             </dd>
                           </div>
                           {resumenVenta.abonoReserva > 0 && (
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <dt className="text-brand-600">Inicial adicional por completar después de la separación</dt>
                               <dd className="font-semibold tabular-nums text-brand-800">
-                                − {currency(resumenVenta.inicialAdicional)}
+                                − {formatSoles(resumenVenta.inicialAdicional)}
                               </dd>
                             </div>
                           )}
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Capital financiado</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
-                              {currency(resumenVenta.capitalFinanciado)}
+                              {formatSoles(resumenVenta.capitalFinanciado)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Intereses totales ({condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual)</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
-                              {currency(resumenVenta.interesTotal)}
+                              {formatSoles(resumenVenta.interesTotal)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
                             <dt className="font-semibold text-brand-800">Total de cuotas</dt>
                             <dd className="font-bold tabular-nums text-brand-900">
-                              {currency(resumenVenta.totalCuotas)}
+                              {formatSoles(resumenVenta.totalCuotas)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2571,7 +2571,7 @@ export function Sales() {
                               Precio final incluyendo intereses
                             </dt>
                             <dd className="text-lg font-bold tabular-nums text-brand-900">
-                              {currency(resumenVenta.totalOperacionConIntereses)}
+                              {formatSoles(resumenVenta.totalOperacionConIntereses)}
                             </dd>
                           </div>
                         </>
@@ -2581,10 +2581,10 @@ export function Sales() {
                       <div className="rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white p-3 sm:p-4">
                         <p className="text-xs font-semibold text-sky-900">Cuota mensual fija</p>
                         <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-900 sm:text-3xl">
-                          {currency(resumenVenta.cuotaMensual)}
+                          {formatSoles(resumenVenta.cuotaMensual)}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-brand-600">
-                          <span>Ajuste última cuota: <strong>{currency(
+                          <span>Ajuste última cuota: <strong>{formatSoles(
                             resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0
                           )}</strong></span>
                           <span>{resumenVenta.cuotas.length} cuotas mensuales</span>
@@ -2598,9 +2598,12 @@ export function Sales() {
                   </section>
                 ) : (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-                    {formSaleModality === 'FINANCIADA'
-                      ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
-                      : 'Seleccione un lote con precio oficial vigente para consultar el saldo.'}
+                    {!formLotId ? 'Seleccione un lote para consultar las condiciones.'
+                      : consultandoPolitica ? 'Consultando política financiera…'
+                      : !condicionesVenta ? 'No se puede calcular la operación sin condiciones financieras verificadas.'
+                      : estadoPrecio !== 'disponible' ? 'No se pudo verificar el precio oficial vigente del lote.'
+                      : formSaleModality === 'FINANCIADA' ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
+                      : 'No se pudo calcular el saldo con las condiciones disponibles.'}
                   </p>
                 )}
                 <p className="text-xs leading-relaxed text-brand-600">
@@ -2814,14 +2817,14 @@ export function Sales() {
               <div>
                 <dt className="text-brand-500">Precio de venta</dt>
                 <dd className="font-semibold text-brand-900">
-                  {currency(confirmacionVenta.datos.montoTotal)}
+                  {formatSoles(confirmacionVenta.datos.montoTotal)}
                 </dd>
               </div>
               {confirmacionVenta.resumen.abonoReserva > 0 && (
                 <div>
                   <dt className="text-emerald-700">Pago de reserva acreditado</dt>
                   <dd className="font-semibold text-emerald-800">
-                    − {currency(confirmacionVenta.resumen.abonoReserva)}
+                    − {formatSoles(confirmacionVenta.resumen.abonoReserva)}
                   </dd>
                 </div>
               )}
@@ -2829,7 +2832,7 @@ export function Sales() {
                 <div>
                   <dt className="text-brand-500">Saldo al contado</dt>
                   <dd className="font-semibold text-brand-900">
-                    {currency(confirmacionVenta.resumen.saldoContado)}
+                    {formatSoles(confirmacionVenta.resumen.saldoContado)}
                   </dd>
                 </div>
               )}
@@ -2839,7 +2842,7 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Inicial total pactada</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.datos.montoInicial ?? 0)}
+                      {formatSoles(confirmacionVenta.datos.montoInicial ?? 0)}
                     </dd>
                   </div>
 
@@ -2858,25 +2861,25 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Capital financiado</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.capitalFinanciado)}
+                      {formatSoles(confirmacionVenta.resumen.capitalFinanciado)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Cuota mensual fija (sistema francés)</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.cuotaMensual)}
+                      {formatSoles(confirmacionVenta.resumen.cuotaMensual)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Intereses totales</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.interesTotal)}
+                      {formatSoles(confirmacionVenta.resumen.interesTotal)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Total incluyendo intereses</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.totalOperacionConIntereses)}
+                      {formatSoles(confirmacionVenta.resumen.totalOperacionConIntereses)}
                     </dd>
                   </div>
                 </>
