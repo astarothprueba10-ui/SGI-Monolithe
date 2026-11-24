@@ -90,3 +90,16 @@ test('separaciones tienen lote de interés persistido y registro múltiple trans
   assert.match(backend,/@Transactional\s+public JsonNode registrarSeparacionesMultiples/);
   assert.match(backend,/resultados\.add\(registrarSeparacion\(actor,req\)\)/);
 });
+
+
+test('fase 1: preferencia CRM sin dependencia de etapa y detalle de lotes separado de pagos',()=>{
+  assert.match(sales,/const etapaConsulta = opType === 'Venta' \? formStageId : ''/);
+  assert.match(sales,/const idElegible=idPreferido\?\?idDestino/);
+  assert.match(sales,/lotesDisponiblesProyecto\.some\(l=>l\.idLote===idElegible\)/);
+  assert.match(sales,/Lotes seleccionados/);
+  const detalle=sales.slice(sales.indexOf('>Lotes seleccionados</h3>'),sales.indexOf('>Pago de la separación</h3>'));
+  assert.match(detalle,/Agregar otro lote/);
+  assert.match(detalle,/formatSoles\(l\.precio\)/);
+  assert.doesNotMatch(detalle,/type="file"|Método de pago/);
+  assert.match(sales,/Total a pagar/);
+});

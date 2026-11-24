@@ -303,6 +303,8 @@ export function Sales() {
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
     idProyecto: number; idEtapa: number; idLote: number;
   } | null>(null);
+  const etapaConsulta = opType === 'Venta' ? formStageId : '';
+  const destinoConsulta = opType === 'Venta' ? autoseleccionPendiente : null;
   const seleccionProspectoPeticionRef = React.useRef(0);
   const [voucherFile, setVoucherFile] = useState<File | null>(null);
   const [comprobantesVenta, setComprobantesVenta] = useState<File[]>([]);
@@ -693,6 +695,12 @@ export function Sales() {
         setInteresesOperacion(prev => [...new Set([
           ...prev.filter(p => !esCambioInteres || p !== origenCambioInteres), idProyecto
         ])]);
+        setPreferenciasLote(prev => {
+          const siguientes = {...prev};
+          if (esCambioInteres) delete siguientes[origenCambioInteres];
+          delete siguientes[idProyecto];
+          return siguientes;
+        });
         // Cambiar el proyecto operativo solo tras la confirmación del CRM.
         const destino = origenPlano?.idProyecto === idProyecto ? origenPlano : null;
         setAutoseleccionPendiente(destino ? {idProyecto: destino.idProyecto, idEtapa: destino.idEtapa, idLote: destino.idLote} : null);
@@ -841,7 +849,7 @@ export function Sales() {
     setEditorAdicional(false);
     setErrorAdicional('');
     setCargandoAdicional(false);
-  },[selectedProspectId,formProjectId,formStageId,formLotId,isModalOpen,revisionPolitica]);
+  },[selectedProspectId,formProjectId,formLotId,isModalOpen,revisionPolitica]);
 
   useEffect(()=>{
     setEditorLote(false);
@@ -876,7 +884,7 @@ export function Sales() {
       }
       if(solicitud!==seleccionProspectoPeticionRef.current) return;
       const etapaNueva=availableStages.find(e=>e.idLotes.includes(candidato.idLote));
-      if(etapaNueva && etapaNueva.codigo!==formStageId){
+      if(opType==='Venta' && etapaNueva && etapaNueva.codigo!==formStageId){
         setAutoseleccionPendiente({idProyecto:proyecto,idEtapa:candidato.idEtapa,idLote:candidato.idLote});
         setFormStageId(etapaNueva.codigo);
       }
@@ -900,7 +908,7 @@ export function Sales() {
         crmBackend.obtenerCondicionesVenta(selectedProspectId,lote.idLote)
       ]);
       if(revision!==revisionLotesAdicionales.current)return;
-      if(!precio||precio.idLote!==lote.idLote||!Number.isFinite(Number(precio.precio))||Number(precio.precio)<=0||
+      if(!precio||precio.idLote!==lote.idLote||precio.codigoMoneda!=='PEN'||precio.activo!==true||!Number.isFinite(Number(precio.precio))||Number(precio.precio)<=0||
         !politica||!Number.isFinite(politica.montoSeparacion)||politica.montoSeparacion<=0||
         !Number.isInteger(politica.diasVencimientoSeparacion)||politica.diasVencimientoSeparacion<1)
         throw new Error('No se pudieron verificar el precio y la política del lote.');
@@ -1492,6 +1500,10 @@ export function Sales() {
   const separacionCondicionesVerificadas = Boolean(selectedProspectId && formLotId && condicionesVenta
     && !consultandoPolitica && !errorPolitica && estadoPrecio === 'disponible'
     && precioLote?.idLote === Number(formLotId));
+  const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
+  const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
+  const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
+  const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
   const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
     ? Number(condicionesVenta.inicialFija)
     : Number(condicionesVenta?.inicialMinima ?? 0);
@@ -1549,10 +1561,7 @@ export function Sales() {
       .then(etapas => {
         if (!vigente) return;
         setAvailableStages(etapas ?? []);
-        const etapaPreferida=opType==='Separacion'&&preferenciaLote?.id
-          ? etapas.find(e=>e.idLotes.includes(preferenciaLote.id!)):undefined;
-        if(etapaPreferida)setFormStageId(etapaPreferida.codigo);
-        else if (etapas.length === 1 || (opType==='Separacion'&&etapas.length>0)) setFormStageId(etapas[0].codigo);
+        if (opType==='Venta' && etapas.length === 1) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
         if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
@@ -1566,10 +1575,10 @@ export function Sales() {
   // El acceso desde el plano o desde una reserva conserva la ubicación física,
   // pero se selecciona el grupo comercial según el identificador real del lote.
   useEffect(() => {
-    if (!autoseleccionPendiente || autoseleccionPendiente.idProyecto !== Number(formProjectId)) return;
+    if (opType!=='Venta' || !autoseleccionPendiente || autoseleccionPendiente.idProyecto !== Number(formProjectId)) return;
     const destino = availableStages.find(e => e.idLotes.includes(autoseleccionPendiente.idLote));
     if (destino) setFormStageId(destino.codigo);
-  }, [availableStages, autoseleccionPendiente, formProjectId]);
+  }, [availableStages, autoseleccionPendiente, formProjectId, opType]);
 
   useEffect(() => {
     let vigente = true;
@@ -1578,15 +1587,17 @@ export function Sales() {
     setLotesDisponiblesProyecto([]);
     setFormLotId('');
 
-    if (!formProjectId || !formStageId || !selectedProspectId) {
+    if (!formProjectId || !selectedProspectId || !proyectoConInteres || !availableStages.length || (opType==='Venta'&&!etapaConsulta)) {
       setLoadingLots(false);
       return;
     }
 
     const idProyecto = Number(formProjectId);
-    const etapa = availableStages.find(e => e.codigo === formStageId);
-    if (!etapa) { setLoadingLots(false); return; }
-    const idsEtapa = new Set(etapa.idLotes);
+    const etapa = availableStages.find(e => e.codigo === etapaConsulta);
+    if (opType==='Venta' && !etapa) { setLoadingLots(false); return; }
+    const idsEtapa = new Set(opType==='Separacion'
+      ? availableStages.flatMap(e=>e.idLotes)
+      : etapa?.idLotes ?? []);
 
     setLoadingLots(true);
 
@@ -1641,12 +1652,10 @@ export function Sales() {
         setLotesDisponiblesProyecto((lotes??[]).filter(l=>l.activo===true&&l.idProyecto===idProyecto
           &&idsProyecto.has(l.idLote)&&l.codigoEstadoLote?.toUpperCase()==='DISPONIBLE'&&idsComerciales.has(l.idLote)));
         setAvailableLots(lotesPermitidos);
-        if (autoseleccionPendiente &&
-            autoseleccionPendiente.idProyecto === idProyecto &&
-            lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
-          setFormLotId(String(autoseleccionPendiente.idLote));
-        } else if (opType==='Separacion' && preferenciaLote?.id && lotesPermitidos.some(l=>l.idLote===preferenciaLote.id)) {
-          setFormLotId(String(preferenciaLote.id));
+        if (destinoConsulta &&
+            destinoConsulta.idProyecto === idProyecto &&
+            lotesPermitidos.some((lote) => lote.idLote === destinoConsulta.idLote)) {
+          setFormLotId(String(destinoConsulta.idLote));
         }
       } catch (err: unknown) {
         if (!vigente) return;
@@ -1674,12 +1683,27 @@ export function Sales() {
     };
   }, [
     formProjectId,
-    formStageId,
+    etapaConsulta,
     selectedProspectId,
     opType,
+    proyectoConInteres,
     availableStages,
-    autoseleccionPendiente
+    destinoConsulta
   ]);
+
+  // En separación se consulta todo el inventario del proyecto, sin exigir una etapa.
+  // Solo se preselecciona una preferencia explícita del CRM si está comercializable.
+  useEffect(()=>{
+    if(opType!=='Separacion'||!isModalOpen||loadingProjects||loadingStages||loadingLots||
+        !selectedProspectId||!formProjectId||formLotId||!lotesDisponiblesProyecto.length)return;
+    const idPreferido=preferenciaLote?.id;
+    const idDestino=autoseleccionPendiente?.idProyecto===Number(formProjectId)
+      ? autoseleccionPendiente.idLote : null;
+    const idElegible=idPreferido??idDestino;
+    if(idElegible&&lotesDisponiblesProyecto.some(l=>l.idLote===idElegible))
+      setFormLotId(String(idElegible));
+  },[opType,isModalOpen,loadingProjects,loadingStages,loadingLots,selectedProspectId,formProjectId,
+    formLotId,lotesDisponiblesProyecto,preferenciaLote?.id,autoseleccionPendiente]);
 
 
 
@@ -2370,14 +2394,14 @@ export function Sales() {
         width={opType==='Separacion'?'max-w-3xl':'max-w-lg'}
         title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
-          ? 'Registra la separación según el importe vigente y adjunta su comprobante para revisión por Finanzas.'
+          ? 'Selecciona los lotes y revisa sus importes antes de registrar el pago.'
           : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             {opType==='Separacion' && separacionCondicionesVerificadas && condicionesVenta && (
               <div className="mr-auto min-w-0 py-1">
                 <p className="text-xs text-brand-500">{1+lotesAdicionales.length} lote(s) · Total separación</p>
-                <p className="text-lg font-semibold tabular-nums text-brand-900">{formatSoles(condicionesVenta.montoSeparacion+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0))}</p>
+                <p className="text-lg font-semibold tabular-nums text-brand-900">{formatSoles(totalSeparacionSeleccion)}</p>
               </div>
             )}
             <Button
@@ -2416,10 +2440,11 @@ export function Sales() {
           </div>
         ) : (
           <form onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
-            {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">01 · Cliente y proyecto</p>
-              <p className="mt-1 text-xs text-brand-500">Verifica el interés comercial antes de elegir los lotes.</p>
-            </div>}
+            {opType==='Separacion' && <header className="flex items-start gap-3 pb-1">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
+              <div><h3 className="text-sm font-semibold text-brand-900">Cliente y proyecto</h3>
+                <p className="text-xs text-brand-500">Verifica los datos registrados en CRM.</p></div>
+            </header>}
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Cliente (CRM) *
@@ -2496,7 +2521,7 @@ export function Sales() {
                   {proyectosConInteres.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
                 </Select>
               ) : (
-                <div className="min-h-11 rounded-lg border border-brand-200 bg-brand-50/40 px-3 py-2.5 text-sm text-brand-800"
+                <div className="flex items-start gap-2 py-1 text-sm font-semibold text-brand-900"
                   aria-label="Proyecto de interés registrado">
                   {loadingProjects ? 'Cargando proyecto…' : !selectedProspectId ? 'Seleccione un cliente primero'
                     : proyectosConInteres.find(p=>p.idProyecto===Number(formProjectId))?.nombre ?? 'Sin proyecto de interés activo disponible'}
@@ -2564,11 +2589,12 @@ export function Sales() {
                 )}
             </div>
 
-            {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">02 · Selección de lotes</p>
-              <p className="mt-1 text-xs text-brand-500">Elige un lote principal y, si corresponde, añade otros lotes disponibles del proyecto.</p>
-            </div>}
-            <div>
+            {opType==='Separacion' && <header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">2</span>
+              <div><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
+                <p className="text-xs text-brand-500">Revisa el lote de interés y añade otros si el cliente lo solicita.</p></div>
+            </header>}
+            {opType==='Venta' && <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Etapa comercial *
               </label>
@@ -2604,31 +2630,45 @@ export function Sales() {
                     No hay etapas comerciales con lotes disponibles o reservas autorizadas.
                   </p>
                 )}
-            </div>
+            </div>}
 
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-brand-700">
-
-                {opType === 'Venta' ? 'Lote disponible o reservado para el comprador *' : 'Lote disponible *'}
-
-              </label>
+              {opType==='Venta' && <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Lote disponible o reservado para el comprador *
+              </label>}
 
               {opType==='Separacion' ? <div className="space-y-2">
-                <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
-                  <p className="text-xs text-brand-600">{preferenciaLote?.id&&Number(formLotId)===preferenciaLote.id?'Lote de interés en CRM':'Lote principal'}</p>
-                  <p className="mt-1 text-sm font-semibold text-brand-900">{availableLots.find(l=>l.idLote===Number(formLotId))?.codigo
-                    ??preferenciaLote?.codigo??'Sin lote identificado'}</p>
-                  {preferenciaLote?.comentario&&!preferenciaLote.id&&<p className="mt-1 text-xs text-brand-500">Referencia anterior en CRM: {preferenciaLote.comentario}. Confirme el lote exacto.</p>}
-                  {preferenciaLote?.id&&!formLotId&&!loadingLots&&<p className="mt-1 text-xs text-amber-700">El lote registrado no está disponible en esta etapa. Seleccione uno disponible.</p>}
-                </div>
+                {(loadingProjects||loadingStages||loadingLots) ? <p role="status" className="py-3 text-sm text-brand-500">Consultando interés e inventario del proyecto…</p>
+                : lotePrincipal ? <div className="rounded-xl border border-brand-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-brand-600">{preferenciaLote?.id===lotePrincipal.idLote?'Lote de interés · Principal':'Lote principal de la operación'}</p>
+                      <p className="mt-1 text-base font-bold text-brand-900">{lotePrincipal.codigo}</p>
+                      <p className="text-xs text-brand-500">{lotePrincipal.nombreManzana??''} · {lotePrincipal.areaM2??0} m²</p>
+                      <p className="text-xs text-brand-500">{nombreEtapaLote(lotePrincipal.idLote)??'Etapa comercial no identificada'}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-brand-500">Precio oficial</p>
+                      {estadoPrecio==='disponible'&&precioLote?.idLote===lotePrincipal.idLote
+                        ? <p className="text-base font-bold tabular-nums text-brand-900">{formatSoles(Number(precioLote.precio))}</p>
+                        : <p className="text-xs text-brand-600">{estadoPrecio==='error'||estadoPrecio==='sin_precio'?'Precio no verificado':'Consultando precio…'}</p>}
+                      {separacionCondicionesVerificadas&&condicionesVenta&&<p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(condicionesVenta.montoSeparacion)}</strong></p>}
+                    </div>
+                  </div>
+                </div> : <div role="status" className="py-2 text-sm text-brand-700">
+                  {preferenciaLote?.id ? <>
+                    <p className="font-semibold">Lote de interés en CRM: {preferenciaLote.codigo??'Lote registrado'}</p>
+                    <p className="mt-1 text-xs text-amber-700">No está disponible para una nueva separación. Puedes elegir otro lote.</p>
+                  </> : <p>{selectedProspectId&&formProjectId?'El cliente aún no tiene un lote de interés identificado en CRM. Selecciona el lote principal.':'Selecciona un cliente y su proyecto para consultar el lote de interés.'}</p>}
+                </div>}
                 {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
-                  disabled={!formStageId||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional}
+                  disabled={!formProjectId||loadingProjects||loadingStages||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional||editorAdicional||editorInteres}
                   onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?(puedeEditarInteres?'Cambiar lote de interés':'Elegir otro lote para esta operación'):'Seleccionar lote'}</Button>}
                 {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
                   <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
                   <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>
                     <option value="">Seleccione un lote</option>
-                    {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m²</option>)}
+                    {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
                   </Select>
                   {puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&<label className="block text-xs font-medium text-brand-700">Motivo del registro o cambio *
                     <textarea rows={2} maxLength={500} className="mt-1 w-full rounded-lg border border-brand-200 p-2" value={motivoLote} disabled={guardandoLote}
@@ -2643,6 +2683,42 @@ export function Sales() {
                       onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
                   </div>
                 </div>}
+                {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-xl border border-brand-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-brand-600">Lote adicional</p>
+                      <p className="mt-1 text-base font-bold text-brand-900">{l.codigo}</p>
+                      <p className="text-xs text-brand-500">{nombreEtapaLote(l.idLote)??'Etapa comercial no identificada'}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-brand-500">Precio oficial</p>
+                      <p className="text-base font-bold tabular-nums text-brand-900">{formatSoles(l.precio)}</p>
+                      <p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(l.monto)}</strong></p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-end"><Button type="button" size="sm" variant="secondary" disabled={submitting||guardandoLote||cargandoAdicional||editorLote} onClick={()=>setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote))}>Quitar lote</Button></div>
+                </div>)}
+                {separacionCondicionesVerificadas&&condicionesVenta&&!editorLote&&<>
+                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} className="w-full sm:w-auto" disabled={submitting||lotesAdicionales.length>=19||!lotesDisponiblesProyecto.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
+                    onClick={()=>{setErrorAdicional('');setEditorAdicional(true)}}>Agregar otro lote</Button>}
+                  {editorAdicional&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
+                    <label className="block text-xs font-medium">Lote adicional
+                      <Select className="mt-1" value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
+                        <option value="">Seleccione otro lote disponible</option>
+                        {lotesDisponiblesProyecto.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
+                      </Select>
+                    </label>
+                    {errorAdicional&&<Alert tone="danger" title="No se pudo añadir el lote">{errorAdicional}</Alert>}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button type="button" variant="secondary" disabled={cargandoAdicional} onClick={()=>{setEditorAdicional(false);setCandidatoAdicional('');setErrorAdicional('')}}>Cancelar</Button>
+                      <Button type="button" disabled={!candidatoAdicional||cargandoAdicional} onClick={()=>void agregarLoteAdicional()}>{cargandoAdicional?'Verificando…':'Añadir lote'}</Button>
+                    </div>
+                  </div>}
+                  <div className="flex flex-wrap justify-between gap-2 border-t border-brand-100 pt-3 text-sm">
+                    <span>{1+lotesAdicionales.length} lote(s) · Precio total referencial</span>
+                    <strong className="tabular-nums">{formatSoles(totalPrecioSeleccion)}</strong>
+                  </div>
+                </>}
               </div> : <Select
                 value={formLotId}
                 disabled={!formProjectId || !formStageId || loadingLots}
@@ -2673,7 +2749,7 @@ export function Sales() {
 
               </Select>}
 
-              {formLotId && (
+              {opType==='Venta' && formLotId && (
                 <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
                   <p className="text-xs font-medium text-brand-600">
                     Precio oficial del lote
@@ -2721,14 +2797,14 @@ export function Sales() {
                 </div>
               )}
 
-              {formStageId &&
+              {(opType==='Venta'?Boolean(formStageId):Boolean(formProjectId&&proyectoConInteres&&!loadingStages&&!loadingProjects)) &&
                 !loadingLots &&
                 availableLots.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
 
                     {opType === 'Venta'
                       ? 'No hay lotes disponibles ni reservas autorizadas en esta etapa.'
-                      : 'No hay lotes disponibles en esta etapa.'}
+                      : 'No hay lotes comercializables disponibles en este proyecto.'}
                   </p>
                 )}
 
@@ -2764,44 +2840,16 @@ export function Sales() {
             )}
             {opType === 'Separacion' ? (
               separacionCondicionesVerificadas && condicionesVenta ? <>
-                <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div><p className="font-semibold text-sm text-brand-900">Lotes de la separación</p><p className="text-xs text-brand-500">Cada lote genera una reserva y un pago independiente.</p></div>
-                    <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold">{1+lotesAdicionales.length} lote(s)</span>
-                  </div>
-                  <div className="flex justify-between gap-2 rounded-lg bg-brand-50/40 p-2 text-sm"><span>{availableLots.find(l=>l.idLote===Number(formLotId))?.codigo} · Principal</span><strong>{formatSoles(condicionesVenta.montoSeparacion)}</strong></div>
-                  {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-lg border border-brand-100 p-3 space-y-2">
-                    <div className="flex flex-wrap justify-between gap-2"><div><strong>{l.codigo}</strong><p className="text-xs text-brand-500">Precio {formatSoles(l.precio)} · {l.dias} días</p></div>
-                      <div className="flex items-center gap-2"><strong>{formatSoles(l.monto)}</strong><Button type="button" size="sm" variant="secondary" disabled={submitting} onClick={()=>setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote))}>Quitar</Button></div></div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="text-xs font-medium">Método de pago<Select value={l.metodo} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{metodo:e.target.value as CrmSeparacionInput['metodoPago'],referencia:''})}>
-                        <option value="TRANSFERENCIA">Transferencia bancaria</option><option value="DEPOSITO">Depósito</option><option value="YAPE_PLIN">Yape / Plin</option><option value="EFECTIVO">Efectivo</option><option value="OTRO">Otro</option>
-                      </Select></label>
-                      {l.metodo!=='EFECTIVO'&&<label className="text-xs font-medium">N° de operación<Input value={l.referencia} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{referencia:e.target.value})}/></label>}
-                    </div>
-                    <label className="block text-xs font-medium">Comprobante propio (máx. 5 MB)<input type="file" accept=".pdf,image/jpeg,image/png,image/webp" disabled={submitting}
-                      className="mt-1 block w-full text-xs" onChange={e=>{
-                        const archivo=e.target.files?.[0]??null;e.target.value='';
-                        if(archivo&&(!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.size<1||archivo.size>5242880)){
-                          toast.error('Archivo no permitido o mayor de 5 MB.');return;
-                        }
-                        editarPagoAdicional(l.idLote,{archivo});
-                      }}/><span className="block text-brand-500">{l.archivo?.name??'Sin comprobante'}</span></label>
-                  </div>)}
-                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} disabled={submitting||lotesAdicionales.length>=19||!lotesDisponiblesProyecto.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
-                    onClick={()=>setEditorAdicional(true)}>Agregar otro lote</Button>}
-                  {editorAdicional&&<div className="space-y-2">
-                    <Select value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
-                      <option value="">Seleccione otro lote disponible</option>
-                      {lotesDisponiblesProyecto.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m²</option>)}
-                    </Select>
-                    {errorAdicional&&<Alert tone="danger" title="No se pudo añadir el lote">{errorAdicional}</Alert>}
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button type="button" variant="secondary" disabled={cargandoAdicional} onClick={()=>setEditorAdicional(false)}>Cancelar</Button>
-                      <Button type="button" disabled={!candidatoAdicional||cargandoAdicional} onClick={()=>void agregarLoteAdicional()}>{cargandoAdicional?'Verificando…':'Añadir lote'}</Button>
-                    </div>
-                  </div>}
-                  <div className="flex justify-between border-t border-brand-100 pt-3 text-sm"><strong>Total de separación</strong><strong className="tabular-nums">{formatSoles(condicionesVenta.montoSeparacion+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0))}</strong></div>
+                <header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">3</span>
+                  <div><h3 className="text-sm font-semibold text-brand-900">Pago de la separación</h3><p className="text-xs text-brand-500">Revisa el importe total y registra los comprobantes.</p></div>
+                </header>
+                <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
+                  <div className="flex justify-between gap-3 text-sm"><span>Cantidad de lotes</span><strong>{1+lotesAdicionales.length}</strong></div>
+                  <div className="flex flex-wrap justify-between gap-2 text-sm"><span>Importes de separación</span><strong>{[condicionesVenta.montoSeparacion,...lotesAdicionales.map(l=>l.monto)].every(m=>m===condicionesVenta.montoSeparacion)
+                    ? `${formatSoles(condicionesVenta.montoSeparacion)} × ${1+lotesAdicionales.length}`
+                    : 'Según el detalle de lotes'}</strong></div>
+                  <div className="flex justify-between gap-3 border-t border-brand-100 pt-3"><strong>Total a pagar</strong><strong className="text-lg tabular-nums text-brand-900">{formatSoles(totalSeparacionSeleccion)}</strong></div>
                 </div>
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-2">
                   <p className="font-semibold text-emerald-950">Condiciones de separación</p>
@@ -2811,10 +2859,7 @@ export function Sales() {
                   <p>Los lotes registrados cambiarán a estado <strong>RESERVADO</strong> en el mapa interactivo.</p>
                   <p>El pago ingresará en estado <strong>REGISTRADO</strong> y el comprobante quedará <strong>PENDIENTE</strong> de auditoría por Finanzas.</p>
                 </div>
-                <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">03 · Pago del lote principal</p>
-                  <p className="mt-1 text-xs text-brand-500">Adjunte el comprobante del importe correspondiente al lote principal.</p>
-                </div>
+                <h4 className="text-sm font-semibold text-brand-900">Pago del lote principal · {lotePrincipal?.codigo}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
@@ -2895,11 +2940,29 @@ export function Sales() {
                   )}
                 </div>
 
+                {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-xl border border-brand-100 p-3 space-y-2">
+                  <div className="flex justify-between gap-2 text-sm"><strong>Pago · {l.codigo}</strong><strong>{formatSoles(l.monto)}</strong></div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs font-medium">Método de pago<Select value={l.metodo} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{metodo:e.target.value as CrmSeparacionInput['metodoPago'],referencia:''})}>
+                        <option value="TRANSFERENCIA">Transferencia bancaria</option><option value="DEPOSITO">Depósito</option><option value="YAPE_PLIN">Yape / Plin</option><option value="EFECTIVO">Efectivo</option><option value="OTRO">Otro</option>
+                      </Select></label>
+                      {l.metodo!=='EFECTIVO'&&<label className="text-xs font-medium">N° de operación<Input value={l.referencia} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{referencia:e.target.value})}/></label>}
+                    </div>
+                    <label className="block text-xs font-medium">Comprobante propio (máx. 5 MB)<input type="file" accept=".pdf,image/jpeg,image/png,image/webp" disabled={submitting}
+                      className="mt-1 block w-full text-xs" onChange={e=>{
+                        const archivo=e.target.files?.[0]??null;e.target.value='';
+                        if(archivo&&(!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.size<1||archivo.size>5242880)){
+                          toast.error('Archivo no permitido o mayor de 5 MB.');return;
+                        }
+                        editarPagoAdicional(l.idLote,{archivo});
+                      }}/><span className="block text-brand-500">{l.archivo?.name??'Sin comprobante'}</span></label>
+
+                </div>)}
               </> : (
                 <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-700" role="status">
                   <p className="font-semibold">Condiciones de separación y pago</p>
                   <p className="mt-1">{!formLotId
-                    ? 'Seleccione el cliente, proyecto, etapa comercial y lote para consultar el importe y la vigencia.'
+                    ? 'Seleccione el cliente, su proyecto y el lote principal para consultar el importe y la vigencia.'
                     : consultandoPolitica ? 'Consultando el importe y la vigencia de la separación…'
                     : errorPolitica ? 'No se puede registrar el pago hasta verificar las condiciones financieras. Reintente la consulta.'
                     : estadoPrecio !== 'disponible' ? 'Se requiere verificar el precio oficial del lote antes de continuar.'
