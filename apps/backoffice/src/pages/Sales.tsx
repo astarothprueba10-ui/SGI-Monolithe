@@ -18,6 +18,7 @@ import { salesService } from '../services/salesService';
 import {
   crmBackend,
   type CrmProspect,
+  type CrmEtapaOperacion,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
@@ -30,7 +31,7 @@ import { OperacionesAgrupadasPanel } from '../components/sales/OperacionesAgrupa
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
-import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
+import type { ProyectoResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
 import { DetalleVentaAmpliadoPanel } from '../components/sales/DetalleVentaAmpliadoPanel';
@@ -227,7 +228,10 @@ export function Sales() {
   const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
   const [availableProjects, setAvailableProjects] = useState<ProyectoResponse[]>([]);
   const [formProjectId, setFormProjectId] = useState('');
-  const [availableStages, setAvailableStages] = useState<EtapaResponse[]>([]);
+  const [availableStages, setAvailableStages] = useState<CrmEtapaOperacion[]>([]);
+  const [interesesOperacion, setInteresesOperacion] = useState<number[]>([]);
+  const [registrandoInteres, setRegistrandoInteres] = useState(false);
+  const proyectoConInteres = interesesOperacion.includes(Number(formProjectId));
   const [formStageId, setFormStageId] = useState('');
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -471,6 +475,7 @@ export function Sales() {
     setLoadingFormData(true);
 
     setSelectedProspectId('');
+    setInteresesOperacion([]);
     setAvailableProjects([]);
     setFormProjectId('');
     setAvailableLots([]);
@@ -503,6 +508,7 @@ export function Sales() {
   const handleSelectProspect = async (id: number | '') => {
     const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
+    setInteresesOperacion([]);
     setFormProjectId('');
     setFormStageId('');
     setAvailableStages([]);
@@ -524,6 +530,7 @@ export function Sales() {
       ]);
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
+      setInteresesOperacion([...intereses]);
       // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
       const compradorExistente = (prospectsList.find(p => p.id_prospecto === id)
         ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
@@ -558,6 +565,26 @@ export function Sales() {
       });
     } finally {
       if (solicitud === seleccionProspectoPeticionRef.current) setLoadingProjects(false);
+    }
+  };
+
+  const registrarInteresOperacion = async () => {
+    if (!selectedProspectId || !formProjectId || registrandoInteres) return;
+    const idProspecto = selectedProspectId;
+    const idProyecto = Number(formProjectId);
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setRegistrandoInteres(true);
+    try {
+      await crmBackend.registrarInteresRecompra(idProspecto, idProyecto);
+      if (solicitud === seleccionProspectoPeticionRef.current) {
+        setInteresesOperacion(prev => [...new Set([...prev, idProyecto])]);
+        toast.success('Interés comercial registrado. Puedes continuar con la adquisición.');
+      }
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        toast.error(err instanceof Error ? err.message : 'No se pudo registrar el interés comercial.');
+    } finally {
+      setRegistrandoInteres(false);
     }
   };
 
@@ -1196,48 +1223,35 @@ export function Sales() {
 
   useEffect(() => {
     let vigente = true;
-
     setAvailableStages([]);
-
-    if (!formProjectId) {
+    setFormStageId('');
+    if (!formProjectId || !selectedProspectId || !proyectoConInteres) {
       setLoadingStages(false);
       return;
     }
-
     setLoadingStages(true);
-
-    void coreService
-      .getActiveStagesByProject(Number(formProjectId))
-      .then((etapas) => {
+    void crmBackend.listarEtapasOperacion(selectedProspectId, Number(formProjectId), opType === 'Venta')
+      .then(etapas => {
         if (!vigente) return;
-
-        const activas = (etapas ?? []).filter(
-          (etapa) => etapa.activo && etapa.idProyecto === Number(formProjectId)
-        );
-        setAvailableStages(activas);
-        if (autoseleccionPendiente?.idProyecto === Number(formProjectId) &&
-            activas.some((etapa) => etapa.idEtapa === autoseleccionPendiente.idEtapa)) {
-          setFormStageId(String(autoseleccionPendiente.idEtapa));
-        }
+        setAvailableStages(etapas ?? []);
+        if (etapas.length === 1) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
-        if (!vigente) return;
-
-        toast.error('No se pudieron cargar las etapas', {
-          description:
-            err instanceof Error ? err.message : 'Error de consulta.'
+        if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
+          description: err instanceof Error ? err.message : 'Error de consulta.'
         });
       })
-      .finally(() => {
-        if (vigente) setLoadingStages(false);
-      });
+      .finally(() => { if (vigente) setLoadingStages(false); });
+    return () => { vigente = false; };
+  }, [formProjectId, selectedProspectId, proyectoConInteres, opType]);
 
-    return () => {
-      vigente = false;
-    };
-  }, [formProjectId, autoseleccionPendiente]);
-
-
+  // El acceso desde el plano o desde una reserva conserva la ubicación física,
+  // pero se selecciona el grupo comercial según el identificador real del lote.
+  useEffect(() => {
+    if (!autoseleccionPendiente || autoseleccionPendiente.idProyecto !== Number(formProjectId)) return;
+    const destino = availableStages.find(e => e.idLotes.includes(autoseleccionPendiente.idLote));
+    if (destino) setFormStageId(destino.codigo);
+  }, [availableStages, autoseleccionPendiente, formProjectId]);
 
   useEffect(() => {
     let vigente = true;
@@ -1251,7 +1265,9 @@ export function Sales() {
     }
 
     const idProyecto = Number(formProjectId);
-    const idEtapa = Number(formStageId);
+    const etapa = availableStages.find(e => e.codigo === formStageId);
+    if (!etapa) { setLoadingLots(false); return; }
+    const idsEtapa = new Set(etapa.idLotes);
 
     setLoadingLots(true);
 
@@ -1260,7 +1276,6 @@ export function Sales() {
         const [lotes, reservas, comercializables] = await Promise.all([
           coreService.searchLots({
             idProyecto,
-            idEtapa,
             activo: true
           }),
 
@@ -1285,7 +1300,7 @@ export function Sales() {
           if (
             lote.activo !== true ||
             lote.idProyecto !== idProyecto ||
-            lote.idEtapa !== idEtapa
+            !idsEtapa.has(lote.idLote)
           ) {
             return false;
           }
@@ -1306,7 +1321,6 @@ export function Sales() {
         setAvailableLots(lotesPermitidos);
         if (autoseleccionPendiente &&
             autoseleccionPendiente.idProyecto === idProyecto &&
-            autoseleccionPendiente.idEtapa === idEtapa &&
             lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
           setFormLotId(String(autoseleccionPendiente.idLote));
         }
@@ -1337,7 +1351,9 @@ export function Sales() {
     formProjectId,
     formStageId,
     selectedProspectId,
-    opType
+    opType,
+    availableStages,
+    autoseleccionPendiente
   ]);
 
 
@@ -2074,6 +2090,7 @@ export function Sales() {
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
+                disabled={registrandoInteres}
                 onChange={(e) =>
                   void handleSelectProspect(
                     e.target.value ? Number(e.target.value) : ''
@@ -2103,7 +2120,7 @@ export function Sales() {
 
               <Select
                 value={formProjectId}
-                disabled={!selectedProspectId || loadingProjects}
+                disabled={!selectedProspectId || loadingProjects || registrandoInteres}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormProjectId(e.target.value);
@@ -2126,6 +2143,15 @@ export function Sales() {
                 ))}
               </Select>
 
+              {selectedProspectId && formProjectId && !loadingProjects && !proyectoConInteres && (
+                <div className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p>El cliente no tiene un interés activo en este proyecto. Regístralo expresamente para continuar sin alterar sus otros intereses.</p>
+                  <Button type="button" variant="secondary" disabled={registrandoInteres}
+                    onClick={() => void registrarInteresOperacion()}>
+                    {registrandoInteres ? 'Registrando…' : 'Registrar interés comercial'}
+                  </Button>
+                </div>
+              )}
               {selectedProspectId &&
                 !loadingProjects &&
                 availableProjects.length === 0 && (
@@ -2137,12 +2163,12 @@ export function Sales() {
 
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Etapa del proyecto *
+                Etapa comercial *
               </label>
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || loadingStages}
+                disabled={!formProjectId || !proyectoConInteres || loadingStages}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
@@ -2157,17 +2183,17 @@ export function Sales() {
                 </option>
 
                 {availableStages.map((etapa) => (
-                  <option key={etapa.idEtapa} value={etapa.idEtapa}>
+                  <option key={etapa.codigo} value={etapa.codigo}>
                     {etapa.nombre}
                   </option>
                 ))}
               </Select>
 
-              {formProjectId &&
+              {formProjectId && proyectoConInteres &&
                 !loadingStages &&
                 availableStages.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    Este proyecto no tiene etapas activas disponibles.
+                    No hay etapas comerciales con lotes disponibles o reservas autorizadas.
                   </p>
                 )}
             </div>
@@ -2175,7 +2201,7 @@ export function Sales() {
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
 
-                {opType === 'Venta' ? 'Lote para venta *' : 'Lote disponible *'}
+                {opType === 'Venta' ? 'Lote disponible o reservado para el comprador *' : 'Lote disponible *'}
 
               </label>
 

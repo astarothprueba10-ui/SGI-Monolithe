@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase';
 
 export type CrmCategory = 'TODOS' | 'LEAD' | 'POTENCIAL' | 'COMPRADOR' | 'CERRADO';
 
+export interface CrmEtapaOperacion {
+  codigo: string;
+  nombre: string;
+  idLotes: number[];
+}
+
 export interface CrmProspect {
   id_prospecto: number;
   id_persona: number;
@@ -1845,6 +1851,12 @@ export const crmBackend = {
   },
 
   /** Política inmutable para esta venta: conserva la versión de una separación vigente. */
+  registrarInteresRecompra: (idProspecto: number, idProyecto: number) =>
+    coreApi.post<{ idInteres: number; creado: boolean }>(
+      `/crm/prospectos/${idProspecto}/intereses/recompra/${idProyecto}`, {}),
+  listarEtapasOperacion: (idProspecto: number, idProyecto: number, incluirReservas: boolean) =>
+    coreApi.get<CrmEtapaOperacion[]>(
+      `/crm/ventas/etapas-comerciales${qs({idProspecto,idProyecto,incluirReservas})}`),
   obtenerCondicionesVenta: (idProspecto:number,idLote:number) =>
     coreApi.get<CondicionesFrancesas>(
       `/crm/financiamiento/condiciones-venta${qs({idProspecto,idLote})}`

@@ -955,6 +955,28 @@ public class CrmVentaService {
             """, actor);
     }
 
+    @Transactional
+    public JsonNode registrarInteresRecompra(Long actor, Long prospecto, Long proyecto) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || proyecto == null || proyecto <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione cliente y proyecto válidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_registrar_interes_recompra_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint))::text
+            """, actor, prospecto, proyecto);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode etapasComercialesOperacion(Long actor, Long prospecto, Long proyecto, boolean incluirReservas) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || proyecto == null || proyecto <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione cliente y proyecto válidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_etapas_operacion_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint), CAST(? AS boolean))::text
+            """, actor, prospecto, proyecto, incluirReservas);
+    }
+
     /** Condiciones contractuales vigentes o congeladas por reserva del comprador. */
     @Transactional(readOnly = true)
     public JsonNode condicionesVentaFinanciada(Long actor,Long idProspecto,Long idLote) {

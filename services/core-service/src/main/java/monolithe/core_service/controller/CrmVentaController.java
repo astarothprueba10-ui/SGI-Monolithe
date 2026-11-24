@@ -55,6 +55,22 @@ public class CrmVentaController {
         private final CrmSeparacionStorageService separacionStorageService;
         private final CrmAnulacionStorageService anulacionStorageService;
 
+        @PostMapping("/prospectos/{idProspecto}/intereses/recompra/{idProyecto}")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view')")
+        public JsonNode registrarInteresRecompra(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idProspecto, @PathVariable Long idProyecto) {
+            return service.registrarInteresRecompra(obtenerActor(jwt), idProspecto, idProyecto);
+        }
+
+        @GetMapping("/ventas/etapas-comerciales")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('lots.view')")
+        public ResponseEntity<JsonNode> etapasComercialesOperacion(@AuthenticationPrincipal Jwt jwt,
+                @RequestParam Long idProspecto, @RequestParam Long idProyecto,
+                @RequestParam(defaultValue="false") boolean incluirReservas) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.etapasComercialesOperacion(obtenerActor(jwt), idProspecto, idProyecto, incluirReservas));
+        }
+
         @PostMapping("/ventas/validar")
         @PreAuthorize("hasAuthority('sales.create')")
         public JsonNode validarVenta(
