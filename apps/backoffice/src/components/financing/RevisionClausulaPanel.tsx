@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {AlertTriangle,FileSearch,RefreshCw,ShieldCheck,Wallet,CalendarDays} from 'lucide-react';
+import {AlertTriangle,FileSearch,RefreshCw,Wallet,CalendarDays} from 'lucide-react';
 import {useAuth} from '../../contexts/AuthContext';
 import {
   crmBackend,type CrmRevisionesResolutorias

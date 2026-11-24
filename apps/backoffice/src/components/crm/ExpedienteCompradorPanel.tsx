@@ -55,7 +55,7 @@ export function ExpedienteCompradorPanel({buyer}:{buyer:CrmBuyer}) {
          <p className="mt-1 text-xs text-brand-500">Venta y adjudicación inmobiliaria.</p>
        </div>
        <span className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-         {buyer.estado_contrato?.replaceAll('_',' ')||'Sin estado'}
+         {buyer.estado_contrato?.replace(/_/g,' ')||'Sin estado'}
        </span>
      </div>
      <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">

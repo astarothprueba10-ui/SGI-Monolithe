@@ -59,7 +59,6 @@ import {
   type CrmVisitaPeriodo,
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
-import { currency } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
 import {
   CrmPeriodoGlobal,

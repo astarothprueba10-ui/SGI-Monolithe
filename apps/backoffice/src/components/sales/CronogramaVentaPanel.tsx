@@ -61,7 +61,7 @@ function CronogramaDocumento({datos}:{datos:CrmCronogramaVenta}) {
         {item.saldoCuota===undefined?'—':formatoSoles(item.saldoCuota)}
       </PdfText>
       <PdfText style={p.cellStatus}>
-        {item.estado.replaceAll('_',' ')}{item.cuotaAtrasada?' (atrasada)':''}
+        {item.estado.replace(/_/g,' ')}{item.cuotaAtrasada?' (atrasada)':''}
       </PdfText>
     </PdfView>)}
     <PdfView style={p.band}>
@@ -196,7 +196,7 @@ export function CronogramaVentaPanel({idVenta}:{idVenta:number}) {
               c.estado==='PAGADA'?'font-semibold text-green-700':
               c.estado==='VENCIDA'?'font-semibold text-rose-700':
               c.estado==='PARCIAL'?'font-semibold text-amber-800':'text-brand-600'
-            }>{c.estado.replaceAll('_',' ')}</span>
+            }>{c.estado.replace(/_/g,' ')}</span>
             {c.cuotaAtrasada&&
               <span className="ml-1 font-semibold text-rose-700">
                 · {c.diasMora??0} d. atraso

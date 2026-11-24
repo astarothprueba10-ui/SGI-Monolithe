@@ -32,7 +32,7 @@ export function crearPeriodoComercial(
   modo: ModoPeriodoComercial, ahora: Date = new Date()
 ): PeriodoComercial {
   const hoy = fechaCalendarioLima(ahora.toISOString());
-  const [anio, mes, dia] = hoy.split('-').map(Number);
+  const [anio, mes] = hoy.split('-').map(Number);
   if (modo === 'hoy') return {modo, desde: hoy, hasta: hoy};
   if (modo === 'mes') return {modo, desde: iso(anio,mes,1), hasta: hoy};
   if (modo === 'anio') return {modo, desde: iso(anio,1,1), hasta: hoy};

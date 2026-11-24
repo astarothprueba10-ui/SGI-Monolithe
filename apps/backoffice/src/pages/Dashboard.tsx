@@ -19,7 +19,6 @@ import { ROLE_KPIS } from '../data/kpis';
 import { COLLECTION_TREND, DASHBOARD_INTRO, SALES_TREND } from '../data/dashboard';
 import { LEAD_SOURCES } from '../data/crm';
 import { ADVISORS } from '../data/people';
-import { commissionsService } from '../services/commissionsService';
 import type { ManagerialKpis } from '../services/commissionsService';
 import { dashboardService } from '../services/dashboardService';
 import type { DashboardSummary } from '../services/dashboardService';
@@ -172,7 +171,7 @@ export function Dashboard() {
   }
   const chart = CHART_BY_ROLE[role];
   const trendData = dashboardSummary?.tendenciaMensual && dashboardSummary.tendenciaMensual.length > 0
-    ? dashboardSummary.tendenciaMensual
+    ? dashboardSummary.tendenciaMensual.map(item => ({ ...item }))
     : chart.data;
 
   return (

@@ -1828,7 +1828,7 @@ export const crmBackend = {
   cambiarLoteInteres: (idProspecto:number,idProyecto:number,idLote:number,idLoteAnterior:number|null,motivo:string) =>
     coreApi.post<{idLoteInteres:number;codigoLoteInteres:string}>(`/crm/prospectos/${idProspecto}/intereses/lote`,{idProyecto,idLote,idLoteAnterior,motivo}),
   registrarSeparacionAcumulada: (body:CrmSeparacionAcumuladaInput) =>
-    coreApi.post<CrmSeparacionAcumuladaResult>('/crm/separaciones/acumulada',body),
+    coreApi.post<CrmSeparacionAcumuladaResult>('/crm/separaciones/acumulada',{...body}),
   registrarSeparacionesMultiples: (lotes: CrmSeparacionInput[]) =>
     coreApi.post<CrmSeparacionResult[]>('/crm/separaciones/multiples',{lotes}),
   registrarSeparacion: (body: CrmSeparacionInput) =>
@@ -2186,7 +2186,7 @@ export const crmBackend = {
 
   prepararCargaVoucherInicial:(datos:CrmPrepararCargaInicialInput)=>
     coreApi.post<CrmCargaVoucherCuota>(
-      '/crm/finanzas/vouchers/inicial/preparar-carga',datos),
+      '/crm/finanzas/vouchers/inicial/preparar-carga',{...datos}),
 
   registrarVoucherInicialPendiente:(idCarga:string)=>{
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
@@ -2208,7 +2208,7 @@ export const crmBackend = {
   /** Preautorización vinculada por el servidor al actor y la cuota. */
   prepararCargaVoucherCuota: (datos:CrmPrepararCargaCuotaInput) =>
     coreApi.post<CrmCargaVoucherCuota>(
-      '/crm/finanzas/vouchers/cuotas/preparar-carga',datos
+      '/crm/finanzas/vouchers/cuotas/preparar-carga',{...datos}
     ),
 
   /** Carga un único archivo de la preparación anterior en Storage privado. */
