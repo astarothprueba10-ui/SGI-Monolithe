@@ -818,7 +818,14 @@ export function Sales() {
     setConsultandoPolitica(true);
     void crmBackend.obtenerCondicionesVenta(idProspecto, idLote)
       .then(condiciones => {
-        if (vigente) setPoliticaOperativa({ idProspecto, idLote, condiciones });
+        if (!vigente) return;
+        if (!condiciones || !Number.isFinite(condiciones.montoSeparacion) || condiciones.montoSeparacion <= 0
+          || !Number.isInteger(condiciones.diasVencimientoSeparacion) || condiciones.diasVencimientoSeparacion < 1
+          || !Number.isInteger(condiciones.idPolitica) || condiciones.idPolitica < 1) {
+          setErrorPolitica('La política recibida no contiene condiciones de separación válidas.');
+          return;
+        }
+        setPoliticaOperativa({ idProspecto, idLote, condiciones });
       })
       .catch(err => {
         if (vigente) setErrorPolitica(err instanceof Error ? err.message
@@ -1331,6 +1338,9 @@ export function Sales() {
     && politicaOperativa.idProspecto === Number(selectedProspectId)
     && politicaOperativa.idLote === Number(formLotId)
     ? politicaOperativa.condiciones : null;
+  const separacionCondicionesVerificadas = Boolean(selectedProspectId && formLotId && condicionesVenta
+    && !consultandoPolitica && !errorPolitica && estadoPrecio === 'disponible'
+    && precioLote?.idLote === Number(formLotId));
   const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
     ? Number(condicionesVenta.inicialFija)
     : Number(condicionesVenta?.inicialMinima ?? 0);
@@ -2217,7 +2227,7 @@ export function Sales() {
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
-                (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
+                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO))
               }
               onClick={handleProcessOperation}
             >
@@ -2537,14 +2547,28 @@ export function Sales() {
                     Condiciones contractuales verificadas · Versión {condicionesVenta.version}
                   </p>
                 ) : null}
+                {errorPolitica && !consultandoPolitica && (
+                  <Button type="button" variant="secondary" size="sm" className="mt-2"
+                    onClick={()=>setRevisionPolitica(revision=>revision+1)}>
+                    Reintentar consulta de condiciones
+                  </Button>
+                )}
               </div>
             )}
             {opType === 'Separacion' ? (
-              <>
+              separacionCondicionesVerificadas && condicionesVenta ? <>
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-2">
+                  <p className="font-semibold text-emerald-950">Condiciones de separación</p>
+                  <p>Proyecto: <strong>{availableProjects.find(p=>p.idProyecto===Number(formProjectId))?.nombre}</strong></p>
+                  <p>Monto reglamentario: <strong>{formatSoles(condicionesVenta.montoSeparacion)} PEN</strong></p>
+                  <p>Plazo de vigencia: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong> (al vencer requiere revisión; no libera el lote ni anula pagos automáticamente).</p>
+                  <p>El lote cambiará a estado <strong>RESERVADO</strong> en el mapa interactivo.</p>
+                  <p>El pago ingresará en estado <strong>REGISTRADO</strong> y el comprobante quedará <strong>PENDIENTE</strong> de auditoría por Finanzas.</p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Método de pago (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}) *
+                      Método de pago ({formatSoles(condicionesVenta.montoSeparacion)}) *
                     </label>
                     <Select
                       value={formPaymentMethod}
@@ -2583,7 +2607,7 @@ export function Sales() {
                         Caja / Modalidad
                       </label>
                       <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                        Pago directo en efectivo (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'})
+                        Pago directo en efectivo ({formatSoles(condicionesVenta.montoSeparacion)})
                       </div>
                     </div>
                   )}
@@ -2616,19 +2640,22 @@ export function Sales() {
                   </div>
                   {!voucherFile && formTouched && (
                     <p className="mt-1 text-[11px] font-medium text-rose-600">
-                      Debe adjuntar el comprobante o voucher de S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}.
+                      Debe adjuntar el comprobante o voucher de {formatSoles(condicionesVenta.montoSeparacion)}.
                     </p>
                   )}
                 </div>
 
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
-                  <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
-                  <p>Monto reglamentario: <span className="font-bold">S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'} PEN</span></p>
-                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (al vencer requiere revisión; no libera el lote ni anula pagos automáticamente).</p>
-                  <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
-                  <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
+              </> : (
+                <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-700" role="status">
+                  <p className="font-semibold">Condiciones de separación y pago</p>
+                  <p className="mt-1">{!formLotId
+                    ? 'Seleccione el cliente, proyecto, etapa comercial y lote para consultar el importe y la vigencia.'
+                    : consultandoPolitica ? 'Consultando el importe y la vigencia de la separación…'
+                    : errorPolitica ? 'No se puede registrar el pago hasta verificar las condiciones financieras. Reintente la consulta.'
+                    : estadoPrecio !== 'disponible' ? 'Se requiere verificar el precio oficial del lote antes de continuar.'
+                    : 'Esperando condiciones financieras verificadas.'}</p>
                 </div>
-              </>
+              )
 
             ) : (
               <div className="space-y-4 rounded-2xl border border-brand-200 bg-gradient-to-b from-brand-50/90 to-white p-3 shadow-sm sm:p-5">

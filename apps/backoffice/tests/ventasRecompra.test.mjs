@@ -63,3 +63,15 @@ test('proyecto registrado por defecto y selector de cambio separado del proyecto
   const cancelar=sales.slice(sales.indexOf('const cerrarEditorInteres'),sales.indexOf('const abrirEditorInteres'));
   assert.doesNotMatch(cancelar,/setFormProjectId|setFormLotId|crmBackend/);
 });
+
+
+test('separación oculta importes y pago hasta verificar política y precio del lote',()=>{
+  assert.match(sales,/const separacionCondicionesVerificadas = Boolean/);
+  assert.match(sales,/precioLote\?\.idLote === Number\(formLotId\)/);
+  assert.match(sales,/separacionCondicionesVerificadas && condicionesVenta \? <>/);
+  assert.match(sales,/Método de pago \(\{formatSoles\(condicionesVenta\.montoSeparacion\)\}\)/);
+  assert.match(sales,/condicionesVenta\.diasVencimientoSeparacion\} días calendario/);
+  assert.match(sales,/Reintentar consulta de condiciones/);
+  assert.match(sales,/!separacionCondicionesVerificadas \|\| SEPARACION_ENVIO_DESHABILITADO/);
+  assert.doesNotMatch(sales,/montoSeparacion\.toFixed\(2\) \?\? '—'/);
+});
