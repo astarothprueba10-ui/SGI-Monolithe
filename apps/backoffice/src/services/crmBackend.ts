@@ -157,7 +157,7 @@ export interface CrmDetail {
   prospecto: CrmProspect;
   documentoPrincipal: { tipoCodigo: string; numero: string; verificado: boolean } | null;
   contactos: { tipoCodigo: string; valor: string; principal: boolean; verificado: boolean }[];
-  intereses: { idInteres: number; idProyecto: number; proyecto: string }[];
+  intereses: { idInteres: number; idProyecto: number; proyecto: string; comentario?: string | null; idLoteInteres?: number | null; codigoLoteInteres?: string | null }[];
   totalSeguimientos: number;
   totalVisitas: number;
   esComprador: boolean;
@@ -1805,6 +1805,10 @@ export const crmBackend = {
     };
   },
 
+  cambiarLoteInteres: (idProspecto:number,idProyecto:number,idLote:number,idLoteAnterior:number|null,motivo:string) =>
+    coreApi.post<{idLoteInteres:number;codigoLoteInteres:string}>(`/crm/prospectos/${idProspecto}/intereses/lote`,{idProyecto,idLote,idLoteAnterior,motivo}),
+  registrarSeparacionesMultiples: (lotes: CrmSeparacionInput[]) =>
+    coreApi.post<CrmSeparacionResult[]>('/crm/separaciones/multiples',{lotes}),
   registrarSeparacion: (body: CrmSeparacionInput) =>
     coreApi.post<CrmSeparacionResult>(
       '/crm/separaciones',

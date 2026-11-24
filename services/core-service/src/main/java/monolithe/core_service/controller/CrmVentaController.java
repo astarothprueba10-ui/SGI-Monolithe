@@ -199,6 +199,25 @@ public class CrmVentaController {
                                 request);
         }
 
+        public record LoteInteresRequest(Long idProyecto, Long idLote, Long idLoteAnterior, String motivo) {}
+        @PostMapping("/prospectos/{idProspecto}/intereses/lote")
+        @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.edit')")
+        public JsonNode cambiarLoteInteres(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto,
+                @RequestBody LoteInteresRequest req) {
+            return service.cambiarLoteInteres(obtenerActor(jwt),idProspecto,req.idProyecto(),req.idLote(),req.idLoteAnterior(),req.motivo());
+        }
+
+        public record SeparacionesMultiplesRequest(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Size(min=2,max=20)
+            java.util.List<@jakarta.validation.constraints.NotNull @Valid RegistrarSeparacionCrmRequest> lotes) {}
+        @PostMapping("/separaciones/multiples")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarSeparacionesMultiples(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody SeparacionesMultiplesRequest req) {
+            return service.registrarSeparacionesMultiples(obtenerActor(jwt),req.lotes());
+        }
+
         @PostMapping("/separaciones")
         @ResponseStatus(HttpStatus.CREATED)
         @PreAuthorize("hasAuthority('sales.create')")

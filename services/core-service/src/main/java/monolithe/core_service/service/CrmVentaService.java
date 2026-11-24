@@ -318,6 +318,41 @@ public class CrmVentaService {
                 request.hashSha256());
     }
 
+    @Transactional
+    public JsonNode cambiarLoteInteres(Long actor, Long prospecto, Long proyecto, Long lote, Long anterior, String motivo) {
+        validarActor(actor);
+        if (prospecto==null || proyecto==null || lote==null || motivo==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione el lote e indique el motivo.");
+        return ejecutar("""
+            SELECT public.sp_crm_cambiar_lote_interes_v1(CAST(? AS bigint),CAST(? AS bigint),
+                CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text))::text
+            """,actor,prospecto,proyecto,lote,anterior,motivo);
+    }
+
+    /** Una única transacción: si falla un lote, no queda ninguna reserva ni pago parcial. */
+    @Transactional
+    public JsonNode registrarSeparacionesMultiples(Long actor, java.util.List<RegistrarSeparacionCrmRequest> lotes) {
+        validarActor(actor);
+        if (lotes==null || lotes.size()<2 || lotes.size()>20)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione entre 2 y 20 lotes.");
+        var ids=new java.util.HashSet<Long>();
+        var archivos=new java.util.HashSet<String>();
+        var referencias=new java.util.HashSet<String>();
+        Long prospecto=lotes.get(0).idProspecto();
+        for (var req:lotes) {
+            validarDatosSeparacion(req);
+            if (!java.util.Objects.equals(prospecto,req.idProspecto()) || !ids.add(req.idLote()) || !archivos.add(req.claveArchivo()))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Cada lote debe ser único y pertenecer a la misma operación.");
+            if (req.numeroOperacion()!=null && !req.numeroOperacion().isBlank() &&
+                    !referencias.add(req.numeroOperacion().trim().toUpperCase(java.util.Locale.ROOT)))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Cada pago debe tener su propia referencia de operación.");
+        }
+        var resultados=jsonMapper.createArrayNode();
+        for (var req:lotes.stream().sorted(java.util.Comparator.comparing(RegistrarSeparacionCrmRequest::idLote)).toList())
+            resultados.add(registrarSeparacion(actor,req));
+        return resultados;
+    }
+
     private void validarDatosSeparacion(RegistrarSeparacionCrmRequest req) {
         if (req == null || req.idProspecto() == null || req.idProspecto() <= 0
                 || req.idLote() == null || req.idLote() <= 0
