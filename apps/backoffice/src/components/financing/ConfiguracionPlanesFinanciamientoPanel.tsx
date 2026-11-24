@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { coreService } from '../../services/coreService';
+import type { ProyectoResponse } from '../../types/core';
 import {
   CalendarClockIcon, CoinsIcon, LandmarkIcon, ListOrderedIcon,
   LockKeyholeIcon, PercentIcon, RefreshCwIcon, ShieldCheckIcon, WalletIcon
@@ -61,12 +63,32 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [idProyecto,setIdProyecto] = useState<number | undefined>();
+  const [proyectos,setProyectos] = useState<ProyectoResponse[]>([]);
+  const [errorProyectos,setErrorProyectos] = useState(false);
+  useEffect(()=>{
+    let vigente=true;
+    void coreService.getActiveProjects().then(p=>{if(vigente)setProyectos(p);})
+      .catch(()=>{if(vigente)setErrorProyectos(true);});
+    return ()=>{vigente=false;};
+  },[]);
+  const selector=<div className="space-y-2 p-3">
+    <label className="block text-sm font-medium text-brand-800">
+      Ámbito de la política financiera
+      <select className="mt-1 block w-full rounded-md border border-brand-200 p-2"
+        value={idProyecto??''} onChange={e=>{setDatos(null);setCargando(true);setError(null);setIdProyecto(e.target.value?Number(e.target.value):undefined);}}>
+        <option value="">Política general</option>
+        {proyectos.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+      </select>
+    </label>
+    {errorProyectos && <p className="text-sm text-red-700">No se pudieron listar los proyectos.</p>}
+  </div>;
 
   useEffect(() => {
     let vigente = true;
     setCargando(true);
     setError(null);
-    void financingConfigService.obtenerPoliticaActual()
+    void financingConfigService.obtenerPoliticaActual(idProyecto)
       .then(res => { if (vigente) setDatos(res); })
       .catch(e => {
         if (vigente) {
@@ -76,15 +98,16 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
       })
       .finally(() => { if (vigente) setCargando(false); });
     return () => { vigente = false; };
-  }, [revision]);
+  }, [revision,idProyecto]);
 
   if (cargando && !datos) {
-    return <p role="status" className="p-6 text-sm text-brand-500">
+    return <>{selector}<p role="status" className="p-6 text-sm text-brand-500">
       Consultando política financiera autorizada…
-    </p>;
+    </p></>;
   }
   if (error) {
     return <div className="p-4">
+      {selector}
       <Alert tone="danger" title="No se pudo consultar la configuración">
         {error}
       </Alert>
@@ -116,6 +139,7 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
   ];
 
   return <div className="space-y-6 p-3 sm:p-5 lg:p-6">
+    {selector}
     <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-950 via-brand-900 to-brand-800 px-5 py-6 text-white shadow-sm sm:px-7">
       <div className="pointer-events-none absolute -right-10 -top-20 h-48 w-48 rounded-full border border-white/10" aria-hidden="true"/>
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -154,7 +178,7 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
               <h3 id="version-financiera-actual" className="mt-1 text-xl font-bold text-brand-950">
                 Versión {datos.version}
               </h3>
-              <p className="mt-1 text-xs text-brand-500">Condiciones vigentes · Solo lectura</p>
+              <p className="mt-1 text-xs text-brand-500">{datos.idProyecto ? (datos.modoAplicacion==='PROPIA'?'Política propia del proyecto':'Hereda la política general') : 'Política general'} · Solo lectura</p>
               <p className="mt-1.5 text-xs text-brand-500">
                 Vigente desde {fechaLima(datos.vigenteDesde)} (Perú)
               </p>
@@ -175,7 +199,7 @@ export function ConfiguracionPlanesFinanciamientoPanel() {
       </section>
 
       <div className="min-w-0">
-        <PublicarPoliticaFinancieraPanel politica={datos}
+        <PublicarPoliticaFinancieraPanel key={`${datos.idProyecto??0}:${datos.idPolitica}:${datos.idPoliticaProyecto??0}`} politica={datos}
           onPublicada={() => setRevision(r => r + 1)} />
       </div>
     </div>

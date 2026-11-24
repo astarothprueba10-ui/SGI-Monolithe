@@ -3,6 +3,10 @@ import type { PoliticaFinanciamientoActual } from './financingConfigService';
 
 /** La normalización y el hash definitivo se calculan exclusivamente en PostgreSQL. */
 export interface BorradorFinanciero {
+  idProyecto?: number;
+  modoAplicacion?: 'GENERAL' | 'PROPIA';
+  idPoliticaBase?: number;
+  idPoliticaProyectoBase?: number | null;
   montoSeparacion: number | null;
   modoInicial: 'MINIMA' | 'RANGO' | 'FIJA';
   inicialMinima: number | null;
@@ -48,6 +52,8 @@ export interface ResultadoPublicacionPolitica {
 }
 
 export const crearBorradorPolitica = (p: PoliticaFinanciamientoActual): BorradorFinanciero => ({
+  ...(p.idProyecto ? {idProyecto:p.idProyecto,modoAplicacion:p.modoAplicacion ?? 'GENERAL',
+    idPoliticaBase:p.idPolitica,idPoliticaProyectoBase:p.idPoliticaProyecto ?? null} : {}),
   montoSeparacion: p.montoSeparacion,
   modoInicial: p.modoInicial,
   inicialMinima: p.inicialMinima,

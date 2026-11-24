@@ -140,9 +140,11 @@ export function PublicarPoliticaFinancieraPanel({
     'tasaNominalAnualPct','cuotasMin','cuotasMax','diasVencimientoSeparacion'
   ];
   const cambiosPendientes = camposEditables.filter(c => borrador[c] !== politica[c]).length +
-    Number(borrador.modoInicial !== politica.modoInicial);
+    Number(borrador.modoInicial !== politica.modoInicial) + Number(borrador.modoAplicacion !== politica.modoAplicacion);
 
   const comparacion = vista ? [
+    { etiqueta: 'Aplicación', actual: politica.modoAplicacion??'GENERAL', nueva: vista.condiciones.modoAplicacion??'GENERAL',
+      cambia: Boolean(politica.idProyecto && politica.modoAplicacion!==vista.condiciones.modoAplicacion) },
     { etiqueta: 'Separación', actual: formatSoles(politica.montoSeparacion),
       nueva: formatSoles(vista.condiciones.montoSeparacion),
       cambia: politica.montoSeparacion !== vista.condiciones.montoSeparacion },
@@ -174,7 +176,7 @@ export function PublicarPoliticaFinancieraPanel({
     </span>
     <Input type="number"
       className="mt-1 w-full tabular-nums"
-      value={borrador[campo]??''} min={min} step={step} disabled={ocupado}
+      value={borrador[campo]??''} min={min} step={step} disabled={ocupado || borrador.modoAplicacion==='GENERAL'}
       onChange={e=>numero(campo,e.target.value)}/>
   </label>;
 
@@ -187,7 +189,7 @@ export function PublicarPoliticaFinancieraPanel({
             Versión a actualizar
           </p>
           <h3 id="version-financiera-nueva" className="mt-1 text-xl font-bold text-brand-950">
-            Propuesta · Versión {politica.version + 1}
+            Propuesta · Versión {politica.versionSiguiente ?? politica.version + 1}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-brand-500">
             Ajuste las condiciones y revise los cambios antes de solicitar autorización.
@@ -212,6 +214,22 @@ export function PublicarPoliticaFinancieraPanel({
       {error && <Alert tone="danger" title="No se completó la operación">{error}</Alert>}
       {mensaje && <Alert tone="success" title="Confirmación">{mensaje}</Alert>}
 
+      {politica.idProyecto && <label className="block text-xs font-medium text-brand-700">
+        Aplicación de la política
+        <select disabled={ocupado} value={borrador.modoAplicacion}
+          className="mt-1 min-h-9 w-full rounded-md border border-brand-200 bg-white px-3"
+          onChange={e=>{
+            const modo=e.target.value as 'GENERAL'|'PROPIA';
+            if(modo==='GENERAL' && politica.politicaGeneral){
+              const g=crearBorradorPolitica(politica.politicaGeneral);
+              actualizar({...g,modoAplicacion:modo,motivoPublicacion:borrador.motivoPublicacion});
+            } else actualizar({modoAplicacion:modo});
+          }}>
+          <option value="GENERAL">Heredar política general vigente</option>
+          <option value="PROPIA">Política propia del proyecto</option>
+        </select>
+        <span className="mt-1 block text-brand-500">Hasta 36 cuotas en esta fase. La política propia no cambia las operaciones existentes.</span>
+      </label>}
       <div className="grid grid-cols-1 gap-x-3 gap-y-4 sm:grid-cols-2">
         {entrada('Cuota de separación (S/)', 'montoSeparacion','0.01','0.01')}
         <label className="block min-w-0 text-xs font-medium text-brand-700">
@@ -219,7 +237,7 @@ export function PublicarPoliticaFinancieraPanel({
             <span>Modalidad de inicial</span>
             {borrador.modoInicial !== politica.modoInicial && <span className="font-semibold text-amber-700">Modificado</span>}
           </span>
-          <select disabled={ocupado} value={borrador.modoInicial}
+          <select disabled={ocupado || borrador.modoAplicacion==='GENERAL'} value={borrador.modoInicial}
             className="mt-1 min-h-9 w-full rounded-md border border-brand-200 bg-white px-3 text-sm text-brand-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             onChange={e=>modoInicial(e.target.value as BorradorFinanciero['modoInicial'])}>
             <option value="MINIMA">Inicial mínima</option>
