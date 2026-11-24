@@ -69,7 +69,7 @@ public class UserManagementService {
 
                 if (!puedeGestionarCuentas("users.create", "users.assign_role")) {
                         return new CreatedUserResult(null, "DENEGADO",
-                                        "Solo Administrador, Gerencia o RRHH con los permisos correspondientes puede crear cuentas.");
+                                        "Se requieren permisos para crear cuentas y asignar roles.");
                 }
 
                 List<String> roles = normalizarRoles(codigosRol);
@@ -196,8 +196,7 @@ public class UserManagementService {
                                 .collect(Collectors.toSet());
                 boolean esAdminGerencia = autoridades.contains("ROLE_ADMINISTRADOR")
                                 || autoridades.contains("ROLE_GERENCIA");
-                boolean tieneRolPermitido = esAdminGerencia
-                                || (!rolesProtegidos && autoridades.contains("ROLE_RRHH"));
+                boolean tieneRolPermitido = !rolesProtegidos || esAdminGerencia;
                 return tieneRolPermitido && autoridades.containsAll(Set.of(permisosRequeridos));
         }
 

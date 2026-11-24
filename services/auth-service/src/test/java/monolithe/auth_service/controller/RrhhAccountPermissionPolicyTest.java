@@ -45,7 +45,7 @@ class RrhhAccountPermissionPolicyTest {
                 .orElseThrow();
         PreAuthorize policy = method.getAnnotation(PreAuthorize.class);
         assertNotNull(policy, "Falta @PreAuthorize en " + nombreMetodo);
-        assertTrue(policy.value().contains("ROLE_RRHH"), "RRHH no está autorizado en " + nombreMetodo);
+        assertFalse(policy.value().contains("ROLE_"), "La autorización delegada debe usar permisos, no nombres de roles");
         assertTrue(policy.value().contains(permiso), "Falta permiso " + permiso + " en " + nombreMetodo);
     }
 }

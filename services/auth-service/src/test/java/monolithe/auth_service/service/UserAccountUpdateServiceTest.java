@@ -112,8 +112,7 @@ class UserAccountUpdateServiceTest {
         assertNotNull(method.getAnnotation(Transactional.class));
         String permission = method.getAnnotation(PreAuthorize.class).value();
         assertTrue(permission.contains("users.edit"));
-        assertTrue(permission.contains("ROLE_ADMINISTRADOR"));
-        assertTrue(permission.contains("ROLE_GERENCIA"));
+        org.junit.jupiter.api.Assertions.assertFalse(permission.contains("ROLE_"));
     }
 
     private UpdateUserRequest request(String login, String email) {

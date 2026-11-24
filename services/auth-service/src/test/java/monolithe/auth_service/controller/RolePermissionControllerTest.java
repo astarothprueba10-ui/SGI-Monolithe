@@ -91,8 +91,7 @@ class RolePermissionControllerTest {
     private void assertPolicy(String methodName, Class<?>[] parameters, String permission) throws Exception {
         Method method = RolePermissionController.class.getMethod(methodName, parameters);
         String policy = method.getAnnotation(PreAuthorize.class).value();
-        assertTrue(policy.contains("ROLE_ADMINISTRADOR"));
-        assertTrue(policy.contains("ROLE_GERENCIA"));
+        org.junit.jupiter.api.Assertions.assertFalse(policy.contains("ROLE_"));
         assertTrue(policy.contains(permission));
     }
 

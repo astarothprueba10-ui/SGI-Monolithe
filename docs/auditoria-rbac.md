@@ -22,3 +22,7 @@
 - Se fijó search_path en las 19 rutinas que carecían de configuración explícita y se restringieron cinco rutinas privilegiadas internas (incluida la actualización de acceso exitoso). Los permisos de backend permanecen.
 - Las tres funciones booleanas de visibilidad CMS son deliberadamente ejecutables por anon/authenticated porque se utilizan en políticas RLS públicas. No contienen datos privados ni mutaciones.
 - Las 171 tablas de public tienen RLS; 87 sin políticas deniegan el acceso directo a filas por defecto. No agregar políticas de acceso general para silenciar avisos informativos.
+
+## Delegación administrativa (167)
+- Los endpoints de usuarios y roles usan permisos efectivos, sin lista de roles ordinarios. ADMINISTRADOR y GERENCIA conservan la jerarquía raíz, la protección de cuentas críticas y la asignación privilegiada; los demás roles son delegados.
+- Un delegado no edita permisos de roles de sistema, de roles propios ni de roles con privilegios de seguridad. Solo puede conceder permisos que posee y nunca delegar administración de seguridad. Las asignaciones a cuentas con privilegios de seguridad superiores se rechazan. Las relaciones laborales y CRM se mantienen.
