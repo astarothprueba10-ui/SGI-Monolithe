@@ -147,7 +147,7 @@ const ESTADOS_VENTA = {
 function EstadoVentaBadge({estado}: {estado:string}) {
   const codigo=estado.trim().toUpperCase();
   const config=ESTADOS_VENTA[codigo as keyof typeof ESTADOS_VENTA] ?? {
-    etiqueta:codigo.replaceAll('_',' '),
+    etiqueta:codigo.replace(/_/g, ' '),
     estilo:'bg-slate-50 text-slate-700 border-slate-200',
     punto:'bg-slate-400'
   };
@@ -2021,7 +2021,7 @@ export function Sales() {
                       onChange={e=>cambiarFiltroVenta('estado',e.target.value)} className="w-full">
                       <option value="all">Todos los estados</option>
                       {estadosVentasFiltro.map(estado=>
-                        <option key={estado} value={estado}>{estado.replaceAll('_',' ')}</option>)}
+                        <option key={estado} value={estado}>{estado.replace(/_/g, ' ')}</option>)}
                     </Select>
                   </label>
                 </div>
