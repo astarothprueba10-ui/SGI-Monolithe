@@ -271,12 +271,14 @@ export function PublicarPoliticaFinancieraPanel({
         </span>
       </label>
 
-      <Button variant="primary" className="w-full sm:w-auto"
-        onClick={()=>void previsualizar()}
-        disabled={ocupado || cambiosPendientes===0 || borrador.motivoPublicacion.trim().length<12}>
-        <FileCheck2Icon className="h-4 w-4" aria-hidden="true"/>
-        {ocupado ? 'Validando condiciones…' : 'Validar propuesta'}
-      </Button>
+      <div className="flex flex-wrap items-center justify-start gap-3 pt-2">
+        <Button variant="primary" icon={FileCheck2Icon}
+          className="w-full min-h-11 px-4 py-2 sm:h-auto sm:min-h-11 sm:w-auto sm:py-2"
+          onClick={()=>void previsualizar()}
+          disabled={ocupado || cambiosPendientes===0 || borrador.motivoPublicacion.trim().length<12}>
+          {ocupado ? 'Validando condiciones…' : 'Validar propuesta'}
+        </Button>
+      </div>
 
       {vista && <div className="space-y-4 rounded-xl border border-sky-200 bg-sky-50/50 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
