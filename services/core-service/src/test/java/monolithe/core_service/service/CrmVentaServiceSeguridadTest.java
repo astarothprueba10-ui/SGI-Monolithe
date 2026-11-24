@@ -25,6 +25,24 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void formalizacionMultipleTraduceRechazosSin503() throws Exception {
+        var solicitud = new JsonMapper().readTree("[{}]");
+        String[] errores = {"UBICACION_INVALIDA", "ESTADO_CIVIL_INVALIDO", "IDENTIDAD_NO_APTA",
+                "VOUCHER_REQUERIDO", "VOUCHER_NO_CARGADO", "RESERVA_PENDIENTE", "CONDICIONES_CAMBIO",
+                "DOCUMENTO_VERIFICADO"};
+        for (String codigo : errores) {
+            reset(jdbc);
+            when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(codigo+"|Detalle privado de prueba"));
+            var error = assertThrows(ResponseStatusException.class,
+                () -> service.registrarVentasMultiples(5L, solicitud));
+            int esperado = java.util.Set.of("RESERVA_PENDIENTE","CONDICIONES_CAMBIO","DOCUMENTO_VERIFICADO").contains(codigo) ? 409 : 400;
+            assertEquals(esperado,error.getStatusCode().value(),codigo);
+            assertFalse(error.getReason().contains("Detalle privado"));
+        }
+    }
+
+    @Test
     void rechazaActorNoAutenticadoAntesDeConsultar() {
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.listarOperaciones(null, "", "", 1, 20));

@@ -23,6 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class CrmVentaService {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CrmVentaService.class);
     private final JdbcTemplate jdbc;
     private final JsonMapper jsonMapper;
 
@@ -2222,7 +2223,25 @@ public class CrmVentaService {
                     parametros);
 
         } catch (DataAccessException ex) {
-            throw traducirError(ex);
+            ResponseStatusException traducido = traducirError(ex);
+            if (traducido.getStatusCode().value() >= 500) {
+                // No registrar parámetros JDBC: incluyen identidad, ficha y referencias privadas.
+                String estado = "desconocido";
+                String regla = "no-identificada";
+                for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
+                    if (causa instanceof java.sql.SQLException sqlError && sqlError.getSQLState() != null) {
+                        estado = sqlError.getSQLState();
+                    }
+                    if (causa.getMessage() != null) {
+                        var codigo = java.util.regex.Pattern.compile("(?<![A-Z_])[A-Z][A-Z0-9_]{2,60}\\|").matcher(causa.getMessage());
+                        if (codigo.find()) regla = codigo.group().replace("|","");
+                    }
+                }
+                var nombre = java.util.regex.Pattern.compile("public\\.([a-z0-9_]+)\\s*\\(").matcher(sql);
+                LOG.error("Fallo de operación CRM: procedimiento={}, SQLSTATE={}, regla={}",
+                    nombre.find() ? nombre.group(1) : "desconocido", estado, regla);
+            }
+            throw traducido;
         }
 
         if (respuesta == null) {
