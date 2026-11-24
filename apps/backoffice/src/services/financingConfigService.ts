@@ -8,6 +8,7 @@ export interface PoliticaFinanciamientoVersion {
   publicadoEn: string;
   motivo: string;
   idPublicador: number | null;
+  nombrePublicador?: string | null;
 }
 
 export interface PoliticaFinanciamientoActual {

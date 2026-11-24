@@ -57,7 +57,7 @@ export function HistorialPoliticasFinancierasPanel({
             <div className="min-w-0">
               <p className="text-sm leading-relaxed text-brand-700">{v.motivo || 'Registro de configuración financiera'}</p>
               {v.idPublicador != null && <p className="mt-1 text-xs text-brand-500">
-                Usuario responsable: #{v.idPublicador}
+                Usuario responsable: {v.nombrePublicador?.trim() || `Usuario #${v.idPublicador}`}
               </p>}
             </div>
             <time dateTime={v.vigenteDesde}

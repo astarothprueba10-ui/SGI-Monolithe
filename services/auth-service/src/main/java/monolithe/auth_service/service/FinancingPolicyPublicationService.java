@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,7 +34,7 @@ public class FinancingPolicyPublicationService {
     }
 
     private static ResponseStatusException error(HttpStatus estado,String mensaje) {
-        return new ResponseStatusException(estado,mensaje);
+        return new MfaFlowException(estado,mensaje);
     }
 
     private long actor(Jwt jwt) {
