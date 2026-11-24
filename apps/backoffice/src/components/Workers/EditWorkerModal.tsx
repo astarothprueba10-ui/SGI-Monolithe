@@ -220,7 +220,7 @@ export function EditWorkerModal({
   onSuccess,
   onPartialUpdate
 }: EditWorkerModalProps) {
-  const { user, can } = useAuth();
+  const { can } = useAuth();
   const [worker, setWorker] = useState<TrabajadorResponse | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogosTrabajadorResponse | null>(null);
   const [form, setForm] = useState<EditFormState | null>(null);
@@ -342,7 +342,7 @@ export function EditWorkerModal({
     const cargo = worker.informacionLaboral.cargo?.toLowerCase() || '';
     return cargo.includes('gerente general') || cargo === 'gg';
   }, [worker]);
-  const protectedEmployment = isWorkerEmploymentProtected(isGerenteGeneral, user.roles, can('hr.edit'));
+  const protectedEmployment = isWorkerEmploymentProtected(isGerenteGeneral, can('hr.manage_all'), can('hr.edit'));
   const registrationDate = getWorkerRegistrationDate(worker?.fechaCreacion);
 
   function handleSelectEstado(targetValue: string) {

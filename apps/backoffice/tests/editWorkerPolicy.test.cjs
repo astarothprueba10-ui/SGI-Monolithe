@@ -50,12 +50,12 @@ test('una fecha histórica sin modificar no impide corregir otros datos', () => 
   assert.match(validateEditedWorkerStartDate('2026-10-28', '2026-10-23', null), /registro/);
 });
 
-test('RRHH con permiso de edición puede gestionar al Gerente General', () => {
-  assert.equal(isWorkerEmploymentProtected(true, ['RRHH'], true), false);
-  assert.equal(isWorkerEmploymentProtected(true, ['GERENCIA', 'RRHH'], true), false);
-  assert.equal(isWorkerEmploymentProtected(true, ['RRHH'], false), true);
-  assert.equal(isWorkerEmploymentProtected(true, ['MARKETING'], true), true);
-  assert.equal(isWorkerEmploymentProtected(false, ['RRHH'], true), false);
+test('El alcance laboral integral con permiso de edición permite gestionar al Gerente General', () => {
+  assert.equal(isWorkerEmploymentProtected(true, true, true), false);
+  assert.equal(isWorkerEmploymentProtected(true, true, true), false);
+  assert.equal(isWorkerEmploymentProtected(true, true, false), true);
+  assert.equal(isWorkerEmploymentProtected(true, false, true), true);
+  assert.equal(isWorkerEmploymentProtected(false, false, true), false);
 });
 
 test('un cambio de nombre no vuelve a enviar teléfono o fecha histórica sin modificar', () => {

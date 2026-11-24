@@ -26,3 +26,7 @@
 ## Delegación administrativa (167)
 - Los endpoints de usuarios y roles usan permisos efectivos, sin lista de roles ordinarios. ADMINISTRADOR y GERENCIA conservan la jerarquía raíz, la protección de cuentas críticas y la asignación privilegiada; los demás roles son delegados.
 - Un delegado no edita permisos de roles de sistema, de roles propios ni de roles con privilegios de seguridad. Solo puede conceder permisos que posee y nunca delegar administración de seguridad. Las asignaciones a cuentas con privilegios de seguridad superiores se rechazan. Las relaciones laborales y CRM se mantienen.
+
+## RRHH y configuración financiera (168)
+- El alcance integral de expedientes protegidos, la aprobación de reincorporaciones y la revisión documental de jefatura se expresan mediante capacidades `hr.*`. Las tres rutinas que dependían del ID físico 25 ya no lo utilizan. Se mantienen la jefatura laboral vigente para revisión documental, los controles de autoaprobación, y la protección de contactos de recuperación.
+- La autorización financiera exclusiva de Gerencia y el TOTP son una regla de seguridad explícita en docs/financiamiento_mfa_bloque3.md y docs/financiamiento_publicacion_bloque4.md. Se impide conceder `financing.configure` a roles distintos de Gerencia; no se amplía esa regla ni se altera la publicación o las políticas pactadas.

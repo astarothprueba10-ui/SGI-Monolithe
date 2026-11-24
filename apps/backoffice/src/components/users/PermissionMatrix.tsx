@@ -37,6 +37,9 @@ const ACTION_LABELS: Record<string, string> = {
   deactivate: 'Desactivar',
   assign_role: 'Asignar rol',
   assign_permissions: 'Asignar permisos',
+  manage_all: 'Gestión laboral integral',
+  approve_reincorporation: 'Resolver reincorporaciones',
+  approve_documents: 'Revisar correcciones documentales',
   request_global: 'Solicitar de toda la cartera',
   operate_advisor: 'Habilitar como asesor',
   scope_all: 'Alcance global',
@@ -131,7 +134,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
   }, [granted, originalGranted]);
 
   const toggle = (codigo: string) => {
-    if (!editable || saving || (rrhhDelegado && (/^(users|roles|permissions|audit)\./.test(codigo) || !effectivePermissions.has(codigo as import('../../types').Permission)))) return;
+    if (!editable || saving || codigo === 'financing.configure' || (rrhhDelegado && (['hr.manage_all','hr.approve_reincorporation','hr.approve_documents'].includes(codigo) || /^(users|roles|permissions|audit)\./.test(codigo) || !effectivePermissions.has(codigo as import('../../types').Permission)))) return;
 
     setGranted((prev) => {
       const next = new Set(prev);
@@ -279,7 +282,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
                           <input
                             type="checkbox"
                             checked={granted.has(permission.codigo)}
-                            disabled={!editable || saving || (rrhhDelegado && (/^(users|roles|permissions|audit)\./.test(permission.codigo) || !effectivePermissions.has(permission.codigo as import('../../types').Permission)))}
+                            disabled={!editable || saving || permission.codigo === 'financing.configure' || (rrhhDelegado && (['hr.manage_all','hr.approve_reincorporation','hr.approve_documents'].includes(permission.codigo) || /^(users|roles|permissions|audit)\./.test(permission.codigo) || !effectivePermissions.has(permission.codigo as import('../../types').Permission)))}
                             onChange={() => toggle(permission.codigo)}
                             aria-label={permission.nombre || permission.codigo}
                             className="h-4 w-4 rounded border-brand-300 accent-brand-700 disabled:cursor-not-allowed"

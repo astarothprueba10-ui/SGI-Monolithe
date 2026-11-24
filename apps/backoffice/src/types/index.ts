@@ -50,7 +50,10 @@ export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review'
   | 'sales.reassign_advisor'
   | 'annulments.scope_all'
   | 'annulments.request_global'
-  | 'crm.operate_advisor';
+  | 'crm.operate_advisor'
+  | 'hr.manage_all'
+  | 'hr.approve_reincorporation'
+  | 'hr.approve_documents';
 
 export type RoleName =
   | 'Administrador'

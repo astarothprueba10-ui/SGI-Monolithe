@@ -34,9 +34,9 @@ export function validateEditedWorkerStartDate(
     ? 'La fecha de ingreso debe ser el día de registro del trabajador o una fecha posterior.' : undefined;
 }
 
-/** RRHH con permiso de edición puede gestionar el estado laboral de cualquier cargo. */
+/** Un actor con alcance integral y permiso de edición puede gestionar el estado laboral de cualquier cargo. */
 export function isWorkerEmploymentProtected(
-  isGeneralManager: boolean, roles: readonly string[], canEdit: boolean
+  isGeneralManager: boolean, canManageAll: boolean, canEdit: boolean
 ): boolean {
-  return isGeneralManager && !(canEdit && roles.includes('RRHH'));
+  return isGeneralManager && !(canEdit && canManageAll);
 }
