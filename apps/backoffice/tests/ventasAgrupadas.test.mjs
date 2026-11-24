@@ -48,5 +48,6 @@ test('la venta se asocia después de registrar, sin recrearla si la vinculación
  assert.match(sales,/resultado\.modalidad/);
  assert.match(sales,/crmBackend\.vincularVentaAgrupada\(/);
  assert.match(sales,/Venta creada, pero sin asociar a la negociación/);
+ assert.match(sales,/setOrigenPlano\(null\);\s*setAsociacionAgrupadaPendiente\(null\);\s*await fetchSalesData\(\)/);
  assert.match(panel,/modalidad:lote\.modalidad/);
 });
