@@ -20,6 +20,7 @@ import {
   type CrmProspect,
   type CrmAdvisor,
   type CrmEtapaOperacion,
+  type CrmSeparacionAcumuladaInput,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
@@ -52,13 +53,13 @@ import {
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
 import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
-import { crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
+import { centavosImporte, crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
 // Fase 2: no enviar pagos globales al contrato antiguo (un comprobante por lote).
 const SEPARACION_ENVIO_DESHABILITADO = true;
 type LoteAdicionalSeparacion = {
-  idLote:number; codigo:string; precio:number; monto:number; dias:number;
+  idLote:number; codigo:string; precio:number; monto:number; dias:number; idPolitica:number;
 };
 
 
@@ -313,6 +314,7 @@ export function Sales() {
   const [comprobantesVenta, setComprobantesVenta] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
+  const [resultadoSeparacionIncierto,setResultadoSeparacionIncierto]=useState(false);
   const registroVentaEnCursoRef = React.useRef(false);
   const [confirmacionVenta, setConfirmacionVenta] = useState<{
     datos: CrmSaleValidationInput;
@@ -791,6 +793,7 @@ export function Sales() {
   const handleOpenModal = () => {
     void loadFormData();
     setFormTouched(false);
+    setResultadoSeparacionIncierto(false);
     setFormPaymentMethod('TRANSFERENCIA');
     setFormSaleModality('CONTADO');
     setFormSaleDownPayment('');
@@ -912,11 +915,11 @@ export function Sales() {
       ]);
       if(revision!==revisionLotesAdicionales.current)return;
       if(!precio||precio.idLote!==lote.idLote||precio.codigoMoneda!=='PEN'||precio.activo!==true||!Number.isFinite(Number(precio.precio))||Number(precio.precio)<=0||
-        !politica||!Number.isFinite(politica.montoSeparacion)||politica.montoSeparacion<=0||
+        !politica||!Number.isInteger(politica.idPolitica)||politica.idPolitica<1||!Number.isFinite(politica.montoSeparacion)||politica.montoSeparacion<=0||
         !Number.isInteger(politica.diasVencimientoSeparacion)||politica.diasVencimientoSeparacion<1)
         throw new Error('No se pudieron verificar el precio y la política del lote.');
       setLotesAdicionales(prev=>[...prev,{idLote:lote.idLote,codigo:lote.codigo,precio:Number(precio.precio),
-        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion}]);
+        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion,idPolitica:politica.idPolitica}]);
       setCandidatoAdicional('');setEditorAdicional(false);
     }catch(err:unknown){
       if(revision===revisionLotesAdicionales.current)setErrorAdicional(err instanceof Error?err.message:'No se pudo añadir el lote.');
@@ -1126,6 +1129,40 @@ export function Sales() {
     }
   };
 
+  const ejecutarRegistroSeparacionAcumulada=async()=>{
+    if(registroSeparacionEnCursoRef.current||resultadoSeparacionIncierto||!condicionesVenta||!precioLote||!selectedProspectId||!validacionPagosSeparacion.valido)return;
+    const idProspecto=Number(selectedProspectId),idPrincipal=Number(formLotId);
+    registroSeparacionEnCursoRef.current=true;setSubmitting(true);
+    let enviado=false;
+    try{
+      const lotes:CrmSeparacionAcumuladaInput['lotes']=[
+        {idLote:idPrincipal,monto:condicionesVenta.montoSeparacion,precio:Number(precioLote.precio),idPolitica:condicionesVenta.idPolitica},
+        ...lotesAdicionales.map(l=>({idLote:l.idLote,monto:l.monto,precio:l.precio,idPolitica:l.idPolitica}))
+      ];
+      const abonos:CrmSeparacionAcumuladaInput['abonos']=[];
+      for(const p of pagosSeparacionResueltos){
+        if(!p.archivo||!p.hashSha256)throw new Error('Falta verificar un comprobante.');
+        const centavos=centavosImporte(p.monto);
+        if(centavos===null)throw new Error('Importe de abono inválido.');
+        const carga=await crmBackend.subirComprobanteSeparacion(idProspecto,idPrincipal,p.archivo);
+        abonos.push({...carga,hashSha256:p.hashSha256,metodoPago:p.metodo,
+          numeroOperacion:p.metodo==='EFECTIVO'?null:p.referencia.trim()||null,monto:centavos/100});
+      }
+      enviado=true;
+      const res=await crmBackend.registrarSeparacionAcumulada({idSolicitud:crypto.randomUUID(),idProspecto,lotes,abonos,observaciones:formObservations.trim()||null});
+      if(!res.success||res.reservas.length!==lotes.length||res.abonos.length!==abonos.length)
+        throw new Error('Respuesta de registro incompleta.');
+      toast.success('Separación registrada',{description:`${res.reservas.length} lote(s) · ${formatSoles(res.total)} · Abonos pendientes de revisión.`});
+      setIsModalOpen(false);void fetchSalesData();
+    }catch(err:unknown){
+      const status=err instanceof ApiError?err.status:undefined;
+      if(enviado&&(status===undefined||status>=500)){
+        setResultadoSeparacionIncierto(true);
+        toast.error('Resultado de registro sin confirmar',{description:'Revisa las separaciones existentes antes de repetir el envío. No se realizará un reintento automático.'});
+      }else toast.error('No se pudo registrar la separación',{description:err instanceof Error?err.message:'Verifica los datos e inténtalo nuevamente.'});
+    }finally{registroSeparacionEnCursoRef.current=false;setSubmitting(false);}
+  };
+
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1144,8 +1181,7 @@ export function Sales() {
       toast.info('El registro del pago acumulado requiere la integración financiera de la fase 3.');
       return;
     }
-    // No se admite el contrato anterior. La fase 3 conectará el nuevo registro transaccional.
-    toast.error('El servicio de pagos acumulados aún no está conectado.');
+    await ejecutarRegistroSeparacionAcumulada();
   };
 
   const confirmarRegistroVentaPendiente = async () => {
@@ -2220,7 +2256,7 @@ export function Sales() {
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
-                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO || !validacionPagosSeparacion.valido))
+                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO || !validacionPagosSeparacion.valido || resultadoSeparacionIncierto))
               }
               onClick={handleProcessOperation}
             >
@@ -2663,6 +2699,7 @@ export function Sales() {
                   <p>El vencimiento requiere revisión; no libera el lote ni anula pagos automáticamente.</p>
                   <p>Finanzas revisará los comprobantes antes de acreditar los pagos. Los lotes registrados quedarán reservados.</p>
                 </div>
+                {resultadoSeparacionIncierto&&<Alert tone="warning" title="Registro sin confirmar">Consulta el listado antes de volver a registrar la operación.</Alert>}
                 {SEPARACION_ENVIO_DESHABILITADO&&<Alert tone="warning" title="Registro temporalmente no disponible">
                   La interfaz de pagos acumulados está preparada. La conexión con Finanzas se habilitará al terminar la integración.
                 </Alert>}

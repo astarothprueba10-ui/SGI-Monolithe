@@ -307,6 +307,18 @@ export interface CrmSeparacionInput {
   hashSha256?: string | null;
 }
 
+export interface CrmSeparacionAcumuladaInput {
+  idSolicitud:string;
+  idProspecto:number;
+  lotes:{idLote:number;monto:number;precio:number;idPolitica:number}[];
+  abonos:Omit<CrmSeparacionInput,'idProspecto'|'idLote'|'observaciones'>[];
+  observaciones:string|null;
+}
+export interface CrmSeparacionAcumuladaResult {
+  success:boolean;idGrupo:string;total:number;
+  reservas:{idReserva:number;idLote:number;monto:number}[];
+  abonos:{idPago:number;idVoucher:number;monto:number}[];
+}
 export interface CrmSeparacionResult {
   success: boolean;
   id_reserva: number;
@@ -335,6 +347,8 @@ export interface CrmSeparacionUpload {
 }
 
 export interface CrmSeparacionVoucherItem {
+  id_grupo?:string|null;
+  lotes_grupo?:string|null;
   id_voucher: number;
   codigo_voucher: string;
   estado_voucher: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
@@ -1269,6 +1283,8 @@ export interface CrmCancelPendingSaleResult {
 }
 
 export interface CrmConciliacionSeparacion {
+  id_grupo?:string|null;
+  lotes_grupo?:string|null;
   id_pago: number;
   codigo_pago: string;
   monto: number;
@@ -1807,6 +1823,8 @@ export const crmBackend = {
 
   cambiarLoteInteres: (idProspecto:number,idProyecto:number,idLote:number,idLoteAnterior:number|null,motivo:string) =>
     coreApi.post<{idLoteInteres:number;codigoLoteInteres:string}>(`/crm/prospectos/${idProspecto}/intereses/lote`,{idProyecto,idLote,idLoteAnterior,motivo}),
+  registrarSeparacionAcumulada: (body:CrmSeparacionAcumuladaInput) =>
+    coreApi.post<CrmSeparacionAcumuladaResult>('/crm/separaciones/acumulada',body),
   registrarSeparacionesMultiples: (lotes: CrmSeparacionInput[]) =>
     coreApi.post<CrmSeparacionResult[]>('/crm/separaciones/multiples',{lotes}),
   registrarSeparacion: (body: CrmSeparacionInput) =>

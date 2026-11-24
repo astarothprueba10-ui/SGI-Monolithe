@@ -329,6 +329,21 @@ public class CrmVentaService {
             """,actor,prospecto,proyecto,lote,anterior,motivo);
     }
 
+    @Transactional
+    public JsonNode registrarSeparacionAcumulada(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("""
+                SELECT public.sp_crm_registrar_separacion_acumulada_v1(
+                    CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+                    CAST(? AS jsonb),CAST(? AS jsonb),CAST(? AS text))::text
+                """,actor,req.idSolicitud().toString(),req.idProspecto(),
+                jsonMapper.writeValueAsString(req.lotes()),jsonMapper.writeValueAsString(req.abonos()),req.observaciones());
+        } catch(JacksonException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se pudieron interpretar los lotes o abonos.");
+        }
+    }
+
     /** Una única transacción: si falla un lote, no queda ninguna reserva ni pago parcial. */
     @Transactional
     public JsonNode registrarSeparacionesMultiples(Long actor, java.util.List<RegistrarSeparacionCrmRequest> lotes) {

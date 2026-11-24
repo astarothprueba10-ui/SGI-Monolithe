@@ -156,6 +156,40 @@ public class CrmSeparacionStorageService {
         return extraerEnlaceCarga(respuesta, clave, base, ruta, req.tipoMime());
     }
 
+    /** Verifica el contenido del archivo real, no una huella aportada solamente por el navegador. */
+    public void verificarComprobantesAcumulados(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        if(actor==null||actor<=0||req==null||req.lotes()==null||req.lotes().isEmpty()||req.abonos()==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Solicitud de separación inválida.");
+        Long principal=req.lotes().get(0).idLote();
+        // Limita el alcance antes de acceder a Storage con credenciales del servidor.
+        ventaService.validarSeparacionPreviaCarga(actor,req.idProspecto(),principal);
+        String prefijo="separaciones/p-"+req.idProspecto()+"/l-"+principal+"/";
+        var hashes=new java.util.HashSet<String>();
+        for(var abono:req.abonos()) {
+            String ext=resolverExtension(abono.tipoMime());
+            if(abono.claveArchivo()==null||!abono.claveArchivo().startsWith(prefijo)||
+                !abono.claveArchivo().substring(prefijo.length()).matches("[0-9a-fA-F-]{36}\\."+ext))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Ruta de comprobante inválida.");
+            try {
+                String hash=restClient.get().uri(validarYResolverBase()+"/object/authenticated/"+BUCKET+"/"+abono.claveArchivo())
+                    .header("apikey",serviceRoleKey).header("Authorization","Bearer "+serviceRoleKey)
+                    .exchange((request,response)->{
+                        if(!response.getStatusCode().is2xxSuccessful())
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se encontró el comprobante cargado.");
+                        byte[] bytes=response.getBody().readNBytes((int)MAX_BYTES+1);
+                        if(bytes.length!=abono.tamanioBytes()||bytes.length>MAX_BYTES)
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"El tamaño del comprobante no coincide.");
+                        try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+                        catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
+                    });
+                if(hash==null||!hash.equalsIgnoreCase(abono.hashSha256())||!hashes.add(hash))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante duplicado o huella no válida.");
+            } catch(RestClientException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"No se pudo verificar el comprobante en Storage.",ex);
+            }
+        }
+    }
+
     /** Ventas: genera URL de carga privada después de verificar lote, precio y cartera. */
     public EnlaceCargaVoucherResponse prepararCargaVenta(
             Long actor, PrepararCargaVoucherVentaRequest req) {

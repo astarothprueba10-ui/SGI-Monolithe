@@ -114,3 +114,19 @@ test('fase 2 separa el pago acumulado de los lotes y bloquea el contrato anterio
   assert.match(panel,/crypto\.subtle\.digest/);
   assert.match(panel,/Total declarado en abonos/);
 });
+
+
+test('fase 3 prepara endpoint acumulado y evita la duplicación de ingresos',()=>{
+  const sql=readFileSync(new URL('../../../database/migrations/154_separaciones_pago_acumulado_v1.sql',import.meta.url),'utf8');
+  const backend=readFileSync(new URL('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmVentaService.java',import.meta.url),'utf8');
+  const storage=readFileSync(new URL('../../../services/core-service/src/main/java/monolithe/core_service/service/CrmSeparacionStorageService.java',import.meta.url),'utf8');
+  assert.match(sql,/CREATE TABLE public\.pag_separaciones_grupo_distribucion_v1/);
+  assert.match(sql,/IF v_pagado<>v_total/);
+  assert.match(sql,/pg_advisory_xact_lock/);
+  assert.match(sql,/ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql,/sp_fin_revisar_abono_separacion_grupo_v1/);
+  assert.match(sales,/crmBackend\.registrarSeparacionAcumulada/);
+  assert.match(backend,/sp_crm_registrar_separacion_acumulada_v1/);
+  assert.match(storage,/MessageDigest\.getInstance\("SHA-256"\)/);
+  assert.match(sales,/resultadoSeparacionIncierto/);
+});

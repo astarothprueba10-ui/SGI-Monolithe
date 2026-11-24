@@ -210,6 +210,16 @@ public class CrmVentaController {
         public record SeparacionesMultiplesRequest(
             @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Size(min=2,max=20)
             java.util.List<@jakarta.validation.constraints.NotNull @Valid RegistrarSeparacionCrmRequest> lotes) {}
+        @PostMapping("/separaciones/acumulada")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarSeparacionAcumulada(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+            Long actor=obtenerActor(jwt);
+            separacionStorageService.verificarComprobantesAcumulados(actor,req);
+            return service.registrarSeparacionAcumulada(actor,req);
+        }
+
         @PostMapping("/separaciones/multiples")
         @ResponseStatus(HttpStatus.CREATED)
         @PreAuthorize("hasAuthority('sales.create')")

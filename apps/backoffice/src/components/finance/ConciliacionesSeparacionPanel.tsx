@@ -189,7 +189,7 @@ export function ConciliacionesSeparacionPanel() {
                                 </TD>
 
                                 <TD>
-                                    <p className="font-medium">{item.codigo_lote}</p>
+                                    <p className="font-medium">{item.lotes_grupo || item.codigo_lote}</p>
                                     <p className="text-xs text-brand-500">
                                         {item.codigo_venta ?? item.codigo_reserva}
                                     </p>
