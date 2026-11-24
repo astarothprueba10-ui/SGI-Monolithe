@@ -173,6 +173,18 @@ public class CrmVentaService {
     }
 
     @Transactional
+    public JsonNode registrarVentasMultiples(Long actor,JsonNode request) {
+        validarActor(actor);
+        if(request==null || !request.isArray() || request.size()<1 || request.size()>20
+            || request.toString().length()>400000)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise las condiciones de los lotes.");
+        return ejecutar("""
+            SELECT public.sp_crm_registrar_ventas_multiples_v1(
+              CAST(? AS bigint),CAST(? AS jsonb))::text
+            """,actor,request.toString());
+    }
+
+    @Transactional
     public JsonNode registrarVentaPendiente(
             Long actor,
             FormalizarVentaCrmRequest req) {

@@ -168,6 +168,14 @@ public class CrmVentaController {
                     .body(service.vincularVentaAgrupada(obtenerActor(jwt),idOperacion,idVenta));
         }
 
+        @PostMapping("/ventas/pendientes/multiple")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarVentasMultiples(@AuthenticationPrincipal Jwt jwt,
+                @RequestBody JsonNode request) {
+            return service.registrarVentasMultiples(obtenerActor(jwt),request);
+        }
+
         @PostMapping("/ventas/pendientes")
         @ResponseStatus(HttpStatus.CREATED)
         @PreAuthorize("hasAuthority('sales.create')")
