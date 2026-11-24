@@ -48,7 +48,9 @@ export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review'
   | 'sales.approve_reservation_change'
   | 'sales.notify_expiry_all'
   | 'sales.reassign_advisor'
-  | 'annulments.scope_all';
+  | 'annulments.scope_all'
+  | 'annulments.request_global'
+  | 'crm.operate_advisor';
 
 export type RoleName =
   | 'Administrador'

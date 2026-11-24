@@ -73,17 +73,14 @@ const resumenLegal = (s: CasoLegal): Expediente => ({
 });
 
 export function Anulaciones() {
-  const { can, user } = useAuth();
+  const { can } = useAuth();
   const puedeVer = can('annulments.view');
   const comercial = puedeVer && can('sales.view');
-  const gerencia = puedeVer && user.roles.includes('Gerencia') &&
-    (can('annulments.approve') || can('annulments.reject'));
-  const finanzas = puedeVer && can('annulments.review_finance') &&
-    user.roles.includes('Finanzas') && !user.roles.includes('Gerencia');
-  const legal = puedeVer && can('annulments.review_legal') &&
-    user.roles.includes('Asesoría Legal') && !user.roles.includes('Gerencia');
-  const puedeSolicitar = comercial && can('annulments.create') &&
-    user.roles.some((r) => ['Gerencia', 'Administrador', 'Asesor', 'Supervisor comercial'].includes(r));
+  const decide = can('annulments.approve') || can('annulments.reject');
+  const gerencia = puedeVer && decide;
+  const finanzas = puedeVer && can('annulments.review_finance') && !decide;
+  const legal = puedeVer && can('annulments.review_legal') && !decide;
+  const puedeSolicitar = comercial && can('annulments.create');
   const accionesGerencia = ACCIONES.filter((accion) =>
     accion.codigo === 'RECHAZAR' ? can('annulments.reject') : can('annulments.approve'));
 

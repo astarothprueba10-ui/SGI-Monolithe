@@ -37,6 +37,8 @@ const ACTION_LABELS: Record<string, string> = {
   deactivate: 'Desactivar',
   assign_role: 'Asignar rol',
   assign_permissions: 'Asignar permisos',
+  request_global: 'Solicitar de toda la cartera',
+  operate_advisor: 'Habilitar como asesor',
   scope_all: 'Alcance global',
   scope_assigned: 'Cartera asignada',
   assign_advisor: 'Asignar asesores',
