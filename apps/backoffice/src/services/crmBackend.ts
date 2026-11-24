@@ -2424,7 +2424,7 @@ export const crmBackend = {
 
   registrarVentasMultiples: (ventas: Array<CrmSaleValidationInput & {creditoEsperado:number;pagoEsperado:number}>) =>
     coreApi.post<{success:boolean;idOperacion:number|null;codigoOperacion:string|null;ventas:CrmPendingSaleResult[];totalPago:number}>(
-      '/crm/ventas/pendientes/multiple',ventas
+      '/crm/ventas/pendientes/multiple',{ventas}
     ),
 
   registrarVentaPendiente: (body: CrmSaleValidationInput) =>

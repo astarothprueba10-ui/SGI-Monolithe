@@ -173,7 +173,7 @@ public class CrmVentaController {
         @PreAuthorize("hasAuthority('sales.create')")
         public JsonNode registrarVentasMultiples(@AuthenticationPrincipal Jwt jwt,
                 @RequestBody JsonNode request) {
-            return service.registrarVentasMultiples(obtenerActor(jwt),request);
+            return service.registrarVentasMultiples(obtenerActor(jwt),request==null?null:request.get("ventas"));
         }
 
         @PostMapping("/ventas/pendientes")

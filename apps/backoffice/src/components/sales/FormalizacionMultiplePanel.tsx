@@ -67,7 +67,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,proyectos,compr
  });
  const validar=async()=>{
   if(enCurso.current||incierto||!seleccion.length)return;
-  setError('');
+  enCurso.current=true;setBusy(true);onBusy(true);setError('');
   try {
    const refs=new Set<string>(),huellas=new Set<string>();
    for(const d of seleccion){
@@ -83,7 +83,6 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,proyectos,compr
      if(huellas.has(hash))throw new Error('No reutilice el mismo comprobante para otro lote.');huellas.add(hash);
     }
    }
-   enCurso.current=true;setBusy(true);onBusy(true);
    for(const d of seleccion){
     const v=await crmBackend.validarVenta(datos(d));
     if(!v.elegible||v.idPolitica!==d.politica.idPolitica||Number(v.montoReservaAplicable)!==credito(d)||
