@@ -118,3 +118,24 @@ test('migración 116 acepta el correo principal ya registrado, sin quitar MFA ni
     assert.doesNotMatch(code,/@monolithe\.pe/);
   }
 });
+
+
+test('publicación presenta errores financieros comprensibles y conserva borrador ante TOTP inválido',()=>{
+  const ui=read('../src/components/financing/PublicarPoliticaFinancieraPanel.tsx');
+  const totp=read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/FinancingTotpService.java');
+  const pub=read('../../../services/auth-service/src/main/java/monolithe/auth_service/service/FinancingPolicyPublicationService.java');
+  const historial=read('../src/components/financing/HistorialPoliticasFinancierasPanel.tsx');
+  const sql=read('../../../database/migrations/151_financiamiento_historial_nombre_responsable_v1.sql');
+  assert.match(ui,/Escriba “PUBLICAR V\{vista\.versionNueva\}”/);
+  assert.match(ui,/Código del autenticador rechazado/);
+  assert.match(ui,/status === 403/);
+  assert.match(ui,/status === 429/);
+  assert.match(ui,/if \(!detalle\.reintentarCodigo\)/);
+  assert.match(ui,/<Modal open=\{error !== null\}/);
+  assert.match(totp,/new MfaFlowException\(status, mensaje\)/);
+  assert.match(pub,/new MfaFlowException\(estado,mensaje\)/);
+  assert.match(historial,/v\.nombrePublicador\?\.trim/);
+  assert.match(sql,/'nombrePublicador'/);
+  assert.match(sql,/JOIN public\.core_personas pe/);
+  assert.doesNotMatch(sql,/UPDATE public\.cfg_fin_politicas_versiones/);
+});

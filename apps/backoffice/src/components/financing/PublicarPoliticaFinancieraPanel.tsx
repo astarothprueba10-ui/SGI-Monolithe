@@ -4,6 +4,7 @@ import { formatSoles } from '../../utils/financeMoney';
 import { Alert } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
+import { Modal } from '../ui/Modal';
 import { ApiError } from '../../lib/apiClient';
 import type { PoliticaFinanciamientoActual } from '../../services/financingConfigService';
 import {
@@ -236,8 +237,7 @@ export function PublicarPoliticaFinancieraPanel({
         <span className="font-semibold">{cambiosPendientes} {cambiosPendientes===1 ? 'campo modificado' : 'campos modificados'}</span>
       </div>
 
-      {error && !vista && <div role="alert"><Alert tone="danger" title={error.titulo}>{error.mensaje}</Alert></div>}
-      {mensaje && <Alert tone="success" title="Confirmación">{mensaje}</Alert>}
+       {mensaje && <Alert tone="success" title="Confirmación">{mensaje}</Alert>}
 
       {politica.idProyecto && <label className="block text-xs font-medium text-brand-700">
         Aplicación de la política
@@ -337,8 +337,7 @@ export function PublicarPoliticaFinancieraPanel({
           <p className="mt-1 break-all font-mono">{vista.hashPropuesta}</p>
         </details>
 
-        {error && <div role="alert"><Alert tone="danger" title={error.titulo}>{error.mensaje}</Alert></div>}
-        {!vista.publicacionHabilitada ? <div className="space-y-3">
+         {!vista.publicacionHabilitada ? <div className="space-y-3">
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <LockKeyholeIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true"/>
             <div>
@@ -403,5 +402,12 @@ export function PublicarPoliticaFinancieraPanel({
         </div>}
       </div>}
     </div>
+    <Modal open={error !== null} onClose={()=>setError(null)}
+      title={error?.titulo ?? 'Aviso de publicación'} width="max-w-md"
+      footer={<Button variant="primary" onClick={()=>setError(null)}>
+        {error?.reintentarCodigo ? 'Ingresar nuevo código' : 'Entendido'}
+      </Button>}>
+      {error && <div role="alert"><Alert tone="warning" title="Revise la operación">{error.mensaje}</Alert></div>}
+    </Modal>
   </section>;
 }
