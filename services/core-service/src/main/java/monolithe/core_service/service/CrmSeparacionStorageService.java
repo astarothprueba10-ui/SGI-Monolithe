@@ -156,6 +156,34 @@ public class CrmSeparacionStorageService {
         return extraerEnlaceCarga(respuesta, clave, base, ruta, req.tipoMime());
     }
 
+    public EnlaceCargaVoucherResponse prepararSubsanacionSeparacion(Long actor,Long reserva,Long voucher,String mime) {
+        if(mime==null||!MIMES_PERMITIDOS.contains(mime))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Formato no permitido.");
+        JsonNode ctx=ventaService.contextoSubsanacionSeparacion(actor,reserva,voucher);
+        String clave="separaciones/p-"+ctx.path("idProspecto").asLong()+"/l-"+ctx.path("idLote").asLong()+"/"+UUID.randomUUID()+"."+resolverExtension(mime);
+        String base=validarYResolverBase(),ruta="/object/upload/sign/"+BUCKET+"/"+clave;
+        return extraerEnlaceCarga(solicitarUrlCargaStorage(base+ruta),clave,base,ruta,mime);
+    }
+
+    public void verificarSubsanacionSeparacion(Long actor,Long reserva,Long voucher,monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+        JsonNode ctx=ventaService.contextoSubsanacionSeparacion(actor,reserva,voucher);
+        String prefijo="separaciones/p-"+ctx.path("idProspecto").asLong()+"/l-"+ctx.path("idLote").asLong()+"/";
+        String ext=resolverExtension(req.tipoMime());
+        if(!req.claveArchivo().startsWith(prefijo)||!req.claveArchivo().substring(prefijo.length()).matches("[0-9a-fA-F-]{36}\\."+ext))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Ruta de comprobante inválida.");
+        try {
+            String hash=restClient.get().uri(validarYResolverBase()+"/object/authenticated/"+BUCKET+"/"+req.claveArchivo())
+                .header("apikey",serviceRoleKey).header("Authorization","Bearer "+serviceRoleKey)
+                .exchange((request,response)->{
+                    if(!response.getStatusCode().is2xxSuccessful())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante no disponible.");
+                    byte[] bytes=response.getBody().readNBytes((int)MAX_BYTES+1);
+                    if(bytes.length!=req.tamanioBytes()||bytes.length>MAX_BYTES)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tamaño inválido.");
+                    try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+                    catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
+                });
+            if(hash==null||!hash.equalsIgnoreCase(req.hashSha256()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Huella no válida.");
+        } catch(RestClientException ex){throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"No se pudo verificar el comprobante.",ex);}
+    }
+
     /** Verifica el contenido del archivo real, no una huella aportada solamente por el navegador. */
     public void verificarComprobantesAcumulados(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
         if(actor==null||actor<=0||req==null||req.lotes()==null||req.lotes().isEmpty()||req.abonos()==null)

@@ -752,6 +752,21 @@ public class CrmVentaService {
     }
 
     @Transactional(readOnly=true)
+    public JsonNode contextoSubsanacionSeparacion(Long actor,Long reserva,Long voucher) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_contexto_subsanacion_sep_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text",actor,reserva,voucher);
+    }
+
+    @Transactional
+    public JsonNode subsanarAbonoSeparacion(Long actor,Long reserva,Long voucher,monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("SELECT public.sp_crm_subsanar_abono_sep_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS jsonb))::text",
+                actor,reserva,voucher,jsonMapper.writeValueAsString(req));
+        } catch(JacksonException ex) {throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante inválido.");}
+    }
+
+    @Transactional(readOnly=true)
     public JsonNode listarComprobantesSeparacion(Long actor,Long idReserva) {
         validarActor(actor);
         if(idReserva==null||idReserva<=0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Identificador de separación inválido.");

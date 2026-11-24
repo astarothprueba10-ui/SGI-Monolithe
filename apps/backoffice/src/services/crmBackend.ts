@@ -2092,6 +2092,19 @@ export const crmBackend = {
     );
   },
 
+  subsanarComprobanteSeparacion:async(idReserva:number,idVoucher:number,archivo:File)=>{
+    if(!archivo||archivo.size<1||archivo.size>5242880||!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.name.length>255)
+      throw new Error('Adjunta un PDF, JPG, PNG o WebP de hasta 5 MB.');
+    const digest=await crypto.subtle.digest('SHA-256',await archivo.arrayBuffer());
+    const hashSha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+    const ruta=`/crm/separaciones/${idReserva}/comprobantes/${idVoucher}`;
+    const carga=await coreApi.post<CrmSeparacionUpload>(ruta+'/preparar-subsanacion',{tipoMime:archivo.type});
+    const token=new URL(carga.urlCarga).searchParams.get('token');
+    if(!token||carga.bucket!=='vouchers-separacion-private')throw new Error('Carga no autorizada.');
+    const {error}=await supabase.storage.from(carga.bucket).uploadToSignedUrl(carga.claveArchivo,token,archivo,{contentType:archivo.type,upsert:false});
+    if(error)throw new Error(error.message);
+    return coreApi.post<{success:boolean;idVoucher:number;version:number}>(ruta+'/subsanar',{claveArchivo:carga.claveArchivo,nombreArchivo:archivo.name,tipoMime:archivo.type,tamanioBytes:archivo.size,hashSha256});
+  },
   listarComprobantesSeparacion:(idReserva:number)=>coreApi.get<CrmAbonosSeparacion>(`/crm/separaciones/${idReserva}/comprobantes`),
   obtenerComprobanteSeparacionEspecifico:(idReserva:number,idVoucher:number)=>coreApi.get<CrmVoucherReadUrl>(`/crm/separaciones/${idReserva}/comprobantes/${idVoucher}/url-firmada`),
 

@@ -4,12 +4,25 @@ import { toast } from 'sonner';
 import { crmBackend,type CrmAbonosSeparacion } from '../../services/crmBackend';
 import { formatSoles } from '../../utils/financeMoney';
 
-export function ComprobanteSeparacionPreview({idReserva}:{idReserva:number}){
+export function ComprobanteSeparacionPreview({idReserva,puedeSubsanar=false}:{idReserva:number;puedeSubsanar?:boolean}){
   const [datos,setDatos]=useState<CrmAbonosSeparacion|null>(null);
   const [cargando,setCargando]=useState(true);
   const [error,setError]=useState('');
   const [intento,setIntento]=useState(0);
   const [abriendo,setAbriendo]=useState<number|null>(null);
+  const [subsanando,setSubsanando]=useState<number|null>(null);
+  const [archivo,setArchivo]=useState<File|null>(null);
+  const [guardando,setGuardando]=useState(false);
+  const subsanar=async()=>{
+    if(subsanando===null||!archivo||guardando)return;
+    setGuardando(true);
+    try{
+      await crmBackend.subsanarComprobanteSeparacion(idReserva,subsanando,archivo);
+      toast.success('Comprobante reemplazado; pendiente de nueva revisión.');
+      setSubsanando(null);setArchivo(null);setIntento(i=>i+1);
+    }catch(e:unknown){toast.error('No se pudo subsanar',{description:e instanceof Error?e.message:'Intenta nuevamente.'});}
+    finally{setGuardando(false);}
+  };
   useEffect(()=>{
     let vigente=true;
     setDatos(null);setError('');setCargando(true);
@@ -42,6 +55,16 @@ export function ComprobanteSeparacionPreview({idReserva}:{idReserva:number}){
           <div className="text-right"><p className="font-semibold text-sm">{formatSoles(v.montoAbono)}</p>{datos.agrupada&&<p className="text-xs text-brand-500">Asignado a este lote: {formatSoles(v.montoLote)}</p>}</div>
         </div>
         <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-brand-800 underline disabled:opacity-50" disabled={abriendo!==null} onClick={()=>void abrir(v.idVoucher)}>{abriendo===v.idVoucher?'Abriendo…':'Ver archivo original'}<ExternalLinkIcon className="h-3 w-3"/></button>
+        {puedeSubsanar&&datos.agrupada&&v.estado==='RECHAZADO'&&<div className="border-t border-brand-100 pt-2">
+          {subsanando===v.idVoucher?<div className="space-y-2">
+            <p className="text-xs text-brand-600">Reemplaza únicamente el comprobante de este abono. Se conserva su importe y referencia, y Finanzas debe aprobarlo nuevamente.</p>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" disabled={guardando} onChange={e=>setArchivo(e.target.files?.[0]??null)} className="block w-full text-xs"/>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={guardando} onClick={()=>{setSubsanando(null);setArchivo(null)}} className="rounded border px-3 py-2 text-xs">Cancelar</button>
+              <button type="button" disabled={guardando||!archivo} onClick={()=>void subsanar()} className="rounded bg-brand-800 px-3 py-2 text-xs text-white disabled:opacity-50">{guardando?'Enviando…':'Enviar a revisión'}</button>
+            </div>
+          </div>:<button type="button" disabled={guardando} onClick={()=>{setSubsanando(v.idVoucher);setArchivo(null)}} className="text-xs font-semibold text-brand-800 underline">Subsanar comprobante rechazado</button>}
+        </div>}
       </div>)}
   </section>;
 }

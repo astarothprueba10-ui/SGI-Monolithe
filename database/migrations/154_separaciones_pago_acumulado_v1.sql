@@ -3292,4 +3292,68 @@ BEGIN
  RETURN v_resultado;
 END;
 $function$;
+
+-- Subsanación por versión: no se crea otro pago ni se cambia la distribución.
+CREATE FUNCTION public.sp_crm_contexto_subsanacion_sep_v1(p_actor bigint,p_reserva bigint,p_voucher bigint)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $sub$
+DECLARE r record;
+BEGIN
+ IF NOT coalesce(public.fn_usuario_tiene_permiso_seguridad(p_actor,'sales.create'::varchar),false)
+ OR NOT public.fn_crm_puede_ver_comprobantes_separacion_v2(p_actor,p_reserva)
+ THEN RAISE EXCEPTION 'DENEGADO|No autorizado para subsanar.'; END IF;
+ SELECT g.id_grupo,g.id_prospecto,p.id_pago,p.monto,l.id_lote INTO r
+ FROM public.pag_vouchers v JOIN public.pag_pagos p USING(id_pago)
+ JOIN public.pag_separaciones_grupo_abonos_v1 a USING(id_pago)
+ JOIN public.ven_separaciones_grupo_v1 g USING(id_grupo)
+ JOIN public.ven_reservas l ON l.id_reserva=p.id_reserva
+ JOIN public.cfg_estados_voucher ev USING(id_estado_voucher)
+ JOIN public.cfg_estados_pago ep USING(id_estado_pago)
+ WHERE v.id_voucher=p_voucher AND v.activo AND ev.codigo='RECHAZADO' AND ep.codigo='ANULADO'
+ AND g.estado='REQUIERE_REVISION'
+ AND EXISTS(SELECT 1 FROM public.ven_separaciones_grupo_lotes_v1 gl WHERE gl.id_grupo=g.id_grupo AND gl.id_reserva=p_reserva)
+ AND NOT EXISTS(SELECT 1 FROM public.fin_movimientos m WHERE m.id_pago=p.id_pago)
+ AND NOT EXISTS(SELECT 1 FROM public.pag_separaciones_grupo_distribucion_v1 d WHERE d.id_pago=p.id_pago AND d.id_venta IS NOT NULL);
+ IF NOT FOUND OR NOT coalesce(public.fn_crm_puede_consultar_prospecto(p_actor,r.id_prospecto),false)
+ THEN RAISE EXCEPTION 'OPERACION_INVALIDA|El abono no admite subsanación.'; END IF;
+ RETURN jsonb_build_object('idGrupo',r.id_grupo,'idPago',r.id_pago,'idProspecto',r.id_prospecto,'idLote',r.id_lote,'monto',r.monto);
+END; $sub$;
+REVOKE ALL ON FUNCTION public.sp_crm_contexto_subsanacion_sep_v1(bigint,bigint,bigint) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_contexto_subsanacion_sep_v1(bigint,bigint,bigint) TO sigi_app_user;
+
+CREATE FUNCTION public.sp_crm_subsanar_abono_sep_v1(p_actor bigint,p_reserva bigint,p_voucher bigint,p_archivo jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $sub$
+DECLARE ctx jsonb;g uuid;pid bigint;vid bigint;version integer; ruta text;mime text;ext text;huella text;nombre text;tam bigint;evento bigint;
+BEGIN
+ ctx:=public.sp_crm_contexto_subsanacion_sep_v1(p_actor,p_reserva,p_voucher);
+ g:=(ctx->>'idGrupo')::uuid;pid:=(ctx->>'idPago')::bigint;
+ PERFORM 1 FROM public.inm_lotes l JOIN public.ven_reservas r USING(id_lote) JOIN public.ven_separaciones_grupo_lotes_v1 gl USING(id_reserva) WHERE gl.id_grupo=g ORDER BY l.id_lote FOR UPDATE OF l;
+ PERFORM 1 FROM public.ven_separaciones_grupo_v1 WHERE id_grupo=g FOR UPDATE;
+ PERFORM 1 FROM public.ven_reservas r JOIN public.ven_separaciones_grupo_lotes_v1 gl USING(id_reserva) WHERE gl.id_grupo=g ORDER BY r.id_reserva FOR UPDATE OF r;
+ PERFORM 1 FROM public.pag_pagos WHERE id_pago=pid FOR UPDATE;
+ PERFORM 1 FROM public.pag_vouchers WHERE id_voucher=p_voucher FOR UPDATE;
+ ctx:=public.sp_crm_contexto_subsanacion_sep_v1(p_actor,p_reserva,p_voucher);
+ ruta:=p_archivo->>'claveArchivo';mime:=p_archivo->>'tipoMime';huella:=lower(p_archivo->>'hashSha256');nombre:=btrim(p_archivo->>'nombreArchivo');
+ ext:=CASE mime WHEN 'application/pdf' THEN 'pdf' WHEN 'image/jpeg' THEN 'jpg' WHEN 'image/png' THEN 'png' WHEN 'image/webp' THEN 'webp' END;
+ IF ext IS NULL OR ruta IS NULL OR ruta!~('^separaciones/p-'||(ctx->>'idProspecto')||'/l-'||(ctx->>'idLote')||'/[0-9a-fA-F-]{36}[.]'||ext||'$')
+ OR huella IS NULL OR huella!~'^[0-9a-f]{64}$' OR nombre IS NULL OR length(nombre) NOT BETWEEN 1 AND 255 OR nombre~'[[:cntrl:]]'
+ THEN RAISE EXCEPTION 'DATOS_INVALIDOS|Comprobante inválido.'; END IF;
+ SELECT (metadata->>'size')::bigint INTO tam FROM storage.objects WHERE bucket_id='vouchers-separacion-private' AND name=ruta AND archived_at IS NULL AND NOT is_delete_marker AND lower(metadata->>'mimetype')=mime;
+ IF tam IS NULL OR tam NOT BETWEEN 1 AND 5242880 OR tam IS DISTINCT FROM (p_archivo->>'tamanioBytes')::bigint THEN RAISE EXCEPTION 'ARCHIVO_NO_EXISTE|Comprobante no disponible.'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('separacion-acumulada-abonos-v1',154));
+ IF EXISTS(SELECT 1 FROM public.pag_vouchers WHERE clave_archivo=ruta OR lower(hash_sha256)=huella) THEN RAISE EXCEPTION 'ARCHIVO_DUPLICADO|El comprobante ya fue registrado.'; END IF;
+ SELECT coalesce(max(numero_version),0)+1 INTO version FROM public.pag_vouchers WHERE id_pago=pid;
+ UPDATE public.pag_vouchers SET activo=false,fecha_actualizacion=now() WHERE id_voucher=p_voucher;
+ vid:=nextval(pg_get_serial_sequence('public.pag_vouchers','id_voucher'));
+ INSERT INTO public.pag_vouchers(id_voucher,id_pago,id_estado_voucher,codigo,numero_version,nombre_archivo_original,clave_archivo,tipo_mime,tamanio_bytes,hash_sha256,fecha_carga,id_usuario_carga,activo) OVERRIDING SYSTEM VALUE
+ VALUES(vid,pid,(SELECT id_estado_voucher FROM public.cfg_estados_voucher WHERE codigo='PENDIENTE' AND activo),'VOU-SEP-'||vid,version,nombre,ruta,mime,tam,huella,now(),p_actor,true);
+ UPDATE public.pag_pagos SET id_estado_pago=(SELECT id_estado_pago FROM public.cfg_estados_pago WHERE codigo='REGISTRADO' AND activo),
+ fecha_anulacion=NULL,id_usuario_anulacion=NULL,motivo_anulacion=NULL,fecha_actualizacion=now() WHERE id_pago=pid;
+ -- El grupo sigue retenido hasta una nueva aprobación; no se amplía su vigencia.
+ SELECT public.sp_registrar_auditoria(p_actor,'CRM'::varchar,'SUBSANACION_ABONO_SEPARACION'::varchar,'SEPARACION_GRUPO'::varchar,g::text::varchar,'EXITOSO'::varchar,'Nueva versión de comprobante rechazado'::varchar,jsonb_build_object('idPago',pid,'voucherAnterior',p_voucher,'voucherNuevo',vid,'version',version)) INTO evento;
+ IF evento IS NULL THEN RAISE EXCEPTION 'AUDITORIA_FALLIDA|No se registró auditoría.'; END IF;
+ RETURN jsonb_build_object('success',true,'idPago',pid,'idVoucher',vid,'version',version);
+END; $sub$;
+REVOKE ALL ON FUNCTION public.sp_crm_subsanar_abono_sep_v1(bigint,bigint,bigint,jsonb) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_subsanar_abono_sep_v1(bigint,bigint,bigint,jsonb) TO sigi_app_user;
+
 COMMIT;

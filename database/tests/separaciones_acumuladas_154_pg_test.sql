@@ -110,4 +110,20 @@ BEGIN
  EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'DENEGADO|%' THEN RAISE; END IF;END;
  IF public.fn_crm_metodo_pago_reserva_v2(1,r2) IS NULL THEN RAISE EXCEPTION 'Método del lote adicional no visible';END IF;
 END $$;
+DO $$
+DECLARE r bigint;v bigint;p bigint;outcome jsonb;archivo jsonb;n bigint;
+BEGIN
+ SELECT id_reserva INTO STRICT r FROM public.ven_reservas WHERE id_lote=104;
+ SELECT vo.id_voucher,vo.id_pago INTO STRICT v,p FROM public.pag_vouchers vo JOIN public.cfg_estados_voucher e USING(id_estado_voucher) WHERE e.codigo='RECHAZADO';
+ SELECT count(*) INTO n FROM public.pag_pagos;
+ archivo:=pg_temp.abono(103,7,300,'YAPE_PLIN');
+ outcome:=public.sp_crm_subsanar_abono_sep_v1(1,r,v,archivo);
+ IF (outcome->>'version')::int<>2 OR (outcome->>'idPago')::bigint<>p OR (SELECT count(*) FROM public.pag_pagos)<>n OR EXISTS(SELECT 1 FROM public.pag_vouchers WHERE id_voucher=v AND activo) THEN RAISE EXCEPTION 'Subsanación duplicó pago o eliminó historial';END IF;
+ outcome:=public.sp_finanzas_revisar_voucher_separacion_v1(1,(outcome->>'idVoucher')::bigint,true,NULL,NULL);
+ IF outcome->>'estadoGrupo'<>'VIGENTE' THEN RAISE EXCEPTION 'No se activó la operación subsanada';END IF;
+ BEGIN
+  PERFORM public.sp_crm_subsanar_abono_sep_v1(1,r,v,archivo);
+  RAISE EXCEPTION 'Se permitió repetir subsanación';
+ EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'OPERACION_INVALIDA|%' THEN RAISE;END IF;END;
+END $$;
 ROLLBACK;

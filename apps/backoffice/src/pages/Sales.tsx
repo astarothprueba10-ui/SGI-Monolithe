@@ -2201,6 +2201,7 @@ export function Sales() {
             {detail.type === 'Separación' && (
               <ComprobanteSeparacionPreview
                 idReserva={Number(detail.id.slice('SEPARACION-'.length))}
+                puedeSubsanar={can('sales.create')}
               />
             )}
 

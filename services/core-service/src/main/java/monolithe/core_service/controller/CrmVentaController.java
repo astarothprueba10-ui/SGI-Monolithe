@@ -462,6 +462,23 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        public record PrepararSubsanacionSeparacionRequest(@jakarta.validation.constraints.NotBlank String tipoMime) {}
+
+        @PostMapping("/separaciones/{idReserva}/comprobantes/{idVoucher}/preparar-subsanacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.create')")
+        public EnlaceCargaVoucherResponse prepararSubsanacionSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva,
+                @PathVariable Long idVoucher,@Valid @RequestBody PrepararSubsanacionSeparacionRequest req) {
+            return separacionStorageService.prepararSubsanacionSeparacion(obtenerActor(jwt),idReserva,idVoucher,req.tipoMime());
+        }
+        @PostMapping("/separaciones/{idReserva}/comprobantes/{idVoucher}/subsanar")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.create')")
+        public JsonNode subsanarAbonoSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva,
+                @PathVariable Long idVoucher,@Valid @RequestBody monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+            Long actor=obtenerActor(jwt);
+            separacionStorageService.verificarSubsanacionSeparacion(actor,idReserva,idVoucher,req);
+            return service.subsanarAbonoSeparacion(actor,idReserva,idVoucher,req);
+        }
+
         @GetMapping("/separaciones/{idReserva}/comprobantes")
         @PreAuthorize("hasAuthority('sales.view')")
         public ResponseEntity<JsonNode> listarComprobantesSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva) {
