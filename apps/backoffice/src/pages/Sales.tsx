@@ -20,6 +20,7 @@ import {
   type CrmProspect,
   type CrmAdvisor,
   type CrmEtapaOperacion,
+  type CrmSeparacionInput,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
@@ -54,6 +55,10 @@ import { validarPagoVenta } from '../utils/crmPagoVenta';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
 const SEPARACION_ENVIO_DESHABILITADO = false;
+type LoteAdicionalSeparacion = {
+  idLote:number; codigo:string; precio:number; monto:number; dias:number;
+  metodo:CrmSeparacionInput['metodoPago']; referencia:string; archivo:File|null;
+};
 
 
 function AdvisorBadge({ advisor, type }: { advisor?: string | null; type: string }) {
@@ -262,6 +267,19 @@ export function Sales() {
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [formLotId, setFormLotId] = useState('');
+  const [preferenciasLote,setPreferenciasLote]=useState<Record<number,{id:number|null;codigo:string|null;comentario:string|null}>>({});
+  const preferenciaLote=preferenciasLote[Number(formProjectId)];
+  const [editorLote,setEditorLote]=useState(false);
+  const [loteCandidato,setLoteCandidato]=useState('');
+  const [motivoLote,setMotivoLote]=useState('');
+  const [guardandoLote,setGuardandoLote]=useState(false);
+  const [errorLote,setErrorLote]=useState('');
+  const [lotesAdicionales,setLotesAdicionales]=useState<LoteAdicionalSeparacion[]>([]);
+  const [editorAdicional,setEditorAdicional]=useState(false);
+  const [candidatoAdicional,setCandidatoAdicional]=useState('');
+  const [cargandoAdicional,setCargandoAdicional]=useState(false);
+  const [errorAdicional,setErrorAdicional]=useState('');
+  const revisionLotesAdicionales=React.useRef(0);
   const [politicaOperativa, setPoliticaOperativa] = useState<{
     idProspecto: number; idLote: number; condiciones: CondicionesFrancesas;
   } | null>(null);
@@ -505,6 +523,8 @@ export function Sales() {
     setErrorAsesorOperacion('');
     setSelectedProspectId('');
     setInteresesOperacion([]);
+    setPreferenciasLote({});
+    setEditorLote(false);
     setEditorInteres(false);
     setProyectoInteresNuevo('');
     setProyectoInteresAnterior('');
@@ -546,6 +566,8 @@ export function Sales() {
     setAsesorOperacion('');
     setErrorAsesorOperacion('');
     setInteresesOperacion([]);
+    setPreferenciasLote({});
+    setEditorLote(false);
     setEditorInteres(false);
     setProyectoInteresNuevo('');
     setProyectoInteresAnterior('');
@@ -573,6 +595,13 @@ export function Sales() {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
       setInteresesOperacion([...intereses]);
+      const preferencias:typeof preferenciasLote={};
+      for(const i of detalle.intereses??[]) {
+        if(!preferencias[i.idProyecto]) preferencias[i.idProyecto]={
+          id:i.idLoteInteres??null,codigo:i.codigoLoteInteres??null,comentario:i.comentario??null
+        };
+      }
+      setPreferenciasLote(preferencias);
       setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
       // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
       const compradorExistente = (detalle.prospecto.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
@@ -786,18 +815,96 @@ export function Sales() {
     if (
       registroSeparacionEnCursoRef.current ||
       registroVentaEnCursoRef.current ||
-      confirmacionVenta || registrandoInteres || guardandoAsesorOperacion
+      confirmacionVenta || registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional || submitting
     ) return;
 
     ++seleccionProspectoPeticionRef.current;
     setEditorAsesor(false);
     setIsModalOpen(false);
+    setEditorLote(false);
     setPreseleccionAgrupada(null);
     setAsociacionAgrupadaPendiente(null);
     setOrigenPlano(null);
     setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
     setEditandoComprador(false);
+  };
+
+  useEffect(()=>{
+    ++revisionLotesAdicionales.current;
+    setLotesAdicionales([]);
+    setCandidatoAdicional('');
+    setEditorAdicional(false);
+    setErrorAdicional('');
+    setCargandoAdicional(false);
+  },[selectedProspectId,formProjectId,formStageId,formLotId,isModalOpen,revisionPolitica]);
+
+  useEffect(()=>{
+    setEditorLote(false);
+    setLoteCandidato('');
+    setMotivoLote('');
+    setErrorLote('');
+  },[selectedProspectId,formProjectId,isModalOpen]);
+
+  const abrirEditorLote=()=>{
+    setLoteCandidato('');
+    setMotivoLote('');
+    setErrorLote('');
+    setEditorLote(true);
+  };
+
+  const confirmarLoteInteres=async()=>{
+    const candidato=availableLots.find(l=>l.idLote===Number(loteCandidato));
+    if(!candidato||!selectedProspectId||guardandoLote||submitting) return;
+    const solicitud=seleccionProspectoPeticionRef.current;
+    const proyecto=Number(formProjectId);
+    setGuardandoLote(true);
+    setErrorLote('');
+    try {
+      if(puedeEditarInteres && candidato.idLote!==preferenciaLote?.id) {
+        if(motivoLote.trim().length<5) return;
+        const res=await crmBackend.cambiarLoteInteres(selectedProspectId,proyecto,candidato.idLote,preferenciaLote?.id??null,motivoLote.trim());
+        if(solicitud!==seleccionProspectoPeticionRef.current) return;
+        setPreferenciasLote(prev=>({...prev,[proyecto]:{
+          id:res.idLoteInteres,codigo:res.codigoLoteInteres,comentario:prev[proyecto]?.comentario??null
+        }}));
+        toast.success('Lote de interés actualizado en el expediente CRM.');
+      }
+      if(solicitud!==seleccionProspectoPeticionRef.current) return;
+      handleSelectLot(String(candidato.idLote));
+      setEditorLote(false);
+    } catch(err:unknown) {
+      if(solicitud===seleccionProspectoPeticionRef.current)
+        setErrorLote(err instanceof Error?err.message:'No se pudo confirmar el lote.');
+    } finally {setGuardandoLote(false);}
+  };
+
+  const agregarLoteAdicional=async()=>{
+    const lote=availableLots.find(l=>l.idLote===Number(candidatoAdicional));
+    if(!lote||!selectedProspectId||cargandoAdicional||submitting||lotesAdicionales.length>=19||
+      lote.idLote===Number(formLotId)||lotesAdicionales.some(l=>l.idLote===lote.idLote))return;
+    const revision=revisionLotesAdicionales.current;
+    setCargandoAdicional(true);setErrorAdicional('');
+    try{
+      const [precio,politica]=await Promise.all([
+        coreService.getCurrentLotPrice(lote.idLote,'PEN'),
+        crmBackend.obtenerCondicionesVenta(selectedProspectId,lote.idLote)
+      ]);
+      if(revision!==revisionLotesAdicionales.current)return;
+      if(!precio||precio.idLote!==lote.idLote||!Number.isFinite(Number(precio.precio))||Number(precio.precio)<=0||
+        !politica||!Number.isFinite(politica.montoSeparacion)||politica.montoSeparacion<=0||
+        !Number.isInteger(politica.diasVencimientoSeparacion)||politica.diasVencimientoSeparacion<1)
+        throw new Error('No se pudieron verificar el precio y la política del lote.');
+      setLotesAdicionales(prev=>[...prev,{idLote:lote.idLote,codigo:lote.codigo,precio:Number(precio.precio),
+        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion,metodo:'TRANSFERENCIA',referencia:'',archivo:null}]);
+      setCandidatoAdicional('');setEditorAdicional(false);
+    }catch(err:unknown){
+      if(revision===revisionLotesAdicionales.current)setErrorAdicional(err instanceof Error?err.message:'No se pudo añadir el lote.');
+    }finally{if(revision===revisionLotesAdicionales.current)setCargandoAdicional(false);}
+  };
+
+  const editarPagoAdicional=(id:number,cambio:Partial<LoteAdicionalSeparacion>)=>{
+    setLotesAdicionales(prev=>prev.map(l=>l.idLote===id?{...l,...cambio}:l));
   };
 
   const handleSelectLot = (lotIdStr: string) => {
@@ -946,6 +1053,16 @@ export function Sales() {
       return false;
     }
 
+    for(const l of lotesAdicionales){
+      if(!l.archivo || (['TRANSFERENCIA','DEPOSITO','YAPE_PLIN'].includes(l.metodo)&&!l.referencia.trim())){
+        toast.error(`Complete el pago y comprobante de ${l.codigo}.`);return false;
+      }
+    }
+    const refs=[formPaymentMethod==='EFECTIVO'?'':formOperationNumber,...lotesAdicionales.map(l=>l.metodo==='EFECTIVO'?'':l.referencia)]
+      .map(x=>x.trim().toUpperCase()).filter(Boolean);
+    if(new Set(refs).size!==refs.length){
+      toast.error('Cada lote debe tener una referencia de pago distinta.');return false;
+    }
     if (!voucherFile) {
       toast.error(`Debe adjuntar el comprobante de S/ ${condicionesVenta.montoSeparacion.toFixed(2)}.`);
       return false;
@@ -976,6 +1093,30 @@ export function Sales() {
       const prospectId = Number(selectedProspectId);
       const lotIdNum = Number(formLotId);
 
+      if(lotesAdicionales.length){
+        const pagos=[{idLote:lotIdNum,monto:condicionesVenta.montoSeparacion,metodo:formPaymentMethod,
+          referencia:formPaymentMethod==='EFECTIVO'?'':formOperationNumber,archivo:voucherFile},
+          ...lotesAdicionales.map(l=>({...l,referencia:l.metodo==='EFECTIVO'?'':l.referencia}))];
+        const hashes=new Set<string>();
+        const entradas:CrmSeparacionInput[]=[];
+        for(const pago of pagos){
+          if(!pago.archivo)throw new Error('Cada lote requiere un comprobante propio.');
+          const digest=await crypto.subtle.digest('SHA-256',await pago.archivo.arrayBuffer());
+          const hashSha256=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
+          if(hashes.has(hashSha256))throw new Error('No se puede utilizar el mismo comprobante para dos lotes. Adjunte pagos independientes.');
+          hashes.add(hashSha256);
+          const carga=await crmBackend.subirComprobanteSeparacion(prospectId,pago.idLote,pago.archivo);
+          comprobanteCargado=true;
+          entradas.push({idProspecto:prospectId,idLote:pago.idLote,metodoPago:pago.metodo,
+            numeroOperacion:pago.referencia.trim()||null,monto:pago.monto,observaciones:formObservations.trim()||null,
+            ...carga,hashSha256});
+        }
+        const resultados=await crmBackend.registrarSeparacionesMultiples(entradas);
+        toast.success(`${resultados.length} separaciones registradas`,{
+          description:`Total: ${formatSoles(entradas.reduce((t,l)=>t+l.monto,0))}. Comprobantes pendientes de revisión.`
+        });
+        setIsModalOpen(false);await fetchSalesData();return;
+      }
       // 1. Subir comprobante al Storage privado.
       const carga = await crmBackend.subirComprobanteSeparacion(
         prospectId,
@@ -1171,7 +1312,7 @@ export function Sales() {
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres) return;
+    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional) return;
 
     if (opType === 'Venta') {
       setFormTouched(true);
@@ -1398,7 +1539,10 @@ export function Sales() {
       .then(etapas => {
         if (!vigente) return;
         setAvailableStages(etapas ?? []);
-        if (etapas.length === 1) setFormStageId(etapas[0].codigo);
+        const etapaPreferida=opType==='Separacion'&&preferenciaLote?.id
+          ? etapas.find(e=>e.idLotes.includes(preferenciaLote.id!)):undefined;
+        if(etapaPreferida)setFormStageId(etapaPreferida.codigo);
+        else if (etapas.length === 1) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
         if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
@@ -1487,6 +1631,8 @@ export function Sales() {
             autoseleccionPendiente.idProyecto === idProyecto &&
             lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
           setFormLotId(String(autoseleccionPendiente.idLote));
+        } else if (opType==='Separacion' && preferenciaLote?.id && lotesPermitidos.some(l=>l.idLote===preferenciaLote.id)) {
+          setFormLotId(String(preferenciaLote.id));
         }
       } catch (err: unknown) {
         if (!vigente) return;
@@ -2206,15 +2352,22 @@ export function Sales() {
       <Modal
         open={isModalOpen}
         onClose={cerrarModalOperacion}
-        title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
+        width={opType==='Separacion'?'max-w-3xl':'max-w-lg'}
+        title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
           ? 'Registra la separación según el importe vigente y adjunta su comprobante para revisión por Finanzas.'
           : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
-          <div className="flex justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            {opType==='Separacion' && separacionCondicionesVerificadas && condicionesVenta && (
+              <div className="mr-auto min-w-0 py-1">
+                <p className="text-xs text-brand-500">{1+lotesAdicionales.length} lote(s) · Total separación</p>
+                <p className="text-lg font-semibold tabular-nums text-brand-900">{formatSoles(condicionesVenta.montoSeparacion+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0))}</p>
+              </div>
+            )}
             <Button
               variant="secondary"
-              disabled={submitting || registrandoInteres || guardandoAsesorOperacion}
+              disabled={submitting || registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional}
               onClick={cerrarModalOperacion}
             >
               Cancelar
@@ -2223,7 +2376,7 @@ export function Sales() {
               variant="primary"
 
               disabled={
-                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres ||
+                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional ||
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
@@ -2234,7 +2387,7 @@ export function Sales() {
               {submitting
                 ? 'Procesando…'
                 : opType === 'Separacion'
-                  ? 'Registrar Separación'
+                  ? (lotesAdicionales.length ? `Registrar ${1+lotesAdicionales.length} separaciones` : 'Registrar separación')
                   : 'Validar Venta'}
             </Button>
 
@@ -2248,13 +2401,17 @@ export function Sales() {
           </div>
         ) : (
           <form onSubmit={handleProcessOperation} className="space-y-4">
+            {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">01 · Cliente y proyecto</p>
+              <p className="mt-1 text-xs text-brand-500">Verifica el interés comercial antes de elegir los lotes.</p>
+            </div>}
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Cliente (CRM) *
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
-                disabled={registrandoInteres || guardandoAsesorOperacion}
+                disabled={registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) =>
                   void handleSelectProspect(
                     e.target.value ? Number(e.target.value) : ''
@@ -2391,6 +2548,10 @@ export function Sales() {
                 )}
             </div>
 
+            {opType==='Separacion' && <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">02 · Selección de lotes</p>
+              <p className="mt-1 text-xs text-brand-500">Elige un lote principal y, si corresponde, añade otros de la etapa.</p>
+            </div>}
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Etapa comercial *
@@ -2398,7 +2559,7 @@ export function Sales() {
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres}
+                disabled={!formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
@@ -2435,7 +2596,36 @@ export function Sales() {
 
               </label>
 
-              <Select
+              {opType==='Separacion' ? <div className="space-y-2">
+                <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
+                  <p className="text-xs text-brand-600">{preferenciaLote?.id?'Lote de interés en CRM':'Lote principal'}</p>
+                  <p className="mt-1 text-sm font-semibold text-brand-900">{availableLots.find(l=>l.idLote===Number(formLotId))?.codigo
+                    ??preferenciaLote?.codigo??'Sin lote identificado'}</p>
+                  {preferenciaLote?.comentario&&!preferenciaLote.id&&<p className="mt-1 text-xs text-brand-500">Referencia anterior en CRM: {preferenciaLote.comentario}. Confirme el lote exacto.</p>}
+                  {preferenciaLote?.id&&!formLotId&&!loadingLots&&<p className="mt-1 text-xs text-amber-700">El lote registrado no está disponible en esta etapa. Seleccione uno disponible.</p>}
+                </div>
+                {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
+                  disabled={!formStageId||loadingLots||!availableLots.length||submitting||guardandoLote||cargandoAdicional}
+                  onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?'Cambiar lote de interés':'Seleccionar lote'}</Button>}
+                {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
+                  <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
+                  <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>
+                    <option value="">Seleccione un lote</option>
+                    {availableLots.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m²</option>)}
+                  </Select>
+                  {puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&<label className="block text-xs font-medium text-brand-700">Motivo del registro o cambio *
+                    <textarea rows={2} maxLength={500} className="mt-1 w-full rounded-lg border border-brand-200 p-2" value={motivoLote} disabled={guardandoLote}
+                      onChange={e=>setMotivoLote(e.target.value)} placeholder="Preferencia expresada por el cliente"/>
+                    <span className="block font-normal text-brand-500">Se guardará en CRM y en el expediente.</span>
+                  </label>}
+                  {errorLote&&<Alert tone="danger" title="No se pudo actualizar el lote">{errorLote}</Alert>}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="secondary" disabled={guardandoLote} onClick={()=>setEditorLote(false)}>Cancelar</Button>
+                    <Button type="button" disabled={!loteCandidato||guardandoLote||(puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&motivoLote.trim().length<5)}
+                      onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
+                  </div>
+                </div>}
+              </div> : <Select
                 value={formLotId}
                 disabled={!formProjectId || !formStageId || loadingLots}
                 onChange={(e) => handleSelectLot(e.target.value)}
@@ -2463,8 +2653,7 @@ export function Sales() {
                   );
                 })}
 
-              </Select>
-
+              </Select>}
 
               {formLotId && (
                 <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
@@ -2557,13 +2746,56 @@ export function Sales() {
             )}
             {opType === 'Separacion' ? (
               separacionCondicionesVerificadas && condicionesVenta ? <>
+                <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><p className="font-semibold text-sm text-brand-900">Lotes de la separación</p><p className="text-xs text-brand-500">Cada lote genera una reserva y un pago independiente.</p></div>
+                    <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold">{1+lotesAdicionales.length} lote(s)</span>
+                  </div>
+                  <div className="flex justify-between gap-2 rounded-lg bg-brand-50/40 p-2 text-sm"><span>{availableLots.find(l=>l.idLote===Number(formLotId))?.codigo} · Principal</span><strong>{formatSoles(condicionesVenta.montoSeparacion)}</strong></div>
+                  {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-lg border border-brand-100 p-3 space-y-2">
+                    <div className="flex flex-wrap justify-between gap-2"><div><strong>{l.codigo}</strong><p className="text-xs text-brand-500">Precio {formatSoles(l.precio)} · {l.dias} días</p></div>
+                      <div className="flex items-center gap-2"><strong>{formatSoles(l.monto)}</strong><Button type="button" size="sm" variant="secondary" disabled={submitting} onClick={()=>setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote))}>Quitar</Button></div></div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs font-medium">Método de pago<Select value={l.metodo} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{metodo:e.target.value as CrmSeparacionInput['metodoPago'],referencia:''})}>
+                        <option value="TRANSFERENCIA">Transferencia bancaria</option><option value="DEPOSITO">Depósito</option><option value="YAPE_PLIN">Yape / Plin</option><option value="EFECTIVO">Efectivo</option><option value="OTRO">Otro</option>
+                      </Select></label>
+                      {l.metodo!=='EFECTIVO'&&<label className="text-xs font-medium">N° de operación<Input value={l.referencia} disabled={submitting} onChange={e=>editarPagoAdicional(l.idLote,{referencia:e.target.value})}/></label>}
+                    </div>
+                    <label className="block text-xs font-medium">Comprobante propio (máx. 5 MB)<input type="file" accept=".pdf,image/jpeg,image/png,image/webp" disabled={submitting}
+                      className="mt-1 block w-full text-xs" onChange={e=>{
+                        const archivo=e.target.files?.[0]??null;e.target.value='';
+                        if(archivo&&(!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.size<1||archivo.size>5242880)){
+                          toast.error('Archivo no permitido o mayor de 5 MB.');return;
+                        }
+                        editarPagoAdicional(l.idLote,{archivo});
+                      }}/><span className="block text-brand-500">{l.archivo?.name??'Sin comprobante'}</span></label>
+                  </div>)}
+                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} disabled={submitting||lotesAdicionales.length>=19||!availableLots.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
+                    onClick={()=>setEditorAdicional(true)}>Agregar otro lote</Button>}
+                  {editorAdicional&&<div className="space-y-2">
+                    <Select value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
+                      <option value="">Seleccione otro lote disponible</option>
+                      {availableLots.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m²</option>)}
+                    </Select>
+                    {errorAdicional&&<Alert tone="danger" title="No se pudo añadir el lote">{errorAdicional}</Alert>}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button type="button" variant="secondary" disabled={cargandoAdicional} onClick={()=>setEditorAdicional(false)}>Cancelar</Button>
+                      <Button type="button" disabled={!candidatoAdicional||cargandoAdicional} onClick={()=>void agregarLoteAdicional()}>{cargandoAdicional?'Verificando…':'Añadir lote'}</Button>
+                    </div>
+                  </div>}
+                  <div className="flex justify-between border-t border-brand-100 pt-3 text-sm"><strong>Total de separación</strong><strong className="tabular-nums">{formatSoles(condicionesVenta.montoSeparacion+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0))}</strong></div>
+                </div>
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-2">
                   <p className="font-semibold text-emerald-950">Condiciones de separación</p>
                   <p>Proyecto: <strong>{availableProjects.find(p=>p.idProyecto===Number(formProjectId))?.nombre}</strong></p>
                   <p>Monto reglamentario: <strong>{formatSoles(condicionesVenta.montoSeparacion)} PEN</strong></p>
                   <p>Plazo de vigencia: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong> (al vencer requiere revisión; no libera el lote ni anula pagos automáticamente).</p>
-                  <p>El lote cambiará a estado <strong>RESERVADO</strong> en el mapa interactivo.</p>
+                  <p>Los lotes registrados cambiarán a estado <strong>RESERVADO</strong> en el mapa interactivo.</p>
                   <p>El pago ingresará en estado <strong>REGISTRADO</strong> y el comprobante quedará <strong>PENDIENTE</strong> de auditoría por Finanzas.</p>
+                </div>
+                <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">03 · Pago del lote principal</p>
+                  <p className="mt-1 text-xs text-brand-500">Adjunte el comprobante del importe correspondiente al lote principal.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
