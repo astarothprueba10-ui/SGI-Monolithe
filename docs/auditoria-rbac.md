@@ -11,3 +11,9 @@
 - Migración 165: decisión y dictámenes de anulaciones mediante permisos existentes, incompatibilidad entre decisión y revisión, alcance de solicitud global independiente. Se preservan los requisitos de evidencia, propiedad y separación de usuarios. Migración 164 invalida tokens al modificar roles, permisos y asignaciones.
 - Las rutas de retroceso del Core Service también se migraron a capacidades del catálogo. Las políticas RLS de public no contienen nombres de roles comerciales en sus expresiones (búsqueda estática). Revisar las versiones anteriores de funciones, llamadas Java efectivas, sesiones, menús y componentes restantes. No asumir que toda aparición de ROLE_* es una autorización (puede ser presentación o separación de portal).
 - Prueba integral en navegador creando un rol nuevo y asignándole alcances distintos, revocando permisos y comprobando el acceso directo a API.
+
+## Validaciones ejecutadas sobre Supabase compartido (rollback)
+- Creación de rol personalizado, asignación a un asesor, acceso a cartera no propia, retiro del permiso y revocación del rol. Los tokens previos quedan invalidados en cada transición.
+- Nuevo rol con crm.operate_advisor asignado a trabajador activo previamente no asesor: se incorpora al listado de asesores; al retirar el rol deja de aparecer. No se conservan roles de prueba.
+- Las migraciones 163 y 165 incluyen comparaciones de alcances y catálogo de asesores antes y después.
+- Los avisos generales de Supabase (RLS sin políticas, funciones con search_path mutable y funciones security definer ejecutables por roles públicos) requieren revisión separada de la migración comercial; no se ampliaron permisos públicos ni se desactivó RLS.

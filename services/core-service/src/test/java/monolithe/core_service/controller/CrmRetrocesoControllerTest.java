@@ -146,14 +146,14 @@ class CrmRetrocesoControllerTest {
                 OffsetDateTime.class, OffsetDateTime.class, String.class, String.class, Integer.class, Integer.class, Jwt.class);
         PreAuthorize preListar = listar.getAnnotation(PreAuthorize.class);
         assertNotNull(preListar);
-        assertTrue(preListar.value().contains("ROLE_GERENCIA"));
-        assertTrue(preListar.value().contains("ROLE_SUPERVISOR_COMERCIAL"));
+        assertEquals("hasAuthority('crm.view') and hasAuthority('crm.approve_stage_change')",preListar.value());
+        assertFalse(preListar.value().contains("ROLE_"));
 
         Method decision = CrmRetrocesoController.class.getMethod("resolverRetroceso",
                 Long.class, ResolverRetrocesoCrmRequest.class, Jwt.class);
         PreAuthorize preDecision = decision.getAnnotation(PreAuthorize.class);
         assertNotNull(preDecision);
-        assertTrue(preDecision.value().contains("ROLE_GERENCIA"));
-        assertTrue(preDecision.value().contains("ROLE_SUPERVISOR_COMERCIAL"));
+        assertEquals("hasAuthority('crm.edit') and hasAuthority('crm.approve_stage_change')",preDecision.value());
+        assertFalse(preDecision.value().contains("ROLE_"));
     }
 }
