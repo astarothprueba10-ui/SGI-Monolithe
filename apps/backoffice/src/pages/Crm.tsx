@@ -239,25 +239,11 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
-  const { user, can } = useAuth();
+  const { can } = useAuth();
 
-  const puedeVerGestionGlobal = user.roles.some(
-    (rol) => rol === 'Administrador' || rol === 'Gerencia' || rol === 'Supervisor comercial'
-  );
-
-  const puedeElegirAsesor = user.roles.some(
-    (rol) =>
-      rol === 'Administrador' ||
-      rol === 'Gerencia' ||
-      rol === 'Supervisor comercial'
-  );
-
-  const puedeGestionarRetrocesos = user.roles.some(
-    (rol) =>
-      rol === 'Gerencia' ||
-      rol === 'Supervisor comercial' ||
-      rol === 'Administrador'
-  );
+  const puedeVerGestionGlobal = can('crm.view') && can('crm.scope_all');
+  const puedeElegirAsesor = can('crm.assign_advisor') && can('crm.edit');
+  const puedeGestionarRetrocesos = can('crm.approve_stage_change') && can('crm.view');
 
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');

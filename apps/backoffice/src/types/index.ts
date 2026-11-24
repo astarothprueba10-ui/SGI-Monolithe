@@ -36,7 +36,19 @@ export type Action =
   | 'projects_visibility'
   | 'publish';
 
-export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review';
+export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review'
+  | 'crm.scope_all'
+  | 'crm.scope_assigned'
+  | 'crm.assign_advisor'
+  | 'crm.approve_stage_change'
+  | 'crm.request_stage_change'
+  | 'crm.deactivate_prospect'
+  | 'sales.scope_all'
+  | 'sales.contract_scope_all'
+  | 'sales.approve_reservation_change'
+  | 'sales.notify_expiry_all'
+  | 'sales.reassign_advisor'
+  | 'annulments.scope_all';
 
 export type RoleName =
   | 'Administrador'

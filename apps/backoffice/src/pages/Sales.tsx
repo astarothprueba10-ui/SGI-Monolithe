@@ -189,10 +189,9 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 
 export function Sales() {
-  const { can, user } = useAuth();
+  const { can } = useAuth();
   const location = useLocation();
-  const puedeReasignarComprador = can('crm.edit') && user.roles.some((r) =>
-    r === 'Gerencia' || r === 'Supervisor comercial');
+  const puedeReasignarComprador = can('crm.edit') && can('sales.reassign_advisor');
   const [tab, setTab] = useState<
     'Separación' | 'Venta' | 'Agrupadas' | 'Contratos' | 'Anexos' | 'CambiosReserva'
   >('Separación');
@@ -259,8 +258,7 @@ export function Sales() {
   const [motivoCambioInteres, setMotivoCambioInteres] = useState('');
   const [errorCambioInteres, setErrorCambioInteres] = useState('');
   const puedeEditarInteres = can('crm.edit');
-  const puedeAsignarAsesorOperacion = can('crm.edit') && user.roles.some(r =>
-    ['Administrador', 'Gerencia', 'Supervisor comercial', 'Administración'].includes(r));
+  const puedeAsignarAsesorOperacion = can('crm.edit') && can('crm.assign_advisor');
   const [editorAsesor, setEditorAsesor] = useState(false);
   const [asesoresOperacion, setAsesoresOperacion] = useState<CrmAdvisor[]>([]);
   const [asesorOperacion, setAsesorOperacion] = useState('');
