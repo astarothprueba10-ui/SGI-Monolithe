@@ -40,7 +40,7 @@ test('Core exige autoridad en JWT y revalida actor contra la política SQL', () 
   assert.doesNotMatch(controller, /@PatchMapping\("\/financiamiento\/configuracion/);
 });
 
-test('tercera pestaña solo visible para Gerencia con permiso y solo permite lectura', () => {
+test('tercera pestaña solo visible para Gerencia; consulta general o por proyecto sin escritura directa', () => {
   const parent = read('../src/components/financing/CarteraFinanciamientoPanel.tsx');
   const panel = read('../src/components/financing/ConfiguracionPlanesFinanciamientoPanel.tsx');
   const api = read('../src/services/financingConfigService.ts');
@@ -51,7 +51,9 @@ test('tercera pestaña solo visible para Gerencia con permiso y solo permite lec
   assert.match(parent, /tab === 'CONFIGURACION' && !puedeConfigurar/);
   assert.match(parent, /Configuración de planes de financiamiento/);
   assert.match(parent, /vista === 'CONFIGURACION' && puedeConfigurar/);
-  assert.match(panel, /financingConfigService\.obtenerPoliticaActual\(\)/);
+  assert.match(panel, /financingConfigService\.obtenerPoliticaActual\(idProyecto\)/);
+  assert.match(api, /authSecuredApi\.get<PoliticaFinanciamientoActual>\(`\/financing-policies\/projects\//);
+  assert.match(panel, /Política general/);
   assert.match(panel, /Versión actual/);
   assert.match(panel, /Versión vigente|Vigente/);
   assert.match(panel, /HistorialPoliticasFinancierasPanel/);

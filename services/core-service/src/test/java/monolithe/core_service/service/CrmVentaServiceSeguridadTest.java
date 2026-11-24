@@ -534,15 +534,32 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
-    void separacionRechazaMontoDiferenteDeQuinientos() {
+    void separacionRechazaImporteInvalidoAntesDeConsultarSql() {
+        for (String monto : java.util.List.of("0", "-1", "500.001")) {
+            var req = new RegistrarSeparacionCrmRequest(
+                    1L, 74L, "TRANSFERENCIA", "OP-01",
+                    new BigDecimal(monto), null, "comprobante.png",
+                    "comprobante.png", "image/png", 1024L, null);
+            assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
+                    () -> service.registrarSeparacion(5L, req)).getStatusCode());
+        }
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void separacionDelegaMontoDelProyectoAlProcedimientoYRechazaDiferencias() {
         var req = new RegistrarSeparacionCrmRequest(
                 1L, 74L, "TRANSFERENCIA", "OP-01",
-                new BigDecimal("499.99"), null, "comprobante.png",
+                new BigDecimal("750.00"), null, "comprobante.png",
                 "comprobante.png", "image/png", 1024L, null);
-        var error = assertThrows(ResponseStatusException.class,
-                () -> service.registrarSeparacion(5L, req));
-        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
-        verifyNoInteractions(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                    "SEPARACION_MONTO_INVALIDO|El importe no coincide con la política vigente."));
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
+                () -> service.registrarSeparacion(5L, req)).getStatusCode());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_separacion_v2"));
     }
 
     @Test
