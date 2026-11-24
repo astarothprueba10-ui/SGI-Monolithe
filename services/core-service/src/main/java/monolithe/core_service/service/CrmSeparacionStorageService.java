@@ -348,6 +348,11 @@ public class CrmSeparacionStorageService {
         return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor, idReserva));
     }
 
+    public EnlaceLecturaVoucherResponse prepararLecturaPorReserva(Long actor,Long idReserva,Long idVoucher) {
+        if(actor==null||actor<=0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor,idReserva,idVoucher));
+    }
+
     private EnlaceLecturaVoucherResponse firmarReferencia(JsonNode info) {
         String clave = info.path("clave_archivo").asString("");
         String bucket = info.path("bucket").asString("");

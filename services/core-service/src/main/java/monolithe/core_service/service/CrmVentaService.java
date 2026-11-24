@@ -751,6 +751,21 @@ public class CrmVentaService {
                 """, actor, idVoucher);
     }
 
+    @Transactional(readOnly=true)
+    public JsonNode listarComprobantesSeparacion(Long actor,Long idReserva) {
+        validarActor(actor);
+        if(idReserva==null||idReserva<=0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Identificador de separación inválido.");
+        return ejecutar("SELECT public.sp_crm_listar_comprobantes_separacion_v2(CAST(? AS bigint),CAST(? AS bigint))::text",actor,idReserva);
+    }
+
+    @Transactional(readOnly=true)
+    public JsonNode obtenerRutaComprobanteSeparacion(Long actor,Long idReserva,Long idVoucher) {
+        validarActor(actor);
+        if(idReserva==null||idReserva<=0||idVoucher==null||idVoucher<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Identificador de comprobante inválido.");
+        return ejecutar("SELECT public.sp_crm_obtener_comprobante_separacion_v2(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text",actor,idReserva,idVoucher);
+    }
+
     /** Ruta validada de un comprobante, segun el alcance comercial de la reserva. */
     @Transactional(readOnly = true)
     public JsonNode obtenerRutaComprobanteSeparacion(Long actor, Long idReserva) {

@@ -89,4 +89,25 @@ BEGIN
  EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'DENEGADO|%' THEN RAISE; END IF; END;
  IF (public.fn_crm_resumen_financiero_anulacion_v1('VENTA',v2)->>'creditoDistribuido')::numeric<>500 THEN RAISE EXCEPTION 'La anulación no reconoce el crédito del lote'; END IF;
 END $$;
+DO $$
+DECLARE r1 bigint;r2 bigint;v1 bigint;v2 bigint;items jsonb;enlace jsonb;
+BEGIN
+ SELECT id_reserva INTO STRICT r1 FROM public.ven_reservas WHERE id_lote=101;
+ SELECT id_reserva INTO STRICT r2 FROM public.ven_reservas WHERE id_lote=102;
+ items:=public.sp_crm_listar_comprobantes_separacion_v2(1,r2);
+ IF jsonb_array_length(items->'items')<>1 OR (items->'items'->0->>'montoAbono')::numeric<>1000 OR (items->'items'->0->>'montoLote')::numeric<>500 THEN RAISE EXCEPTION 'Comprobantes del lote adicional incorrectos';END IF;
+ v1:=(items->'items'->0->>'idVoucher')::bigint;
+ enlace:=public.sp_crm_obtener_comprobante_separacion_v2(1,r2,v1);
+ IF enlace->>'bucket'<>'vouchers-separacion-private' THEN RAISE EXCEPTION 'Lectura del abono compartido incorrecta';END IF;
+ SELECT id_voucher INTO v2 FROM public.pag_vouchers WHERE id_voucher<>v1 ORDER BY id_voucher LIMIT 1;
+ BEGIN
+   PERFORM public.sp_crm_obtener_comprobante_separacion_v2(1,r2,v2);
+   RAISE EXCEPTION 'Se permitió un voucher ajeno a la operación';
+ EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'ARCHIVO_NO_EXISTE|%' THEN RAISE; END IF;END;
+ BEGIN
+   PERFORM public.sp_crm_listar_comprobantes_separacion_v2(2,r2);
+   RAISE EXCEPTION 'Acceso comercial no autorizado';
+ EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'DENEGADO|%' THEN RAISE; END IF;END;
+ IF public.fn_crm_metodo_pago_reserva_v2(1,r2) IS NULL THEN RAISE EXCEPTION 'Método del lote adicional no visible';END IF;
+END $$;
 ROLLBACK;

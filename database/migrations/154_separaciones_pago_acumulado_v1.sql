@@ -2976,4 +2976,320 @@ BEGIN
 END;
 $function$;
 
+
+-- Lectura comercial de abonos compartidos. La consulta no concede acceso directo
+-- a las tablas de distribución y no expone rutas privadas en el listado.
+CREATE FUNCTION public.fn_crm_puede_ver_comprobantes_separacion_v2(p_actor bigint,p_reserva bigint)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $lectura$
+ SELECT coalesce(public.fn_usuario_tiene_permiso_seguridad(p_actor,'sales.view'::varchar),false)
+ AND EXISTS(SELECT 1 FROM public.ven_reservas r JOIN public.inm_lotes l USING(id_lote)
+  WHERE r.id_reserva=p_reserva AND (
+    r.id_usuario_registro=p_actor OR EXISTS(SELECT 1 FROM public.seg_usuarios_roles ur JOIN public.seg_roles rol USING(id_rol)
+      WHERE ur.id_usuario=p_actor AND ur.activo AND ur.fecha_revocacion IS NULL AND rol.activo AND rol.codigo IN ('ADMINISTRADOR','GERENCIA','SUPERVISOR_COMERCIAL','FINANZAS'))
+    OR EXISTS(SELECT 1 FROM public.crm_prospectos p JOIN public.crm_prospectos_intereses i USING(id_prospecto)
+      WHERE p.id_persona=r.id_persona AND i.id_proyecto=l.id_proyecto AND i.activo AND public.fn_crm_puede_consultar_prospecto(p_actor,p.id_prospecto))
+  ));
+$lectura$;
+REVOKE ALL ON FUNCTION public.fn_crm_puede_ver_comprobantes_separacion_v2(bigint,bigint) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+
+CREATE FUNCTION public.sp_crm_listar_comprobantes_separacion_v2(p_actor bigint,p_reserva bigint)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $lectura$
+DECLARE v_grupo uuid;
+BEGIN
+ IF NOT public.fn_crm_puede_ver_comprobantes_separacion_v2(p_actor,p_reserva) THEN RAISE EXCEPTION 'DENEGADO|No autorizado para consultar esta separación.'; END IF;
+ SELECT id_grupo INTO v_grupo FROM public.ven_separaciones_grupo_lotes_v1 WHERE id_reserva=p_reserva;
+ RETURN jsonb_build_object('agrupada',v_grupo IS NOT NULL,'items',coalesce((
+ SELECT jsonb_agg(jsonb_build_object('idVoucher',vo.id_voucher,'nombreArchivo',vo.nombre_archivo_original,'tipoMime',vo.tipo_mime,
+ 'montoAbono',pg.monto,'montoLote',CASE WHEN v_grupo IS NULL THEN pg.monto ELSE coalesce(d.monto,0) END,
+ 'metodo',met.nombre,'estado',ev.codigo) ORDER BY pg.id_pago,vo.numero_version DESC)
+ FROM public.pag_pagos pg JOIN public.pag_vouchers vo USING(id_pago)
+ JOIN public.cfg_estados_voucher ev USING(id_estado_voucher)
+ JOIN public.cfg_metodos_pago met USING(id_metodo_pago)
+ LEFT JOIN public.pag_separaciones_grupo_abonos_v1 a USING(id_pago)
+ LEFT JOIN public.pag_separaciones_grupo_distribucion_v1 d ON d.id_pago=pg.id_pago AND d.id_reserva=p_reserva
+ WHERE vo.activo AND ((v_grupo IS NULL AND a.id_grupo IS NULL AND pg.id_reserva=p_reserva) OR a.id_grupo=v_grupo)
+ ),'[]'::jsonb));
+END; $lectura$;
+REVOKE ALL ON FUNCTION public.sp_crm_listar_comprobantes_separacion_v2(bigint,bigint) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_listar_comprobantes_separacion_v2(bigint,bigint) TO sigi_app_user;
+
+CREATE FUNCTION public.fn_crm_metodo_pago_reserva_v2(p_actor bigint,p_reserva bigint)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $lectura$
+ SELECT CASE WHEN public.fn_crm_puede_ver_comprobantes_separacion_v2(p_actor,p_reserva) THEN (
+ SELECT string_agg(DISTINCT met.nombre::text, ' / ' ORDER BY met.nombre::text)
+ FROM public.pag_pagos pg JOIN public.cfg_metodos_pago met USING(id_metodo_pago)
+ JOIN public.cfg_estados_pago ep USING(id_estado_pago)
+ LEFT JOIN public.pag_separaciones_grupo_abonos_v1 a USING(id_pago)
+ WHERE ep.codigo<>'ANULADO' AND ((a.id_grupo IS NULL AND pg.id_reserva=p_reserva)
+ OR EXISTS(SELECT 1 FROM public.pag_separaciones_grupo_distribucion_v1 d WHERE d.id_pago=pg.id_pago AND d.id_reserva=p_reserva))
+ ) ELSE NULL END;
+$lectura$;
+REVOKE ALL ON FUNCTION public.fn_crm_metodo_pago_reserva_v2(bigint,bigint) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.fn_crm_metodo_pago_reserva_v2(bigint,bigint) TO sigi_app_user;
+
+CREATE FUNCTION public.sp_crm_obtener_comprobante_separacion_v2(p_actor bigint, p_id_reserva bigint, p_id_voucher bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_persona bigint;
+    v_usuario_registro bigint;
+    v_proyecto bigint;
+    v_ruta varchar;
+    v_nombre varchar;
+    v_mime varchar;
+BEGIN
+    IF p_actor IS NULL OR p_actor <= 0
+       OR NOT coalesce(public.fn_usuario_tiene_permiso_seguridad(
+            p_actor, 'sales.view'::varchar), false) THEN
+        RAISE EXCEPTION 'DENEGADO|No autorizado para consultar separaciones.';
+    END IF;
+
+    IF p_id_reserva IS NULL OR p_id_reserva <= 0 THEN
+        RAISE EXCEPTION 'DATOS_INVALIDOS|Identificador de separacion invalido.';
+    END IF;
+
+    SELECT r.id_persona, r.id_usuario_registro, l.id_proyecto
+      INTO v_persona, v_usuario_registro, v_proyecto
+    FROM public.ven_reservas r
+    JOIN public.inm_lotes l ON l.id_lote = r.id_lote
+    WHERE r.id_reserva = p_id_reserva;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'RESERVA_NO_EXISTE|No existe la separacion solicitada.';
+    END IF;
+
+    IF NOT public.fn_crm_puede_ver_comprobantes_separacion_v2(p_actor,p_id_reserva) THEN
+        RAISE EXCEPTION 'DENEGADO|No autorizado para ver el comprobante de esta separación.';
+    END IF;
+    SELECT v.clave_archivo, v.nombre_archivo_original, v.tipo_mime
+      INTO v_ruta, v_nombre, v_mime
+    FROM public.pag_vouchers v
+    JOIN public.pag_pagos pg ON pg.id_pago = v.id_pago
+    WHERE v.activo AND (p_id_voucher IS NULL OR v.id_voucher=p_id_voucher)
+      AND (
+        (NOT EXISTS(SELECT 1 FROM public.pag_separaciones_grupo_abonos_v1 a WHERE a.id_pago=pg.id_pago)
+         AND pg.id_reserva=p_id_reserva)
+        OR EXISTS(SELECT 1 FROM public.pag_separaciones_grupo_abonos_v1 a
+          JOIN public.ven_separaciones_grupo_lotes_v1 g USING(id_grupo)
+          WHERE a.id_pago=pg.id_pago AND g.id_reserva=p_id_reserva)
+      )
+    ORDER BY v.fecha_carga DESC, v.id_voucher DESC
+    LIMIT 1;
+
+    IF v_ruta IS NULL THEN
+        RAISE EXCEPTION 'ARCHIVO_NO_EXISTE|La separacion no tiene comprobante registrado.';
+    END IF;
+
+    IF v_ruta !~ '^separaciones/p-[0-9]+/l-[0-9]+/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(pdf|jpg|png|webp)$'
+        OR v_mime NOT IN ('application/pdf','image/jpeg','image/png','image/webp') THEN
+        RAISE EXCEPTION 'ARCHIVO_INVALIDO|La referencia o el formato del comprobante no es valido.';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM storage.objects o
+        WHERE o.bucket_id = 'vouchers-separacion-private'
+          AND o.name = v_ruta
+          AND o.archived_at IS NULL
+          AND o.is_delete_marker = false
+    ) THEN
+        RAISE EXCEPTION 'ARCHIVO_NO_EXISTE|El comprobante no esta disponible en Storage.';
+    END IF;
+
+    RETURN jsonb_build_object(
+        'bucket', 'vouchers-separacion-private',
+        'clave_archivo', v_ruta,
+        'nombre_archivo', v_nombre,
+        'tipo_mime', v_mime
+    );
+END
+$function$;
+REVOKE ALL ON FUNCTION public.sp_crm_obtener_comprobante_separacion_v2(bigint,bigint,bigint) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_obtener_comprobante_separacion_v2(bigint,bigint,bigint) TO sigi_app_user;
+CREATE OR REPLACE FUNCTION public.sp_crm_obtener_comprobante_separacion_v1(p_actor bigint,p_id_reserva bigint)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $lectura$
+ SELECT public.sp_crm_obtener_comprobante_separacion_v2(p_actor,p_id_reserva,NULL);
+$lectura$;
+CREATE OR REPLACE FUNCTION public.sp_crm_listar_operaciones_v1(p_actor bigint, p_tipo text, p_busqueda text, p_pagina integer, p_tamano integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+DECLARE v_resultado jsonb;
+BEGIN
+ IF p_actor IS NULL OR p_actor <= 0
+ OR NOT COALESCE(public.fn_usuario_tiene_permiso_seguridad(p_actor, 'sales.view'::varchar),FALSE)
+ THEN RAISE EXCEPTION 'DENEGADO|No autorizado para consultar operaciones comerciales.'; END IF;
+ p_tipo := UPPER(BTRIM(COALESCE(p_tipo,'')));
+ p_busqueda := LOWER(BTRIM(COALESCE(p_busqueda,'')));
+ IF p_tipo NOT IN ('','VENTA','SEPARACION') THEN
+  RAISE EXCEPTION 'DATOS_INVALIDOS|Tipo de operacion invalido.'; END IF;
+ IF CHAR_LENGTH(p_busqueda)>120
+ OR p_pagina IS NULL OR p_pagina<1 OR p_pagina>100000
+ OR p_tamano IS NULL OR p_tamano<1 OR p_tamano>100 THEN
+  RAISE EXCEPTION 'DATOS_INVALIDOS|Filtros de operaciones invalidos.'; END IF;
+ WITH contexto AS (
+                    SELECT p_actor AS actor,
+                           p_tipo AS tipo,
+                           p_busqueda AS busqueda
+                ), autorizacion AS (
+                    SELECT c.*,
+                           EXISTS (
+                               SELECT 1 FROM public.seg_usuarios_roles ur
+                               JOIN public.seg_roles rol ON rol.id_rol=ur.id_rol
+                               WHERE ur.id_usuario=c.actor AND ur.activo
+                                 AND ur.fecha_revocacion IS NULL AND rol.activo
+                                 AND rol.codigo IN ('ADMINISTRADOR','GERENCIA','SUPERVISOR_COMERCIAL','FINANZAS')
+                           ) AS acceso_global
+                    FROM contexto c
+                ), operaciones AS (
+                    SELECT v.id_venta AS id, 'VENTA'::text AS tipo,
+                           v.codigo::text AS codigo, l.id_lote AS id_lote,
+                           l.codigo::text AS lote, proyecto.nombre::text AS proyecto,
+                           concat_ws(' ',per.nombres,per.apellido_paterno,
+                                     per.apellido_materno)::text AS comprador,
+                           doc.numero_documento::text AS documento,
+                           modalidad.codigo::text AS modalidad,
+                           v.precio_venta AS monto,
+                           estado.codigo::text AS estado,
+                           v.fecha_venta AS fecha,
+                           NULL::timestamptz AS fecha_vencimiento,
+                           contrato.codigo::text AS contrato,
+                           estado_contrato.codigo::text AS estado_contrato,
+                           NULLIF(concat_ws(' ',ad.nombres,ad.apellido_paterno,
+                                          ad.apellido_materno),'')::text AS asesor,
+                           NULL::text AS metodo_pago
+                    FROM public.ven_ventas v
+                    JOIN public.inm_lotes l ON l.id_lote=v.id_lote
+                    JOIN public.inm_proyectos proyecto ON proyecto.id_proyecto=l.id_proyecto
+                    JOIN public.cfg_modalidades_venta modalidad
+                      ON modalidad.id_modalidad_venta=v.id_modalidad_venta
+                    JOIN public.cfg_estados_venta estado
+                      ON estado.id_estado_venta=v.id_estado_venta
+                    LEFT JOIN public.ven_ventas_clientes vc
+                      ON vc.id_venta=v.id_venta AND vc.titular
+                    LEFT JOIN public.crm_clientes cl ON cl.id_cliente=vc.id_cliente
+                    LEFT JOIN public.core_personas per ON per.id_persona=cl.id_persona
+                    LEFT JOIN LATERAL (
+                        SELECT d.numero_documento
+                        FROM public.core_personas_documentos d
+                        WHERE d.id_persona=per.id_persona AND d.principal AND d.activo
+                        ORDER BY d.id_persona_documento DESC LIMIT 1
+                    ) doc ON true
+                    LEFT JOIN LATERAL (
+                        SELECT c.codigo,c.id_estado_contrato
+                        FROM public.ven_contratos c WHERE c.id_venta=v.id_venta
+                        ORDER BY c.id_contrato DESC LIMIT 1
+                    ) contrato ON true
+                    LEFT JOIN public.cfg_estados_contrato estado_contrato
+                      ON estado_contrato.id_estado_contrato=contrato.id_estado_contrato
+                    LEFT JOIN LATERAL (
+                        SELECT va.id_asesor
+                        FROM public.com_ventas_asesores va
+                        WHERE va.id_venta=v.id_venta
+                        ORDER BY va.es_principal DESC,va.id_venta_asesor LIMIT 1
+                    ) va ON true
+                    LEFT JOIN public.com_asesores asesor ON asesor.id_asesor=va.id_asesor
+                    LEFT JOIN public.core_personas ad ON ad.id_persona=asesor.id_persona
+                    CROSS JOIN autorizacion a
+                    WHERE public.fn_usuario_tiene_permiso_seguridad(
+                        a.actor, 'sales.view'::varchar)
+                      AND (a.acceso_global OR v.id_usuario_registro=a.actor
+                           OR EXISTS (
+                              SELECT 1 FROM public.com_ventas_asesores x
+                              JOIN public.com_asesores ca ON ca.id_asesor=x.id_asesor
+                              JOIN public.seg_usuarios u ON u.id_persona=ca.id_persona
+                              WHERE x.id_venta=v.id_venta AND u.id_usuario=a.actor
+                           ))
+                    UNION ALL
+                    SELECT r.id_reserva, 'SEPARACION'::text, r.codigo::text,
+                           l.id_lote, l.codigo::text, proyecto.nombre::text,
+                           concat_ws(' ',per.nombres,per.apellido_paterno,
+                                     per.apellido_materno)::text,
+                           doc.numero_documento::text,
+                           COALESCE(
+                               (SELECT mv.codigo::text
+                                FROM public.ven_ventas vv
+                                JOIN public.cfg_modalidades_venta mv
+                                  ON mv.id_modalidad_venta=vv.id_modalidad_venta
+                                WHERE vv.id_reserva=r.id_reserva
+                                ORDER BY vv.fecha_venta DESC, vv.id_venta DESC
+                                LIMIT 1),
+                               r.modalidad_prevista::text
+                           ) AS modalidad, r.monto_reserva, estado.codigo::text,
+                           r.fecha_reserva, r.fecha_vencimiento,
+                           NULL::text, NULL::text,
+                           (
+                               SELECT NULLIF(concat_ws(' ', ap.nombres, ap.apellido_paterno,
+                                                      ap.apellido_materno), '')::text
+                               FROM public.crm_prospectos pro
+                               JOIN public.crm_prospectos_intereses pi
+                                 ON pi.id_prospecto=pro.id_prospecto
+                                AND pi.id_proyecto=l.id_proyecto
+                               JOIN public.com_asignaciones_prospecto asep
+                                 ON asep.id_prospecto=pro.id_prospecto
+                               JOIN public.com_asesores ca
+                                 ON ca.id_asesor=asep.id_asesor
+                               JOIN public.core_personas ap
+                                 ON ap.id_persona=ca.id_persona
+                               WHERE pro.id_persona=r.id_persona
+                                 AND asep.fecha_asignacion<=r.fecha_reserva
+                                 AND (asep.fecha_fin IS NULL OR asep.fecha_fin>r.fecha_reserva)
+                               ORDER BY asep.fecha_asignacion DESC, asep.id_asignacion_prospecto DESC
+                               LIMIT 1
+                           )::text AS asesor,
+                           public.fn_crm_metodo_pago_reserva_v2(a.actor,r.id_reserva) AS metodo_pago
+                    FROM public.ven_reservas r
+                    JOIN public.inm_lotes l ON l.id_lote=r.id_lote
+                    JOIN public.inm_proyectos proyecto ON proyecto.id_proyecto=l.id_proyecto
+                    JOIN public.core_personas per ON per.id_persona=r.id_persona
+                    JOIN public.cfg_estados_reserva estado
+                      ON estado.id_estado_reserva=r.id_estado_reserva
+                    LEFT JOIN LATERAL (
+                        SELECT d.numero_documento
+                        FROM public.core_personas_documentos d
+                        WHERE d.id_persona=per.id_persona AND d.principal AND d.activo
+                        ORDER BY d.id_persona_documento DESC LIMIT 1
+                    ) doc ON true
+                    CROSS JOIN autorizacion a
+                    WHERE public.fn_usuario_tiene_permiso_seguridad(
+                        a.actor, 'sales.view'::varchar)
+                      AND (a.acceso_global
+                           OR EXISTS (
+                               SELECT 1 FROM public.crm_prospectos p
+                               JOIN public.crm_prospectos_intereses i
+                                 ON i.id_prospecto=p.id_prospecto
+                                AND i.id_proyecto=l.id_proyecto AND i.activo
+                               WHERE p.id_persona=r.id_persona
+                                 AND public.fn_crm_puede_consultar_prospecto(
+                                     a.actor,p.id_prospecto)
+                           ))
+                      
+                ), filtradas AS (
+                    SELECT op.* FROM operaciones op CROSS JOIN autorizacion a
+                    WHERE (a.tipo='' OR op.tipo=a.tipo)
+                      AND (a.busqueda='' OR
+                          lower(op.codigo) LIKE '%'||a.busqueda||'%' OR
+                          lower(op.lote) LIKE '%'||a.busqueda||'%' OR
+                          lower(op.proyecto) LIKE '%'||a.busqueda||'%' OR
+                          lower(op.comprador) LIKE '%'||a.busqueda||'%')
+                )
+                SELECT jsonb_build_object(
+                    'items',COALESCE((
+                        SELECT jsonb_agg(to_jsonb(f) ORDER BY f.fecha DESC,f.id DESC)
+                        FROM (SELECT * FROM filtradas
+                              ORDER BY fecha DESC,id DESC
+                              LIMIT p_tamano OFFSET ((p_pagina - 1) * p_tamano)) f
+                    ),'[]'::jsonb),
+                    'total',(SELECT COUNT(*) FROM filtradas),
+                    'pagina',p_pagina,
+                    'tamano',p_tamano,
+                    'paginas',CEIL((SELECT COUNT(*) FROM filtradas)::numeric
+                                   /p_tamano)::integer
+                ) INTO v_resultado;
+ RETURN v_resultado;
+END;
+$function$;
 COMMIT;

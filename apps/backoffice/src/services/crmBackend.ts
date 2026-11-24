@@ -830,6 +830,10 @@ export interface CrmSeparacionVouchersResponse {
   paginas: number;
 }
 
+export interface CrmAbonosSeparacion {
+  agrupada:boolean;
+  items:{idVoucher:number;nombreArchivo:string;tipoMime:string;montoAbono:number;montoLote:number;metodo:string;estado:string}[];
+}
 export interface CrmVoucherReadUrl {
   bucket: string;
   claveArchivo: string;
@@ -2087,6 +2091,9 @@ export const crmBackend = {
       `/crm/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
     );
   },
+
+  listarComprobantesSeparacion:(idReserva:number)=>coreApi.get<CrmAbonosSeparacion>(`/crm/separaciones/${idReserva}/comprobantes`),
+  obtenerComprobanteSeparacionEspecifico:(idReserva:number,idVoucher:number)=>coreApi.get<CrmVoucherReadUrl>(`/crm/separaciones/${idReserva}/comprobantes/${idVoucher}/url-firmada`),
 
   obtenerComprobanteSeparacion: (idReserva: number) => {
     if (!Number.isSafeInteger(idReserva) || idReserva <= 0) {
