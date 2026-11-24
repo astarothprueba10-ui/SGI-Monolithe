@@ -27,3 +27,13 @@ test('recompra conserva seguridad por asesor, lote y origen de captación', () =
   assert.match(migration,/id_origen_prospecto=v_origen[\s\S]*?AND NOT EXISTS/);
   assert.doesNotMatch(migration,/YA_COMPRADOR/);
 });
+
+
+test('operación permite registrar interés y asignar asesor desde el formulario con permisos CRM', () => {
+  assert.match(sales,/compradorExistente \|\| intereses\.has\(p\.idProyecto\) \|\| puedeEditarInteres/);
+  assert.match(sales,/crmBackend\.actualizar\(idProspecto, \{ idProyectoInteres: idProyecto \}\)/);
+  assert.match(sales,/crmBackend\.registrarInteresRecompra/);
+  assert.match(sales,/crmBackend\.asesor\(id, asesor\.id_asesor/);
+  assert.match(sales,/puedeAsignarAsesorOperacion = can\('crm\.edit'\)/);
+  assert.match(sales,/const tieneAsesor = \(prospect\.id_asesor \?\? 0\) > 0/);
+});

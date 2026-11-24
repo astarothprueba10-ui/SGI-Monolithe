@@ -18,6 +18,7 @@ import { salesService } from '../services/salesService';
 import {
   crmBackend,
   type CrmProspect,
+  type CrmAdvisor,
   type CrmEtapaOperacion,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
@@ -75,12 +76,12 @@ function AdvisorBadge({ advisor, type }: { advisor?: string | null; type: string
   return <span className="text-xs text-brand-400 italic">No aplica</span>;
 }
 
-function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
+function ProspectAdvisorInfo({ prospect, onAssign, disabled }: { prospect?: CrmProspect; onAssign?: () => void; disabled?: boolean }) {
   if (!prospect) return null;
-  const tieneAsesor = Boolean(prospect.asesor_nombre?.trim());
+  const tieneAsesor = (prospect.id_asesor ?? 0) > 0;
   return (
     <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/50 p-2.5 text-xs">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-brand-600 font-medium">Asesor asignado en CRM:</span>
         <span className={`inline-flex items-center gap-1 font-semibold ${tieneAsesor ? 'text-emerald-800' : 'text-amber-800'}`}>
           {tieneAsesor ? <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" /> : <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-600" />}
@@ -88,8 +89,12 @@ function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
         </span>
       </div>
       <p className="mt-1 text-[11px] text-brand-500">
-        {tieneAsesor ? 'Continuidad confirmada: el backend asignará este asesor a la venta.' : 'Atención: prospecto sin asesor activo; la operación no tendrá asesor vinculado.'}
+        {tieneAsesor ? 'Se conservará el asesor registrado en CRM para la gestión comercial.' : 'El cliente no tiene asesor activo asignado.'}
       </p>
+      {!tieneAsesor && onAssign && (
+        <Button size="sm" variant="secondary" icon={UserCheckIcon} className="mt-2 w-full sm:w-auto"
+          disabled={disabled} onClick={onAssign}>Asignar asesor</Button>
+      )}
     </div>
   );
 }
@@ -231,6 +236,17 @@ export function Sales() {
   const [availableStages, setAvailableStages] = useState<CrmEtapaOperacion[]>([]);
   const [interesesOperacion, setInteresesOperacion] = useState<number[]>([]);
   const [registrandoInteres, setRegistrandoInteres] = useState(false);
+  const puedeEditarInteres = can('crm.edit');
+  const puedeAsignarAsesorOperacion = can('crm.edit') && user.roles.some(r =>
+    ['Administrador', 'Gerencia', 'Supervisor comercial', 'Administración'].includes(r));
+  const [editorAsesor, setEditorAsesor] = useState(false);
+  const [asesoresOperacion, setAsesoresOperacion] = useState<CrmAdvisor[]>([]);
+  const [asesorOperacion, setAsesorOperacion] = useState('');
+  const [cargandoAsesoresOperacion, setCargandoAsesoresOperacion] = useState(false);
+  const [guardandoAsesorOperacion, setGuardandoAsesorOperacion] = useState(false);
+  const [errorAsesorOperacion, setErrorAsesorOperacion] = useState('');
+  const clienteOperacion = prospectsList.find(p => p.id_prospecto === selectedProspectId);
+  const compradorOperacion = clienteOperacion?.estado_codigo?.toUpperCase() === 'CONVERTIDO';
   const proyectoConInteres = interesesOperacion.includes(Number(formProjectId));
   const [formStageId, setFormStageId] = useState('');
   const [loadingStages, setLoadingStages] = useState(false);
@@ -473,7 +489,10 @@ export function Sales() {
 
   const loadFormData = async () => {
     setLoadingFormData(true);
-
+    ++seleccionProspectoPeticionRef.current;
+    setEditorAsesor(false);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
     setSelectedProspectId('');
     setInteresesOperacion([]);
     setAvailableProjects([]);
@@ -508,6 +527,9 @@ export function Sales() {
   const handleSelectProspect = async (id: number | '') => {
     const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
+    setEditorAsesor(false);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
     setInteresesOperacion([]);
     setFormProjectId('');
     setFormStageId('');
@@ -517,7 +539,7 @@ export function Sales() {
     setFormLotId('');
     setReservasVigentes([]);
     setAutoseleccionPendiente(null);
-    if (id === '') return;
+    if (id === '') { setLoadingProjects(false); return; }
 
     setLoadingProjects(true);
     try {
@@ -531,11 +553,12 @@ export function Sales() {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
       setInteresesOperacion([...intereses]);
+      setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
       // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
       const compradorExistente = (prospectsList.find(p => p.id_prospecto === id)
         ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
       const elegibles = proyectos.filter((p) =>
-        p.activo && (compradorExistente || intereses.has(p.idProyecto))
+        p.activo && (compradorExistente || intereses.has(p.idProyecto) || puedeEditarInteres)
       );
       setAvailableProjects(elegibles);
       setReservasVigentes(consultaReservas.reservas ?? []);
@@ -575,7 +598,12 @@ export function Sales() {
     const solicitud = seleccionProspectoPeticionRef.current;
     setRegistrandoInteres(true);
     try {
-      await crmBackend.registrarInteresRecompra(idProspecto, idProyecto);
+      if (compradorOperacion) {
+        await crmBackend.registrarInteresRecompra(idProspecto, idProyecto);
+      } else {
+        if (!puedeEditarInteres) return;
+        await crmBackend.actualizar(idProspecto, { idProyectoInteres: idProyecto });
+      }
       if (solicitud === seleccionProspectoPeticionRef.current) {
         setInteresesOperacion(prev => [...new Set([...prev, idProyecto])]);
         toast.success('Interés comercial registrado. Puedes continuar con la adquisición.');
@@ -585,6 +613,60 @@ export function Sales() {
         toast.error(err instanceof Error ? err.message : 'No se pudo registrar el interés comercial.');
     } finally {
       setRegistrandoInteres(false);
+    }
+  };
+
+  const abrirEditorAsesorOperacion = async () => {
+    if (!clienteOperacion || !puedeAsignarAsesorOperacion || compradorOperacion ||
+        (clienteOperacion.id_asesor ?? 0) > 0 || guardandoAsesorOperacion) return;
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setEditorAsesor(true);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
+    setAsesoresOperacion([]);
+    setCargandoAsesoresOperacion(true);
+    try {
+      const asesores = await crmBackend.asesores();
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setAsesoresOperacion((asesores ?? []).filter(a => a.activo));
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setErrorAsesorOperacion(err instanceof Error ? err.message : 'No se pudieron consultar los asesores.');
+    } finally {
+      if (solicitud === seleccionProspectoPeticionRef.current) setCargandoAsesoresOperacion(false);
+    }
+  };
+
+  const guardarAsesorOperacion = async () => {
+    if (!selectedProspectId || !puedeAsignarAsesorOperacion || compradorOperacion ||
+        (clienteOperacion?.id_asesor ?? 0) > 0 || guardandoAsesorOperacion) return;
+    const asesor = asesoresOperacion.find(a => a.id_asesor === Number(asesorOperacion));
+    if (!asesor) return;
+    const id = selectedProspectId;
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setGuardandoAsesorOperacion(true);
+    setErrorAsesorOperacion('');
+    try {
+      // Reutiliza el flujo CRM: valida rol, asesor habilitado y registra el seguimiento.
+      const detalle = await crmBackend.detalle(id);
+      if ((detalle.prospecto.id_asesor ?? 0) > 0) {
+        setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
+        setEditorAsesor(false);
+        toast.info('El cliente ya tiene un asesor asignado.');
+        return;
+      }
+      await crmBackend.asesor(id, asesor.id_asesor, 'Asignación desde Separaciones y Ventas');
+      if (solicitud === seleccionProspectoPeticionRef.current) {
+        setProspectsList(prev => prev.map(p => p.id_prospecto === id
+          ? {...p,id_asesor:asesor.id_asesor,asesor_nombre:asesor.nombre_completo} : p));
+        setEditorAsesor(false);
+        toast.success('Asesor asignado en CRM. Puedes continuar con la operación.');
+      }
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setErrorAsesorOperacion(err instanceof Error ? err.message : 'No se pudo asignar el asesor.');
+    } finally {
+      setGuardandoAsesorOperacion(false);
     }
   };
 
@@ -634,9 +716,11 @@ export function Sales() {
     if (
       registroSeparacionEnCursoRef.current ||
       registroVentaEnCursoRef.current ||
-      confirmacionVenta
+      confirmacionVenta || registrandoInteres || guardandoAsesorOperacion
     ) return;
 
+    ++seleccionProspectoPeticionRef.current;
+    setEditorAsesor(false);
     setIsModalOpen(false);
     setPreseleccionAgrupada(null);
     setAsociacionAgrupadaPendiente(null);
@@ -1010,7 +1094,7 @@ export function Sales() {
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (submitting || registroSeparacionEnCursoRef.current) return;
+    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor) return;
 
     if (opType === 'Venta') {
       setFormTouched(true);
@@ -2050,7 +2134,7 @@ export function Sales() {
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
-              disabled={submitting}
+              disabled={submitting || registrandoInteres || guardandoAsesorOperacion}
               onClick={cerrarModalOperacion}
             >
               Cancelar
@@ -2059,7 +2143,7 @@ export function Sales() {
               variant="primary"
 
               disabled={
-                submitting ||
+                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor ||
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
                 ventaFinanciadaInvalida ||
@@ -2090,7 +2174,7 @@ export function Sales() {
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
-                disabled={registrandoInteres}
+                disabled={registrandoInteres || guardandoAsesorOperacion}
                 onChange={(e) =>
                   void handleSelectProspect(
                     e.target.value ? Number(e.target.value) : ''
@@ -2104,7 +2188,31 @@ export function Sales() {
                   </option>
                 ))}
               </Select>
-              <ProspectAdvisorInfo prospect={prospectsList.find((p) => p.id_prospecto === selectedProspectId)} />
+              <ProspectAdvisorInfo prospect={clienteOperacion}
+                disabled={editorAsesor || registrandoInteres || guardandoAsesorOperacion || loadingProjects}
+                onAssign={puedeAsignarAsesorOperacion && !compradorOperacion ? () => void abrirEditorAsesorOperacion() : undefined}/>
+              {editorAsesor && (
+                <div className="mt-2 space-y-2 rounded-lg border border-brand-200 bg-white p-3">
+                  <label className="block text-xs font-medium text-brand-700">
+                    Asesor comercial *
+                    <Select className="mt-1 w-full" value={asesorOperacion}
+                      disabled={cargandoAsesoresOperacion || guardandoAsesorOperacion}
+                      onChange={e=>setAsesorOperacion(e.target.value)}>
+                      <option value="">{cargandoAsesoresOperacion ? 'Cargando asesores…' : 'Seleccione un asesor activo'}</option>
+                      {asesoresOperacion.map(a=><option key={a.id_asesor} value={a.id_asesor}>{a.nombre_completo}</option>)}
+                    </Select>
+                  </label>
+                  <p className="text-xs text-brand-500">La asignación se guardará en CRM antes de continuar. No es necesario salir del formulario.</p>
+                  {errorAsesorOperacion && <div role="alert"><Alert tone="danger" title="No se pudo asignar el asesor">{errorAsesorOperacion}</Alert></div>}
+                  {!cargandoAsesoresOperacion && !asesoresOperacion.length && !errorAsesorOperacion &&
+                    <p className="text-xs text-amber-700">No hay asesores activos disponibles.</p>}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button variant="secondary" disabled={guardandoAsesorOperacion} onClick={()=>setEditorAsesor(false)}>Cancelar</Button>
+                    <Button variant="primary" disabled={!asesorOperacion || cargandoAsesoresOperacion || guardandoAsesorOperacion}
+                      onClick={()=>void guardarAsesorOperacion()}>{guardandoAsesorOperacion ? 'Guardando…' : 'Confirmar asignación'}</Button>
+                  </div>
+                </div>
+              )}
               {opType === 'Venta' && reservasVigentes.length > 0 && (
                 <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                   Reserva vigente detectada. Se preseleccionó el proyecto, etapa y lote reservado.
@@ -2120,7 +2228,7 @@ export function Sales() {
 
               <Select
                 value={formProjectId}
-                disabled={!selectedProspectId || loadingProjects || registrandoInteres}
+                disabled={!selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormProjectId(e.target.value);
@@ -2138,17 +2246,17 @@ export function Sales() {
 
                 {availableProjects.map((project) => (
                   <option key={project.idProyecto} value={project.idProyecto}>
-                    {project.nombre}
+                    {project.nombre}{interesesOperacion.includes(project.idProyecto) ? '' : ' — Sin interés registrado'}
                   </option>
                 ))}
               </Select>
 
               {selectedProspectId && formProjectId && !loadingProjects && !proyectoConInteres && (
                 <div className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  <p>El cliente no tiene un interés activo en este proyecto. Regístralo expresamente para continuar sin alterar sus otros intereses.</p>
-                  <Button type="button" variant="secondary" disabled={registrandoInteres}
+                  <p>El cliente no tiene un interés activo en este proyecto. Confirma el nuevo interés para continuar. Se conservarán los intereses anteriores.</p>
+                  <Button type="button" variant="secondary" disabled={registrandoInteres || guardandoAsesorOperacion}
                     onClick={() => void registrarInteresOperacion()}>
-                    {registrandoInteres ? 'Registrando…' : 'Registrar interés comercial'}
+                    {registrandoInteres ? 'Registrando…' : 'Registrar interés en este proyecto'}
                   </Button>
                 </div>
               )}
