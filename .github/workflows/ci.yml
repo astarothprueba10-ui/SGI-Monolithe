@@ -390,6 +390,37 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/126_planos_grants_core_service_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_core_grants_v1_pg_test.sql
 
+  separaciones-acumuladas-postgres:
+    name: Separaciones acumuladas - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: separaciones_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: separaciones_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d separaciones_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: separaciones_ci_password
+      PGDATABASE: separaciones_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probar registro, revisión y conciliación acumulados
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/separaciones_acumuladas_154_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/154_separaciones_pago_acumulado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/separaciones_acumuladas_154_pg_test.sql
+
   crm-postgres-validation:
     name: CRM cartera y riesgo - PostgreSQL 17 aislado
     runs-on: ubuntu-latest

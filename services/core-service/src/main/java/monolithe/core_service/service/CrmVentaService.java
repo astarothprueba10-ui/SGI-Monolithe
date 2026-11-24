@@ -329,6 +329,21 @@ public class CrmVentaService {
             """,actor,prospecto,proyecto,lote,anterior,motivo);
     }
 
+    @Transactional(readOnly=true)
+    public JsonNode buscarSeparacionAcumulada(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("""
+                SELECT public.sp_crm_buscar_separacion_acumulada_v1(
+                    CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+                    CAST(? AS jsonb),CAST(? AS jsonb),CAST(? AS text))::text
+                """,actor,req.idSolicitud().toString(),req.idProspecto(),
+                jsonMapper.writeValueAsString(req.lotes()),jsonMapper.writeValueAsString(req.abonos()),req.observaciones());
+        } catch(JacksonException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se pudo interpretar la solicitud.");
+        }
+    }
+
     @Transactional
     public JsonNode registrarSeparacionAcumulada(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
         validarActor(actor);

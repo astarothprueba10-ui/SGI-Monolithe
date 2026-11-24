@@ -216,6 +216,8 @@ public class CrmVentaController {
         public JsonNode registrarSeparacionAcumulada(@AuthenticationPrincipal Jwt jwt,
                 @Valid @RequestBody monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
             Long actor=obtenerActor(jwt);
+            JsonNode previo=service.buscarSeparacionAcumulada(actor,req);
+            if(previo.path("encontrado").asBoolean(false)) return previo.path("resultado");
             separacionStorageService.verificarComprobantesAcumulados(actor,req);
             return service.registrarSeparacionAcumulada(actor,req);
         }

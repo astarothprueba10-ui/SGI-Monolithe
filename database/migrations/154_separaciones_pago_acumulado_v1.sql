@@ -44,7 +44,7 @@ DECLARE
  v_reserva bigint; v_pago bigint; v_voucher bigint; v_evento bigint;
  v_total numeric:=0; v_pagado numeric:=0; v_monto numeric; v_restante numeric; v_asignar numeric;
  v_precio numeric; v_politica jsonb; v_etapas jsonb; v_contexto jsonb; v_req jsonb; v_resultado jsonb;
- v_existente record; v_item jsonb; v_abono jsonb; v_r record; v_size bigint; v_mime text; v_ext text;
+ v_existente record; v_item jsonb; v_abono jsonb; v_r record; v_size bigint; v_mime text; v_ext text; v_legacy jsonb;
  v_ref text; v_hash text; v_ruta text; v_nombre text; v_reservas jsonb:='[]'; v_abonos jsonb:='[]';
 BEGIN
  IF p_actor IS NULL OR p_solicitud IS NULL OR NOT coalesce(public.fn_usuario_tiene_permiso_seguridad(p_actor,'sales.create'::varchar),false)
@@ -121,6 +121,21 @@ BEGIN
   v_pagado:=v_pagado+v_monto;
  END LOOP;
  IF v_pagado<>v_total THEN RAISE EXCEPTION 'SEPARACION_MONTO_INVALIDO|La suma de abonos debe ser igual al importe de separación.'; END IF;
+ -- El caso individual de un solo abono conserva exactamente el contrato histórico.
+ IF jsonb_array_length(p_lotes)=1 AND jsonb_array_length(p_abonos)=1 THEN
+  v_abono:=p_abonos->0;
+  v_legacy:=public.sp_crm_registrar_separacion_v2(p_actor,p_prospecto,v_principal,
+   (v_abono->>'metodoPago')::varchar,nullif(btrim(v_abono->>'numeroOperacion'),'')::varchar,v_total,p_observaciones,
+   (v_abono->>'claveArchivo')::varchar,(v_abono->>'nombreArchivo')::varchar,(v_abono->>'tipoMime')::varchar,
+   (v_abono->>'tamanioBytes')::bigint,(v_abono->>'hashSha256')::varchar);
+  v_resultado:=jsonb_build_object('success',true,'idGrupo',p_solicitud,'total',v_total,
+    'reservas',jsonb_build_array(jsonb_build_object('idReserva',v_legacy->'id_reserva','idLote',v_principal,'monto',v_total)),
+    'abonos',jsonb_build_array(jsonb_build_object('idPago',v_legacy->'id_pago','idVoucher',v_legacy->'id_voucher','monto',v_total)));
+  -- Solo conserva la solicitud idempotente; no vincula el pago individual a las tablas agrupadas.
+  INSERT INTO public.ven_separaciones_grupo_v1(id_grupo,id_prospecto,id_proyecto,id_actor,total,solicitud,resultado)
+   VALUES(p_solicitud,p_prospecto,v_proyecto,p_actor,v_total,v_req,v_resultado);
+  RETURN v_resultado;
+ END IF;
  INSERT INTO public.ven_separaciones_grupo_v1(id_grupo,id_prospecto,id_proyecto,id_actor,total,solicitud) VALUES(p_solicitud,p_prospecto,v_proyecto,p_actor,v_total,v_req);
  FOR v_item IN SELECT x FROM jsonb_array_elements(p_lotes) x LOOP
   v_lote:=(v_item->>'idLote')::bigint;v_politica:=public.fn_fin_politica_lote_v2(v_lote);v_monto:=(v_politica->>'montoSeparacion')::numeric;
@@ -164,6 +179,20 @@ BEGIN
 END; $$;
 REVOKE ALL ON FUNCTION public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
 GRANT EXECUTE ON FUNCTION public.sp_crm_registrar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) TO sigi_app_user;
+CREATE FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(p_actor bigint,p_solicitud uuid,p_prospecto bigint,p_lotes jsonb,p_abonos jsonb,p_observaciones text)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $
+DECLARE r record;
+BEGIN
+ IF p_actor IS NULL OR p_solicitud IS NULL OR NOT coalesce(public.fn_usuario_tiene_permiso_seguridad(p_actor,'sales.create'::varchar),false)
+ OR NOT coalesce(public.fn_crm_puede_consultar_prospecto(p_actor,p_prospecto),false) THEN RAISE EXCEPTION 'DENEGADO|No autorizado.'; END IF;
+ SELECT * INTO r FROM public.ven_separaciones_grupo_v1 WHERE id_grupo=p_solicitud;
+ IF NOT FOUND THEN RETURN jsonb_build_object('encontrado',false); END IF;
+ IF r.id_actor<>p_actor OR r.solicitud IS DISTINCT FROM jsonb_build_object('prospecto',p_prospecto,'lotes',p_lotes,'abonos',p_abonos,'observaciones',p_observaciones)
+ THEN RAISE EXCEPTION 'OPERACION_INVALIDA|Solicitud reutilizada con otros datos.'; END IF;
+ RETURN jsonb_build_object('encontrado',true,'resultado',r.resultado);
+END; $;
+REVOKE ALL ON FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
+GRANT EXECUTE ON FUNCTION public.sp_crm_buscar_separacion_acumulada_v1(bigint,uuid,bigint,jsonb,jsonb,text) TO sigi_app_user;
 
 CREATE FUNCTION public.sp_fin_revisar_abono_separacion_grupo_v1(p_actor bigint,p_voucher bigint,p_aprobar boolean,p_motivo text,p_observaciones text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $$
@@ -216,12 +245,12 @@ REVOKE ALL ON FUNCTION public.fn_guardar_reserva_grupo_v1() FROM PUBLIC,anon,aut
 CREATE TRIGGER trg_reserva_grupo_v1 BEFORE UPDATE OF id_estado_reserva ON public.ven_reservas FOR EACH ROW EXECUTE FUNCTION public.fn_guardar_reserva_grupo_v1();
 CREATE FUNCTION public.fn_guardar_venta_reserva_grupo_v1() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public','pg_temp' AS $$
 BEGIN
- IF NEW.id_reserva IS NOT NULL AND EXISTS(SELECT 1 FROM public.ven_separaciones_grupo_lotes_v1 WHERE id_reserva=NEW.id_reserva)
+ IF EXISTS(SELECT 1 FROM public.ven_separaciones_grupo_lotes_v1 g JOIN public.ven_reservas r USING(id_reserva) JOIN public.cfg_estados_reserva e USING(id_estado_reserva) WHERE (r.id_reserva=NEW.id_reserva OR r.id_lote=NEW.id_lote) AND e.codigo IN ('PENDIENTE','VIGENTE'))
  THEN RAISE EXCEPTION 'OPERACION_INVALIDA|La venta de una reserva agrupada requiere distribución financiera integrada.'; END IF;
  RETURN NEW;
 END; $$;
 REVOKE ALL ON FUNCTION public.fn_guardar_venta_reserva_grupo_v1() FROM PUBLIC,anon,authenticated,service_role,sigi_app_user;
-CREATE TRIGGER trg_venta_reserva_grupo_v1 BEFORE INSERT OR UPDATE OF id_reserva ON public.ven_ventas FOR EACH ROW EXECUTE FUNCTION public.fn_guardar_venta_reserva_grupo_v1();
+CREATE TRIGGER trg_venta_reserva_grupo_v1 BEFORE INSERT OR UPDATE OF id_reserva,id_lote ON public.ven_ventas FOR EACH ROW EXECUTE FUNCTION public.fn_guardar_venta_reserva_grupo_v1();
 CREATE OR REPLACE FUNCTION public.sp_finanzas_revisar_voucher_separacion_v1(p_actor bigint, p_id_voucher bigint, p_aprobar boolean, p_motivo text, p_observaciones text)
  RETURNS jsonb
  LANGUAGE plpgsql
