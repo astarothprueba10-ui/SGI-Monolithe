@@ -158,6 +158,7 @@ export interface CrmDetail {
   documentoPrincipal: { tipoCodigo: string; numero: string; verificado: boolean } | null;
   contactos: { tipoCodigo: string; valor: string; principal: boolean; verificado: boolean }[];
   intereses: { idInteres: number; idProyecto: number; proyecto: string; comentario?: string | null; idLoteInteres?: number | null; codigoLoteInteres?: string | null }[];
+  reservasActivas?: {idReserva:number;codigo:string;idProyecto:number;proyecto:string;idLote:number;lote:string;estado:string;monto:number;fechaVencimiento:string}[];
   totalSeguimientos: number;
   totalVisitas: number;
   esComprador: boolean;
@@ -851,6 +852,8 @@ export interface CrmRevisarVoucherInput {
 
 
 export interface CrmOperacionItem {
+  id_grupo?:string;
+  lotes_grupo?:{idReserva:number;codigo:string;lote:string;monto:number;estado:string;fechaVencimiento:string}[];
   id: number;
   tipo: 'VENTA' | 'SEPARACION';
   codigo: string;

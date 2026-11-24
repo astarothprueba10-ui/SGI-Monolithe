@@ -108,6 +108,8 @@ function ProspectAdvisorInfo({ prospect, onAssign, disabled }: { prospect?: CrmP
 
 
 const ESTADOS_SEPARACION = {
+  REQUIERE_REVISION: {etiqueta:'Requiere revisión',estilo:'bg-amber-50 text-amber-800 border-amber-200',punto:'bg-amber-500'},
+  ESTADOS_MIXTOS: {etiqueta:'Estados por lote',estilo:'bg-sky-50 text-sky-800 border-sky-200',punto:'bg-sky-500'},
   PENDIENTE: {
     etiqueta: 'Pendiente',
     estilo: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -1981,9 +1983,9 @@ export function Sales() {
                       {sale.project || '—'}
                     </TD>
                     <TD className="whitespace-nowrap">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">
-                        {sale.lot || '—'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(sale.groupedLots?.length?sale.groupedLots.map(l=>l.lote):[sale.lot||'—']).map(lote=><span key={lote} className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">{lote}</span>)}
+                      </div>
                     </TD>
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
                       {formatSoles(sale.amount)}
@@ -2124,7 +2126,7 @@ export function Sales() {
                 <p className="mt-1 font-mono text-lg font-bold text-brand-900">{detail.code}</p>
                 <p className="mt-1 text-xs text-brand-600">
                   {detail.type === 'Separación'
-                    ? 'Separación de lote con comprobante de pago asociado'
+                    ? (detail.groupedLots?.length ? `Separación acumulada · ${detail.groupedLots.length} lotes · un único expediente` : 'Separación de lote con comprobante de pago asociado')
                     : 'Operación comercial y documentación de venta'}
                 </p>
               </div>
@@ -2157,7 +2159,7 @@ export function Sales() {
                     )
                   }] : []),
                   { label: 'Proyecto inmobiliario', value: detail.project || '—' },
-                  { label: 'Lote', value: detail.lot || '—' },
+                  { label: detail.groupedLots?.length ? 'Lotes' : 'Lote', value: detail.lot || '—' },
                   { label: 'Asesor comercial', value: (
                     detail.advisor?.trim() ? (
                       <span className="inline-flex items-center gap-1.5 text-emerald-800">
@@ -2197,10 +2199,22 @@ export function Sales() {
               </dl>
             </section>
 
+            {detail.type === 'Separación' && !!detail.groupedLots?.length && (
+              <section className="rounded-xl border border-brand-100 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-brand-900">Lotes de la operación</h3>
+                {detail.groupedLots.map(l=><div key={l.idReserva} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-100 p-3">
+                  <div><p className="font-semibold text-sm">{l.lote}</p><p className="text-xs text-brand-500">{l.codigo}</p></div>
+                  <EstadoSeparacionBadge estado={l.estado}/>
+                  <strong className="text-sm tabular-nums">{formatSoles(l.monto)}</strong>
+                </div>)}
+                <p className="flex justify-between border-t border-brand-100 pt-2 text-sm font-semibold"><span>Total de separación</span><span>{formatSoles(detail.amount)}</span></p>
+              </section>
+            )}
             {detail.type === 'Separación' && (
               <ComprobanteSeparacionPreview
                 idReserva={Number(detail.id.slice('SEPARACION-'.length))}
                 puedeSubsanar={can('sales.create')}
+                vistaGrupo={!!detail.groupedLots?.length}
               />
             )}
 

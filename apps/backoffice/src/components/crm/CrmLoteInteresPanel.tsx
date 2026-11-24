@@ -6,6 +6,7 @@ import type { LoteResponse } from '../../types/core';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Field';
 import { Alert } from '../ui/Feedback';
+import { formatSoles } from '../../utils/financeMoney';
 
 export function CrmLoteInteresPanel({detalle,puedeEditar,onSaved}:{
   detalle:CrmDetail;puedeEditar:boolean;onSaved:()=>Promise<void>
@@ -52,8 +53,17 @@ export function CrmLoteInteresPanel({detalle,puedeEditar,onSaved}:{
   return <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
     <h4 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-brand-700">Intereses comerciales activos</h4>
     {!detalle.intereses.length&&<p className="text-xs text-brand-500">No hay proyectos de interés registrados.</p>}
+    {detalle.reservasActivas?.filter(r=>!detalle.intereses.some(i=>i.idProyecto===r.idProyecto)).map(r=><div key={r.idReserva} className="mb-2 rounded-md border border-brand-100 p-2 text-xs">
+      <strong>{r.proyecto}</strong><p>{r.lote} · {r.codigo} · {formatSoles(r.monto)} · {r.estado==='PENDIENTE'?'Pendiente de Finanzas':'Vigente'}</p>
+    </div>)}
     {detalle.intereses.map(i=><div key={i.idInteres} className="mb-2 space-y-2 rounded-lg bg-brand-50/40 p-3 text-xs">
-      <strong>{i.proyecto}</strong><p>Lote de interés: {i.codigoLoteInteres??'Sin lote identificado'}</p>
+      <strong>{i.proyecto}</strong><p>Lote de interés principal: {i.codigoLoteInteres??'Sin lote identificado'}</p>
+      {!!detalle.reservasActivas?.some(r=>r.idProyecto===i.idProyecto)&&<div className="space-y-1 rounded-md border border-brand-100 bg-white p-2">
+        <p className="font-semibold text-brand-700">Lotes con separación registrada</p>
+        {detalle.reservasActivas.filter(r=>r.idProyecto===i.idProyecto).map(r=><div key={r.idReserva} className="flex flex-wrap justify-between gap-1">
+          <span className="font-medium">{r.lote} · {r.codigo}</span><span>{formatSoles(r.monto)} · {r.estado==='PENDIENTE'?'Pendiente de Finanzas':'Vigente'}</span>
+        </div>)}
+      </div>}
       {i.comentario&&<p className="text-brand-500">Referencia anterior: {i.comentario}</p>}
       {puedeEditar&&idInteres!==i.idInteres&&<Button type="button" variant="secondary" size="sm" disabled={guardando} onClick={()=>void abrir(i)}>
         {i.idLoteInteres?'Cambiar lote de interés':'Registrar lote de interés'}

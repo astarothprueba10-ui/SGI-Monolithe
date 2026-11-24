@@ -49,6 +49,8 @@ export function mapOperacion(row: CrmOperacionItem): Sale {
   return {
     id: `${row.tipo}-${row.id}`,
     code: row.codigo,
+    groupId: row.id_grupo,
+    groupedLots: row.lotes_grupo,
     type: esVenta ? 'Venta' : 'Separación',
     buyer: row.comprador ?? '',
     document: row.documento ?? '',

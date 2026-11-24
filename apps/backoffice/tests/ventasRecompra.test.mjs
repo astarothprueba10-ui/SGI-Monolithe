@@ -130,3 +130,15 @@ test('fase 3 prepara endpoint acumulado y evita la duplicación de ingresos',()=
   assert.match(storage,/MessageDigest\.getInstance\("SHA-256"\)/);
   assert.match(sales,/resultadoSeparacionIncierto/);
 });
+
+
+test('separación acumulada muestra un expediente de operación y conserva los lotes e importes',()=>{
+  const sql=readFileSync(new URL('../../../database/migrations/155_separaciones_vista_agrupada_crm.sql',import.meta.url),'utf8');
+  assert.match(sql,/sum\(monto\) AS monto_total/);
+  assert.match(sql,/lotes_grupo/);
+  assert.match(sql,/er\.codigo IN \('PENDIENTE','VIGENTE'\)/);
+  assert.match(sql,/'reservasActivas'/);
+  const sales=readFileSync(new URL('../src/pages/Sales.tsx',import.meta.url),'utf8');
+  assert.match(sales,/Lotes de la operación/);
+  assert.match(sales,/vistaGrupo=/);
+});

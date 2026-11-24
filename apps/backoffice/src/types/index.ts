@@ -120,6 +120,8 @@ export interface Lead {
 }
 
 export interface Sale {
+  groupId?:string;
+  groupedLots?:{idReserva:number;codigo:string;lote:string;monto:number;estado:string;fechaVencimiento:string}[];
   id: string;
   code: string;
   type: 'Separación' | 'Venta';
