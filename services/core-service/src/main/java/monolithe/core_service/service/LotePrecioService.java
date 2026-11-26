@@ -100,6 +100,7 @@ public class LotePrecioService {
     @Transactional
     public LotePrecioResponse calcularYRegistrar(LotePrecioRequest request) {
         exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(request.idLote());
         ContextoPrecio ctx = resolverContexto(request);
         validarEdicionComercial(ctx.lote());
         ResultadoCalculo resultado = calcular(ctx);
@@ -131,13 +132,9 @@ public class LotePrecioService {
         }
 
         exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(idLote);
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
-
-        if (!Boolean.TRUE.equals(lote.getActivo())) {
-            throw new ReglaNegocioException(
-                    "No se puede registrar precio en un lote inactivo.");
-        }
 
         Moneda moneda = obtenerMonedaActiva("PEN");
 
@@ -180,9 +177,9 @@ public class LotePrecioService {
             ActualizarPrecioManualRequest request) {
         validarMontoPrecio(request.monto());
         exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(idLote);
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
-        validarOperacionesLoteParaPrecio(lote);
         Moneda moneda = obtenerMonedaActiva("PEN");
         Optional<LotePrecio> vigenteOpt = lotePrecioRepository
                 .buscarVigente(idLote, moneda.getIdMoneda());
@@ -204,10 +201,17 @@ public class LotePrecioService {
         }
     }
 
+    private void bloquearLoteParaEdicion(Long idLote) {
+        if (lotePrecioRepository.bloquearLoteParaPrecio(idLote) == null) {
+            throw new RecursoNoEncontradoException("No se pudo localizar el lote para modificar su precio.");
+        }
+    }
+
     private void validarEdicionComercial(Lote lote) {
-        lotePrecioRepository.bloquearLoteParaPrecio(lote.getIdLote());
-        if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto()))
+        if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto())) {
             throw new ReglaNegocioException("El precio se administra desde la política comercial del proyecto.");
+        }
+        validarOperacionesLoteParaPrecio(lote);
     }
 
     private void validarMontoPrecio(BigDecimal monto) {
