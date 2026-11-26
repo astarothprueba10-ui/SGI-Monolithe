@@ -1,3 +1,6 @@
+-- BLOQUEADO POR CAMBIO DE IDENTIDAD INICIAL. No ejecutar este ensayo.
+-- La cuenta de Gerencia anteriormente seleccionada ya no es la cuenta autorizada.
+-- Se requiere alta, verificacion y prueba de acceso de la nueva identidad antes de reactivar el ensayo.
 -- Ensayo de reinicio operativo: nunca confirma modificaciones.
 -- Proyecto existente, exclusivamente durante mantenimiento. No es una migracion.
 -- No borra objetos Storage ni rota claves. Conserva una cuenta de Gerencia existente
@@ -204,6 +207,7 @@ DECLARE
     v_actual text[];
     v_esperado text[];
 BEGIN
+    RAISE EXCEPTION 'Ensayo suspendido: cambio de identidad inicial pendiente de alta y verificacion';
     -- Bloque interno: el error controlado del final revierte TODOS los cambios.
     BEGIN
         SELECT array_agg(n.nspname || '.' || c.relname ORDER BY n.nspname, c.relname)
