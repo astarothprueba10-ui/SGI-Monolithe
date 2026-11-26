@@ -144,8 +144,6 @@ services:
       context: ./apps/pagina-web
       dockerfile: Dockerfile
     container_name: sgi-pagina-web-frontend
-    env_file:
-      - .env
     ports:
       - "${WEB_FRONTEND_PORT:-5175}:5175"
     environment:
