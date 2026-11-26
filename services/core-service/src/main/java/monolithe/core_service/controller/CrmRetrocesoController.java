@@ -27,7 +27,7 @@ public class CrmRetrocesoController {
     private final CrmRetrocesoService service;
 
     @PostMapping("/prospectos/{idProspecto}/retrocesos")
-    @PreAuthorize("hasAuthority('crm.edit') or hasAuthority('ROLE_ASESOR')")
+    @PreAuthorize("hasAuthority('crm.edit') and hasAuthority('crm.request_stage_change')")
     public ResponseEntity<JsonNode> solicitarRetroceso(
             @PathVariable Long idProspecto,
             @Valid @RequestBody SolicitarRetrocesoCrmRequest request,
@@ -37,7 +37,7 @@ public class CrmRetrocesoController {
     }
 
     @PostMapping(value = "/retrocesos/{idSolicitud}/evidencia", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('crm.edit') or hasAuthority('ROLE_ASESOR')")
+    @PreAuthorize("hasAuthority('crm.edit') and hasAuthority('crm.request_stage_change')")
     public ResponseEntity<JsonNode> adjuntarEvidencia(
             @PathVariable Long idSolicitud,
             @RequestParam("archivo") MultipartFile archivo,
@@ -47,7 +47,7 @@ public class CrmRetrocesoController {
     }
 
     @GetMapping("/retrocesos/{idSolicitud}/evidencia/url-firmada")
-    @PreAuthorize("hasAuthority('crm.view') or hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR', 'ROLE_ASESOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAnyAuthority('crm.approve_stage_change', 'crm.request_stage_change')")
     public JsonNode obtenerUrlEvidencia(
             @PathVariable Long idSolicitud,
             @AuthenticationPrincipal Jwt jwt) {
@@ -55,7 +55,7 @@ public class CrmRetrocesoController {
     }
 
     @GetMapping("/prospectos/{idProspecto}/retrocesos/pendiente")
-    @PreAuthorize("hasAuthority('crm.view') or hasAuthority('crm.edit') or hasAnyAuthority('ROLE_ASESOR', 'ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.request_stage_change')")
     public JsonNode miRetrocesoPendiente(
             @PathVariable Long idProspecto,
             @AuthenticationPrincipal Jwt jwt) {
@@ -63,7 +63,7 @@ public class CrmRetrocesoController {
     }
 
     @GetMapping("/retrocesos")
-    @PreAuthorize("hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.approve_stage_change')")
     public JsonNode listarSolicitudes(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo,
@@ -76,7 +76,7 @@ public class CrmRetrocesoController {
         return service.listarSolicitudes(idActor(jwt), desde, hastaExclusivo, estado, busqueda, pagina, tamano, asesor);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.approve_stage_change')")
     public JsonNode listarSolicitudes(
             OffsetDateTime desde,
             OffsetDateTime hastaExclusivo,
@@ -89,7 +89,7 @@ public class CrmRetrocesoController {
     }
 
     @GetMapping("/retrocesos/indicadores")
-    @PreAuthorize("hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.approve_stage_change')")
     public JsonNode obtenerIndicadores(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime desde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime hastaExclusivo,
@@ -98,7 +98,7 @@ public class CrmRetrocesoController {
         return service.obtenerIndicadores(idActor(jwt), desde, hastaExclusivo, asesor);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.approve_stage_change')")
     public JsonNode obtenerIndicadores(
             OffsetDateTime desde,
             OffsetDateTime hastaExclusivo,
@@ -107,13 +107,13 @@ public class CrmRetrocesoController {
     }
 
     @GetMapping("/retrocesos/motivos")
-    @PreAuthorize("hasAuthority('crm.view') or hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR', 'ROLE_ASESOR')")
+    @PreAuthorize("hasAuthority('crm.view') and hasAnyAuthority('crm.approve_stage_change', 'crm.request_stage_change')")
     public JsonNode catalogoMotivos(@AuthenticationPrincipal Jwt jwt) {
         return service.catalogoMotivos(idActor(jwt));
     }
 
     @PutMapping("/retrocesos/{idSolicitud}/decision")
-    @PreAuthorize("hasAnyAuthority('ROLE_GERENCIA', 'ROLE_SUPERVISOR_COMERCIAL', 'ROLE_ADMINISTRADOR')")
+    @PreAuthorize("hasAuthority('crm.edit') and hasAuthority('crm.approve_stage_change')")
     public JsonNode resolverRetroceso(
             @PathVariable Long idSolicitud,
             @Valid @RequestBody ResolverRetrocesoCrmRequest request,

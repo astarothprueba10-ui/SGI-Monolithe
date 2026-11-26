@@ -18,9 +18,11 @@ test('RRHH sin el permiso requerido no puede editar ni gestionar roles', () => {
     ['RRHH'], new Set(['users.view']), 'roles.assign_permissions'), false);
 });
 
-test('Los permisos no habilitan usuarios sin rol administrativo autorizado', () => {
+test('Un rol personalizado con permiso explícito puede administrar cuentas delegadas', () => {
   assert.equal(puedeAdministrarCuentas(
-    ['ASESOR'], new Set(['users.view', 'users.edit']), 'users.edit'), false);
+    ['Gestor personalizado'], new Set(['users.view', 'users.edit']), 'users.edit'), true);
+  assert.equal(puedeAdministrarCuentas(
+    ['Gestor personalizado'], new Set(['users.view']), 'users.edit'), false);
 });
 
 test('La alta de usuario exige ambos permisos', () => {

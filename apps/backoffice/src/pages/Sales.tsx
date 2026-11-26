@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
+import { FormalizacionMultiplePanel } from '../components/sales/FormalizacionMultiplePanel';
+import { CambiosReservaPanel, ReservasVentaPanel } from '../components/sales/CambiosReservaPanel';
 import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon, RotateCcwIcon, CreditCardIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
@@ -9,15 +12,18 @@ import { Table, TD, TH, TR } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
 import { StatusBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
-import { EmptyState } from '../components/ui/Feedback';
+import { Alert, EmptyState } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { Gate } from '../components/auth/PermissionRoute';
 import { useAuth } from '../contexts/AuthContext';
-import { currency } from '../utils/format';
+import { formatSoles } from '../utils/financeMoney';
 import { salesService } from '../services/salesService';
 import {
   crmBackend,
   type CrmProspect,
+  type CrmAdvisor,
+  type CrmEtapaOperacion,
+  type CrmSeparacionAcumuladaInput,
   type CrmSaleValidationInput,
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
@@ -26,10 +32,11 @@ import {
 } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
 import { DocumentacionContratosPanel } from '../components/sales/DocumentacionContratosPanel';
+import { OperacionesAgrupadasPanel } from '../components/sales/OperacionesAgrupadasPanel';
 import type { Sale } from '../types';
 import { coreService, type LotePrecioVigente } from '../services/coreService';
 import { ApiError } from '../lib/apiClient';
-import type { ProyectoResponse, EtapaResponse, LoteResponse } from '../types/core';
+import type { ProyectoResponse, LoteResponse } from '../types/core';
 import { AnexosContratoPanel } from '../components/sales/AnexosContratoPanel';
 import { ComprobanteSeparacionPreview } from '../components/sales/ComprobanteSeparacionPreview';
 import { DetalleVentaAmpliadoPanel } from '../components/sales/DetalleVentaAmpliadoPanel';
@@ -48,9 +55,15 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
+import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
+import { centavosImporte, crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
 
+// Registro acumulado habilitado tras validar y aplicar la migración 154.
 const SEPARACION_ENVIO_DESHABILITADO = false;
+type LoteAdicionalSeparacion = {
+  idLote:number; codigo:string; precio:number; monto:number; dias:number; idPolitica:number;
+};
 
 
 function AdvisorBadge({ advisor, type }: { advisor?: string | null; type: string }) {
@@ -73,12 +86,12 @@ function AdvisorBadge({ advisor, type }: { advisor?: string | null; type: string
   return <span className="text-xs text-brand-400 italic">No aplica</span>;
 }
 
-function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
+function ProspectAdvisorInfo({ prospect, onAssign, disabled }: { prospect?: CrmProspect; onAssign?: () => void; disabled?: boolean }) {
   if (!prospect) return null;
-  const tieneAsesor = Boolean(prospect.asesor_nombre?.trim());
+  const tieneAsesor = (prospect.id_asesor ?? 0) > 0;
   return (
     <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/50 p-2.5 text-xs">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-brand-600 font-medium">Asesor asignado en CRM:</span>
         <span className={`inline-flex items-center gap-1 font-semibold ${tieneAsesor ? 'text-emerald-800' : 'text-amber-800'}`}>
           {tieneAsesor ? <UserCheckIcon className="h-3.5 w-3.5 text-emerald-600" /> : <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-600" />}
@@ -86,14 +99,20 @@ function ProspectAdvisorInfo({ prospect }: { prospect?: CrmProspect }) {
         </span>
       </div>
       <p className="mt-1 text-[11px] text-brand-500">
-        {tieneAsesor ? 'Continuidad confirmada: el backend asignará este asesor a la venta.' : 'Atención: prospecto sin asesor activo; la operación no tendrá asesor vinculado.'}
+        {tieneAsesor ? 'Se conservará el asesor registrado en CRM para la gestión comercial.' : 'El cliente no tiene asesor activo asignado.'}
       </p>
+      {!tieneAsesor && onAssign && (
+        <Button size="sm" variant="secondary" icon={UserCheckIcon} className="mt-2 w-full sm:w-auto"
+          disabled={disabled} onClick={onAssign}>Asignar asesor</Button>
+      )}
     </div>
   );
 }
 
 
 const ESTADOS_SEPARACION = {
+  REQUIERE_REVISION: {etiqueta:'Requiere revisión',estilo:'bg-amber-50 text-amber-800 border-amber-200',punto:'bg-amber-500'},
+  ESTADOS_MIXTOS: {etiqueta:'Estados por lote',estilo:'bg-sky-50 text-sky-800 border-sky-200',punto:'bg-sky-500'},
   PENDIENTE: {
     etiqueta: 'Pendiente',
     estilo: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -110,7 +129,7 @@ const ESTADOS_SEPARACION = {
     punto: 'bg-emerald-500'
   },
   VENCIDA: {
-    etiqueta: 'Vencida',
+    etiqueta: 'Anulada',
     estilo: 'bg-red-50 text-red-800 border-red-200',
     punto: 'bg-red-500'
   },
@@ -135,7 +154,7 @@ const ESTADOS_VENTA = {
 function EstadoVentaBadge({estado}: {estado:string}) {
   const codigo=estado.trim().toUpperCase();
   const config=ESTADOS_VENTA[codigo as keyof typeof ESTADOS_VENTA] ?? {
-    etiqueta:codigo.replaceAll('_',' '),
+    etiqueta:codigo.replace(/_/g, ' '),
     estilo:'bg-slate-50 text-slate-700 border-slate-200',
     punto:'bg-slate-400'
   };
@@ -170,12 +189,15 @@ function EstadoSeparacionBadge({ estado }: { estado: string }) {
 
 
 export function Sales() {
-  const { can, user } = useAuth();
-  const puedeReasignarComprador = can('crm.edit') && user.roles.some((r) =>
-    r === 'Gerencia' || r === 'Supervisor comercial');
+  const { can } = useAuth();
+  const location = useLocation();
+  const puedeReasignarComprador = can('crm.edit') && can('sales.reassign_advisor');
   const [tab, setTab] = useState<
-    'Separación' | 'Venta' | 'Contratos' | 'Anexos'
+    'Separación' | 'Venta' | 'Agrupadas' | 'Contratos' | 'Anexos' | 'CambiosReserva'
   >('Separación');
+  useEffect(()=>{
+    if(new URLSearchParams(location.search).get('tab')==='cambios-reserva') setTab('CambiosReserva');
+  },[location.search]);
   const [filtrosVenta, setFiltrosVenta] = useState<FiltrosVentas>(FILTROS_VENTAS_INICIALES);
   const [paginaVentas, setPaginaVentas] = useState(1);
   const tamanoPaginaVentas = 15;
@@ -199,6 +221,13 @@ export function Sales() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
+  const [preseleccionAgrupada,setPreseleccionAgrupada] = useState<{
+    idOperacion:number;idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
+    modalidad:'CONTADO'|'FINANCIADA';
+  }|null>(null);
+  const [asociacionAgrupadaPendiente,setAsociacionAgrupadaPendiente] = useState<{
+    idOperacion:number;idLote:number;idProspecto:number;modalidad:'CONTADO'|'FINANCIADA';
+  }|null>(null);
   const [origenPlano, setOrigenPlano] = useState<{
     idProyecto:number; idEtapa:number; idLote:number; operacion:'Separacion'|'Venta'
   } | null>(() => {
@@ -215,15 +244,52 @@ export function Sales() {
   // El formulario pertenece a la pestaña; no se cambia el tipo dentro del modal.
   const opType: 'Separacion' | 'Venta' = tab === 'Venta' ? 'Venta' : 'Separacion';
   const [availableLots, setAvailableLots] = useState<LoteResponse[]>([]);
+  const [lotesDisponiblesProyecto,setLotesDisponiblesProyecto]=useState<LoteResponse[]>([]);
   const [loadingLots, setLoadingLots] = useState(false); const [prospectsList, setProspectsList] = useState<CrmProspect[]>([]);
   const [selectedProspectId, setSelectedProspectId] = useState<number | ''>('');
   const [availableProjects, setAvailableProjects] = useState<ProyectoResponse[]>([]);
   const [formProjectId, setFormProjectId] = useState('');
-  const [availableStages, setAvailableStages] = useState<EtapaResponse[]>([]);
+  const [availableStages, setAvailableStages] = useState<CrmEtapaOperacion[]>([]);
+  const [interesesOperacion, setInteresesOperacion] = useState<number[]>([]);
+  const [registrandoInteres, setRegistrandoInteres] = useState(false);
+  const [editorInteres, setEditorInteres] = useState(false);
+  const [proyectoInteresNuevo, setProyectoInteresNuevo] = useState('');
+  const [proyectoInteresAnterior, setProyectoInteresAnterior] = useState('');
+  const [motivoCambioInteres, setMotivoCambioInteres] = useState('');
+  const [errorCambioInteres, setErrorCambioInteres] = useState('');
+  const puedeEditarInteres = can('crm.edit');
+  const puedeAsignarAsesorOperacion = can('crm.edit') && can('crm.assign_advisor');
+  const [editorAsesor, setEditorAsesor] = useState(false);
+  const [asesoresOperacion, setAsesoresOperacion] = useState<CrmAdvisor[]>([]);
+  const [asesorOperacion, setAsesorOperacion] = useState('');
+  const [cargandoAsesoresOperacion, setCargandoAsesoresOperacion] = useState(false);
+  const [guardandoAsesorOperacion, setGuardandoAsesorOperacion] = useState(false);
+  const [errorAsesorOperacion, setErrorAsesorOperacion] = useState('');
+  const clienteOperacion = prospectsList.find(p => p.id_prospecto === selectedProspectId);
+  const compradorOperacion = clienteOperacion?.estado_codigo?.toUpperCase() === 'CONVERTIDO';
+  const esCambioInteres = !compradorOperacion && interesesOperacion.length > 0;
+  const origenCambioInteres = interesesOperacion.length === 1
+    ? interesesOperacion[0] : Number(proyectoInteresAnterior);
+  const proyectosConInteres = availableProjects.filter(p => interesesOperacion.includes(p.idProyecto));
+  const proyectosSinInteres = availableProjects.filter(p => !interesesOperacion.includes(p.idProyecto));
+  const proyectoConInteres = interesesOperacion.includes(Number(formProjectId));
   const [formStageId, setFormStageId] = useState('');
   const [loadingStages, setLoadingStages] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [formLotId, setFormLotId] = useState('');
+  const [preferenciasLote,setPreferenciasLote]=useState<Record<number,{id:number|null;codigo:string|null;comentario:string|null}>>({});
+  const preferenciaLote=preferenciasLote[Number(formProjectId)];
+  const [editorLote,setEditorLote]=useState(false);
+  const [loteCandidato,setLoteCandidato]=useState('');
+  const [motivoLote,setMotivoLote]=useState('');
+  const [guardandoLote,setGuardandoLote]=useState(false);
+  const [errorLote,setErrorLote]=useState('');
+  const [lotesAdicionales,setLotesAdicionales]=useState<LoteAdicionalSeparacion[]>([]);
+  const [editorAdicional,setEditorAdicional]=useState(false);
+  const [candidatoAdicional,setCandidatoAdicional]=useState('');
+  const [cargandoAdicional,setCargandoAdicional]=useState(false);
+  const [errorAdicional,setErrorAdicional]=useState('');
+  const revisionLotesAdicionales=React.useRef(0);
   const [politicaOperativa, setPoliticaOperativa] = useState<{
     idProspecto: number; idLote: number; condiciones: CondicionesFrancesas;
   } | null>(null);
@@ -243,14 +309,23 @@ export function Sales() {
   const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
+  const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
+  const formalizacionMultiple=tieneReservasVenta && !asociacionAgrupadaPendiente;
+  const reservaSeleccionada=reservasVigentes.find(r=>r.idLote===Number(formLotId));
+  const reservaPendienteVenta=tieneReservasVenta && reservaSeleccionada?.estado==='PENDIENTE';
   const [autoseleccionPendiente, setAutoseleccionPendiente] = useState<{
-    idProyecto: number; idEtapa: number; idLote: number;
+    idProyecto: number; idLote: number;
   } | null>(null);
+  const etapaConsulta = opType === 'Venta' ? formStageId : '';
+  const destinoConsulta = opType === 'Venta' ? autoseleccionPendiente : null;
   const seleccionProspectoPeticionRef = React.useRef(0);
-  const [voucherFile, setVoucherFile] = useState<File | null>(null);
+  const [pagosSeparacion,setPagosSeparacion]=useState<PagoSeparacionBorrador[]>(()=>[crearPagoSeparacion(1)]);
+  const secuenciaPagoSeparacion=React.useRef(1);
+  const reiniciarPagosSeparacion=()=>setPagosSeparacion([crearPagoSeparacion(++secuenciaPagoSeparacion.current)]);
   const [comprobantesVenta, setComprobantesVenta] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const registroSeparacionEnCursoRef = React.useRef(false);
+  const [resultadoSeparacionIncierto,setResultadoSeparacionIncierto]=useState(false);
   const registroVentaEnCursoRef = React.useRef(false);
   const [confirmacionVenta, setConfirmacionVenta] = useState<{
     datos: CrmSaleValidationInput;
@@ -461,18 +536,30 @@ export function Sales() {
 
   const loadFormData = async () => {
     setLoadingFormData(true);
-
+    ++seleccionProspectoPeticionRef.current;
+    setEditorAsesor(false);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
     setSelectedProspectId('');
+    setInteresesOperacion([]);
+    setPreferenciasLote({});
+    setEditorLote(false);
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
     setAvailableProjects([]);
     setFormProjectId('');
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
 
     try {
       const prospects = await crmBackend.prospectos();
 
       const elegibles = (prospects ?? []).filter((p) =>
-        ['INTERESADO', 'NEGOCIACION', 'CON_RESERVA'].includes(
+        ['INTERESADO', 'NEGOCIACION', 'CON_RESERVA', 'CONVERTIDO'].includes(
           p.estado_codigo?.toUpperCase() ?? ''
         )
       );
@@ -495,15 +582,27 @@ export function Sales() {
   const handleSelectProspect = async (id: number | '') => {
     const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
+    setEditorAsesor(false);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
+    setInteresesOperacion([]);
+    setPreferenciasLote({});
+    setEditorLote(false);
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
     setFormProjectId('');
     setFormStageId('');
     setAvailableStages([]);
     setAvailableProjects([]);
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
     setReservasVigentes([]);
     setAutoseleccionPendiente(null);
-    if (id === '') return;
+    if (id === '') { setLoadingProjects(false); return; }
 
     setLoadingProjects(true);
     try {
@@ -516,27 +615,48 @@ export function Sales() {
       ]);
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
-      const elegibles = proyectos.filter((p) => p.activo && intereses.has(p.idProyecto));
+      setInteresesOperacion([...intereses]);
+      const preferencias:typeof preferenciasLote={};
+      for(const i of detalle.intereses??[]) {
+        if(!preferencias[i.idProyecto]) preferencias[i.idProyecto]={
+          id:i.idLoteInteres??null,codigo:i.codigoLoteInteres??null,comentario:i.comentario??null
+        };
+      }
+      setPreferenciasLote(preferencias);
+      setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
+      // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
+      const compradorExistente = (detalle.prospecto.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
+      const elegibles = proyectos.filter((p) =>
+        p.activo && (compradorExistente || intereses.has(p.idProyecto) || puedeEditarInteres)
+      );
       setAvailableProjects(elegibles);
       setReservasVigentes(consultaReservas.reservas ?? []);
 
-      const reserva = (consultaReservas.reservas ?? [])
-        .find((r) => elegibles.some((p) => p.idProyecto === r.idProyecto));
+      const reservasElegibles=(consultaReservas.reservas ?? []).filter(r=>elegibles.some(p=>p.idProyecto===r.idProyecto));
+      const reserva=reservasElegibles.find(r=>r.idLote===origenPlano?.idLote) ?? reservasElegibles[0];
       const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
         ? origenPlano : null;
-      if (destino) {
+      if (destino && intereses.has(destino.idProyecto) && !reserva) {
         setAutoseleccionPendiente({idProyecto:destino.idProyecto,
-          idEtapa:destino.idEtapa,idLote:destino.idLote});
+          idLote:destino.idLote});
         setFormProjectId(String(destino.idProyecto));
       } else if (reserva) {
         setAutoseleccionPendiente({
           idProyecto: reserva.idProyecto,
-          idEtapa: reserva.idEtapa,
           idLote: reserva.idLote
         });
         setFormProjectId(String(reserva.idProyecto));
-      } else if (origenPlano) {
-        toast.info('Este prospecto no tiene interés registrado en el proyecto del plano.');
+      } else {
+        const registrado = [...intereses].find(idProyecto => elegibles.some(p => p.idProyecto === idProyecto));
+        if (registrado !== undefined) setFormProjectId(String(registrado));
+        if (destino && (compradorExistente || puedeEditarInteres)) {
+          setProyectoInteresNuevo(String(destino.idProyecto));
+          setProyectoInteresAnterior(registrado === undefined ? '' : String(registrado));
+          setEditorInteres(true);
+          toast.info('Confirme el interés en el proyecto del plano antes de continuar.');
+        } else if (origenPlano) {
+          toast.info('Este prospecto no tiene interés registrado en el proyecto del plano.');
+        }
       }
     } catch (err: unknown) {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
@@ -548,6 +668,134 @@ export function Sales() {
     }
   };
 
+  const cerrarEditorInteres = () => {
+    if (registrandoInteres) return;
+    setEditorInteres(false);
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior('');
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
+  };
+
+  const abrirEditorInteres = () => {
+    setProyectoInteresNuevo('');
+    setProyectoInteresAnterior(formProjectId);
+    setMotivoCambioInteres('');
+    setErrorCambioInteres('');
+    setEditorInteres(true);
+  };
+
+  const registrarInteresOperacion = async () => {
+    if (!selectedProspectId || !proyectoInteresNuevo || registrandoInteres ||
+        !proyectosSinInteres.some(p => p.idProyecto === Number(proyectoInteresNuevo))) return;
+    if (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) ||
+        origenCambioInteres === Number(proyectoInteresNuevo) || motivoCambioInteres.trim().length < 5)) return;
+    setErrorCambioInteres('');
+    const idProspecto = selectedProspectId;
+    const idProyecto = Number(proyectoInteresNuevo);
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setRegistrandoInteres(true);
+    try {
+      if (compradorOperacion) {
+        await crmBackend.registrarInteresRecompra(idProspecto, idProyecto);
+      } else {
+        if (!puedeEditarInteres) return;
+        if (esCambioInteres) {
+          await crmBackend.cambiarInteresProyecto(idProspecto, idProyecto, origenCambioInteres, motivoCambioInteres.trim());
+        } else {
+          await crmBackend.actualizar(idProspecto, { idProyectoInteres: idProyecto });
+        }
+      }
+      if (solicitud === seleccionProspectoPeticionRef.current) {
+        setInteresesOperacion(prev => [...new Set([
+          ...prev.filter(p => !esCambioInteres || p !== origenCambioInteres), idProyecto
+        ])]);
+        setPreferenciasLote(prev => {
+          const siguientes = {...prev};
+          if (esCambioInteres) delete siguientes[origenCambioInteres];
+          delete siguientes[idProyecto];
+          return siguientes;
+        });
+        // Cambiar el proyecto operativo solo tras la confirmación del CRM.
+        const destino = origenPlano?.idProyecto === idProyecto ? origenPlano : null;
+        setAutoseleccionPendiente(destino ? {idProyecto: destino.idProyecto, idLote: destino.idLote} : null);
+        setFormStageId('');
+        setAvailableStages([]);
+        setFormLotId('');
+        setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
+        setFormProjectId(String(idProyecto));
+        setEditorInteres(false);
+        setProyectoInteresNuevo('');
+        setProyectoInteresAnterior('');
+        setMotivoCambioInteres('');
+        setProspectsList(prev => prev.map(p => p.id_prospecto === idProspecto
+          ? {...p,interes:availableProjects.find(proyecto => proyecto.idProyecto === idProyecto)?.nombre ?? p.interes} : p));
+        toast.success(esCambioInteres ? 'Interés actualizado y registrado en el expediente CRM.'
+          : 'Interés comercial registrado. Puedes continuar con la adquisición.');
+      }
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setErrorCambioInteres(err instanceof Error ? err.message : 'No se pudo actualizar el interés comercial.');
+    } finally {
+      setRegistrandoInteres(false);
+    }
+  };
+
+  const abrirEditorAsesorOperacion = async () => {
+    if (!clienteOperacion || !puedeAsignarAsesorOperacion || compradorOperacion ||
+        (clienteOperacion.id_asesor ?? 0) > 0 || guardandoAsesorOperacion) return;
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setEditorAsesor(true);
+    setAsesorOperacion('');
+    setErrorAsesorOperacion('');
+    setAsesoresOperacion([]);
+    setCargandoAsesoresOperacion(true);
+    try {
+      const asesores = await crmBackend.asesores();
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setAsesoresOperacion((asesores ?? []).filter(a => a.activo));
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setErrorAsesorOperacion(err instanceof Error ? err.message : 'No se pudieron consultar los asesores.');
+    } finally {
+      if (solicitud === seleccionProspectoPeticionRef.current) setCargandoAsesoresOperacion(false);
+    }
+  };
+
+  const guardarAsesorOperacion = async () => {
+    if (!selectedProspectId || !puedeAsignarAsesorOperacion || compradorOperacion ||
+        (clienteOperacion?.id_asesor ?? 0) > 0 || guardandoAsesorOperacion) return;
+    const asesor = asesoresOperacion.find(a => a.id_asesor === Number(asesorOperacion));
+    if (!asesor) return;
+    const id = selectedProspectId;
+    const solicitud = seleccionProspectoPeticionRef.current;
+    setGuardandoAsesorOperacion(true);
+    setErrorAsesorOperacion('');
+    try {
+      // Reutiliza el flujo CRM: valida rol, asesor habilitado y registra el seguimiento.
+      const detalle = await crmBackend.detalle(id);
+      if ((detalle.prospecto.id_asesor ?? 0) > 0) {
+        setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
+        setEditorAsesor(false);
+        toast.info('El cliente ya tiene un asesor asignado.');
+        return;
+      }
+      await crmBackend.asesor(id, asesor.id_asesor, 'Asignación desde Separaciones y Ventas');
+      if (solicitud === seleccionProspectoPeticionRef.current) {
+        setProspectsList(prev => prev.map(p => p.id_prospecto === id
+          ? {...p,id_asesor:asesor.id_asesor,asesor_nombre:asesor.nombre_completo} : p));
+        setEditorAsesor(false);
+        toast.success('Asesor asignado en CRM. Puedes continuar con la operación.');
+      }
+    } catch (err: unknown) {
+      if (solicitud === seleccionProspectoPeticionRef.current)
+        setErrorAsesorOperacion(err instanceof Error ? err.message : 'No se pudo asignar el asesor.');
+    } finally {
+      setGuardandoAsesorOperacion(false);
+    }
+  };
+
   useEffect(() => {
     void fetchSalesData();
   }, []);
@@ -555,12 +803,13 @@ export function Sales() {
   const handleOpenModal = () => {
     void loadFormData();
     setFormTouched(false);
+    setResultadoSeparacionIncierto(false);
     setFormPaymentMethod('TRANSFERENCIA');
     setFormSaleModality('CONTADO');
     setFormSaleDownPayment('');
     setFormSaleInstallments('12');
     setFormOperationNumber('');
-    setVoucherFile(null);
+    reiniciarPagosSeparacion();
     setComprobantesVenta([]);
     setFormObservations('');
     setDatosVentaValidados(null);
@@ -578,18 +827,113 @@ export function Sales() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(()=>{
+    if(!preseleccionAgrupada||!isModalOpen||loadingFormData||prospectsList.length===0
+        ||tab!=='Venta')return;
+    const seleccion=preseleccionAgrupada;
+    if(!prospectsList.some(p=>p.id_prospecto===seleccion.idProspecto))return;
+    setPreseleccionAgrupada(null);
+    setFormSaleModality(seleccion.modalidad);
+    void handleSelectProspect(seleccion.idProspecto);
+    // Al seleccionar comprador se conserva el origenPlano para preseleccionar lote.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preseleccionAgrupada,isModalOpen,loadingFormData,prospectsList,tab]);
+
   const cerrarModalOperacion = () => {
     if (
       registroSeparacionEnCursoRef.current ||
       registroVentaEnCursoRef.current ||
-      confirmacionVenta
+      confirmacionVenta || registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional || submitting
     ) return;
 
+    ++seleccionProspectoPeticionRef.current;
+    setEditorAsesor(false);
     setIsModalOpen(false);
+    setEditorLote(false);
+    setPreseleccionAgrupada(null);
+    setAsociacionAgrupadaPendiente(null);
     setOrigenPlano(null);
     setAutoseleccionPendiente(null);
     setDatosVentaValidados(null);
     setEditandoComprador(false);
+  };
+
+  useEffect(()=>{
+    ++revisionLotesAdicionales.current;
+    setLotesAdicionales([]);
+    setCandidatoAdicional('');
+    setEditorAdicional(false);
+    setErrorAdicional('');
+    setCargandoAdicional(false);
+  },[selectedProspectId,formProjectId,formLotId,isModalOpen,revisionPolitica]);
+
+  useEffect(()=>{
+    setEditorLote(false);
+    setLoteCandidato('');
+    setMotivoLote('');
+    setErrorLote('');
+  },[selectedProspectId,formProjectId,isModalOpen]);
+
+  const abrirEditorLote=()=>{
+    setLoteCandidato('');
+    setMotivoLote('');
+    setErrorLote('');
+    setEditorLote(true);
+  };
+
+  const confirmarLoteInteres=async()=>{
+    const candidato=lotesDisponiblesProyecto.find(l=>l.idLote===Number(loteCandidato));
+    if(!candidato||!selectedProspectId||guardandoLote||submitting) return;
+    const solicitud=seleccionProspectoPeticionRef.current;
+    const proyecto=Number(formProjectId);
+    setGuardandoLote(true);
+    setErrorLote('');
+    try {
+      if(puedeEditarInteres && candidato.idLote!==preferenciaLote?.id) {
+        if(motivoLote.trim().length<5) return;
+        const res=await crmBackend.cambiarLoteInteres(selectedProspectId,proyecto,candidato.idLote,preferenciaLote?.id??null,motivoLote.trim());
+        if(solicitud!==seleccionProspectoPeticionRef.current) return;
+        setPreferenciasLote(prev=>({...prev,[proyecto]:{
+          id:res.idLoteInteres,codigo:res.codigoLoteInteres,comentario:prev[proyecto]?.comentario??null
+        }}));
+        toast.success('Lote de interés actualizado en el expediente CRM.');
+      }
+      if(solicitud!==seleccionProspectoPeticionRef.current) return;
+      const etapaNueva=availableStages.find(e=>e.idLotes.includes(candidato.idLote));
+      if(opType==='Venta' && etapaNueva && etapaNueva.codigo!==formStageId){
+        setAutoseleccionPendiente({idProyecto:proyecto,idLote:candidato.idLote});
+        setFormStageId(etapaNueva.codigo);
+      }
+      handleSelectLot(String(candidato.idLote));
+      setEditorLote(false);
+    } catch(err:unknown) {
+      if(solicitud===seleccionProspectoPeticionRef.current)
+        setErrorLote(err instanceof Error?err.message:'No se pudo confirmar el lote.');
+    } finally {setGuardandoLote(false);}
+  };
+
+  const agregarLoteAdicional=async()=>{
+    const lote=lotesDisponiblesProyecto.find(l=>l.idLote===Number(candidatoAdicional));
+    if(!lote||!selectedProspectId||cargandoAdicional||submitting||lotesAdicionales.length>=19||
+      lote.idLote===Number(formLotId)||lotesAdicionales.some(l=>l.idLote===lote.idLote))return;
+    const revision=revisionLotesAdicionales.current;
+    setCargandoAdicional(true);setErrorAdicional('');
+    try{
+      const [precio,politica]=await Promise.all([
+        coreService.getCurrentLotPrice(lote.idLote,'PEN'),
+        crmBackend.obtenerCondicionesVenta(selectedProspectId,lote.idLote)
+      ]);
+      if(revision!==revisionLotesAdicionales.current)return;
+      if(!precio||precio.idLote!==lote.idLote||precio.codigoMoneda!=='PEN'||precio.activo!==true||!Number.isFinite(Number(precio.precio))||Number(precio.precio)<=0||
+        !politica||!Number.isInteger(politica.idPolitica)||politica.idPolitica<1||!Number.isFinite(politica.montoSeparacion)||politica.montoSeparacion<=0||
+        !Number.isInteger(politica.diasVencimientoSeparacion)||politica.diasVencimientoSeparacion<1)
+        throw new Error('No se pudieron verificar el precio y la política del lote.');
+      setLotesAdicionales(prev=>[...prev,{idLote:lote.idLote,codigo:lote.codigo,precio:Number(precio.precio),
+        monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion,idPolitica:politica.idPolitica}]);
+      setCandidatoAdicional('');setEditorAdicional(false);
+    }catch(err:unknown){
+      if(revision===revisionLotesAdicionales.current)setErrorAdicional(err instanceof Error?err.message:'No se pudo añadir el lote.');
+    }finally{if(revision===revisionLotesAdicionales.current)setCargandoAdicional(false);}
   };
 
   const handleSelectLot = (lotIdStr: string) => {
@@ -610,7 +954,14 @@ export function Sales() {
     setConsultandoPolitica(true);
     void crmBackend.obtenerCondicionesVenta(idProspecto, idLote)
       .then(condiciones => {
-        if (vigente) setPoliticaOperativa({ idProspecto, idLote, condiciones });
+        if (!vigente) return;
+        if (!condiciones || !Number.isFinite(condiciones.montoSeparacion) || condiciones.montoSeparacion <= 0
+          || !Number.isInteger(condiciones.diasVencimientoSeparacion) || condiciones.diasVencimientoSeparacion < 1
+          || !Number.isInteger(condiciones.idPolitica) || condiciones.idPolitica < 1) {
+          setErrorPolitica('La política recibida no contiene condiciones de separación válidas.');
+          return;
+        }
+        setPoliticaOperativa({ idProspecto, idLote, condiciones });
       })
       .catch(err => {
         if (vigente) setErrorPolitica(err instanceof Error ? err.message
@@ -621,7 +972,8 @@ export function Sales() {
   }, [isModalOpen, selectedProspectId, formLotId, revisionPolitica]);
 
   useEffect(() => {
-    setVoucherFile(null);
+    reiniciarPagosSeparacion();
+    setFormOperationNumber('');
     setComprobantesVenta([]);
   }, [
     selectedProspectId,
@@ -630,60 +982,15 @@ export function Sales() {
     formLotId
   ]);
 
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0] ?? null;
-
-    // Permite volver a seleccionar el mismo archivo.
-    e.target.value = '';
-
-    // Evita conservar un comprobante anterior.
-    setVoucherFile(null);
-
-    if (!file) return;
-
-    const allowed = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/webp'
-    ];
-    if (!allowed.includes(file.type)) {
-      toast.error('Formato no permitido', {
-        description: 'Utilice archivos PDF, JPG, PNG o WebP.'
-      });
-      return;
-    }
-    if (file.size <= 0) {
-      toast.error('Archivo vacío', {
-        description: 'El comprobante debe contener información.'
-      });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Archivo demasiado grande', {
-        description: 'El comprobante no debe superar 5 MB.'
-      });
-      return;
-    }
-    if (!file.name.trim() || file.name.length > 255) {
-      toast.error('Nombre de archivo inválido', {
-        description: 'El nombre del comprobante no debe superar 255 caracteres.'
-      });
-      return;
-    }
-    setVoucherFile(file);
-  };
-
-  const archivosVentaObligatorios = formPaymentMethod !== 'EFECTIVO';
+  const archivosVentaObligatorios = formSaleModality === 'FINANCIADA' || formPaymentMethod !== 'EFECTIVO';
   const requiereNumeroOperacionVenta = ['TRANSFERENCIA','DEPOSITO','YAPE_PLIN']
     .includes(formPaymentMethod);
   const agregarComprobantesVenta = (e: React.ChangeEvent<HTMLInputElement>) => {
     const candidatos = Array.from(e.target.files ?? []);
     e.target.value = '';
     if (!candidatos.length) return;
-    if (comprobantesVenta.length + candidatos.length > 8) {
+    if(formSaleModality==='FINANCIADA' && candidatos.length!==1){toast.error('Adjunte un único comprobante para la inicial.');return;}
+    if (formSaleModality!=='FINANCIADA' && comprobantesVenta.length + candidatos.length > 8) {
       toast.error('Se permiten como máximo 8 comprobantes por venta.');
       return;
     }
@@ -694,141 +1001,21 @@ export function Sales() {
       toast.error('Solo se admiten PDF, JPG, PNG o WebP, máximo 5 MB por archivo.');
       return;
     }
-    setComprobantesVenta(prev => [...prev, ...candidatos]);
+    setComprobantesVenta(prev => formSaleModality==='FINANCIADA'?candidatos:[...prev, ...candidatos]);
   };
 
   const validarFormularioSeparacion = (): boolean => {
     setFormTouched(true);
-    if (!condicionesVenta || consultandoPolitica) {
-      toast.error('Las condiciones financieras no están verificadas. Selecciona nuevamente el lote.');
+    if (!separacionCondicionesVerificadas || !lotePrincipal || cargandoAdicional) {
+      toast.error('Verifica los lotes y las condiciones financieras antes de continuar.');
       return false;
     }
-    if (!selectedProspectId) {
-      toast.error('Debe seleccionar un prospecto del CRM.');
-      return false;
-    }
-    if (!formLotId) {
-      toast.error('Debe seleccionar un lote disponible.');
-      return false;
-    }
-    if (estadoPrecio !== 'disponible' || !precioLote) {
-      toast.error(
-        'No se puede continuar sin un precio oficial vigente.'
-      );
-      return false;
-    }
-
-    const requiereNumeroOperacion = [
-      'TRANSFERENCIA',
-      'DEPOSITO',
-      'YAPE_PLIN'
-    ].includes(formPaymentMethod);
-
-    if (requiereNumeroOperacion && !formOperationNumber.trim()) {
-      toast.error(
-        'El número de operación es obligatorio para el método de pago seleccionado.'
-      );
-      return false;
-    }
-
-    if (!voucherFile) {
-      toast.error(`Debe adjuntar el comprobante de S/ ${condicionesVenta.montoSeparacion.toFixed(2)}.`);
+    if (!validacionPagosSeparacion.valido) {
+      toast.error('Completa los comprobantes y verifica que los abonos coincidan con el total de separación.');
       return false;
     }
     return true;
   };
-
-
-
-  const ejecutarRegistroSeparacion = async () => {
-    if (registroSeparacionEnCursoRef.current) {
-      return;
-    }
-
-    registroSeparacionEnCursoRef.current = true;
-    setSubmitting(true);
-
-    let comprobanteCargado = false;
-
-    try {
-      if (!voucherFile) {
-        throw new Error('Comprobante requerido.');
-      }
-      if (!condicionesVenta) {
-        throw new Error('No se han confirmado las condiciones de separación.');
-      }
-
-      const prospectId = Number(selectedProspectId);
-      const lotIdNum = Number(formLotId);
-
-      // 1. Subir comprobante al Storage privado.
-      const carga = await crmBackend.subirComprobanteSeparacion(
-        prospectId,
-        lotIdNum,
-        voucherFile
-      );
-
-      comprobanteCargado = true;
-
-      // 2. Registrar la separación mediante Core Service.
-      const res = await crmBackend.registrarSeparacion({
-        idProspecto: prospectId,
-        idLote: lotIdNum,
-        metodoPago: formPaymentMethod,
-        numeroOperacion: formOperationNumber.trim() || null,
-        monto: condicionesVenta.montoSeparacion,
-        observaciones: formObservations.trim() || null,
-        claveArchivo: carga.claveArchivo,
-        nombreArchivo: carga.nombreArchivo,
-        tipoMime: carga.tipoMime,
-        tamanioBytes: carga.tamanioBytes
-      });
-
-      const vencimiento = res.fecha_vencimiento
-        ? new Date(res.fecha_vencimiento).toLocaleDateString(
-          'es-PE',
-          { timeZone: 'America/Lima' }
-        )
-        : 'Fecha pendiente de confirmar';
-
-      toast.success('Separación registrada exitosamente', {
-        description:
-          `Código: ${res.codigo_reserva || res.id_reserva}. ` +
-          `Monto: S/ ${condicionesVenta.montoSeparacion.toFixed(2)} PEN. ` +
-          `Vence: ${vencimiento}. ` +
-          'Comprobante pendiente de revisión por Finanzas.'
-      });
-
-      setIsModalOpen(false);
-      await fetchSalesData();
-
-    } catch (err: unknown) {
-      const mensaje = err instanceof Error
-        ? err.message
-        : 'Error inesperado durante la operación.';
-
-      if (comprobanteCargado) {
-        toast.error('No se pudo confirmar la separación', {
-          description:
-            'El comprobante fue cargado, pero el registro ' +
-            'comercial no pudo confirmarse. ' +
-            'Verifica las operaciones existentes antes ' +
-            'de intentar nuevamente. Detalle: ' + mensaje,
-          duration: 10000
-        });
-      } else {
-        toast.error('No se confirmó la carga del comprobante', {
-          description: mensaje,
-          duration: 8000
-        });
-      }
-
-    } finally {
-      registroSeparacionEnCursoRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
 
   const validarVentaAntesDeRevisarComprador = async () => {
     if (submitting || registroVentaEnCursoRef.current) return;
@@ -879,6 +1066,7 @@ export function Sales() {
       return;
     }
 
+    if(esFinanciada && montoInicial>reservaAplicable && comprobantesVenta.length!==1){toast.error('Adjunte un único comprobante para la inicial adicional.');return;}
     const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
     if (errorPago) {
       toast.error(errorPago);
@@ -953,12 +1141,48 @@ export function Sales() {
     }
   };
 
+  const ejecutarRegistroSeparacionAcumulada=async()=>{
+    if(registroSeparacionEnCursoRef.current||resultadoSeparacionIncierto||!condicionesVenta||!precioLote||!selectedProspectId||!validacionPagosSeparacion.valido)return;
+    const idProspecto=Number(selectedProspectId),idPrincipal=Number(formLotId);
+    registroSeparacionEnCursoRef.current=true;setSubmitting(true);
+    let enviado=false;
+    try{
+      const lotes:CrmSeparacionAcumuladaInput['lotes']=[
+        {idLote:idPrincipal,monto:condicionesVenta.montoSeparacion,precio:Number(precioLote.precio),idPolitica:condicionesVenta.idPolitica},
+        ...lotesAdicionales.map(l=>({idLote:l.idLote,monto:l.monto,precio:l.precio,idPolitica:l.idPolitica}))
+      ];
+      const abonos:CrmSeparacionAcumuladaInput['abonos']=[];
+      for(const p of pagosSeparacionResueltos){
+        if(!p.archivo||!p.hashSha256)throw new Error('Falta verificar un comprobante.');
+        const centavos=centavosImporte(p.monto);
+        if(centavos===null)throw new Error('Importe de abono inválido.');
+        const carga=await crmBackend.subirComprobanteSeparacion(idProspecto,idPrincipal,p.archivo);
+        abonos.push({...carga,hashSha256:p.hashSha256,metodoPago:p.metodo,
+          numeroOperacion:p.metodo==='EFECTIVO'?null:p.referencia.trim()||null,monto:centavos/100});
+      }
+      enviado=true;
+      const res=await crmBackend.registrarSeparacionAcumulada({idSolicitud:crypto.randomUUID(),idProspecto,lotes,abonos,observaciones:formObservations.trim()||null});
+      if(!res.success||res.reservas.length!==lotes.length||res.abonos.length!==abonos.length)
+        throw new Error('Respuesta de registro incompleta.');
+      toast.success('Separación registrada',{description:`${res.reservas.length} lote(s) · ${formatSoles(res.total)} · Abonos pendientes de revisión.`});
+      setIsModalOpen(false);void fetchSalesData();
+    }catch(err:unknown){
+      const status=err instanceof ApiError?err.status:undefined;
+      if(enviado&&(status===undefined||status>=500)){
+        setResultadoSeparacionIncierto(true);
+        toast.error('Resultado de registro sin confirmar',{description:'Revisa las separaciones existentes antes de repetir el envío. No se realizará un reintento automático.'});
+      }else toast.error('No se pudo registrar la separación',{description:err instanceof Error?err.message:'Verifica los datos e inténtalo nuevamente.'});
+    }finally{registroSeparacionEnCursoRef.current=false;setSubmitting(false);}
+  };
+
   const handleProcessOperation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (submitting || registroSeparacionEnCursoRef.current) return;
+    if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional) return;
 
     if (opType === 'Venta') {
+      if(formalizacionMultiple)return;
+      if(reservaPendienteVenta){toast.error('Finanzas debe aprobar la separación antes de formalizar.');return;}
       setFormTouched(true);
       await validarVentaAntesDeRevisarComprador();
       return;
@@ -968,11 +1192,10 @@ export function Sales() {
     if (!validarFormularioSeparacion()) return;
 
     if (SEPARACION_ENVIO_DESHABILITADO) {
-      toast.info('El registro de separaciones está deshabilitado.');
+      toast.info('El registro del pago acumulado requiere la integración financiera de la fase 3.');
       return;
     }
-
-    await ejecutarRegistroSeparacion();
+    await ejecutarRegistroSeparacionAcumulada();
   };
 
   const confirmarRegistroVentaPendiente = async () => {
@@ -990,6 +1213,14 @@ export function Sales() {
     try {
       if (!solicitud.datos.datosComprador) {
         throw new Error('Revise primero los datos del comprador.');
+      }
+      // Una venta derivada de negociación no puede cambiar comprador, lote
+      // ni modalidad y quedar vinculada incorrectamente.
+      if(asociacionAgrupadaPendiente
+        &&(solicitud.datos.idProspecto!==asociacionAgrupadaPendiente.idProspecto
+          ||solicitud.datos.idLote!==asociacionAgrupadaPendiente.idLote
+          ||solicitud.datos.modalidad!==asociacionAgrupadaPendiente.modalidad)){
+        throw new Error('La venta no coincide con el comprador, lote y modalidad de la compra agrupada. Revisa la selección antes de registrar.');
       }
       const errorPago = validarPagoVenta(formPaymentMethod, formOperationNumber, comprobantesVenta);
       if (errorPago) throw new Error(errorPago);
@@ -1032,6 +1263,33 @@ export function Sales() {
         duration: 10000
       });
 
+      // El registro ya se confirmó; un error de agrupación nunca debe ocultar
+      // ni reintentar la venta recién creada.
+      if (asociacionAgrupadaPendiente
+          &&asociacionAgrupadaPendiente.idLote===resultado.idLote
+          &&asociacionAgrupadaPendiente.idProspecto===resultado.idProspecto
+          &&asociacionAgrupadaPendiente.modalidad===resultado.modalidad) {
+        try {
+          await crmBackend.vincularVentaAgrupada(
+            asociacionAgrupadaPendiente.idOperacion,resultado.idVenta
+          );
+          toast.success('Venta vinculada a su negociación agrupada',{
+            description:'El contrato y cronograma permanecen individuales por lote.'
+          });
+        }catch(e){
+          toast.warning('Venta creada, pero sin asociar a la negociación',{
+            description:(e instanceof Error?e.message:'Error de vinculación.')
+              +' Abre Compras agrupadas para vincularla sin registrar otra venta.',
+            duration:12000
+          });
+        }finally{
+          setAsociacionAgrupadaPendiente(null);
+        }
+      }
+
+      // Evita que la próxima venta herede el origen de plano/negociación anterior.
+      setOrigenPlano(null);
+      setAsociacionAgrupadaPendiente(null);
       await fetchSalesData();
     } catch (err: unknown) {
       setConfirmacionVenta(null);
@@ -1088,6 +1346,15 @@ export function Sales() {
     && politicaOperativa.idProspecto === Number(selectedProspectId)
     && politicaOperativa.idLote === Number(formLotId)
     ? politicaOperativa.condiciones : null;
+  const separacionCondicionesVerificadas = Boolean(selectedProspectId && formLotId && condicionesVenta
+    && !consultandoPolitica && !errorPolitica && estadoPrecio === 'disponible'
+    && precioLote?.idLote === Number(formLotId));
+  const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
+  const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
+  const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
+  const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
+  const pagosSeparacionResueltos = resolverPagosSeparacion(pagosSeparacion,totalSeparacionSeleccion);
+  const validacionPagosSeparacion = validarPagosSeparacion(pagosSeparacionResueltos,totalSeparacionSeleccion);
   const inicialMinimaVigente = condicionesVenta?.modoInicial === 'FIJA'
     ? Number(condicionesVenta.inicialFija)
     : Number(condicionesVenta?.inicialMinima ?? 0);
@@ -1111,12 +1378,12 @@ export function Sales() {
   }, [opType, precioLote, estadoPrecio, formLotId, formSaleModality,
       formSaleDownPayment, formSaleInstallments, reservaAplicable, condicionesVenta, inicialMinimaVigente]);
 
-  const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA'
+  const errorMontoInicial = opType === 'Venta' && formSaleModality === 'FINANCIADA' && condicionesVenta
     ? validarInicialTotal(
         formSaleDownPayment,
         precioLote ? Number(precioLote.precio) : null,
         reservaAplicable,
-        condicionesVenta ?? undefined
+        condicionesVenta
       )
     : null;
   const ventaFinanciadaInvalida = opType === 'Venta' && formSaleModality === 'FINANCIADA'
@@ -1125,67 +1392,63 @@ export function Sales() {
       || Number(formSaleInstallments) < cuotasMinimas
       || Number(formSaleInstallments) > cuotasMaximas);
 
+  const lotesVencidos = (s: Sale) => s.groupedLots?.length
+    ? s.groupedLots.filter(l => l.estado === 'VENCIDA').map(l => l.lote)
+    : s.status === 'VENCIDA' ? [s.lot] : [];
+
   const separationsCount = salesList.filter((s) => s.type === 'Separación').length;
   const salesCount = salesList.filter((s) => s.type === 'Venta').length;
 
   useEffect(() => {
     let vigente = true;
-
     setAvailableStages([]);
-
-    if (!formProjectId) {
+    setFormStageId('');
+    if (!formProjectId || !selectedProspectId || !proyectoConInteres) {
       setLoadingStages(false);
       return;
     }
-
     setLoadingStages(true);
-
-    void coreService
-      .getActiveStagesByProject(Number(formProjectId))
-      .then((etapas) => {
+    void crmBackend.listarEtapasOperacion(selectedProspectId, Number(formProjectId), opType === 'Venta')
+      .then(etapas => {
         if (!vigente) return;
-
-        const activas = (etapas ?? []).filter(
-          (etapa) => etapa.activo && etapa.idProyecto === Number(formProjectId)
-        );
-        setAvailableStages(activas);
-        if (autoseleccionPendiente?.idProyecto === Number(formProjectId) &&
-            activas.some((etapa) => etapa.idEtapa === autoseleccionPendiente.idEtapa)) {
-          setFormStageId(String(autoseleccionPendiente.idEtapa));
-        }
+        setAvailableStages(etapas ?? []);
+        if (opType==='Venta' && etapas.length === 1) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
-        if (!vigente) return;
-
-        toast.error('No se pudieron cargar las etapas', {
-          description:
-            err instanceof Error ? err.message : 'Error de consulta.'
+        if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
+          description: err instanceof Error ? err.message : 'Error de consulta.'
         });
       })
-      .finally(() => {
-        if (vigente) setLoadingStages(false);
-      });
+      .finally(() => { if (vigente) setLoadingStages(false); });
+    return () => { vigente = false; };
+  }, [formProjectId, selectedProspectId, proyectoConInteres, opType]);
 
-    return () => {
-      vigente = false;
-    };
-  }, [formProjectId, autoseleccionPendiente]);
-
-
+  // El acceso desde el plano o desde una reserva conserva la ubicación física,
+  // pero se selecciona el grupo comercial según el identificador real del lote.
+  useEffect(() => {
+    if (opType!=='Venta' || !autoseleccionPendiente || autoseleccionPendiente.idProyecto !== Number(formProjectId)) return;
+    const destino = availableStages.find(e => e.idLotes.includes(autoseleccionPendiente.idLote));
+    if (destino) setFormStageId(destino.codigo);
+  }, [availableStages, autoseleccionPendiente, formProjectId, opType]);
 
   useEffect(() => {
     let vigente = true;
 
     setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
     setFormLotId('');
 
-    if (!formProjectId || !formStageId || !selectedProspectId) {
+    if (!formProjectId || !selectedProspectId || !proyectoConInteres || !availableStages.length || (opType==='Venta'&&!etapaConsulta)) {
       setLoadingLots(false);
       return;
     }
 
     const idProyecto = Number(formProjectId);
-    const idEtapa = Number(formStageId);
+    const etapa = availableStages.find(e => e.codigo === etapaConsulta);
+    if (opType==='Venta' && !etapa) { setLoadingLots(false); return; }
+    const idsEtapa = new Set(opType==='Separacion'
+      ? availableStages.flatMap(e=>e.idLotes)
+      : etapa?.idLotes ?? []);
 
     setLoadingLots(true);
 
@@ -1194,7 +1457,6 @@ export function Sales() {
         const [lotes, reservas, comercializables] = await Promise.all([
           coreService.searchLots({
             idProyecto,
-            idEtapa,
             activo: true
           }),
 
@@ -1219,7 +1481,7 @@ export function Sales() {
           if (
             lote.activo !== true ||
             lote.idProyecto !== idProyecto ||
-            lote.idEtapa !== idEtapa
+            !idsEtapa.has(lote.idLote)
           ) {
             return false;
           }
@@ -1237,17 +1499,20 @@ export function Sales() {
           );
         });
 
+        const idsProyecto=new Set(availableStages.flatMap(e=>e.idLotes));
+        setLotesDisponiblesProyecto((lotes??[]).filter(l=>l.activo===true&&l.idProyecto===idProyecto
+          &&idsProyecto.has(l.idLote)&&l.codigoEstadoLote?.toUpperCase()==='DISPONIBLE'&&idsComerciales.has(l.idLote)));
         setAvailableLots(lotesPermitidos);
-        if (autoseleccionPendiente &&
-            autoseleccionPendiente.idProyecto === idProyecto &&
-            autoseleccionPendiente.idEtapa === idEtapa &&
-            lotesPermitidos.some((lote) => lote.idLote === autoseleccionPendiente.idLote)) {
-          setFormLotId(String(autoseleccionPendiente.idLote));
+        if (destinoConsulta &&
+            destinoConsulta.idProyecto === idProyecto &&
+            lotesPermitidos.some((lote) => lote.idLote === destinoConsulta.idLote)) {
+          setFormLotId(String(destinoConsulta.idLote));
         }
       } catch (err: unknown) {
         if (!vigente) return;
 
         setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
 
         toast.error('No se pudieron consultar los lotes', {
           description:
@@ -1269,10 +1534,27 @@ export function Sales() {
     };
   }, [
     formProjectId,
-    formStageId,
+    etapaConsulta,
     selectedProspectId,
-    opType
+    opType,
+    proyectoConInteres,
+    availableStages,
+    destinoConsulta
   ]);
+
+  // En separación se consulta todo el inventario del proyecto, sin exigir una etapa.
+  // Solo se preselecciona una preferencia explícita del CRM si está comercializable.
+  useEffect(()=>{
+    if(opType!=='Separacion'||!isModalOpen||loadingProjects||loadingStages||loadingLots||
+        !selectedProspectId||!formProjectId||formLotId||!lotesDisponiblesProyecto.length)return;
+    const idPreferido=preferenciaLote?.id;
+    const idDestino=autoseleccionPendiente?.idProyecto===Number(formProjectId)
+      ? autoseleccionPendiente.idLote : null;
+    const idElegible=idPreferido??idDestino;
+    if(idElegible&&lotesDisponiblesProyecto.some(l=>l.idLote===idElegible))
+      setFormLotId(String(idElegible));
+  },[opType,isModalOpen,loadingProjects,loadingStages,loadingLots,selectedProspectId,formProjectId,
+    formLotId,lotesDisponiblesProyecto,preferenciaLote?.id,autoseleccionPendiente]);
 
 
 
@@ -1344,7 +1626,9 @@ export function Sales() {
           ? 'Gestiona separaciones según la política vigente, métodos de pago y reservas de lotes.'
           : tab === 'Venta'
             ? 'Gestiona las ventas, modalidades de financiamiento y contratos asociados.'
-            : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
+            : tab === 'Agrupadas'
+              ? 'Organiza compras de múltiples lotes por comprador, proyecto y modalidad.'
+              : 'Gestiona los contratos y documentos comerciales de las operaciones.'}
         actions={
           <div className="flex items-center gap-2">
             {tab === 'Venta' && (
@@ -1405,6 +1689,14 @@ export function Sales() {
             count: salesCount
           },
           {
+            id: 'Agrupadas',
+            label: 'Compras agrupadas'
+          },
+          {
+            id: 'CambiosReserva',
+            label: 'Solicitudes de cambio'
+          },
+          {
             id: 'Contratos',
             label: 'Contratos pendientes de firma'
           },
@@ -1414,6 +1706,29 @@ export function Sales() {
           }
         ]}
       />
+
+      {tab === 'CambiosReserva' && <CambiosReservaPanel />}
+
+      {tab === 'Agrupadas' && (
+        <Gate permission="sales.view">
+          <OperacionesAgrupadasPanel onPrepararVenta={(datos)=>{
+            setOrigenPlano({
+              idProyecto:datos.idProyecto,idEtapa:datos.idEtapa,
+              idLote:datos.idLote,operacion:'Venta'
+            });
+            setPreseleccionAgrupada(datos);
+            setAsociacionAgrupadaPendiente({
+              idOperacion:datos.idOperacion,idLote:datos.idLote,
+              idProspecto:datos.idProspecto,modalidad:datos.modalidad
+            });
+            setTab('Venta');
+            handleOpenModal();
+            toast.info('Formaliza el lote de la negociación',{
+              description:'Los datos del cliente y lote se preseleccionarán; la compra se valida individualmente.'
+            });
+          }}/>
+        </Gate>
+      )}
 
       {/* Contratos pendientes de firma */}
       {tab === 'Contratos' && (
@@ -1578,7 +1893,7 @@ export function Sales() {
                       onChange={e=>cambiarFiltroVenta('estado',e.target.value)} className="w-full">
                       <option value="all">Todos los estados</option>
                       {estadosVentasFiltro.map(estado=>
-                        <option key={estado} value={estado}>{estado.replaceAll('_',' ')}</option>)}
+                        <option key={estado} value={estado}>{estado.replace(/_/g, ' ')}</option>)}
                     </Select>
                   </label>
                 </div>
@@ -1678,12 +1993,16 @@ export function Sales() {
                       {sale.project || '—'}
                     </TD>
                     <TD className="whitespace-nowrap">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">
-                        {sale.lot || '—'}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {sale.groupedLots && sale.groupedLots.length > 1 ? (
+                          <button type="button" onClick={() => setDetail(sale)} title="Ver todos los lotes" aria-label={`Ver los ${sale.groupedLots.length} lotes de ${sale.code}`} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-brand-800 hover:bg-brand-100">
+                            Varios ({sale.groupedLots.length}) <EyeIcon className="h-3.5 w-3.5" />
+                          </button>
+                        ) : <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-brand-800">{sale.groupedLots?.[0]?.lote || sale.lot || '—'}</span>}
+                      </div>
                     </TD>
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
-                      {currency(sale.amount)}
+                      {formatSoles(sale.amount)}
                     </TD>
                     <TD className="min-w-[155px]">
                       <span className="inline-flex items-center gap-1.5 text-xs text-brand-700">
@@ -1695,7 +2014,14 @@ export function Sales() {
                       {sale.advisor?.trim() || '—'}
                     </TD>
                     <TD>
-                      <EstadoSeparacionBadge estado={sale.status} />
+                      <div className="flex flex-col items-start gap-1.5">
+                        <EstadoSeparacionBadge estado={sale.status} />
+                        {lotesVencidos(sale).length > 0 && (
+                          <span role="status" className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">
+                            Plazo vencido
+                          </span>
+                        )}
+                      </div>
                     </TD>
                     <TD align="right">
                       <Button
@@ -1736,7 +2062,7 @@ export function Sales() {
                     </TD>
 
                     <TD align="right" className="whitespace-nowrap font-semibold tabular-nums text-brand-900">
-                      {currency(sale.amount)}
+                      {formatSoles(sale.amount)}
                     </TD>
 
                     <TD className="whitespace-nowrap text-xs text-brand-700">
@@ -1814,7 +2140,7 @@ export function Sales() {
                 <p className="mt-1 font-mono text-lg font-bold text-brand-900">{detail.code}</p>
                 <p className="mt-1 text-xs text-brand-600">
                   {detail.type === 'Separación'
-                    ? 'Separación de lote con comprobante de pago asociado'
+                    ? (detail.groupedLots?.length ? `Separación acumulada · ${detail.groupedLots.length} lotes · un único expediente` : 'Separación de lote con comprobante de pago asociado')
                     : 'Operación comercial y documentación de venta'}
                 </p>
               </div>
@@ -1822,7 +2148,7 @@ export function Sales() {
                 <p className="text-xs text-brand-500">
                   {detail.type === 'Separación' ? 'Monto de separación' : 'Monto de venta'}
                 </p>
-                <p className="text-2xl font-bold tabular-nums text-brand-900">{currency(detail.amount)}</p>
+                <p className="text-2xl font-bold tabular-nums text-brand-900">{formatSoles(detail.amount)}</p>
                 {detail.type === 'Separación'
                   ? <EstadoSeparacionBadge estado={detail.status} />
                   : <EstadoVentaBadge estado={detail.status} />}
@@ -1847,7 +2173,7 @@ export function Sales() {
                     )
                   }] : []),
                   { label: 'Proyecto inmobiliario', value: detail.project || '—' },
-                  { label: 'Lote', value: detail.lot || '—' },
+                  { label: detail.groupedLots?.length ? 'Lotes' : 'Lote', value: detail.lot || '—' },
                   { label: 'Asesor comercial', value: (
                     detail.advisor?.trim() ? (
                       <span className="inline-flex items-center gap-1.5 text-emerald-800">
@@ -1868,7 +2194,7 @@ export function Sales() {
                           {textoVencimientoDetalle && (
                             <span className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700"
                               role="status" aria-live="polite">
-                              {textoVencimientoDetalle}
+                              {detail.status === 'VENCIDA' ? 'Plazo vencido' : textoVencimientoDetalle}
                             </span>
                           )}
                         </div>
@@ -1887,9 +2213,22 @@ export function Sales() {
               </dl>
             </section>
 
+            {detail.type === 'Separación' && !!detail.groupedLots?.length && (
+              <section className="rounded-xl border border-brand-100 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-brand-900">Lotes de la operación</h3>
+                {detail.groupedLots.map(l=><div key={l.idReserva} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-100 p-3">
+                  <div><p className="font-semibold text-sm">{l.lote}</p><p className="text-xs text-brand-500">{l.codigo}</p></div>
+                  <EstadoSeparacionBadge estado={l.estado}/>
+                  <strong className="text-sm tabular-nums">{formatSoles(l.monto)}</strong>
+                </div>)}
+                <p className="flex justify-between border-t border-brand-100 pt-2 text-sm font-semibold"><span>Total de separación</span><span>{formatSoles(detail.amount)}</span></p>
+              </section>
+            )}
             {detail.type === 'Separación' && (
               <ComprobanteSeparacionPreview
                 idReserva={Number(detail.id.slice('SEPARACION-'.length))}
+                puedeSubsanar={can('sales.create')}
+                vistaGrupo={!!detail.groupedLots?.length}
               />
             )}
 
@@ -1917,37 +2256,44 @@ export function Sales() {
       <Modal
         open={isModalOpen}
         onClose={cerrarModalOperacion}
-        title={opType === 'Separacion' ? 'Registrar Separación de Lote' : 'Formalización de Venta'}
+        width="max-w-3xl"
+        title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
-          ? 'Registra la separación según el importe vigente y adjunta su comprobante para revisión por Finanzas.'
+          ? 'Selecciona los lotes y revisa sus importes antes de registrar el pago.'
           : 'Selecciona comprador, lote y condiciones de venta para formalizar la operación.'}
         footer={
-          <div className="flex justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            {opType==='Separacion' && separacionCondicionesVerificadas && condicionesVenta && (
+              <div className="mr-auto min-w-0 py-1">
+                <p className="text-xs text-brand-500">{1+lotesAdicionales.length} lote(s) · Total separación</p>
+                <p className="text-lg font-semibold tabular-nums text-brand-900">{formatSoles(totalSeparacionSeleccion)}</p>
+              </div>
+            )}
             <Button
               variant="secondary"
-              disabled={submitting}
+              disabled={submitting || registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional}
               onClick={cerrarModalOperacion}
             >
               Cancelar
             </Button>
-            <Button
+            {!formalizacionMultiple && <Button
               variant="primary"
 
               disabled={
-                submitting ||
+                submitting || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional ||
                 consultandoPolitica ||
                 (Boolean(selectedProspectId) && Boolean(formLotId) && !condicionesVenta) ||
-                ventaFinanciadaInvalida ||
-                (opType === 'Separacion' && SEPARACION_ENVIO_DESHABILITADO)
+                ventaFinanciadaInvalida || reservaPendienteVenta ||
+                (opType === 'Separacion' && (!separacionCondicionesVerificadas || SEPARACION_ENVIO_DESHABILITADO || !validacionPagosSeparacion.valido || resultadoSeparacionIncierto))
               }
               onClick={handleProcessOperation}
             >
               {submitting
                 ? 'Procesando…'
                 : opType === 'Separacion'
-                  ? 'Registrar Separación'
+                  ? 'Registrar separación'
                   : 'Validar Venta'}
-            </Button>
+            </Button>}
 
 
           </div>
@@ -1958,31 +2304,60 @@ export function Sales() {
             Cargando prospectos y lotes disponibles…
           </div>
         ) : (
-          <form onSubmit={handleProcessOperation} className="space-y-4">
+          <form onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
+            {<header className="flex items-start gap-3 pb-1">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
+              <div><h3 className="text-sm font-semibold text-brand-900">Cliente y proyecto</h3>
+                <p className="text-xs text-brand-500">Verifica los datos registrados en CRM.</p></div>
+            </header>}
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Prospecto (CRM) *
+                Cliente (CRM) *
               </label>
               <Select
                 value={selectedProspectId === '' ? '' : String(selectedProspectId)}
+                disabled={registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) =>
                   void handleSelectProspect(
                     e.target.value ? Number(e.target.value) : ''
                   )
                 }
               >
-                <option value="">Seleccione un prospecto del CRM...</option>
+                <option value="">Seleccione un cliente del CRM...</option>
                 {prospectsList.map((prospect) => (
                   <option key={prospect.id_prospecto} value={prospect.id_prospecto}>
-                    {prospect.nombre_completo} ({prospect.codigo}) - {prospect.estado_nombre}
+                    {prospect.nombre_completo} ({prospect.codigo}) - {prospect.categoria === 'COMPRADOR' ? 'Comprador' : prospect.estado_nombre}
                   </option>
                 ))}
               </Select>
-              <ProspectAdvisorInfo prospect={prospectsList.find((p) => p.id_prospecto === selectedProspectId)} />
+              <ProspectAdvisorInfo prospect={clienteOperacion}
+                disabled={editorAsesor || registrandoInteres || guardandoAsesorOperacion || loadingProjects}
+                onAssign={puedeAsignarAsesorOperacion && !compradorOperacion ? () => void abrirEditorAsesorOperacion() : undefined}/>
+              {editorAsesor && (
+                <div className="mt-2 space-y-2 rounded-lg border border-brand-200 bg-white p-3">
+                  <label className="block text-xs font-medium text-brand-700">
+                    Asesor comercial *
+                    <Select className="mt-1 w-full" value={asesorOperacion}
+                      disabled={cargandoAsesoresOperacion || guardandoAsesorOperacion}
+                      onChange={e=>setAsesorOperacion(e.target.value)}>
+                      <option value="">{cargandoAsesoresOperacion ? 'Cargando asesores…' : 'Seleccione un asesor activo'}</option>
+                      {asesoresOperacion.map(a=><option key={a.id_asesor} value={a.id_asesor}>{a.nombre_completo}</option>)}
+                    </Select>
+                  </label>
+                  <p className="text-xs text-brand-500">La asignación se guardará en CRM antes de continuar. No es necesario salir del formulario.</p>
+                  {errorAsesorOperacion && <div role="alert"><Alert tone="danger" title="No se pudo asignar el asesor">{errorAsesorOperacion}</Alert></div>}
+                  {!cargandoAsesoresOperacion && !asesoresOperacion.length && !errorAsesorOperacion &&
+                    <p className="text-xs text-amber-700">No hay asesores activos disponibles.</p>}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button variant="secondary" disabled={guardandoAsesorOperacion} onClick={()=>setEditorAsesor(false)}>Cancelar</Button>
+                    <Button variant="primary" disabled={!asesorOperacion || cargandoAsesoresOperacion || guardandoAsesorOperacion}
+                      onClick={()=>void guardarAsesorOperacion()}>{guardandoAsesorOperacion ? 'Guardando…' : 'Confirmar asignación'}</Button>
+                  </div>
+                </div>
+              )}
               {opType === 'Venta' && reservasVigentes.length > 0 && (
                 <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  Reserva vigente detectada. Se preseleccionó el proyecto, etapa y lote reservado.
-                  Puedes cambiar cualquiera de ellos; el abono se aplicará solo al lote con reserva confirmada.
+                  {reservasVigentes.length} reserva(s) detectada(s). Se precarga el proyecto, etapa y lote; cualquier traslado requiere aprobación de Gerencia o Supervisión.
                 </p>
               )}
             </div>
@@ -1992,53 +2367,126 @@ export function Sales() {
                 Proyecto inmobiliario *
               </label>
 
-              <Select
-                value={formProjectId}
-                disabled={!selectedProspectId || loadingProjects}
-                onChange={(e) => {
-                  setAutoseleccionPendiente(null);
-                  setFormProjectId(e.target.value);
-                  setFormStageId('');
-                  setAvailableStages([]);
-                  setFormLotId('');
-                  setAvailableLots([]);
-                }}
-              >
-                <option value="">
-                  {loadingProjects
-                    ? 'Cargando proyectos...'
-                    : 'Seleccione un proyecto...'}
-                </option>
+              {proyectosConInteres.length > 1 ? (
+                <Select
+                  aria-label="Proyecto de interés registrado"
+                  value={formProjectId}
+                  disabled={tieneReservasVenta || !selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
+                  onChange={e=>{
+                    setAutoseleccionPendiente(null);
+                    setFormStageId('');
+                    setAvailableStages([]);
+                    setFormLotId('');
+                    setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
+                    setFormProjectId(e.target.value);
+                  }}>
+                  <option value="">Seleccione un interés registrado</option>
+                  {proyectosConInteres.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+                </Select>
+              ) : (
+                <div className="flex items-start gap-2 py-1 text-sm font-semibold text-brand-900"
+                  aria-label="Proyecto de interés registrado">
+                  {loadingProjects ? 'Cargando proyecto…' : !selectedProspectId ? 'Seleccione un cliente primero'
+                    : proyectosConInteres.find(p=>p.idProyecto===Number(formProjectId))?.nombre ?? 'Sin proyecto de interés activo disponible'}
+                </div>
+              )}
 
-                {availableProjects.map((project) => (
-                  <option key={project.idProyecto} value={project.idProyecto}>
-                    {project.nombre}
-                  </option>
-                ))}
-              </Select>
-
+              {!tieneReservasVenta && selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
+                proyectosSinInteres.length > 0 && !editorInteres && (
+                <Button type="button" variant="secondary" className="mt-2 w-full sm:w-auto"
+                  disabled={registrandoInteres || guardandoAsesorOperacion || submitting || guardandoLote || cargandoAdicional}
+                  onClick={abrirEditorInteres}>
+                  {compradorOperacion ? 'Registrar interés para nueva compra'
+                    : esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar proyecto de interés'}
+                </Button>
+              )}
+              {editorInteres && selectedProspectId && !loadingProjects && (
+                <div className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-800">
+                  <p className="font-semibold">{esCambioInteres ? 'Cambiar proyecto de interés' : 'Registrar interés comercial'}</p>
+                  {esCambioInteres && <>
+                    {interesesOperacion.length > 1 ? <label className="block font-medium">
+                      Proyecto de interés que se reemplazará *
+                      <Select className="mt-1 w-full" value={proyectoInteresAnterior} disabled={registrandoInteres}
+                        onChange={e=>setProyectoInteresAnterior(e.target.value)}>
+                        <option value="">Seleccione el interés anterior</option>
+                        {interesesOperacion.map(id=><option key={id} value={id}>
+                          {availableProjects.find(p=>p.idProyecto===id)?.nombre ?? `Proyecto #${id}`}
+                        </option>)}
+                      </Select>
+                    </label> : <p>Interés actual: <strong>{availableProjects.find(p=>p.idProyecto===origenCambioInteres)?.nombre ?? `Proyecto #${origenCambioInteres}`}</strong></p>}
+                  </>}
+                  <label className="block font-medium">Nuevo proyecto *
+                    <Select className="mt-1 w-full" value={proyectoInteresNuevo} disabled={registrandoInteres}
+                      onChange={e=>{setProyectoInteresNuevo(e.target.value);setErrorCambioInteres('');}}>
+                      <option value="">Seleccione un proyecto</option>
+                      {proyectosSinInteres.map(p=><option key={p.idProyecto} value={p.idProyecto}>{p.nombre}</option>)}
+                    </Select>
+                  </label>
+                  {esCambioInteres ? <>
+                    <label className="block font-medium">Motivo del cambio *
+                      <textarea className="mt-1 w-full rounded-md border border-brand-200 bg-white p-2 text-brand-800"
+                        rows={2} maxLength={500} value={motivoCambioInteres} disabled={registrandoInteres}
+                        onChange={e=>setMotivoCambioInteres(e.target.value)}
+                        placeholder="Ej.: El cliente prefirió otro proyecto por su ubicación." />
+                      <span className="block font-normal">De 5 a 500 caracteres.</span>
+                    </label>
+                    <p>El interés anterior quedará como histórico y el cambio se registrará en el expediente CRM.</p>
+                  </> : <p>{compradorOperacion ? 'Se conservarán los intereses y compras anteriores.' : 'Se registrará el primer interés comercial.'}</p>}
+                  {errorCambioInteres && <div role="alert"><Alert tone="danger" title="No se pudo actualizar el interés">{errorCambioInteres}</Alert></div>}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="secondary" disabled={registrandoInteres} onClick={cerrarEditorInteres}>Cancelar</Button>
+                    <Button type="button" variant="primary" disabled={!proyectoInteresNuevo || registrandoInteres || guardandoAsesorOperacion ||
+                      (esCambioInteres && (!interesesOperacion.includes(origenCambioInteres) || motivoCambioInteres.trim().length < 5))}
+                      onClick={() => void registrarInteresOperacion()}>
+                      {registrandoInteres ? 'Guardando…' : esCambioInteres ? 'Confirmar cambio de interés' : 'Registrar interés en este proyecto'}
+                    </Button>
+                  </div>
+                </div>
+              )}
               {selectedProspectId &&
                 !loadingProjects &&
                 availableProjects.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    Este potencial no tiene proyectos de interés activos.
+                    No hay proyectos habilitados para este comprador.
                   </p>
                 )}
             </div>
 
-            <div>
+            {<header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">2</span>
+              <div><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
+                <p className="text-xs text-brand-500">{opType==='Venta' ? 'Revisa el lote reservado y sus condiciones comerciales.' : 'Revisa el lote de interés y añade otros si el cliente lo solicita.'}</p></div>
+            </header>}
+            {tieneReservasVenta && selectedProspectId && <ReservasVentaPanel
+              idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
+              idLoteSeleccionado={Number(formLotId)} disabled={submitting || loadingLots || loadingStages}
+              onSeleccionar={r=>{
+                setAutoseleccionPendiente({idProyecto:r.idProyecto,idLote:r.idLote});
+                if(r.idProyecto!==Number(formProjectId)){
+                  setFormProjectId(String(r.idProyecto));setFormStageId('');setFormLotId('');
+                }else{
+                  const etapa=availableStages.find(e=>e.idLotes.includes(r.idLote));
+                  if(etapa && etapa.codigo!==formStageId) setFormStageId(etapa.codigo);
+                  else setFormLotId(String(r.idLote));
+                }
+              }}
+              onActualizar={()=>void handleSelectProspect(selectedProspectId)}
+            />}
+            {opType==='Venta' && <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                Etapa del proyecto *
+                Etapa comercial *
               </label>
 
               <Select
                 value={formStageId}
-                disabled={!formProjectId || loadingStages}
+                disabled={tieneReservasVenta || !formProjectId || !proyectoConInteres || loadingStages || editorInteres || guardandoLote || cargandoAdicional || submitting}
                 onChange={(e) => {
                   setAutoseleccionPendiente(null);
                   setFormStageId(e.target.value);
                   setFormLotId('');
                   setAvailableLots([]);
+    setLotesDisponiblesProyecto([]);
                 }}
               >
                 <option value="">
@@ -2048,31 +2496,111 @@ export function Sales() {
                 </option>
 
                 {availableStages.map((etapa) => (
-                  <option key={etapa.idEtapa} value={etapa.idEtapa}>
+                  <option key={etapa.codigo} value={etapa.codigo}>
                     {etapa.nombre}
                   </option>
                 ))}
               </Select>
 
-              {formProjectId &&
+              {formProjectId && proyectoConInteres &&
                 !loadingStages &&
                 availableStages.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    Este proyecto no tiene etapas activas disponibles.
+                    No hay etapas comerciales con lotes disponibles o reservas autorizadas.
                   </p>
                 )}
-            </div>
+            </div>}
 
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-brand-700">
+              {opType==='Venta' && <label className="mb-1 block text-[12px] font-medium text-brand-700">
+                Lote disponible o reservado para el comprador *
+              </label>}
 
-                {opType === 'Venta' ? 'Lote para venta *' : 'Lote disponible *'}
-
-              </label>
-
-              <Select
+              {opType==='Separacion' ? <div className="space-y-2">
+                {(loadingProjects||loadingStages||loadingLots) ? <p role="status" className="py-3 text-sm text-brand-500">Consultando interés e inventario del proyecto…</p>
+                : lotePrincipal ? <div className="rounded-xl border border-brand-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-brand-600">{preferenciaLote?.id===lotePrincipal.idLote?'Lote de interés · Principal':'Lote principal de la operación'}</p>
+                      <p className="mt-1 text-base font-bold text-brand-900">{lotePrincipal.codigo}</p>
+                      <p className="text-xs text-brand-500">{lotePrincipal.nombreManzana??''} · {lotePrincipal.areaM2??0} m²</p>
+                      <p className="text-xs text-brand-500">{nombreEtapaLote(lotePrincipal.idLote)??'Etapa comercial no identificada'}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-brand-500">Precio oficial</p>
+                      {estadoPrecio==='disponible'&&precioLote?.idLote===lotePrincipal.idLote
+                        ? <p className="text-base font-bold tabular-nums text-brand-900">{formatSoles(Number(precioLote.precio))}</p>
+                        : <p className="text-xs text-brand-600">{estadoPrecio==='error'||estadoPrecio==='sin_precio'?'Precio no verificado':'Consultando precio…'}</p>}
+                      {separacionCondicionesVerificadas&&condicionesVenta&&<p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(condicionesVenta.montoSeparacion)}</strong></p>}
+                    </div>
+                  </div>
+                </div> : <div role="status" className="py-2 text-sm text-brand-700">
+                  {preferenciaLote?.id ? <>
+                    <p className="font-semibold">Lote de interés en CRM: {preferenciaLote.codigo??'Lote registrado'}</p>
+                    <p className="mt-1 text-xs text-amber-700">No está disponible para una nueva separación. Puedes elegir otro lote.</p>
+                  </> : <p>{selectedProspectId&&formProjectId?'El cliente aún no tiene un lote de interés identificado en CRM. Selecciona el lote principal.':'Selecciona un cliente y su proyecto para consultar el lote de interés.'}</p>}
+                </div>}
+                {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
+                  disabled={!formProjectId||loadingProjects||loadingStages||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional||editorAdicional||editorInteres}
+                  onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?(puedeEditarInteres?'Cambiar lote de interés':'Elegir otro lote para esta operación'):'Seleccionar lote'}</Button>}
+                {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
+                  <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
+                  <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>
+                    <option value="">Seleccione un lote</option>
+                    {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
+                  </Select>
+                  {puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&<label className="block text-xs font-medium text-brand-700">Motivo del registro o cambio *
+                    <textarea rows={2} maxLength={500} className="mt-1 w-full rounded-lg border border-brand-200 p-2" value={motivoLote} disabled={guardandoLote}
+                      onChange={e=>setMotivoLote(e.target.value)} placeholder="Preferencia expresada por el cliente"/>
+                    <span className="block font-normal text-brand-500">Se guardará en CRM y en el expediente.</span>
+                  </label>}
+                  {lotesAdicionales.length>0&&<p className="text-xs text-amber-700">Al cambiar el lote principal se reiniciará la selección de lotes adicionales y los datos del pago.</p>}
+                  {errorLote&&<Alert tone="danger" title="No se pudo actualizar el lote">{errorLote}</Alert>}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="secondary" disabled={guardandoLote} onClick={()=>setEditorLote(false)}>Cancelar</Button>
+                    <Button type="button" disabled={!loteCandidato||guardandoLote||(puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&motivoLote.trim().length<5)}
+                      onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
+                  </div>
+                </div>}
+                {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-xl border border-brand-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-brand-600">Lote adicional</p>
+                      <p className="mt-1 text-base font-bold text-brand-900">{l.codigo}</p>
+                      <p className="text-xs text-brand-500">{nombreEtapaLote(l.idLote)??'Etapa comercial no identificada'}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-brand-500">Precio oficial</p>
+                      <p className="text-base font-bold tabular-nums text-brand-900">{formatSoles(l.precio)}</p>
+                      <p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(l.monto)}</strong></p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-end"><Button type="button" size="sm" variant="secondary" disabled={submitting||guardandoLote||cargandoAdicional||editorLote} onClick={()=>setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote))}>Quitar lote</Button></div>
+                </div>)}
+                {separacionCondicionesVerificadas&&condicionesVenta&&!editorLote&&<>
+                  {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} className="w-full sm:w-auto" disabled={submitting||lotesAdicionales.length>=19||!lotesDisponiblesProyecto.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
+                    onClick={()=>{setErrorAdicional('');setEditorAdicional(true)}}>Agregar otro lote</Button>}
+                  {editorAdicional&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
+                    <label className="block text-xs font-medium">Lote adicional
+                      <Select className="mt-1" value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
+                        <option value="">Seleccione otro lote disponible</option>
+                        {lotesDisponiblesProyecto.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
+                      </Select>
+                    </label>
+                    {errorAdicional&&<Alert tone="danger" title="No se pudo añadir el lote">{errorAdicional}</Alert>}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button type="button" variant="secondary" disabled={cargandoAdicional} onClick={()=>{setEditorAdicional(false);setCandidatoAdicional('');setErrorAdicional('')}}>Cancelar</Button>
+                      <Button type="button" disabled={!candidatoAdicional||cargandoAdicional} onClick={()=>void agregarLoteAdicional()}>{cargandoAdicional?'Verificando…':'Añadir lote'}</Button>
+                    </div>
+                  </div>}
+                  <div className="flex flex-wrap justify-between gap-2 border-t border-brand-100 pt-3 text-sm">
+                    <span>{1+lotesAdicionales.length} lote(s) · Precio total referencial</span>
+                    <strong className="tabular-nums">{formatSoles(totalPrecioSeleccion)}</strong>
+                  </div>
+                </>}
+              </div> : <Select
                 value={formLotId}
-                disabled={!formProjectId || !formStageId || loadingLots}
+                disabled={tieneReservasVenta || !formProjectId || !formStageId || loadingLots}
                 onChange={(e) => handleSelectLot(e.target.value)}
               >
                 <option value="">
@@ -2098,10 +2626,9 @@ export function Sales() {
                   );
                 })}
 
-              </Select>
+              </Select>}
 
-
-              {formLotId && (
+              {opType==='Venta' && formLotId && (
                 <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
                   <p className="text-xs font-medium text-brand-600">
                     Precio oficial del lote
@@ -2129,7 +2656,7 @@ export function Sales() {
                       {opType === 'Venta' && reservaAplicable > 0 && (
                         <div className="mt-3 flex items-center justify-between border-t border-brand-200 pt-3 text-sm">
                           <span className="font-medium text-emerald-800">Pago de reserva acreditado</span>
-                          <span className="font-bold tabular-nums text-emerald-800">− {currency(reservaAplicable)}</span>
+                          <span className="font-bold tabular-nums text-emerald-800">− {formatSoles(reservaAplicable)}</span>
                         </div>
                       )}
                     </>
@@ -2149,14 +2676,14 @@ export function Sales() {
                 </div>
               )}
 
-              {formStageId &&
+              {(opType==='Venta'?Boolean(formStageId):Boolean(formProjectId&&proyectoConInteres&&!loadingStages&&!loadingProjects)) &&
                 !loadingLots &&
                 availableLots.length === 0 && (
                   <p className="mt-1 text-xs text-amber-700">
 
                     {opType === 'Venta'
                       ? 'No hay lotes disponibles ni reservas autorizadas en esta etapa.'
-                      : 'No hay lotes disponibles en esta etapa.'}
+                      : 'No hay lotes comercializables disponibles en este proyecto.'}
                   </p>
                 )}
 
@@ -2175,106 +2702,66 @@ export function Sales() {
                   </p>
                 ) : errorPolitica ? (
                   <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                    No se pudieron cargar las condiciones financieras: {errorPolitica}. Selecciona nuevamente el lote.
+                    No se pudieron verificar las condiciones financieras: {errorPolitica}
                   </p>
                 ) : condicionesVenta ? (
                   <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
                     Condiciones contractuales verificadas · Versión {condicionesVenta.version}
                   </p>
                 ) : null}
+                {errorPolitica && !consultandoPolitica && (
+                  <Button type="button" variant="secondary" size="sm" className="mt-2"
+                    onClick={()=>setRevisionPolitica(revision=>revision+1)}>
+                    Reintentar consulta de condiciones
+                  </Button>
+                )}
               </div>
             )}
             {opType === 'Separacion' ? (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                      Método de pago (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}) *
-                    </label>
-                    <Select
-                      value={formPaymentMethod}
-                      onChange={(e) => setFormPaymentMethod(e.target.value as any)}
-                    >
-                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                      <option value="DEPOSITO">Depósito en Cuenta</option>
-                      <option value="YAPE_PLIN">Billetera (Yape / Plin)</option>
-                      <option value="EFECTIVO">Efectivo en Caja</option>
-                      <option value="OTRO">Otro Medio</option>
-                    </Select>
-                  </div>
-
-                  {formPaymentMethod !== 'EFECTIVO' ? (
-                    <div>
-                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                        N° de Operación {formPaymentMethod === 'OTRO' ? '(Opcional)' : '*'}
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="Ej: 00982341..."
-                        value={formOperationNumber}
-                        onChange={(e) => setFormOperationNumber(e.target.value)}
-                      />
-                      {formPaymentMethod !== 'OTRO' &&
-                        !formOperationNumber.trim() &&
-                        formTouched && (
-                          <p className="mt-1 text-[11px] font-medium text-rose-600">
-                            Número de operación obligatorio.
-                          </p>
-                        )}
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                        Caja / Modalidad
-                      </label>
-                      <div className="py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
-                        Pago directo en efectivo (S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'})
-                      </div>
-                    </div>
-                  )}
+              separacionCondicionesVerificadas && condicionesVenta ? <>
+                <header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">3</span>
+                  <div><h3 className="text-sm font-semibold text-brand-900">Pago de la separación</h3><p className="text-xs text-brand-500">Revisa el importe total y registra los comprobantes.</p></div>
+                </header>
+                <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
+                  <div className="flex justify-between gap-3 text-sm"><span>Cantidad de lotes</span><strong>{1+lotesAdicionales.length}</strong></div>
+                  <div className="flex flex-wrap justify-between gap-2 text-sm"><span>Importes de separación</span><strong>{[condicionesVenta.montoSeparacion,...lotesAdicionales.map(l=>l.monto)].every(m=>m===condicionesVenta.montoSeparacion)
+                    ? `${formatSoles(condicionesVenta.montoSeparacion)} × ${1+lotesAdicionales.length}`
+                    : 'Según el detalle de lotes'}</strong></div>
+                  <div className="flex justify-between gap-3 border-t border-brand-100 pt-3"><strong>Total a pagar</strong><strong className="text-lg tabular-nums text-brand-900">{formatSoles(totalSeparacionSeleccion)}</strong></div>
                 </div>
-
-                <div>
-                  <label className="mb-1 block text-[12px] font-medium text-brand-700">
-                    Comprobante de pago * (PDF, JPG, PNG o WebP - Máx. 5 MB)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id="voucher-input"
-                      accept=".pdf,image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <label
-                      htmlFor="voucher-input"
-                      className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-brand-300 rounded-md bg-white hover:bg-brand-50 text-brand-800"
-                    >
-                      <FileTextIcon className="w-3.5 h-3.5 text-brand-600" />
-                      {voucherFile ? 'Cambiar comprobante' : 'Adjuntar comprobante'}
-                    </label>
-                    {voucherFile && (
-                      <span className="text-xs text-brand-700 font-medium truncate max-w-[220px]">
-                        {voucherFile.name} ({(voucherFile.size / 1024).toFixed(0)} KB)
-                      </span>
-                    )}
-                  </div>
-                  {!voucherFile && formTouched && (
-                    <p className="mt-1 text-[11px] font-medium text-rose-600">
-                      Debe adjuntar el comprobante o voucher de S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'}.
-                    </p>
-                  )}
+                <PagoSeparacionPanel pagos={pagosSeparacion} total={totalSeparacionSeleccion}
+                  validacion={validacionPagosSeparacion} disabled={submitting||editorInteres||editorLote||editorAdicional||guardandoLote||cargandoAdicional}
+                  onChange={setPagosSeparacion} nuevoId={()=>++secuenciaPagoSeparacion.current}/>
+                <div className="rounded-lg border border-brand-100 bg-brand-50/40 p-3 text-xs text-brand-700 space-y-1">
+                  <p className="font-semibold">Condiciones de separación</p>
+                  <p>Vigencia del lote principal: <strong>{condicionesVenta.diasVencimientoSeparacion} días calendario</strong>.</p>
+                  {lotesAdicionales.some(l=>l.dias!==condicionesVenta.diasVencimientoSeparacion)&&
+                    <p>Los lotes adicionales tienen plazos propios según sus políticas.</p>}
+                  <p>Al vencer el plazo, el lote se libera automáticamente. Los pagos y comprobantes se conservan para revisión financiera.</p>
+                  <p>Finanzas revisará los comprobantes antes de acreditar los pagos. Los lotes registrados quedarán reservados.</p>
                 </div>
-
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
-                  <p className="font-semibold text-emerald-950">Condiciones de Separación:</p>
-                  <p>Monto reglamentario: <span className="font-bold">S/ {condicionesVenta?.montoSeparacion.toFixed(2) ?? '—'} PEN</span></p>
-                  <p>Plazo de vigencia: <span className="font-bold">{condicionesVenta?.diasVencimientoSeparacion ?? '—'} días calendario</span> (vence automáticamente si no se formaliza venta).</p>
-                  <p>El lote cambiará a estado <span className="font-bold text-emerald-800">RESERVADO</span> en el mapa interactivo.</p>
-                  <p>El pago ingresará en estado <span className="font-bold text-emerald-800">REGISTRADO</span> y el comprobante quedará <span className="font-bold text-emerald-800">PENDIENTE</span> de auditoría por Finanzas.</p>
+                {resultadoSeparacionIncierto&&<Alert tone="warning" title="Registro sin confirmar">Consulta el listado antes de volver a registrar la operación.</Alert>}
+                {SEPARACION_ENVIO_DESHABILITADO&&<Alert tone="warning" title="Registro temporalmente no disponible">
+                  La interfaz de pagos acumulados está preparada. La conexión con Finanzas se habilitará al terminar la integración.
+                </Alert>}
+              </> : (
+                <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 text-xs text-brand-700" role="status">
+                  <p className="font-semibold">Condiciones de separación y pago</p>
+                  <p className="mt-1">{!formLotId
+                    ? 'Seleccione el cliente, su proyecto y el lote principal para consultar el importe y la vigencia.'
+                    : consultandoPolitica ? 'Consultando el importe y la vigencia de la separación…'
+                    : errorPolitica ? 'No se puede registrar el pago hasta verificar las condiciones financieras. Reintente la consulta.'
+                    : estadoPrecio !== 'disponible' ? 'Se requiere verificar el precio oficial del lote antes de continuar.'
+                    : 'Esperando condiciones financieras verificadas.'}</p>
                 </div>
-              </>
+              )
 
+            ) : formalizacionMultiple && selectedProspectId ? (
+              <FormalizacionMultiplePanel key={selectedProspectId} idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
+                proyectos={availableProjects} compradorExistente={(prospectsList.find(p=>p.id_prospecto===selectedProspectId)?.estado_codigo??'').toUpperCase()==='CONVERTIDO'}
+                puedeReasignar={puedeReasignarComprador} asesorNombre={prospectsList.find(p=>p.id_prospecto===selectedProspectId)?.asesor_nombre??''}
+                observaciones={formObservations} onBusy={setSubmitting} onCompleted={()=>{setIsModalOpen(false);void fetchSalesData();}}/>
             ) : (
               <div className="space-y-4 rounded-2xl border border-brand-200 bg-gradient-to-b from-brand-50/90 to-white p-3 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2312,7 +2799,7 @@ export function Sales() {
                   </Select>
                 </div>
 
-                {formSaleModality === 'FINANCIADA' && (
+                {formSaleModality === 'FINANCIADA' && condicionesVenta && (
                   <div className="space-y-3 rounded-xl border border-brand-100 bg-white p-3 sm:p-4">
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
                       <div className="min-w-0">
@@ -2386,7 +2873,7 @@ export function Sales() {
                       <div>
                         <p className="text-xs font-semibold text-sky-900">Interés nominal anual fijo</p>
                         <p className="mt-0.5 text-[11px] text-sky-700">
-                          Equivalente nominal mensual: {((condicionesVenta?.tasaNominalAnualPct ?? 0) / 12).toFixed(4)} %. No modificable por el asesor.
+                          Equivalente nominal mensual: {(condicionesVenta.tasaNominalAnualPct / 12).toFixed(4)} %. No modificable por el asesor.
                         </p>
                       </div>
                       <strong className="text-xl font-bold tabular-nums text-sky-900">
@@ -2405,14 +2892,14 @@ export function Sales() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <dt className="text-brand-600">Precio oficial</dt>
                         <dd className="font-semibold tabular-nums text-brand-900">
-                          {currency(resumenVenta.precioOficial)}
+                          {formatSoles(resumenVenta.precioOficial)}
                         </dd>
                       </div>
                       {resumenVenta.abonoReserva > 0 && (
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <dt className="text-emerald-700">Pago de reserva acreditado</dt>
                           <dd className="font-semibold tabular-nums text-emerald-800">
-                            − {currency(resumenVenta.abonoReserva)}
+                            − {formatSoles(resumenVenta.abonoReserva)}
                           </dd>
                         </div>
                       )}
@@ -2420,7 +2907,7 @@ export function Sales() {
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
                           <dt className="font-semibold text-brand-900">Saldo por pagar al contado</dt>
                           <dd className="text-lg font-bold tabular-nums text-brand-900">
-                            {currency(resumenVenta.saldoContado)}
+                            {formatSoles(resumenVenta.saldoContado)}
                           </dd>
                         </div>
                       ) : (
@@ -2428,33 +2915,33 @@ export function Sales() {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Inicial total pactada</dt>
                             <dd className="font-semibold tabular-nums text-brand-800">
-                              {currency(resumenVenta.inicialTotal)}
+                              {formatSoles(resumenVenta.inicialTotal)}
                             </dd>
                           </div>
                           {resumenVenta.abonoReserva > 0 && (
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <dt className="text-brand-600">Inicial adicional por completar después de la separación</dt>
                               <dd className="font-semibold tabular-nums text-brand-800">
-                                − {currency(resumenVenta.inicialAdicional)}
+                                − {formatSoles(resumenVenta.inicialAdicional)}
                               </dd>
                             </div>
                           )}
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Capital financiado</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
-                              {currency(resumenVenta.capitalFinanciado)}
+                              {formatSoles(resumenVenta.capitalFinanciado)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <dt className="text-brand-600">Intereses totales ({condicionesVenta?.tasaNominalAnualPct ?? '—'} % anual)</dt>
                             <dd className="font-semibold tabular-nums text-brand-900">
-                              {currency(resumenVenta.interesTotal)}
+                              {formatSoles(resumenVenta.interesTotal)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 pt-3">
                             <dt className="font-semibold text-brand-800">Total de cuotas</dt>
                             <dd className="font-bold tabular-nums text-brand-900">
-                              {currency(resumenVenta.totalCuotas)}
+                              {formatSoles(resumenVenta.totalCuotas)}
                             </dd>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2462,7 +2949,7 @@ export function Sales() {
                               Precio final incluyendo intereses
                             </dt>
                             <dd className="text-lg font-bold tabular-nums text-brand-900">
-                              {currency(resumenVenta.totalOperacionConIntereses)}
+                              {formatSoles(resumenVenta.totalOperacionConIntereses)}
                             </dd>
                           </div>
                         </>
@@ -2472,10 +2959,10 @@ export function Sales() {
                       <div className="rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-white p-3 sm:p-4">
                         <p className="text-xs font-semibold text-sky-900">Cuota mensual fija</p>
                         <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-900 sm:text-3xl">
-                          {currency(resumenVenta.cuotaMensual)}
+                          {formatSoles(resumenVenta.cuotaMensual)}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-brand-600">
-                          <span>Ajuste última cuota: <strong>{currency(
+                          <span>Ajuste última cuota: <strong>{formatSoles(
                             resumenVenta.cuotas[resumenVenta.cuotas.length - 1]?.cuota ?? 0
                           )}</strong></span>
                           <span>{resumenVenta.cuotas.length} cuotas mensuales</span>
@@ -2489,9 +2976,12 @@ export function Sales() {
                   </section>
                 ) : (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-                    {formSaleModality === 'FINANCIADA'
-                      ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
-                      : 'Seleccione un lote con precio oficial vigente para consultar el saldo.'}
+                    {!formLotId ? 'Seleccione un lote para consultar las condiciones.'
+                      : consultandoPolitica ? 'Consultando política financiera…'
+                      : !condicionesVenta ? 'No se puede calcular la operación sin condiciones financieras verificadas.'
+                      : estadoPrecio !== 'disponible' ? 'No se pudo verificar el precio oficial vigente del lote.'
+                      : formSaleModality === 'FINANCIADA' ? 'Complete una inicial válida y un plazo dentro de la política autorizada para calcular las cuotas.'
+                      : 'No se pudo calcular el saldo con las condiciones disponibles.'}
                   </p>
                 )}
                 <p className="text-xs leading-relaxed text-brand-600">
@@ -2502,7 +2992,7 @@ export function Sales() {
               </div>
             )}
 
-            {opType === 'Venta' && (
+            {opType === 'Venta' && !formalizacionMultiple && (
               <section className="space-y-3 rounded-2xl border border-brand-200 bg-white p-3 shadow-sm sm:p-5">
                 <div>
                   <h3 className="text-sm font-semibold text-brand-900">Pago y comprobantes</h3>
@@ -2548,12 +3038,12 @@ export function Sales() {
                     Comprobantes de {formSaleModality === 'FINANCIADA' ? 'inicial' : 'pago'}
                     {archivosVentaObligatorios ? ' *' : ' (opcional en efectivo)'}
                   </label>
-                  <input id="comprobantes-venta" type="file" multiple
+                  <input id="comprobantes-venta" type="file" multiple={formSaleModality!=='FINANCIADA'}
                     accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                     onChange={agregarComprobantesVenta}
                     className="block w-full min-w-0 text-xs text-brand-700 file:mr-3 file:rounded-md file:border file:border-brand-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-800 hover:file:bg-brand-50" />
                   <p className="text-[11px] text-brand-500">
-                    Hasta 8 archivos. PDF, JPG, PNG o WebP; 5 MB por archivo. Al confirmar se cargarán al almacenamiento privado.
+                    {formSaleModality==='FINANCIADA'?'Un comprobante por inicial.':'Hasta 8 archivos.'} PDF, JPG, PNG o WebP; 5 MB por archivo. Al confirmar se cargarán al almacenamiento privado.
                   </p>
                   {comprobantesVenta.length > 0 && (
                     <ul className="space-y-1.5">
@@ -2589,7 +3079,7 @@ export function Sales() {
                 onChange={(e) => setFormObservations(e.target.value)}
               />
             </div>
-          </form>
+          </fieldset></form>
         )}
       </Modal>
 
@@ -2599,6 +3089,9 @@ export function Sales() {
         idProspecto={datosVentaValidados?.datos.idProspecto ?? 0}
         lote={datosVentaValidados?.codigoLote ?? ''}
         proyecto={availableProjects.find((p) => p.idProyecto === Number(formProjectId))?.nombre ?? ''}
+        idProyectoVenta={Number(formProjectId)}
+        compradorExistente={(prospectsList.find(p => p.id_prospecto === selectedProspectId)
+          ?.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO'}
         modalidad={datosVentaValidados?.datos.modalidad ?? 'CONTADO'}
         puedeReasignar={puedeReasignarComprador}
         asesorNombre={prospectsList.find((p) => p.id_prospecto === selectedProspectId)?.asesor_nombre ?? ''}
@@ -2702,14 +3195,14 @@ export function Sales() {
               <div>
                 <dt className="text-brand-500">Precio de venta</dt>
                 <dd className="font-semibold text-brand-900">
-                  {currency(confirmacionVenta.datos.montoTotal)}
+                  {formatSoles(confirmacionVenta.datos.montoTotal)}
                 </dd>
               </div>
               {confirmacionVenta.resumen.abonoReserva > 0 && (
                 <div>
                   <dt className="text-emerald-700">Pago de reserva acreditado</dt>
                   <dd className="font-semibold text-emerald-800">
-                    − {currency(confirmacionVenta.resumen.abonoReserva)}
+                    − {formatSoles(confirmacionVenta.resumen.abonoReserva)}
                   </dd>
                 </div>
               )}
@@ -2717,7 +3210,7 @@ export function Sales() {
                 <div>
                   <dt className="text-brand-500">Saldo al contado</dt>
                   <dd className="font-semibold text-brand-900">
-                    {currency(confirmacionVenta.resumen.saldoContado)}
+                    {formatSoles(confirmacionVenta.resumen.saldoContado)}
                   </dd>
                 </div>
               )}
@@ -2727,7 +3220,7 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Inicial total pactada</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.datos.montoInicial ?? 0)}
+                      {formatSoles(confirmacionVenta.datos.montoInicial ?? 0)}
                     </dd>
                   </div>
 
@@ -2746,25 +3239,25 @@ export function Sales() {
                   <div>
                     <dt className="text-brand-500">Capital financiado</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.capitalFinanciado)}
+                      {formatSoles(confirmacionVenta.resumen.capitalFinanciado)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Cuota mensual fija (sistema francés)</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.cuotaMensual)}
+                      {formatSoles(confirmacionVenta.resumen.cuotaMensual)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Intereses totales</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.interesTotal)}
+                      {formatSoles(confirmacionVenta.resumen.interesTotal)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-brand-500">Total incluyendo intereses</dt>
                     <dd className="font-semibold text-brand-900">
-                      {currency(confirmacionVenta.resumen.totalOperacionConIntereses)}
+                      {formatSoles(confirmacionVenta.resumen.totalOperacionConIntereses)}
                     </dd>
                   </div>
                 </>

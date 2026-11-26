@@ -3,7 +3,7 @@ import type { PlanoSvgDocumento, SvgFigura } from '../../../types/projectSvg';
 import type { LoteResponse } from '../../../types/core';
 
 const numero=(figura: SvgFigura,campo: string) => Number(figura.atributos[campo] ?? 0);
-function propsSvg(figura: SvgFigura): SVGProps<SVGElement> {
+function propsSvg(figura: SvgFigura): Pick<SVGProps<SVGElement>, 'fill' | 'stroke' | 'strokeWidth' | 'fillOpacity' | 'strokeOpacity' | 'opacity' | 'transform' | 'strokeLinecap' | 'strokeLinejoin'> {
   const a=figura.atributos;
   return {
     fill:a.fill ?? 'none', stroke:a.stroke ?? '#64748b',

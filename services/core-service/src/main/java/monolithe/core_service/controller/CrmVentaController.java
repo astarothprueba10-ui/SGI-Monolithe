@@ -18,6 +18,15 @@ import monolithe.core_service.dto.PrepararCargaVoucherInicialRequest;
 import monolithe.core_service.dto.RegistrarVoucherCuotaPendienteRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherCuotaResponse;
 import monolithe.core_service.dto.RevisarVoucherSeparacionRequest;
+import monolithe.core_service.dto.RevisarComprobanteVentaRequest;
+import monolithe.core_service.dto.ConciliarCobroVentaRequest;
+import monolithe.core_service.dto.CrearCuentaReceptoraRequest;
+import monolithe.core_service.dto.CrearOperacionAgrupadaRequest;
+import monolithe.core_service.dto.ConfigurarDesgloseVentaRequest;
+import monolithe.core_service.dto.ConciliarDesgloseVentaRequest;
+import monolithe.core_service.dto.ReiniciarDesgloseVentaRequest;
+import monolithe.core_service.dto.PrepararSubsanacionVentaRequest;
+import monolithe.core_service.dto.ConfirmarSubsanacionVentaRequest;
 import monolithe.core_service.dto.EnlaceCargaVoucherResponse;
 import monolithe.core_service.dto.EnlaceLecturaVoucherResponse;
 import monolithe.core_service.service.CrmSeparacionStorageService;
@@ -45,6 +54,33 @@ public class CrmVentaController {
         private final CrmContratoStorageService storageService;
         private final CrmSeparacionStorageService separacionStorageService;
         private final CrmAnulacionStorageService anulacionStorageService;
+
+        public record CambiarInteresOperacionRequest(Long idProyectoAnterior, String motivo) {}
+
+        @PostMapping("/prospectos/{idProspecto}/intereses/cambio/{idProyecto}")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view') and hasAuthority('crm.edit')")
+        public JsonNode cambiarInteresOperacion(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idProspecto, @PathVariable Long idProyecto,
+                @RequestBody CambiarInteresOperacionRequest request) {
+            return service.cambiarInteresOperacion(obtenerActor(jwt), idProspecto,
+                request.idProyectoAnterior(), idProyecto, request.motivo());
+        }
+
+        @PostMapping("/prospectos/{idProspecto}/intereses/recompra/{idProyecto}")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('crm.view')")
+        public JsonNode registrarInteresRecompra(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idProspecto, @PathVariable Long idProyecto) {
+            return service.registrarInteresRecompra(obtenerActor(jwt), idProspecto, idProyecto);
+        }
+
+        @GetMapping("/ventas/etapas-comerciales")
+        @PreAuthorize("hasAuthority('sales.create') and hasAuthority('lots.view')")
+        public ResponseEntity<JsonNode> etapasComercialesOperacion(@AuthenticationPrincipal Jwt jwt,
+                @RequestParam Long idProspecto, @RequestParam Long idProyecto,
+                @RequestParam(defaultValue="false") boolean incluirReservas) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.etapasComercialesOperacion(obtenerActor(jwt), idProspecto, idProyecto, incluirReservas));
+        }
 
         @PostMapping("/ventas/validar")
         @PreAuthorize("hasAuthority('sales.create')")
@@ -103,6 +139,43 @@ public class CrmVentaController {
                                 idProspecto);
         }
 
+        @PostMapping("/ventas/operaciones-agrupadas")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> crearOperacionAgrupada(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody CrearOperacionAgrupadaRequest request) {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(service.crearOperacionAgrupada(obtenerActor(jwt),request));
+        }
+
+        @GetMapping("/ventas/operaciones-agrupadas")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> listarOperacionesAgrupadas(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(defaultValue="1") Integer pagina,
+                @RequestParam(defaultValue="20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarOperacionesAgrupadas(obtenerActor(jwt),pagina,tamano));
+        }
+
+        @PostMapping("/ventas/operaciones-agrupadas/{idOperacion}/vinculos/{idVenta}")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> vincularVentaAgrupada(
+                @AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idOperacion,@PathVariable Long idVenta) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.vincularVentaAgrupada(obtenerActor(jwt),idOperacion,idVenta));
+        }
+
+        @PostMapping("/ventas/pendientes/multiple")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarVentasMultiples(@AuthenticationPrincipal Jwt jwt,
+                @RequestBody JsonNode request) {
+            return service.registrarVentasMultiples(obtenerActor(jwt),request==null?null:request.get("ventas"));
+        }
+
         @PostMapping("/ventas/pendientes")
         @ResponseStatus(HttpStatus.CREATED)
         @PreAuthorize("hasAuthority('sales.create')")
@@ -132,6 +205,37 @@ public class CrmVentaController {
                 return separacionStorageService.prepararCarga(
                                 obtenerActor(jwt),
                                 request);
+        }
+
+        public record LoteInteresRequest(Long idProyecto, Long idLote, Long idLoteAnterior, String motivo) {}
+        @PostMapping("/prospectos/{idProspecto}/intereses/lote")
+        @PreAuthorize("hasAuthority('crm.view') and hasAuthority('crm.edit')")
+        public JsonNode cambiarLoteInteres(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idProspecto,
+                @RequestBody LoteInteresRequest req) {
+            return service.cambiarLoteInteres(obtenerActor(jwt),idProspecto,req.idProyecto(),req.idLote(),req.idLoteAnterior(),req.motivo());
+        }
+
+        public record SeparacionesMultiplesRequest(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Size(min=2,max=20)
+            java.util.List<@jakarta.validation.constraints.NotNull @Valid RegistrarSeparacionCrmRequest> lotes) {}
+        @PostMapping("/separaciones/acumulada")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarSeparacionAcumulada(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+            Long actor=obtenerActor(jwt);
+            JsonNode previo=service.buscarSeparacionAcumulada(actor,req);
+            if(previo.path("encontrado").asBoolean(false)) return previo.path("resultado");
+            separacionStorageService.verificarComprobantesAcumulados(actor,req);
+            return service.registrarSeparacionAcumulada(actor,req);
+        }
+
+        @PostMapping("/separaciones/multiples")
+        @ResponseStatus(HttpStatus.CREATED)
+        @PreAuthorize("hasAuthority('sales.create')")
+        public JsonNode registrarSeparacionesMultiples(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody SeparacionesMultiplesRequest req) {
+            return service.registrarSeparacionesMultiples(obtenerActor(jwt),req.lotes());
         }
 
         @PostMapping("/separaciones")
@@ -366,6 +470,36 @@ public class CrmVentaController {
                                 tamano);
         }
 
+        public record PrepararSubsanacionSeparacionRequest(@jakarta.validation.constraints.NotBlank String tipoMime) {}
+
+        @PostMapping("/separaciones/{idReserva}/comprobantes/{idVoucher}/preparar-subsanacion")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.create')")
+        public EnlaceCargaVoucherResponse prepararSubsanacionSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva,
+                @PathVariable Long idVoucher,@Valid @RequestBody PrepararSubsanacionSeparacionRequest req) {
+            return separacionStorageService.prepararSubsanacionSeparacion(obtenerActor(jwt),idReserva,idVoucher,req.tipoMime());
+        }
+        @PostMapping("/separaciones/{idReserva}/comprobantes/{idVoucher}/subsanar")
+        @PreAuthorize("hasAuthority('sales.view') and hasAuthority('sales.create')")
+        public JsonNode subsanarAbonoSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva,
+                @PathVariable Long idVoucher,@Valid @RequestBody monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+            Long actor=obtenerActor(jwt);
+            separacionStorageService.verificarSubsanacionSeparacion(actor,idReserva,idVoucher,req);
+            return service.subsanarAbonoSeparacion(actor,idReserva,idVoucher,req);
+        }
+
+        @GetMapping("/separaciones/{idReserva}/comprobantes")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> listarComprobantesSeparacion(@AuthenticationPrincipal Jwt jwt,@PathVariable Long idReserva) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.listarComprobantesSeparacion(obtenerActor(jwt),idReserva));
+        }
+
+        @GetMapping("/separaciones/{idReserva}/comprobantes/{idVoucher}/url-firmada")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteSeparacionEspecifico(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idReserva,@PathVariable Long idVoucher) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(separacionStorageService.prepararLecturaPorReserva(obtenerActor(jwt),idReserva,idVoucher));
+        }
+
         /** URL de solo lectura y corta duracion para el comprobante de una separacion. */
         @GetMapping("/separaciones/{idReserva}/comprobante/url-firmada")
         @PreAuthorize("hasAuthority('sales.view')")
@@ -521,6 +655,162 @@ public class CrmVentaController {
         }
 
         /** Pagos reales registrados, CONFIRMADOS o pendientes de revisión. */
+        /** Evidencia de venta firmada por Storage, solo para Finanzas. */
+        @PostMapping("/finanzas/ventas/{idVenta}/desglose/reiniciar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> reiniciarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ReiniciarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.reiniciarDesgloseVenta(
+                            obtenerActor(jwt),idVenta,request.motivo()));
+        }
+
+        @PostMapping("/finanzas/ventas/{idVenta}/desglose")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> configurarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ConfigurarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.configurarDesgloseVenta(obtenerActor(jwt),idVenta,request));
+        }
+
+        @PutMapping("/finanzas/ventas/desgloses/{idDesglose}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idDesglose,
+                @Valid @RequestBody RevisarComprobanteVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.revisarDesgloseVenta(obtenerActor(jwt),idDesglose,request));
+        }
+
+        @PostMapping("/finanzas/ventas/desgloses/{idDesglose}/conciliar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> conciliarDesgloseVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idDesglose,
+                @Valid @RequestBody ConciliarDesgloseVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.conciliarDesgloseVenta(obtenerActor(jwt),idDesglose,request));
+        }
+
+        @GetMapping("/finanzas/ventas/{idVenta}/comprobantes/{idComprobante}/url-firmada")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<EnlaceLecturaVoucherResponse> leerComprobanteVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @PathVariable Long idComprobante) {
+            var enlace=separacionStorageService.prepararLecturaComprobanteVentaFinanzas(
+                    obtenerActor(jwt),idVenta,idComprobante);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(enlace);
+        }
+
+        /** Aprobar soporte documental jamás equivale a acreditar fondos. */
+        @PutMapping("/finanzas/ventas/{idVenta}/comprobantes/{idComprobante}/revision")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> revisarComprobanteVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @PathVariable Long idComprobante,
+                @Valid @RequestBody RevisarComprobanteVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.revisarComprobanteVenta(obtenerActor(jwt),idVenta,
+                            idComprobante,request.aprobar(),request.motivo()));
+        }
+
+        /** Contabilización atómica solo con cuenta real y referencia de banco. */
+        @PostMapping("/finanzas/ventas/{idVenta}/conciliar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> conciliarCobroVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody ConciliarCobroVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.conciliarCobroVenta(obtenerActor(jwt),idVenta,
+                            request.idCuentaFinanciera(),request.fechaOperacion(),
+                            request.numeroOperacion(),request.observaciones()));
+        }
+
+        @PostMapping("/finanzas/ventas/{idVenta}/subsanacion/preparar-carga")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<EnlaceCargaVoucherCuotaResponse> prepararSubsanacionVenta(
+                @AuthenticationPrincipal Jwt jwt,@PathVariable Long idVenta,
+                @Valid @RequestBody PrepararSubsanacionVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    separacionStorageService.prepararCargaSubsanacionVenta(
+                            obtenerActor(jwt),idVenta,request));
+        }
+
+        @PostMapping("/finanzas/ventas/subsanacion/confirmar")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> confirmarSubsanacionVenta(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody ConfirmarSubsanacionVentaRequest request) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                    service.confirmarSubsanacionVenta(obtenerActor(jwt),request.idCarga()));
+        }
+
+        @PostMapping("/finanzas/ventas/cuentas-receptoras")
+        @PreAuthorize("hasAuthority('finance.view') and hasAuthority('finance.edit')")
+        public ResponseEntity<JsonNode> crearCuentaReceptora(
+                @AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody CrearCuentaReceptoraRequest request) {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .cacheControl(CacheControl.noStore())
+                    .body(service.crearCuentaReceptora(obtenerActor(jwt),request));
+        }
+
+        @GetMapping("/finanzas/ventas/cuentas-receptoras")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> cuentasReceptorasVentaFinanzas(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.cuentasReceptorasVenta(obtenerActor(jwt)));
+        }
+
+        @GetMapping("/cambios-reserva")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> listarCambiosReserva(@AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required = false) Long idProspecto) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarCambiosReserva(obtenerActor(jwt),idProspecto));
+        }
+        @PostMapping("/cambios-reserva")
+        @PreAuthorize("hasAuthority('sales.create')")
+        public ResponseEntity<JsonNode> solicitarCambioReserva(@AuthenticationPrincipal Jwt jwt,
+                @Valid @RequestBody monolithe.core_service.dto.CambioReservaRequest req) {
+            return ResponseEntity.ok(service.solicitarCambioReserva(obtenerActor(jwt),req));
+        }
+        @PostMapping("/cambios-reserva/{idSolicitud}/decision")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> decidirCambioReserva(@AuthenticationPrincipal Jwt jwt,
+                @PathVariable Long idSolicitud,@Valid @RequestBody monolithe.core_service.dto.DecisionCambioReservaRequest req) {
+            return ResponseEntity.ok(service.decidirCambioReserva(obtenerActor(jwt),idSolicitud,req));
+        }
+        @GetMapping("/avisos-comerciales")
+        @PreAuthorize("hasAuthority('sales.view')")
+        public ResponseEntity<JsonNode> avisosComerciales(@AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.avisosComerciales(obtenerActor(jwt)));
+        }
+
+        @GetMapping("/finanzas/separaciones/vencidas-revision")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> reservasVencidasParaRevision(
+                @AuthenticationPrincipal Jwt jwt) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.reservasVencidasParaRevision(obtenerActor(jwt)));
+        }
+
+        /** Cobros de venta no verificados por Finanzas: consulta sin efectos contables. */
+        @GetMapping("/finanzas/ventas/cobros-pendientes")
+        @PreAuthorize("hasAuthority('finance.view')")
+        public ResponseEntity<JsonNode> listarCobrosVentaPendientes(
+                @AuthenticationPrincipal Jwt jwt,
+                @RequestParam(required = false) String busqueda,
+                @RequestParam(defaultValue = "1") Integer pagina,
+                @RequestParam(defaultValue = "20") Integer tamano) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(service.listarCobrosVentaPendientes(
+                            obtenerActor(jwt),busqueda,pagina,tamano));
+        }
+
         @GetMapping("/finanzas/movimientos")
         @PreAuthorize("hasAuthority('finance.view')")
         public ResponseEntity<JsonNode> movimientosFinanzas(

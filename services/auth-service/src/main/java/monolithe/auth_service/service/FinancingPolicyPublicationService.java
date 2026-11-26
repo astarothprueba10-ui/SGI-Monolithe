@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,7 +34,7 @@ public class FinancingPolicyPublicationService {
     }
 
     private static ResponseStatusException error(HttpStatus estado,String mensaje) {
-        return new ResponseStatusException(estado,mensaje);
+        return new MfaFlowException(estado,mensaje);
     }
 
     private long actor(Jwt jwt) {
@@ -52,7 +53,7 @@ public class FinancingPolicyPublicationService {
     }
 
     private String json(Map<String,Object> borrador) {
-        if (borrador==null || borrador.isEmpty() || borrador.size()>12)
+        if (borrador==null || borrador.isEmpty() || borrador.size()>16)
             throw error(HttpStatus.BAD_REQUEST,"La propuesta está incompleta.");
         try { return jsonMapper.writeValueAsString(borrador); }
         catch (JacksonException ex) { throw error(HttpStatus.BAD_REQUEST,"Propuesta con formato incorrecto."); }
@@ -75,6 +76,18 @@ public class FinancingPolicyPublicationService {
                 SELECT public.sp_fin_consultar_politicas_v1(CAST(? AS bigint))::text
                 """, String.class, id);
             return parsear(resultado);
+        } catch (DataAccessException ex) { throw traducir(ex); }
+    }
+
+    @Transactional(readOnly=true)
+    public JsonNode consultarProyecto(Jwt jwt,Long idProyecto) {
+        long id=actor(jwt);
+        versionSesion(jwt);
+        if(idProyecto==null || idProyecto<1) throw error(HttpStatus.BAD_REQUEST,"Proyecto inválido.");
+        try {
+            return parsear(db.queryForObject("""
+                SELECT public.sp_fin_consultar_politicas_proyecto_v2(CAST(? AS bigint),CAST(? AS bigint))::text
+                """,String.class,id,idProyecto));
         } catch (DataAccessException ex) { throw traducir(ex); }
     }
 

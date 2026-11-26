@@ -23,6 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class CrmVentaService {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CrmVentaService.class);
     private final JdbcTemplate jdbc;
     private final JsonMapper jsonMapper;
 
@@ -173,6 +174,18 @@ public class CrmVentaService {
     }
 
     @Transactional
+    public JsonNode registrarVentasMultiples(Long actor,JsonNode request) {
+        validarActor(actor);
+        if(request==null || !request.isArray() || request.size()<1 || request.size()>20
+            || request.toString().length()>400000)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise las condiciones de los lotes.");
+        return ejecutar("""
+            SELECT public.sp_crm_registrar_ventas_multiples_v1(
+              CAST(? AS bigint),CAST(? AS jsonb))::text
+            """,actor,request.toString());
+    }
+
+    @Transactional
     public JsonNode registrarVentaPendiente(
             Long actor,
             FormalizarVentaCrmRequest req) {
@@ -318,10 +331,75 @@ public class CrmVentaService {
                 request.hashSha256());
     }
 
+    @Transactional
+    public JsonNode cambiarLoteInteres(Long actor, Long prospecto, Long proyecto, Long lote, Long anterior, String motivo) {
+        validarActor(actor);
+        if (prospecto==null || proyecto==null || lote==null || motivo==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione el lote e indique el motivo.");
+        return ejecutar("""
+            SELECT public.sp_crm_cambiar_lote_interes_v1(CAST(? AS bigint),CAST(? AS bigint),
+                CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text))::text
+            """,actor,prospecto,proyecto,lote,anterior,motivo);
+    }
+
+    @Transactional(readOnly=true)
+    public JsonNode buscarSeparacionAcumulada(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("""
+                SELECT public.sp_crm_buscar_separacion_acumulada_v1(
+                    CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+                    CAST(? AS jsonb),CAST(? AS jsonb),CAST(? AS text))::text
+                """,actor,req.idSolicitud().toString(),req.idProspecto(),
+                jsonMapper.writeValueAsString(req.lotes()),jsonMapper.writeValueAsString(req.abonos()),req.observaciones());
+        } catch(JacksonException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se pudo interpretar la solicitud.");
+        }
+    }
+
+    @Transactional
+    public JsonNode registrarSeparacionAcumulada(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("""
+                SELECT public.sp_crm_registrar_separacion_acumulada_v1(
+                    CAST(? AS bigint),CAST(? AS uuid),CAST(? AS bigint),
+                    CAST(? AS jsonb),CAST(? AS jsonb),CAST(? AS text))::text
+                """,actor,req.idSolicitud().toString(),req.idProspecto(),
+                jsonMapper.writeValueAsString(req.lotes()),jsonMapper.writeValueAsString(req.abonos()),req.observaciones());
+        } catch(JacksonException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se pudieron interpretar los lotes o abonos.");
+        }
+    }
+
+    /** Una única transacción: si falla un lote, no queda ninguna reserva ni pago parcial. */
+    @Transactional
+    public JsonNode registrarSeparacionesMultiples(Long actor, java.util.List<RegistrarSeparacionCrmRequest> lotes) {
+        validarActor(actor);
+        if (lotes==null || lotes.size()<2 || lotes.size()>20)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione entre 2 y 20 lotes.");
+        var ids=new java.util.HashSet<Long>();
+        var archivos=new java.util.HashSet<String>();
+        var referencias=new java.util.HashSet<String>();
+        Long prospecto=lotes.get(0).idProspecto();
+        for (var req:lotes) {
+            validarDatosSeparacion(req);
+            if (!java.util.Objects.equals(prospecto,req.idProspecto()) || !ids.add(req.idLote()) || !archivos.add(req.claveArchivo()))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Cada lote debe ser único y pertenecer a la misma operación.");
+            if (req.numeroOperacion()!=null && !req.numeroOperacion().isBlank() &&
+                    !referencias.add(req.numeroOperacion().trim().toUpperCase(java.util.Locale.ROOT)))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Cada pago debe tener su propia referencia de operación.");
+        }
+        var resultados=jsonMapper.createArrayNode();
+        for (var req:lotes.stream().sorted(java.util.Comparator.comparing(RegistrarSeparacionCrmRequest::idLote)).toList())
+            resultados.add(registrarSeparacion(actor,req));
+        return resultados;
+    }
+
     private void validarDatosSeparacion(RegistrarSeparacionCrmRequest req) {
         if (req == null || req.idProspecto() == null || req.idProspecto() <= 0
                 || req.idLote() == null || req.idLote() <= 0
-                || req.monto() == null || req.monto().compareTo(new java.math.BigDecimal("500.00")) != 0
+                || req.monto() == null || req.monto().signum() <= 0 || req.monto().stripTrailingZeros().scale() > 2
                 || req.metodoPago() == null || req.metodoPago().isBlank()
                 || req.claveArchivo() == null || req.claveArchivo().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datos de separacion invalidos.");
@@ -686,6 +764,36 @@ public class CrmVentaService {
                 """, actor, idVoucher);
     }
 
+    @Transactional(readOnly=true)
+    public JsonNode contextoSubsanacionSeparacion(Long actor,Long reserva,Long voucher) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_contexto_subsanacion_sep_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text",actor,reserva,voucher);
+    }
+
+    @Transactional
+    public JsonNode subsanarAbonoSeparacion(Long actor,Long reserva,Long voucher,monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+        validarActor(actor);
+        try {
+            return ejecutar("SELECT public.sp_crm_subsanar_abono_sep_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS jsonb))::text",
+                actor,reserva,voucher,jsonMapper.writeValueAsString(req));
+        } catch(JacksonException ex) {throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante inválido.");}
+    }
+
+    @Transactional(readOnly=true)
+    public JsonNode listarComprobantesSeparacion(Long actor,Long idReserva) {
+        validarActor(actor);
+        if(idReserva==null||idReserva<=0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Identificador de separación inválido.");
+        return ejecutar("SELECT public.sp_crm_listar_comprobantes_separacion_v2(CAST(? AS bigint),CAST(? AS bigint))::text",actor,idReserva);
+    }
+
+    @Transactional(readOnly=true)
+    public JsonNode obtenerRutaComprobanteSeparacion(Long actor,Long idReserva,Long idVoucher) {
+        validarActor(actor);
+        if(idReserva==null||idReserva<=0||idVoucher==null||idVoucher<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Identificador de comprobante inválido.");
+        return ejecutar("SELECT public.sp_crm_obtener_comprobante_separacion_v2(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text",actor,idReserva,idVoucher);
+    }
+
     /** Ruta validada de un comprobante, segun el alcance comercial de la reserva. */
     @Transactional(readOnly = true)
     public JsonNode obtenerRutaComprobanteSeparacion(Long actor, Long idReserva) {
@@ -955,6 +1063,42 @@ public class CrmVentaService {
             """, actor);
     }
 
+    @Transactional
+    public JsonNode cambiarInteresOperacion(Long actor, Long prospecto, Long anterior, Long nuevo, String motivo) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || anterior == null || anterior <= 0
+                || nuevo == null || nuevo <= 0 || anterior.equals(nuevo)
+                || motivo == null || motivo.trim().length() < 5 || motivo.trim().length() > 500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione los proyectos e indique el motivo del cambio.");
+        return ejecutar("""
+            SELECT public.sp_crm_cambiar_interes_operacion_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint),
+                CAST(? AS bigint), CAST(? AS text))::text
+            """, actor, prospecto, anterior, nuevo, motivo.trim());
+    }
+
+    @Transactional
+    public JsonNode registrarInteresRecompra(Long actor, Long prospecto, Long proyecto) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || proyecto == null || proyecto <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione cliente y proyecto válidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_registrar_interes_recompra_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint))::text
+            """, actor, prospecto, proyecto);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode etapasComercialesOperacion(Long actor, Long prospecto, Long proyecto, boolean incluirReservas) {
+        validarActor(actor);
+        if (prospecto == null || prospecto <= 0 || proyecto == null || proyecto <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seleccione cliente y proyecto válidos.");
+        return ejecutar("""
+            SELECT public.sp_crm_etapas_operacion_v1(
+                CAST(? AS bigint), CAST(? AS bigint), CAST(? AS bigint), CAST(? AS boolean))::text
+            """, actor, prospecto, proyecto, incluirReservas);
+    }
+
     /** Condiciones contractuales vigentes o congeladas por reserva del comprador. */
     @Transactional(readOnly = true)
     public JsonNode condicionesVentaFinanciada(Long actor,Long idProspecto,Long idLote) {
@@ -1035,6 +1179,269 @@ public class CrmVentaService {
     }
 
     /** Pagos y comprobantes efectivamente registrados; nunca datos de demostración. */
+    /** Revisión de soporte sin confirmar ningún pago. */
+    @Transactional
+    public JsonNode revisarComprobanteVenta(
+            Long actor,Long venta,Long comprobante,Boolean aprobar,String motivo) {
+        validarActor(actor);
+        if (venta==null||venta<=0||comprobante==null||comprobante<=0||aprobar==null
+                || (motivo!=null&&motivo.length()>500)
+                || (aprobar && motivo!=null && !motivo.isBlank())
+                || (!aprobar && (motivo==null || motivo.trim().length()<10))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Decisión o motivo de comprobante inválido.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_revisar_comprobante_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS boolean),CAST(? AS varchar))::text
+                """,actor,venta,comprobante,aprobar,motivo);
+    }
+
+    /** Comprobantes de venta, exclusivamente al área financiera. */
+    @Transactional(readOnly = true)
+    public JsonNode rutaComprobanteVentaFinanzas(
+            Long actor,Long venta,Long comprobante) {
+        validarActor(actor);
+        if(venta==null||venta<=0||comprobante==null||comprobante<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Referencia de comprobante inválida.");
+        return ejecutar("""
+                SELECT public.sp_fin_venta_autorizar_lectura_comprobante_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text
+                """,actor,venta,comprobante);
+    }
+
+    /** Solo permite confirmar dinero sobre evidencia documental ya aprobada. */
+    @Transactional
+    public JsonNode conciliarCobroVenta(
+            Long actor,Long venta,Long cuenta,java.time.LocalDate fecha,
+            String referencia,String observaciones) {
+        validarActor(actor);
+        if(venta==null||venta<=0||cuenta==null||cuenta<=0||fecha==null
+          || (referencia!=null&&referencia.length()>100)
+          || (observaciones!=null&&observaciones.length()>300)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cuenta, fecha o referencia de conciliación inválida.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_conciliar_cobro_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS date),CAST(? AS varchar),CAST(? AS varchar))::text
+                """,actor,venta,cuenta,fecha,referencia,observaciones);
+    }
+
+    /** Solo Gerencia con finance.edit puede crear una cuenta bancaria receptora. */
+    @Transactional
+    public JsonNode crearCuentaReceptora(
+            Long actor,monolithe.core_service.dto.CrearCuentaReceptoraRequest req) {
+        validarActor(actor);
+        if(req==null) throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,"Indique los datos bancarios verificados.");
+        return ejecutar("""
+                SELECT public.sp_fin_crear_cuenta_receptora_v1(
+                  CAST(? AS bigint),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS varchar),CAST(? AS varchar),
+                  CAST(? AS varchar))::text
+                """,actor,req.nombre(),req.banco(),req.titular(),
+                req.numeroCuenta(),req.cci(),req.moneda());
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode cuentasReceptorasVenta(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+                SELECT public.sp_fin_cuentas_venta_receptoras_v1(CAST(? AS bigint))::text
+                """,actor);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarCambiosReserva(Long actor,Long prospecto) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_listar_cambios_reserva_v1(CAST(? AS bigint),CAST(? AS bigint))::text",actor,prospecto);
+    }
+    @Transactional
+    public JsonNode solicitarCambioReserva(Long actor,monolithe.core_service.dto.CambioReservaRequest req) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_solicitar_cambio_reserva_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text))::text",actor,req.idProspecto(),req.idReserva(),req.idLote(),req.motivo());
+    }
+    @Transactional
+    public JsonNode decidirCambioReserva(Long actor,Long solicitud,monolithe.core_service.dto.DecisionCambioReservaRequest req) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_decidir_cambio_reserva_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS boolean),CAST(? AS text))::text",actor,solicitud,req.aprobar(),req.motivo());
+    }
+    @Transactional(readOnly = true)
+    public JsonNode avisosComerciales(Long actor) {
+        validarActor(actor);
+        return ejecutar("SELECT public.sp_crm_avisos_comerciales_v1(CAST(? AS bigint))::text",actor);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode reservasVencidasParaRevision(Long actor) {
+        validarActor(actor);
+        return ejecutar("""
+                SELECT public.sp_fin_reservas_vencidas_revision_v1(CAST(? AS bigint))::text
+                """,actor);
+    }
+
+    /** Solicitud de carga asociada a una venta formalizada sin comprobante. */
+    @Transactional
+    public JsonNode prepararSubsanacionVenta(Long actor,Long venta,
+            monolithe.core_service.dto.PrepararSubsanacionVentaRequest req) {
+        validarActor(actor);
+        if(venta==null||venta<=0||req==null||req.tamanioBytes()==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos de subsanación incompletos.");
+        return ejecutar("""
+                SELECT public.sp_fin_preparar_subsanacion_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar),
+                  CAST(? AS varchar),CAST(? AS bigint))::text
+                """,actor,venta,req.nombreArchivo(),req.tipoMime(),req.tamanioBytes());
+    }
+
+    /** Confirma el registro únicamente si Storage contiene el objeto autorizado. */
+    @Transactional
+    public JsonNode confirmarSubsanacionVenta(Long actor,java.util.UUID idCarga) {
+        validarActor(actor);
+        if(idCarga==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Carga inválida.");
+        return ejecutar("""
+                SELECT public.sp_fin_confirmar_subsanacion_venta_v1(
+                  CAST(? AS bigint),CAST(? AS uuid))::text
+                """,actor,idCarga);
+    }
+
+    /** No acredita dinero ni altera la contabilidad; acceso restringido. */
+    /** Gerencia puede reiniciar revisiones no conciliadas conservando auditoría. */
+    @Transactional
+    public JsonNode reiniciarDesgloseVenta(Long actor,Long venta,String motivo) {
+        validarActor(actor);
+        if(venta==null||venta<=0||motivo==null||motivo.trim().length()<10
+            ||motivo.length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indique venta y motivo verificable de 10 a 500 caracteres.");
+        return ejecutar("""
+                SELECT public.sp_fin_reiniciar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS varchar))::text
+                """,actor,venta,motivo.trim());
+    }
+
+    /** Distribuye el importe pendiente entre todos los comprobantes de una venta. */
+    @Transactional
+    public JsonNode configurarDesgloseVenta(Long actor,Long idVenta,
+            monolithe.core_service.dto.ConfigurarDesgloseVentaRequest req) {
+        validarActor(actor);
+        if(idVenta==null||idVenta<=0||req==null||req.items()==null
+                ||!req.items().isArray()||req.items().size()<2||req.items().size()>8)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El desglose debe incluir de 2 a 8 comprobantes.");
+        return ejecutar("""
+                SELECT public.sp_fin_configurar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS jsonb))::text
+                """,actor,idVenta,req.items().toString());
+    }
+
+    /** La evidencia revisada aún no constituye un abono confirmado. */
+    @Transactional
+    public JsonNode revisarDesgloseVenta(Long actor,Long idDesglose,
+            monolithe.core_service.dto.RevisarComprobanteVentaRequest req) {
+        validarActor(actor);
+        if(idDesglose==null||idDesglose<=0||req==null||req.aprobar()==null
+          ||(req.motivo()!=null&&req.motivo().length()>500)
+          ||(req.aprobar()&&req.motivo()!=null&&!req.motivo().isBlank())
+          ||(!req.aprobar()&&(req.motivo()==null||req.motivo().trim().length()<10)))
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                  "Decisión o motivo del soporte inválidos.");
+        return ejecutar("""
+                SELECT public.sp_fin_revisar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS boolean),
+                  CAST(? AS varchar))::text
+                """,actor,idDesglose,req.aprobar(),req.motivo());
+    }
+
+    /** Un pago físico, voucher y movimiento por cada documento validado. */
+    @Transactional
+    public JsonNode conciliarDesgloseVenta(Long actor,Long idDesglose,
+            monolithe.core_service.dto.ConciliarDesgloseVentaRequest req) {
+        validarActor(actor);
+        if(idDesglose==null||idDesglose<=0||req==null||req.idCuentaFinanciera()==null
+          ||req.idCuentaFinanciera()<=0||req.fechaOperacion()==null
+          ||(req.observaciones()!=null&&req.observaciones().length()>300))
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                  "Cuenta y fecha de conciliación inválidas.");
+        return ejecutar("""
+                SELECT public.sp_fin_conciliar_desglose_venta_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS date),CAST(? AS varchar))::text
+                """,actor,idDesglose,req.idCuentaFinanciera(),req.fechaOperacion(),
+                   req.observaciones());
+    }
+
+    /** Planificación multílote: valida comprador, lote y modalidad, pero no crea contratos. */
+    @Transactional
+    public JsonNode crearOperacionAgrupada(
+            Long actor,monolithe.core_service.dto.CrearOperacionAgrupadaRequest req) {
+        validarActor(actor);
+        if(req==null||req.idProspecto()==null||req.idProspecto()<=0
+          ||req.lotes()==null||!req.lotes().isArray()
+          ||req.lotes().size()<2||req.lotes().size()>20
+          ||(req.observaciones()!=null&&req.observaciones().length()>500))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La negociación debe contener entre 2 y 20 lotes con sus modalidades.");
+        return ejecutar("""
+                SELECT public.sp_crm_crear_operacion_agrupada_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),
+                  CAST(? AS jsonb),CAST(? AS varchar))::text
+                """,actor,req.idProspecto(),req.lotes().toString(),req.observaciones());
+    }
+
+    /** Vista resumida y paginada con comprador único y contratos por cada lote. */
+    @Transactional(readOnly = true)
+    public JsonNode listarOperacionesAgrupadas(Long actor,Integer pagina,Integer tamano) {
+        validarActor(actor);
+        final int p=pagina==null?1:pagina;
+        final int t=tamano==null?20:tamano;
+        if(p<1||p>10000||t<1||t>50)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paginación de adquisiciones agrupadas inválida.");
+        return ejecutar("""
+                SELECT public.sp_crm_listar_operaciones_agrupadas_v1(
+                  CAST(? AS bigint),CAST(? AS integer),CAST(? AS integer))::text
+                """,actor,p,t);
+    }
+
+    /** Vincula solamente ventas del mismo cliente, lote y modalidad. */
+    @Transactional
+    public JsonNode vincularVentaAgrupada(Long actor,Long idOperacion,Long idVenta) {
+        validarActor(actor);
+        if(idOperacion==null||idOperacion<=0||idVenta==null||idVenta<=0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Operación agrupada o venta inválida.");
+        return ejecutar("""
+                SELECT public.sp_crm_vincular_venta_operacion_agrupada_v1(
+                  CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint))::text
+                """,actor,idOperacion,idVenta);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listarCobrosVentaPendientes(
+            Long actor,String busqueda,Integer pagina,Integer tamano) {
+        validarActor(actor);
+        final int p = pagina == null ? 1 : pagina;
+        final int t = tamano == null ? 20 : tamano;
+        if (p < 1 || p > 10000 || t < 1 || t > 100
+                || (busqueda != null && busqueda.length() > 120)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Filtros de cobros de ventas inválidos.");
+        }
+        return ejecutar("""
+                SELECT public.sp_fin_ventas_cobros_pendientes_v1(
+                    CAST(? AS bigint),CAST(? AS varchar),
+                    CAST(? AS integer),CAST(? AS integer)
+                )::text
+                """,actor,busqueda,p,t);
+    }
+
     @Transactional(readOnly = true)
     public JsonNode movimientosFinancierosReales(Long actor, String busqueda,
             Integer pagina, Integer tamano) {
@@ -1816,7 +2223,25 @@ public class CrmVentaService {
                     parametros);
 
         } catch (DataAccessException ex) {
-            throw traducirError(ex);
+            ResponseStatusException traducido = traducirError(ex);
+            if (traducido.getStatusCode().value() >= 500) {
+                // No registrar parámetros JDBC: incluyen identidad, ficha y referencias privadas.
+                String estado = "desconocido";
+                String regla = "no-identificada";
+                for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
+                    if (causa instanceof java.sql.SQLException sqlError && sqlError.getSQLState() != null) {
+                        estado = sqlError.getSQLState();
+                    }
+                    if (causa.getMessage() != null) {
+                        var codigo = java.util.regex.Pattern.compile("(?<![A-Z_])[A-Z][A-Z0-9_]{2,60}\\|").matcher(causa.getMessage());
+                        if (codigo.find()) regla = codigo.group().replace("|","");
+                    }
+                }
+                var nombre = java.util.regex.Pattern.compile("public\\.([a-z0-9_]+)\\s*\\(").matcher(sql);
+                LOG.error("Fallo de operación CRM: procedimiento={}, SQLSTATE={}, regla={}",
+                    nombre.find() ? nombre.group(1) : "desconocido", estado, regla);
+            }
+            throw traducido;
         }
 
         if (respuesta == null) {
@@ -1916,6 +2341,23 @@ public class CrmVentaService {
         }
 
         String mensaje = errores.toString();
+
+        // Rechazos explícitos de la formalización: nunca reportarlos como caída del servicio.
+        if (mensaje.contains("UBICACION_INVALIDA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione país, departamento, provincia y distrito válidos en la ficha contractual.",ex);
+        if (mensaje.contains("ESTADO_CIVIL_INVALIDO|") || mensaje.contains("CONYUGE_REQUERIDO|") || mensaje.contains("CONYUGE_INVALIDO|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise el estado civil y los datos del cónyuge en la ficha contractual.",ex);
+        if (mensaje.contains("DATOS_COMPRADOR_INVALIDOS|") || mensaje.contains("DATOS_COMPRADOR_REQUERIDOS|") || mensaje.contains("IDENTIDAD_NO_VERIFICADA|") || mensaje.contains("IDENTIDAD_NO_APTA|") || mensaje.contains("DOCUMENTO_INVALIDO|") || mensaje.contains("CATALOGO_INVALIDO|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise los datos personales, documento, contacto y cotejo de identidad del comprador.",ex);
+        if (mensaje.contains("DOCUMENTO_VERIFICADO|") || mensaje.contains("CORREO_VERIFICADO|") || mensaje.contains("TELEFONO_VERIFICADO|"))
+            return new ResponseStatusException(HttpStatus.CONFLICT,"Los datos verificados no pueden modificarse sin su procedimiento de verificación.",ex);
+        if (mensaje.contains("CONDICIONES_CAMBIO|") || mensaje.contains("RESERVA_PENDIENTE|") || mensaje.contains("RESERVA_CAMBIO|") || mensaje.contains("VENTA_NO_APTA|"))
+            return new ResponseStatusException(HttpStatus.CONFLICT,"La reserva o las condiciones de venta cambiaron. Actualice las reservas y vuelva a validar.",ex);
+        if (mensaje.contains("VOUCHER_REQUERIDO|") || mensaje.contains("VOUCHER_NO_CARGADO|") || mensaje.contains("ARCHIVOS_INVALIDOS|") || mensaje.contains("PAGO_INVALIDO|") || mensaje.contains("METODO_PAGO_INVALIDO|") || mensaje.contains("OPERACION_REQUERIDA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise el método de pago, número de operación y comprobante individual de cada lote.",ex);
+        if (mensaje.contains("LOTE_DUPLICADO|") || mensaje.contains("INICIAL_INVALIDA|") || mensaje.contains("TASA_FIJA|"))
+            return new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise los lotes y las condiciones de financiamiento.",ex);
+
 
         if (mensaje.contains("COMERCIAL_NO_DISPONIBLE|")) {
             return new ResponseStatusException(HttpStatus.CONFLICT,
@@ -2042,6 +2484,14 @@ public class CrmVentaService {
                     ex);
         }
 
+        if (mensaje.contains("INTERES_CAMBIO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El interés anterior ya cambió o el nuevo ya está activo. Vuelva a seleccionar el cliente.", ex);
+        }
+        if (mensaje.contains("INTERES_COMPROMETIDO|")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El proyecto anterior tiene una separación o venta sin cerrar. Gestione esa operación antes de cambiar el interés.", ex);
+        }
         if (mensaje.contains("PROSPECTO_NO_ELEGIBLE|")
                 || mensaje.contains("YA_COMPRADOR|")
                 || mensaje.contains("ASESOR_INVALIDO|")

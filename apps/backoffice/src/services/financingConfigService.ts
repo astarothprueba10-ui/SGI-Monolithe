@@ -8,10 +8,16 @@ export interface PoliticaFinanciamientoVersion {
   publicadoEn: string;
   motivo: string;
   idPublicador: number | null;
+  nombrePublicador?: string | null;
 }
 
 export interface PoliticaFinanciamientoActual {
-  codigo: 'GENERAL';
+  codigo: string;
+  idProyecto?: number;
+  modoAplicacion?: 'GENERAL' | 'PROPIA';
+  idPoliticaProyecto?: number | null;
+  versionSiguiente?: number;
+  politicaGeneral?: PoliticaFinanciamientoActual;
   version: number;
   idPolitica: number;
   vigenteDesde: string;
@@ -33,8 +39,9 @@ export interface PoliticaFinanciamientoActual {
 
 export const financingConfigService = {
   /** Actor y permisos se extraen del JWT de Core; SQL valida rol GERENCIA activo. */
-  obtenerPoliticaActual: () =>
-    import.meta.env.VITE_FINANCING_STAGING_AUTH_CURRENT === 'true'
+  obtenerPoliticaActual: (idProyecto?: number) =>
+    idProyecto ? authSecuredApi.get<PoliticaFinanciamientoActual>(`/financing-policies/projects/${idProyecto}`, { cache: 'no-store' })
+      : import.meta.env.VITE_FINANCING_STAGING_AUTH_CURRENT === 'true'
       ? authSecuredApi.get<PoliticaFinanciamientoActual>('/financing-policies/current', { cache: 'no-store' })
       : coreApi.get<PoliticaFinanciamientoActual>('/crm/financiamiento/configuracion/actual')
 };

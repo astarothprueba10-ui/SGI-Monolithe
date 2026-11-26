@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase';
 
 export type CrmCategory = 'TODOS' | 'LEAD' | 'POTENCIAL' | 'COMPRADOR' | 'CERRADO';
 
+export interface CrmEtapaOperacion {
+  codigo: string;
+  nombre: string;
+  idLotes: number[];
+}
+
 export interface CrmProspect {
   id_prospecto: number;
   id_persona: number;
@@ -151,7 +157,8 @@ export interface CrmDetail {
   prospecto: CrmProspect;
   documentoPrincipal: { tipoCodigo: string; numero: string; verificado: boolean } | null;
   contactos: { tipoCodigo: string; valor: string; principal: boolean; verificado: boolean }[];
-  intereses: { idInteres: number; idProyecto: number; proyecto: string }[];
+  intereses: { idInteres: number; idProyecto: number; proyecto: string; comentario?: string | null; idLoteInteres?: number | null; codigoLoteInteres?: string | null }[];
+  reservasActivas?: {idReserva:number;codigo:string;idProyecto:number;proyecto:string;idLote:number;lote:string;estado:string;monto:number;fechaVencimiento:string}[];
   totalSeguimientos: number;
   totalVisitas: number;
   esComprador: boolean;
@@ -301,6 +308,18 @@ export interface CrmSeparacionInput {
   hashSha256?: string | null;
 }
 
+export interface CrmSeparacionAcumuladaInput {
+  idSolicitud:string;
+  idProspecto:number;
+  lotes:{idLote:number;monto:number;precio:number;idPolitica:number}[];
+  abonos:Omit<CrmSeparacionInput,'idProspecto'|'idLote'|'observaciones'>[];
+  observaciones:string|null;
+}
+export interface CrmSeparacionAcumuladaResult {
+  success:boolean;idGrupo:string;total:number;
+  reservas:{idReserva:number;idLote:number;monto:number}[];
+  abonos:{idPago:number;idVoucher:number;monto:number}[];
+}
 export interface CrmSeparacionResult {
   success: boolean;
   id_reserva: number;
@@ -329,6 +348,8 @@ export interface CrmSeparacionUpload {
 }
 
 export interface CrmSeparacionVoucherItem {
+  id_grupo?:string|null;
+  lotes_grupo?:string|null;
   id_voucher: number;
   codigo_voucher: string;
   estado_voucher: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
@@ -506,6 +527,177 @@ export interface CrmCarteraReal {
   resumen:{planes:number;cuotasExigibles:number;capitalFinanciadoActivo:number;
     saldoCuotas:number;inicialPorConciliar:number;montoVencido:number;montoProximo:number};
 }
+export interface CrmOperacionAgrupadaLote {
+  idItem:number;
+  idLote:number;
+  codigoLote:string;
+  idProyecto:number;
+  idEtapa:number;
+  proyecto:string;
+  modalidad:'CONTADO'|'FINANCIADA';
+  idVenta:number|null;
+  codigoVenta:string|null;
+  estadoVenta:string|null;
+  precioVenta:number|null;
+  monedaVenta:string|null;
+  codigoContrato:string|null;
+  estadoContrato:string|null;
+  codigoPlan:string|null;
+}
+export interface CrmOperacionAgrupada {
+  idOperacion:number;
+  codigo:string;
+  idProspecto:number;
+  idPersona:number;
+  codigoCliente:string|null;
+  comprador:string;
+  fechaCreacion:string;
+  observaciones:string|null;
+  cantidadLotes:number;
+  cantidadVentas:number;
+  lotes:CrmOperacionAgrupadaLote[];
+}
+export interface CrmOperacionesAgrupadasPage {
+  total:number;pagina:number;tamano:number;paginas:number;
+  items:CrmOperacionAgrupada[];
+}
+export interface CrmOperacionAgrupadaCreada {
+  idOperacion:number;
+  codigo:string;
+  idProspecto:number;
+  cantidadLotes:number;
+  estado:'PLANIFICADA';
+  ventasCreadas:0;
+  dineroConfirmado:false;
+  advertencia:string;
+}
+export interface CrmOperacionAgrupadaVinculada {
+  idOperacion:number;
+  idVenta:number;
+  idLote?:number;
+  reutilizado:boolean;
+}
+export interface CrmCobroVentaPendiente {
+  idVenta:number;
+  codigoVenta:string;
+  fechaVenta:string;
+  codigoLote:string;
+  proyecto:string;
+  comprador:string|null;
+  tipoAbono:'CONTADO'|'INICIAL';
+  metodoPago:string;
+  numeroOperacion:string|null;
+  montoPendiente:number;
+  estadoRevision:'PENDIENTE'|'APROBADO';
+  idComprobante:number|null;
+  ultimaDecision:'APROBADO'|'OBSERVADO'|null;
+  observacion:string|null;
+  archivos:Array<{
+    idComprobante:number;nombreArchivo:string;
+    estadoRevision:'PENDIENTE'|'APROBADO'|'RECHAZADO';
+    tipoMime:string;tamanioBytes:number;
+  }>;
+  montoOriginal:number;
+  desgloses:CrmDesgloseComprobanteVenta[];
+  comprobantesConciliados:number;
+  comprobantesAprobados:number;
+  estadoVenta:string;
+  codigoContrato:string|null;
+  estadoContrato:string|null;
+  comprobantes:number;
+}
+export interface CrmDesgloseComprobanteVenta {
+  idDesglose:number;
+  idComprobante:number;
+  monto:number;
+  numeroOperacion:string|null;
+  estado:'PENDIENTE'|'OBSERVADO'|'APROBADO'|'CONCILIADO';
+  motivo:string|null;
+  idPago:number|null;
+  idMovimiento:number|null;
+  fechaRevision:string|null;
+}
+export interface CrmDesgloseVentaResultado {
+  idVenta:number;
+  totalDesglosado:number;
+  cantidad:number;
+  items:CrmDesgloseComprobanteVenta[];
+  dineroConfirmado:false;
+}
+export interface CrmRevisionDesgloseVenta {
+  idVenta:number;idDesglose:number;
+  estado:'APROBADO'|'OBSERVADO';dineroConfirmado:false;
+}
+export interface CrmConciliacionDesgloseVenta {
+  estado:'CONCILIADO';idVenta:number;idDesglose:number;
+  idPago:number;idVoucher:number;idMovimiento:number;
+  idAplicacionInicial:number|null;monto:number;
+  comprobantesRestantes:number;dineroConfirmado:true;
+}
+export interface CrmCobrosVentasPendientesPage {
+  total:number;
+  montoPendiente:number;
+  pagina:number;
+  tamano:number;
+  paginas:number;
+  items:CrmCobroVentaPendiente[];
+  porVerificar:number;
+  porConciliar:number;
+  requiereAprobacionYConciliacion:true;
+}
+export interface CrmRevisionComprobanteVenta {
+  idRevision:number;
+  idVenta:number;
+  idComprobante:number;
+  decision:'APROBADO'|'OBSERVADO';
+  estadoCobro:'PENDIENTE'|'APROBADO';
+  dineroConfirmado:false;
+  requiereConciliacion:boolean;
+}
+export interface CrmConciliacionCobroVenta {
+  estado:'CONCILIADO';
+  idVenta:number;
+  idPago:number;
+  idVoucher:number;
+  idMovimiento:number;
+  idAplicacionInicial:number|null;
+  monto:number;
+  codigoCategoria:string;
+}
+export interface CrmCuentasVenta {
+  puedeConfigurar:boolean;
+  cuentas:Array<{
+    idCuenta:number;codigo:string;nombre:string;tipo:string;idMoneda:number;
+    banco?:string|null;terminaEn?:string;moneda?:'PEN'|'USD';
+  }>;
+  categorias:Array<{codigo:string;nombre:string}>;
+}
+export interface CrmCuentaReceptoraCreada {
+  idCuenta:number;codigo:string;nombre:string;banco:string;
+  terminaEn:string;moneda:'PEN'|'USD';auditoriaRegistrada:true;
+}
+export interface CrmComprobanteSubsanado {
+  idVenta:number;idComprobante:number;
+  estadoRevision:'PENDIENTE';reutilizado:boolean;dineroConfirmado?:false;
+}
+export interface CrmReservaVencidaRevision {
+  idReserva:number;
+  codigo:string;
+  fechaVencimiento:string;
+  estadoReserva:string;
+  estadoLote:string;
+  codigoLote:string;
+  proyecto:string;
+  montoReserva:number;
+  montoConfirmado:number;
+  pagosEnRevision:number;
+  requiereRevision:boolean;
+  fechaReserva:string;
+}
+export interface CrmReservasVencidasRevision {
+  items:CrmReservaVencidaRevision[];
+  soloConsulta:true;
+}
 export interface CrmMovimientoFinanzasReal {
   idPago:number;codigo:string;fechaOperacion:string;fechaConfirmacion:string|null;
   monto:number;estado:string;tipo:'SEPARACION'|'FINANCIAMIENTO'|'VENTA'|'OTRO';
@@ -639,6 +831,10 @@ export interface CrmSeparacionVouchersResponse {
   paginas: number;
 }
 
+export interface CrmAbonosSeparacion {
+  agrupada:boolean;
+  items:{idVoucher:number;nombreArchivo:string;tipoMime:string;montoAbono:number;montoLote:number;metodo:string;estado:string}[];
+}
 export interface CrmVoucherReadUrl {
   bucket: string;
   claveArchivo: string;
@@ -656,6 +852,8 @@ export interface CrmRevisarVoucherInput {
 
 
 export interface CrmOperacionItem {
+  id_grupo?:string;
+  lotes_grupo?:{idReserva:number;codigo:string;lote:string;monto:number;estado:string;fechaVencimiento:string}[];
   id: number;
   tipo: 'VENTA' | 'SEPARACION';
   codigo: string;
@@ -928,8 +1126,16 @@ export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
 }
 
 
+export interface CrmCambioReserva {
+  idSolicitud:number; idProspecto:number; idReserva:number; idLoteAnterior:number; idLoteNuevo:number;
+  loteAnterior:string; loteNuevo:string; proyectoAnterior:string; proyectoNuevo:string; codigoReserva:string;
+  cliente:string; motivo:string; estado:'PENDIENTE'|'APROBADA'|'RECHAZADA'; decision?:string|null;
+  fecha:string; puedeDecidir:boolean; credito:number; precioDestino:number; separacionDestino:number;
+}
 export interface CrmReservaVigenteVenta {
   idReserva: number;
+  codigoLote: string;
+  estado: 'PENDIENTE'|'VIGENTE';
   codigoReserva: string;
   idLote: number;
   idProyecto: number;
@@ -1092,6 +1298,8 @@ export interface CrmCancelPendingSaleResult {
 }
 
 export interface CrmConciliacionSeparacion {
+  id_grupo?:string|null;
+  lotes_grupo?:string|null;
   id_pago: number;
   codigo_pago: string;
   monto: number;
@@ -1628,6 +1836,12 @@ export const crmBackend = {
     };
   },
 
+  cambiarLoteInteres: (idProspecto:number,idProyecto:number,idLote:number,idLoteAnterior:number|null,motivo:string) =>
+    coreApi.post<{idLoteInteres:number;codigoLoteInteres:string}>(`/crm/prospectos/${idProspecto}/intereses/lote`,{idProyecto,idLote,idLoteAnterior,motivo}),
+  registrarSeparacionAcumulada: (body:CrmSeparacionAcumuladaInput) =>
+    coreApi.post<CrmSeparacionAcumuladaResult>('/crm/separaciones/acumulada',{...body}),
+  registrarSeparacionesMultiples: (lotes: CrmSeparacionInput[]) =>
+    coreApi.post<CrmSeparacionResult[]>('/crm/separaciones/multiples',{lotes}),
   registrarSeparacion: (body: CrmSeparacionInput) =>
     coreApi.post<CrmSeparacionResult>(
       '/crm/separaciones',
@@ -1674,6 +1888,15 @@ export const crmBackend = {
   },
 
   /** Política inmutable para esta venta: conserva la versión de una separación vigente. */
+  cambiarInteresProyecto: (idProspecto: number, idProyecto: number, idProyectoAnterior: number, motivo: string) =>
+    coreApi.post<{ idInteres: number; idSeguimiento: number }>(
+      `/crm/prospectos/${idProspecto}/intereses/cambio/${idProyecto}`, {idProyectoAnterior, motivo}),
+  registrarInteresRecompra: (idProspecto: number, idProyecto: number) =>
+    coreApi.post<{ idInteres: number; creado: boolean }>(
+      `/crm/prospectos/${idProspecto}/intereses/recompra/${idProyecto}`, {}),
+  listarEtapasOperacion: (idProspecto: number, idProyecto: number, incluirReservas: boolean) =>
+    coreApi.get<CrmEtapaOperacion[]>(
+      `/crm/ventas/etapas-comerciales${qs({idProspecto,idProyecto,incluirReservas})}`),
   obtenerCondicionesVenta: (idProspecto:number,idLote:number) =>
     coreApi.get<CondicionesFrancesas>(
       `/crm/financiamiento/condiciones-venta${qs({idProspecto,idLote})}`
@@ -1696,6 +1919,129 @@ export const crmBackend = {
   ),
 
   /** FINANZAS: pagos realmente registrados, sin movimientos ficticios. */
+  crearOperacionAgrupada: (body:{
+    idProspecto:number;
+    lotes:Array<{idLote:number;modalidad:'CONTADO'|'FINANCIADA'}>;
+    observaciones?:string|null;
+  }) => coreApi.post<CrmOperacionAgrupadaCreada>(
+    '/crm/ventas/operaciones-agrupadas',body
+  ),
+
+  listarOperacionesAgrupadas: (pagina=1,tamano=20) =>
+    coreApi.get<CrmOperacionesAgrupadasPage>(
+      `/crm/ventas/operaciones-agrupadas${qs({pagina,tamano})}`
+    ),
+
+  vincularVentaAgrupada: (idOperacion:number,idVenta:number) =>
+    coreApi.post<CrmOperacionAgrupadaVinculada>(
+      `/crm/ventas/operaciones-agrupadas/${idOperacion}/vinculos/${idVenta}`,
+      {}
+    ),
+
+  listarCobrosVentasPendientes: (f: {busqueda?:string; pagina?:number; tamano?:number} = {}) =>
+    coreApi.get<CrmCobrosVentasPendientesPage>(
+      `/crm/finanzas/ventas/cobros-pendientes${qs(f)}`
+    ),
+
+  reiniciarDesgloseVenta: (idVenta:number,motivo:string) =>
+    coreApi.post<{
+      idVenta:number;estado:'PENDIENTE_DESGLOSE';
+      comprobantesARevisar:number;dineroConfirmado:false;auditoria:true;
+    }>(
+      `/crm/finanzas/ventas/${idVenta}/desglose/reiniciar`,
+      {motivo:motivo.trim()}
+    ),
+
+  configurarDesgloseVenta: (idVenta:number,items:Array<{
+    idComprobante:number;monto:number;numeroOperacion:string|null
+  }>) => coreApi.post<CrmDesgloseVentaResultado>(
+    `/crm/finanzas/ventas/${idVenta}/desglose`,{items}
+  ),
+
+  revisarDesgloseVenta: (idDesglose:number,body:{
+    aprobar:boolean;motivo?:string|null;
+  }) => coreApi.put<CrmRevisionDesgloseVenta>(
+    `/crm/finanzas/ventas/desgloses/${idDesglose}/revision`,
+    {aprobar:body.aprobar,motivo:body.aprobar?null:body.motivo?.trim()??null}
+  ),
+
+  conciliarDesgloseVenta: (idDesglose:number,body:{
+    idCuentaFinanciera:number;fechaOperacion:string;observaciones?:string|null;
+  }) => coreApi.post<CrmConciliacionDesgloseVenta>(
+    `/crm/finanzas/ventas/desgloses/${idDesglose}/conciliar`,body
+  ),
+
+  revisarComprobanteVenta: (idVenta:number,idComprobante:number,body:{
+    aprobar:boolean;motivo?:string|null
+  }) => coreApi.put<CrmRevisionComprobanteVenta>(
+    `/crm/finanzas/ventas/${idVenta}/comprobantes/${idComprobante}/revision`,
+    {aprobar:body.aprobar,motivo:body.aprobar?null:body.motivo?.trim()??null}
+  ),
+
+  obtenerComprobanteVentaFinanzas: (idVenta:number,idComprobante:number) =>
+    coreApi.get<CrmVoucherReadUrl>(
+      `/crm/finanzas/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
+    ),
+
+  conciliarCobroVenta: (idVenta:number,body:{
+    idCuentaFinanciera:number;fechaOperacion:string;numeroOperacion:string|null;
+    observaciones?:string|null
+  }) => coreApi.post<CrmConciliacionCobroVenta>(
+    `/crm/finanzas/ventas/${idVenta}/conciliar`,body
+  ),
+
+  cuentasReceptorasVenta: () => coreApi.get<CrmCuentasVenta>(
+    '/crm/finanzas/ventas/cuentas-receptoras'
+  ),
+
+  crearCuentaReceptora: (datos:{
+    nombre:string;banco:string;titular:string;numeroCuenta:string;cci:string|null;
+    moneda:'PEN'|'USD'
+  })=>coreApi.post<CrmCuentaReceptoraCreada>(
+    '/crm/finanzas/ventas/cuentas-receptoras',datos
+  ),
+
+  /** La evidencia debe existir en Storage privado antes de registrarse en la venta. */
+  subirComprobanteFaltanteVenta: async (idVenta:number,archivo:File):
+    Promise<CrmComprobanteSubsanado> => {
+    const mimes=['application/pdf','image/jpeg','image/png','image/webp'];
+    if(!Number.isSafeInteger(idVenta)||idVenta<=0
+      ||!archivo||archivo.size<1||archivo.size>5242880
+      ||!archivo.name.trim()||archivo.name.length>255
+      ||!mimes.includes(archivo.type)) {
+      throw new Error('Selecciona un PDF o imagen de hasta 5 MB.');
+    }
+    const firma=await coreApi.post<CrmCargaVoucherCuota>(
+      `/crm/finanzas/ventas/${idVenta}/subsanacion/preparar-carga`,
+      {nombreArchivo:archivo.name,tipoMime:archivo.type,tamanioBytes:archivo.size}
+    );
+    const token=new URL(firma.urlCarga).searchParams.get('token');
+    if(!token||firma.bucket!=='vouchers-ventas-private'
+      ||firma.tipoMime!==archivo.type||!firma.idCarga) {
+      throw new Error('La autorización de carga no es válida.');
+    }
+    const {error}=await supabase.storage.from(firma.bucket)
+      .uploadToSignedUrl(firma.claveArchivo,token,archivo,{
+        contentType:firma.tipoMime,upsert:false
+      });
+    if(error) throw new Error('Error al subir evidencia privada: '+error.message);
+    return coreApi.post<CrmComprobanteSubsanado>(
+      '/crm/finanzas/ventas/subsanacion/confirmar',{idCarga:firma.idCarga}
+    );
+  },
+
+  avisosComerciales: () => coreApi.get<{items:{id:string;titulo:string;mensaje:string;fecha:string;ruta?:string}[]}>('/crm/avisos-comerciales'),
+  listarCambiosReserva: (idProspecto?:number) => coreApi.get<{items:CrmCambioReserva[]}>(
+    `/crm/cambios-reserva${qs({idProspecto})}`),
+  solicitarCambioReserva: (data:{idProspecto:number;idReserva:number;idLote:number;motivo:string}) =>
+    coreApi.post<{idSolicitud:number;estado:string}>('/crm/cambios-reserva',data),
+  decidirCambioReserva: (idSolicitud:number,data:{aprobar:boolean;motivo:string}) =>
+    coreApi.post<{idSolicitud:number;estado:string}>(`/crm/cambios-reserva/${idSolicitud}/decision`,data),
+
+  reservasVencidasRevision: () => coreApi.get<CrmReservasVencidasRevision>(
+    '/crm/finanzas/separaciones/vencidas-revision'
+  ),
+
   listarMovimientosFinanzasReal: (params: {
     busqueda?:string;pagina?:number;tamano?:number;
   }={}) => coreApi.get<CrmMovimientosFinanzasReal>(
@@ -1764,6 +2110,22 @@ export const crmBackend = {
       `/crm/ventas/${idVenta}/comprobantes/${idComprobante}/url-firmada`
     );
   },
+
+  subsanarComprobanteSeparacion:async(idReserva:number,idVoucher:number,archivo:File)=>{
+    if(!archivo||archivo.size<1||archivo.size>5242880||!['application/pdf','image/jpeg','image/png','image/webp'].includes(archivo.type)||archivo.name.length>255)
+      throw new Error('Adjunta un PDF, JPG, PNG o WebP de hasta 5 MB.');
+    const digest=await crypto.subtle.digest('SHA-256',await archivo.arrayBuffer());
+    const hashSha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+    const ruta=`/crm/separaciones/${idReserva}/comprobantes/${idVoucher}`;
+    const carga=await coreApi.post<CrmSeparacionUpload>(ruta+'/preparar-subsanacion',{tipoMime:archivo.type});
+    const token=new URL(carga.urlCarga).searchParams.get('token');
+    if(!token||carga.bucket!=='vouchers-separacion-private')throw new Error('Carga no autorizada.');
+    const {error}=await supabase.storage.from(carga.bucket).uploadToSignedUrl(carga.claveArchivo,token,archivo,{contentType:archivo.type,upsert:false});
+    if(error)throw new Error(error.message);
+    return coreApi.post<{success:boolean;idVoucher:number;version:number}>(ruta+'/subsanar',{claveArchivo:carga.claveArchivo,nombreArchivo:archivo.name,tipoMime:archivo.type,tamanioBytes:archivo.size,hashSha256});
+  },
+  listarComprobantesSeparacion:(idReserva:number)=>coreApi.get<CrmAbonosSeparacion>(`/crm/separaciones/${idReserva}/comprobantes`),
+  obtenerComprobanteSeparacionEspecifico:(idReserva:number,idVoucher:number)=>coreApi.get<CrmVoucherReadUrl>(`/crm/separaciones/${idReserva}/comprobantes/${idVoucher}/url-firmada`),
 
   obtenerComprobanteSeparacion: (idReserva: number) => {
     if (!Number.isSafeInteger(idReserva) || idReserva <= 0) {
@@ -1843,7 +2205,7 @@ export const crmBackend = {
 
   prepararCargaVoucherInicial:(datos:CrmPrepararCargaInicialInput)=>
     coreApi.post<CrmCargaVoucherCuota>(
-      '/crm/finanzas/vouchers/inicial/preparar-carga',datos),
+      '/crm/finanzas/vouchers/inicial/preparar-carga',{...datos}),
 
   registrarVoucherInicialPendiente:(idCarga:string)=>{
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idCarga))
@@ -1865,7 +2227,7 @@ export const crmBackend = {
   /** Preautorización vinculada por el servidor al actor y la cuota. */
   prepararCargaVoucherCuota: (datos:CrmPrepararCargaCuotaInput) =>
     coreApi.post<CrmCargaVoucherCuota>(
-      '/crm/finanzas/vouchers/cuotas/preparar-carga',datos
+      '/crm/finanzas/vouchers/cuotas/preparar-carga',{...datos}
     ),
 
   /** Carga un único archivo de la preparación anterior en Storage privado. */
@@ -2058,6 +2420,11 @@ export const crmBackend = {
         tasaInteresMensualPct: body.tasaInteresMensualPct ?? null,
         observaciones: body.observaciones ?? null
       }
+    ),
+
+  registrarVentasMultiples: (ventas: Array<CrmSaleValidationInput & {creditoEsperado:number;pagoEsperado:number}>) =>
+    coreApi.post<{success:boolean;idOperacion:number|null;codigoOperacion:string|null;ventas:CrmPendingSaleResult[];totalPago:number}>(
+      '/crm/ventas/pendientes/multiple',{ventas}
     ),
 
   registrarVentaPendiente: (body: CrmSaleValidationInput) =>

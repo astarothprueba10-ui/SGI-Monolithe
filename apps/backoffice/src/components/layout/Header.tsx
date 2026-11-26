@@ -153,7 +153,7 @@ export function Header({
 
             <div className="max-h-80 overflow-y-auto border-t border-brand-100" aria-live="polite">
               {!autorizado && <p className="px-3 py-5 text-center text-xs text-brand-500">
-                Sin alertas financieras disponibles para este rol.
+                Sin notificaciones disponibles para este rol.
               </p>}
               {autorizado && alertsError && <div role="alert" className="px-3 py-3 text-xs text-rose-700">
                 No se pudieron actualizar los avisos. {alertsError}
@@ -165,7 +165,7 @@ export function Header({
                 <p className="px-3 py-5 text-center text-xs text-brand-500">Consultando alertas reales…</p>}
               {autorizado && !loadingAlerts && !alertsError && notifications.length===0 &&
                 <p className="px-3 py-5 text-center text-xs text-brand-500">
-                  No tienes cuotas próximas ni vencidas con saldo pendiente.
+                  No tienes notificaciones activas.
                 </p>}
               {notifications.slice(0,30).map(n=>(
                 <button key={n.id} type="button"
@@ -188,7 +188,7 @@ export function Header({
               ))}
               {notifications.length>30 && <button type="button"
                 className="w-full px-3 py-3 text-center text-xs font-semibold text-brand-700 hover:bg-brand-50"
-                onClick={()=>{navigate('/financiamiento?tab=alertas');close();}}>
+                onClick={()=>{navigate(notifications.some(n=>n.module==='sales')?'/ventas':'/financiamiento?tab=alertas');close();}}>
                 Ver todas las alertas ({notifications.length})
               </button>}
             </div>

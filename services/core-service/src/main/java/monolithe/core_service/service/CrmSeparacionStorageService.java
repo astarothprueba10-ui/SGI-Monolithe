@@ -81,6 +81,22 @@ public class CrmSeparacionStorageService {
             ventaService.prepararCargaVoucherInicial(actor,req),req.tipoMime());
     }
 
+    /** Reutiliza URL firmada existente; la clave viene de SQL y no del navegador. */
+    public EnlaceCargaVoucherCuotaResponse prepararCargaSubsanacionVenta(
+            Long actor,Long idVenta,
+            monolithe.core_service.dto.PrepararSubsanacionVentaRequest req) {
+        if(actor==null||actor<=0||req==null||req.tipoMime()==null
+                ||!MIMES_PERMITIDOS.contains(req.tipoMime()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solicitud de subsanación inválida.");
+        var firma=firmarCargaFinanciada(
+                ventaService.prepararSubsanacionVenta(actor,idVenta,req),req.tipoMime());
+        // La autorización SQL vence a los 15 minutos, antes que otros tipos de carga.
+        return new EnlaceCargaVoucherCuotaResponse(
+                firma.idCarga(),firma.bucket(),firma.claveArchivo(),
+                firma.urlCarga(),firma.tipoMime(),firma.maxBytes(),900);
+    }
+
     /** 5.4.4: reutiliza firma Storage; la preautorización privada ocurre
      * previamente en PortalClienteService y está asociada al JWT.
      */
@@ -138,6 +154,68 @@ public class CrmSeparacionStorageService {
         String ruta = "/object/upload/sign/" + BUCKET + "/" + clave;
         String respuesta = solicitarUrlCargaStorage(base + ruta);
         return extraerEnlaceCarga(respuesta, clave, base, ruta, req.tipoMime());
+    }
+
+    public EnlaceCargaVoucherResponse prepararSubsanacionSeparacion(Long actor,Long reserva,Long voucher,String mime) {
+        if(mime==null||!MIMES_PERMITIDOS.contains(mime))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Formato no permitido.");
+        JsonNode ctx=ventaService.contextoSubsanacionSeparacion(actor,reserva,voucher);
+        String clave="separaciones/p-"+ctx.path("idProspecto").asLong()+"/l-"+ctx.path("idLote").asLong()+"/"+UUID.randomUUID()+"."+resolverExtension(mime);
+        String base=validarYResolverBase(),ruta="/object/upload/sign/"+BUCKET+"/"+clave;
+        return extraerEnlaceCarga(solicitarUrlCargaStorage(base+ruta),clave,base,ruta,mime);
+    }
+
+    public void verificarSubsanacionSeparacion(Long actor,Long reserva,Long voucher,monolithe.core_service.dto.SubsanarAbonoSeparacionRequest req) {
+        JsonNode ctx=ventaService.contextoSubsanacionSeparacion(actor,reserva,voucher);
+        String prefijo="separaciones/p-"+ctx.path("idProspecto").asLong()+"/l-"+ctx.path("idLote").asLong()+"/";
+        String ext=resolverExtension(req.tipoMime());
+        if(!req.claveArchivo().startsWith(prefijo)||!req.claveArchivo().substring(prefijo.length()).matches("[0-9a-fA-F-]{36}\\."+ext))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Ruta de comprobante inválida.");
+        try {
+            String hash=restClient.get().uri(validarYResolverBase()+"/object/authenticated/"+BUCKET+"/"+req.claveArchivo())
+                .header("apikey",serviceRoleKey).header("Authorization","Bearer "+serviceRoleKey)
+                .exchange((request,response)->{
+                    if(!response.getStatusCode().is2xxSuccessful())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante no disponible.");
+                    byte[] bytes=response.getBody().readNBytes((int)MAX_BYTES+1);
+                    if(bytes.length!=req.tamanioBytes()||bytes.length>MAX_BYTES)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tamaño inválido.");
+                    try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+                    catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
+                });
+            if(hash==null||!hash.equalsIgnoreCase(req.hashSha256()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Huella no válida.");
+        } catch(RestClientException ex){throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"No se pudo verificar el comprobante.",ex);}
+    }
+
+    /** Verifica el contenido del archivo real, no una huella aportada solamente por el navegador. */
+    public void verificarComprobantesAcumulados(Long actor, monolithe.core_service.dto.RegistrarSeparacionAcumuladaRequest req) {
+        if(actor==null||actor<=0||req==null||req.lotes()==null||req.lotes().isEmpty()||req.abonos()==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Solicitud de separación inválida.");
+        Long principal=req.lotes().get(0).idLote();
+        // Limita el alcance antes de acceder a Storage con credenciales del servidor.
+        ventaService.validarSeparacionPreviaCarga(actor,req.idProspecto(),principal);
+        String prefijo="separaciones/p-"+req.idProspecto()+"/l-"+principal+"/";
+        var hashes=new java.util.HashSet<String>();
+        for(var abono:req.abonos()) {
+            String ext=resolverExtension(abono.tipoMime());
+            if(abono.claveArchivo()==null||!abono.claveArchivo().startsWith(prefijo)||
+                !abono.claveArchivo().substring(prefijo.length()).matches("[0-9a-fA-F-]{36}\\."+ext))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Ruta de comprobante inválida.");
+            try {
+                String hash=restClient.get().uri(validarYResolverBase()+"/object/authenticated/"+BUCKET+"/"+abono.claveArchivo())
+                    .header("apikey",serviceRoleKey).header("Authorization","Bearer "+serviceRoleKey)
+                    .exchange((request,response)->{
+                        if(!response.getStatusCode().is2xxSuccessful())
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se encontró el comprobante cargado.");
+                        byte[] bytes=response.getBody().readNBytes((int)MAX_BYTES+1);
+                        if(bytes.length!=abono.tamanioBytes()||bytes.length>MAX_BYTES)
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"El tamaño del comprobante no coincide.");
+                        try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+                        catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}
+                    });
+                if(hash==null||!hash.equalsIgnoreCase(abono.hashSha256())||!hashes.add(hash))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Comprobante duplicado o huella no válida.");
+            } catch(RestClientException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"No se pudo verificar el comprobante en Storage.",ex);
+            }
+        }
     }
 
     /** Ventas: genera URL de carga privada después de verificar lote, precio y cartera. */
@@ -261,6 +339,19 @@ public class CrmSeparacionStorageService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
         }
         JsonNode info = ventaService.rutaComprobanteVenta(actor, idVenta, idComprobante);
+        return firmarComprobanteVenta(info);
+    }
+
+    /** Finanzas tiene permiso propio; no se amplía el acceso comercial a otras carteras. */
+    public EnlaceLecturaVoucherResponse prepararLecturaComprobanteVentaFinanzas(
+            Long actor,Long idVenta,Long idComprobante) {
+        if(actor==null||actor<=0)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        return firmarComprobanteVenta(
+                ventaService.rutaComprobanteVentaFinanzas(actor,idVenta,idComprobante));
+    }
+
+    private EnlaceLecturaVoucherResponse firmarComprobanteVenta(JsonNode info) {
         String bucket = info.path("bucket").asString("");
         String clave = info.path("clave_archivo").asString("");
         String nombre = info.path("nombre_archivo").asString("");
@@ -283,6 +374,11 @@ public class CrmSeparacionStorageService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesion invalida.");
         }
         return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor, idReserva));
+    }
+
+    public EnlaceLecturaVoucherResponse prepararLecturaPorReserva(Long actor,Long idReserva,Long idVoucher) {
+        if(actor==null||actor<=0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Sesión inválida.");
+        return firmarReferencia(ventaService.obtenerRutaComprobanteSeparacion(actor,idReserva,idVoucher));
     }
 
     private EnlaceLecturaVoucherResponse firmarReferencia(JsonNode info) {

@@ -25,6 +25,24 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
+    void formalizacionMultipleTraduceRechazosSin503() throws Exception {
+        var solicitud = new JsonMapper().readTree("[{}]");
+        String[] errores = {"UBICACION_INVALIDA", "ESTADO_CIVIL_INVALIDO", "IDENTIDAD_NO_APTA",
+                "VOUCHER_REQUERIDO", "VOUCHER_NO_CARGADO", "RESERVA_PENDIENTE", "CONDICIONES_CAMBIO",
+                "DOCUMENTO_VERIFICADO"};
+        for (String codigo : errores) {
+            reset(jdbc);
+            when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(codigo+"|Detalle privado de prueba"));
+            var error = assertThrows(ResponseStatusException.class,
+                () -> service.registrarVentasMultiples(5L, solicitud));
+            int esperado = java.util.Set.of("RESERVA_PENDIENTE","CONDICIONES_CAMBIO","DOCUMENTO_VERIFICADO").contains(codigo) ? 409 : 400;
+            assertEquals(esperado,error.getStatusCode().value(),codigo);
+            assertFalse(error.getReason().contains("Detalle privado"));
+        }
+    }
+
+    @Test
     void rechazaActorNoAutenticadoAntesDeConsultar() {
         var error = assertThrows(ResponseStatusException.class,
                 () -> service.listarOperaciones(null, "", "", 1, 20));
@@ -534,15 +552,32 @@ class CrmVentaServiceSeguridadTest {
     }
 
     @Test
-    void separacionRechazaMontoDiferenteDeQuinientos() {
+    void separacionRechazaImporteInvalidoAntesDeConsultarSql() {
+        for (String monto : java.util.List.of("0", "-1", "500.001")) {
+            var req = new RegistrarSeparacionCrmRequest(
+                    1L, 74L, "TRANSFERENCIA", "OP-01",
+                    new BigDecimal(monto), null, "comprobante.png",
+                    "comprobante.png", "image/png", 1024L, null);
+            assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
+                    () -> service.registrarSeparacion(5L, req)).getStatusCode());
+        }
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void separacionDelegaMontoDelProyectoAlProcedimientoYRechazaDiferencias() {
         var req = new RegistrarSeparacionCrmRequest(
                 1L, 74L, "TRANSFERENCIA", "OP-01",
-                new BigDecimal("499.99"), null, "comprobante.png",
+                new BigDecimal("750.00"), null, "comprobante.png",
                 "comprobante.png", "image/png", 1024L, null);
-        var error = assertThrows(ResponseStatusException.class,
-                () -> service.registrarSeparacion(5L, req));
-        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
-        verifyNoInteractions(jdbc);
+        when(jdbc.queryForObject(anyString(), eq(String.class), any(Object[].class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                    "SEPARACION_MONTO_INVALIDO|El importe no coincide con la política vigente."));
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(ResponseStatusException.class,
+                () -> service.registrarSeparacion(5L, req)).getStatusCode());
+        var sql=ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(),eq(String.class),any(Object[].class));
+        assertTrue(sql.getValue().contains("sp_crm_registrar_separacion_v2"));
     }
 
     @Test

@@ -10,6 +10,8 @@ import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.*;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -97,6 +99,8 @@ public class LotePrecioService {
 
     @Transactional
     public LotePrecioResponse calcularYRegistrar(LotePrecioRequest request) {
+        exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(request.idLote());
         ContextoPrecio ctx = resolverContexto(request);
         validarEdicionComercial(ctx.lote());
         ResultadoCalculo resultado = calcular(ctx);
@@ -127,13 +131,10 @@ public class LotePrecioService {
                             "y tener como máximo dos decimales.");
         }
 
+        exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(idLote);
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
-
-        if (!Boolean.TRUE.equals(lote.getActivo())) {
-            throw new ReglaNegocioException(
-                    "No se puede registrar precio en un lote inactivo.");
-        }
 
         Moneda moneda = obtenerMonedaActiva("PEN");
 
@@ -175,9 +176,10 @@ public class LotePrecioService {
             Long idLote,
             ActualizarPrecioManualRequest request) {
         validarMontoPrecio(request.monto());
+        exigirVerificacionIntegridadPrecio();
+        bloquearLoteParaEdicion(idLote);
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
-        validarOperacionesLoteParaPrecio(lote);
         Moneda moneda = obtenerMonedaActiva("PEN");
         Optional<LotePrecio> vigenteOpt = lotePrecioRepository
                 .buscarVigente(idLote, moneda.getIdMoneda());
@@ -192,10 +194,24 @@ public class LotePrecioService {
         return toResponse(lotePrecioRepository.saveAndFlush(nuevo));
     }
 
+    private void exigirVerificacionIntegridadPrecio() {
+        if (!lotePrecioRepository.puedeVerificarIntegridadPrecio()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se puede verificar la integridad comercial del lote. No se modificó el precio.");
+        }
+    }
+
+    private void bloquearLoteParaEdicion(Long idLote) {
+        if (lotePrecioRepository.bloquearLoteParaPrecio(idLote) == null) {
+            throw new RecursoNoEncontradoException("No se pudo localizar el lote para modificar su precio.");
+        }
+    }
+
     private void validarEdicionComercial(Lote lote) {
-        lotePrecioRepository.bloquearLoteParaPrecio(lote.getIdLote());
-        if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto()))
+        if (lotePrecioRepository.proyectoConPolitica(lote.getIdProyecto())) {
             throw new ReglaNegocioException("El precio se administra desde la política comercial del proyecto.");
+        }
+        validarOperacionesLoteParaPrecio(lote);
     }
 
     private void validarMontoPrecio(BigDecimal monto) {

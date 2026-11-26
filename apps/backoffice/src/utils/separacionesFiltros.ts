@@ -46,7 +46,7 @@ export function filtrarSeparaciones(items: Sale[], f: FiltrosSeparaciones): Sale
     if (op.type !== 'Separación') return false;
     const fecha = fechaCalendarioLima(op.dateIso);
     return (
-      (!busqueda || [op.code, op.buyer, op.document, op.project, op.lot, op.advisor]
+      (!busqueda || [op.code, op.buyer, op.document, op.project, op.lot, op.advisor, ...(op.groupedLots??[]).map(l=>l.codigo)]
         .some((v) => normalizar(v).includes(busqueda))) &&
       (f.metodoPago === 'all' || op.paymentMethod === f.metodoPago) &&
       (f.asesor === 'all' || (f.asesor === '__sin_asesor__'

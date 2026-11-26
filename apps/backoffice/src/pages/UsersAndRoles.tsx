@@ -51,10 +51,9 @@ function filterUser(
 }
 
 export function UsersAndRoles() {
-  const { user: sesionUsuario } = useAuth();
-  const rrhhDelegado = sesionUsuario.roles.includes('RRHH')
-    && !sesionUsuario.roles.includes('Administrador')
-    && !sesionUsuario.roles.includes('Gerencia');
+  const { user: sesionUsuario, can } = useAuth();
+  const rrhhDelegado = !can('roles.assign_permissions') || (!sesionUsuario.roles.includes('Administrador')
+    && !sesionUsuario.roles.includes('Gerencia'));
   const [tab, setTab] = useState('usuarios');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('ACTIVO');

@@ -1,151 +1,70 @@
-import { useEffect, useState } from 'react';
-import { ExternalLinkIcon, FileImageIcon, FileTextIcon, LoaderCircleIcon } from 'lucide-react';
+import { useEffect,useState } from 'react';
+import { ExternalLinkIcon,FileTextIcon,LoaderCircleIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { crmBackend, type CrmVoucherReadUrl } from '../../services/crmBackend';
-import { ApiError } from '../../lib/apiClient';
+import { crmBackend,type CrmAbonosSeparacion } from '../../services/crmBackend';
+import { formatSoles } from '../../utils/financeMoney';
 
-interface ComprobanteSeparacionPreviewProps {
-  idReserva: number;
-}
-
-export function ComprobanteSeparacionPreview({ idReserva }: ComprobanteSeparacionPreviewProps) {
-  const [comprobante, setComprobante] = useState<CrmVoucherReadUrl | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [sinArchivo, setSinArchivo] = useState(false);
-  const [error, setError] = useState(false);
-  const [abriendo, setAbriendo] = useState(false);
-  const [intento, setIntento] = useState(0);
-  const [miniaturaError, setMiniaturaError] = useState(false);
-
-  useEffect(() => {
-    let vigente = true;
-    setComprobante(null);
-    setSinArchivo(false);
-    setError(false);
-    setMiniaturaError(false);
-    setCargando(true);
-
-    void crmBackend.obtenerComprobanteSeparacion(idReserva)
-      .then((datos) => {
-        if (vigente) setComprobante(datos);
-      })
-      .catch((err: unknown) => {
-        if (!vigente) return;
-        if (err instanceof ApiError && err.status === 404) {
-          setSinArchivo(true);
-        } else {
-          setError(true);
-        }
-      })
-      .finally(() => {
-        if (vigente) setCargando(false);
-      });
-
-    return () => { vigente = false; };
-  }, [idReserva, intento]);
-
-  const abrirComprobante = async () => {
-    if (!comprobante || abriendo) return;
-
-    // Abrir la pestaña durante el clic para evitar bloqueos de ventanas emergentes.
-    const ventana = window.open('about:blank', '_blank');
-    if (!ventana) {
-      toast.error('Habilita las ventanas emergentes para visualizar el comprobante.');
-      return;
-    }
-    ventana.opener = null;
-    setAbriendo(true);
-    try {
-      // Renovar el enlace al hacer clic, aunque la miniatura lleve abierta
-      // mas de los cinco minutos de validez del enlace de Storage.
-      const enlace = await crmBackend.obtenerComprobanteSeparacion(idReserva);
-      ventana.location.replace(enlace.urlDescarga);
-      setComprobante(enlace);
-      setMiniaturaError(false);
-    } catch (err: unknown) {
-      ventana.close();
-      toast.error('No se pudo abrir el comprobante', {
-        description: err instanceof Error ? err.message : 'Intenta nuevamente.'
-      });
-    } finally {
-      setAbriendo(false);
-    }
+export function ComprobanteSeparacionPreview({idReserva,puedeSubsanar=false,vistaGrupo=false}:{idReserva:number;puedeSubsanar?:boolean;vistaGrupo?:boolean}){
+  const [datos,setDatos]=useState<CrmAbonosSeparacion|null>(null);
+  const [cargando,setCargando]=useState(true);
+  const [error,setError]=useState('');
+  const [intento,setIntento]=useState(0);
+  const [abriendo,setAbriendo]=useState<number|null>(null);
+  const [subsanando,setSubsanando]=useState<number|null>(null);
+  const [archivo,setArchivo]=useState<File|null>(null);
+  const [guardando,setGuardando]=useState(false);
+  const subsanar=async()=>{
+    if(subsanando===null||!archivo||guardando)return;
+    setGuardando(true);
+    try{
+      await crmBackend.subsanarComprobanteSeparacion(idReserva,subsanando,archivo);
+      toast.success('Comprobante reemplazado; pendiente de nueva revisión.');
+      setSubsanando(null);setArchivo(null);setIntento(i=>i+1);
+    }catch(e:unknown){toast.error('No se pudo subsanar',{description:e instanceof Error?e.message:'Intenta nuevamente.'});}
+    finally{setGuardando(false);}
   };
-
-  const mime = comprobante?.tipoMime.toLowerCase() ?? '';
-  const esImagen = ['image/jpeg', 'image/png', 'image/webp'].includes(mime);
-  const esPdf = mime === 'application/pdf';
-
-  return (
-    <section className="border-t border-brand-100 pt-4">
-      <h3 className="mb-2 text-sm font-semibold text-brand-900">
-        Comprobante de separación
-      </h3>
-      <p className="mb-3 text-xs text-brand-500">
-        Selecciona la miniatura para visualizar el archivo original.
-      </p>
-
-      {cargando ? (
-        <div className="flex items-center gap-2 py-4 text-xs text-brand-500">
-          <LoaderCircleIcon className="h-4 w-4 animate-spin" />
-          Cargando comprobante...
+  useEffect(()=>{
+    let vigente=true;
+    setDatos(null);setError('');setCargando(true);
+    void crmBackend.listarComprobantesSeparacion(idReserva)
+      .then(r=>{if(vigente)setDatos(r);})
+      .catch((e:unknown)=>{if(vigente)setError(e instanceof Error?e.message:'No se pudieron consultar los comprobantes.');})
+      .finally(()=>{if(vigente)setCargando(false);});
+    return ()=>{vigente=false;};
+  },[idReserva,intento]);
+  const abrir=async(idVoucher:number)=>{
+    if(abriendo!==null)return;
+    const ventana=window.open('about:blank','_blank');
+    if(!ventana){toast.error('Habilita las ventanas emergentes para ver el comprobante.');return;}
+    ventana.opener=null;setAbriendo(idVoucher);
+    try{
+      const enlace=await crmBackend.obtenerComprobanteSeparacionEspecifico(idReserva,idVoucher);
+      ventana.location.replace(enlace.urlDescarga);
+    }catch(e:unknown){ventana.close();toast.error('No se pudo abrir el comprobante',{description:e instanceof Error?e.message:'Intenta nuevamente.'});}
+    finally{setAbriendo(null);}
+  };
+  return <section className="border-t border-brand-100 pt-4 space-y-3">
+    <h3 className="text-sm font-semibold text-brand-900">Comprobantes de separación</h3>
+    {datos?.agrupada&&<p className="text-xs text-brand-500">{vistaGrupo?'Cada comprobante representa un abono de la operación completa. No se duplica por lote.':'Los comprobantes pertenecen a la operación completa. El importe asignado a este lote es parte del mismo abono, no otro ingreso.'}</p>}
+    {cargando?<p role="status" className="flex items-center gap-2 text-xs text-brand-500"><LoaderCircleIcon className="h-4 w-4 animate-spin"/>Consultando comprobantes…</p>
+      :error?<div className="rounded-md border border-amber-200 p-3 text-xs text-amber-900">{error} <button type="button" className="underline" onClick={()=>setIntento(x=>x+1)}>Reintentar</button></div>
+      :!datos?.items.length?<p className="text-xs text-brand-500">No hay comprobantes registrados.</p>
+      :datos.items.map(v=><div key={v.idVoucher} className="rounded-lg border border-brand-200 p-3 space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0"><p className="break-all text-sm font-semibold"><FileTextIcon className="mr-1 inline h-4 w-4"/>{v.nombreArchivo}</p><p className="text-xs text-brand-500">{v.metodo} · {v.estado}</p></div>
+          <div className="text-right"><p className="font-semibold text-sm">{formatSoles(v.montoAbono)}</p>{datos.agrupada&&!vistaGrupo&&<p className="text-xs text-brand-500">Asignado a este lote: {formatSoles(v.montoLote)}</p>}</div>
         </div>
-      ) : comprobante ? (
-        <button
-          type="button"
-          onClick={() => void abrirComprobante()}
-          disabled={abriendo}
-          className="group flex w-full items-center gap-4 rounded-lg border border-brand-200 bg-brand-50/30 p-3 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 disabled:cursor-wait disabled:opacity-70"
-          aria-label={'Visualizar comprobante ' + comprobante.nombreArchivo}
-          title="Abrir comprobante en una pestaña nueva"
-        >
-          <div className="flex h-28 w-32 shrink-0 items-center justify-center overflow-hidden rounded-md border border-brand-200 bg-white">
-            {esImagen && !miniaturaError ? (
-              <img
-                src={comprobante.urlDescarga}
-                alt={'Miniatura de ' + comprobante.nombreArchivo}
-                className="h-full w-full object-contain"
-                loading="lazy"
-                onError={() => setMiniaturaError(true)}
-              />
-            ) : esPdf ? (
-              <div className="flex flex-col items-center gap-1 text-rose-700">
-                <FileTextIcon className="h-12 w-12" />
-                <span className="text-xs font-semibold">PDF</span>
-              </div>
-            ) : (
-              <FileImageIcon className="h-10 w-10 text-brand-400" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="break-all text-sm font-semibold text-brand-900">
-              {comprobante.nombreArchivo}
-            </p>
-            <p className="mt-1 text-xs text-brand-500">
-              {esPdf ? 'Documento PDF' : esImagen ? 'Imagen' : 'Archivo adjunto'}
-            </p>
-            <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand-700 group-hover:text-brand-900">
-              {abriendo ? 'Abriendo...' : 'Ver archivo original'}
-              <ExternalLinkIcon className="h-3.5 w-3.5" />
-            </span>
-          </div>
-        </button>
-      ) : sinArchivo ? (
-        <p className="rounded-md border border-brand-100 bg-brand-50/30 p-3 text-xs text-brand-500">
-          Esta separación no tiene un comprobante disponible.
-        </p>
-      ) : error ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          No se pudo consultar el comprobante.
-          <button
-            type="button"
-            onClick={() => setIntento((actual) => actual + 1)}
-            className="ml-2 font-semibold underline"
-          >
-            Reintentar
-          </button>
-        </div>
-      ) : null}
-    </section>
-  );
+        <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-brand-800 underline disabled:opacity-50" disabled={abriendo!==null} onClick={()=>void abrir(v.idVoucher)}>{abriendo===v.idVoucher?'Abriendo…':'Ver archivo original'}<ExternalLinkIcon className="h-3 w-3"/></button>
+        {puedeSubsanar&&datos.agrupada&&v.estado==='RECHAZADO'&&<div className="border-t border-brand-100 pt-2">
+          {subsanando===v.idVoucher?<div className="space-y-2">
+            <p className="text-xs text-brand-600">Reemplaza únicamente el comprobante de este abono. Se conserva su importe y referencia, y Finanzas debe aprobarlo nuevamente.</p>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" disabled={guardando} onChange={e=>setArchivo(e.target.files?.[0]??null)} className="block w-full text-xs"/>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={guardando} onClick={()=>{setSubsanando(null);setArchivo(null)}} className="rounded border px-3 py-2 text-xs">Cancelar</button>
+              <button type="button" disabled={guardando||!archivo} onClick={()=>void subsanar()} className="rounded bg-brand-800 px-3 py-2 text-xs text-white disabled:opacity-50">{guardando?'Enviando…':'Enviar a revisión'}</button>
+            </div>
+          </div>:<button type="button" disabled={guardando} onClick={()=>{setSubsanando(v.idVoucher);setArchivo(null)}} className="text-xs font-semibold text-brand-800 underline">Subsanar comprobante rechazado</button>}
+        </div>}
+      </div>)}
+  </section>;
 }

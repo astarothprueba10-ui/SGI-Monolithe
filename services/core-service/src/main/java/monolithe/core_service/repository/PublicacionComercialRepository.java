@@ -12,6 +12,31 @@ import java.util.List;
 public class PublicacionComercialRepository {
     private final JdbcTemplate jdbc;
 
+    // Una vista previa incompleta puede clasificar como libre un lote comprometido.
+    // Protección transitoria mientras se valida la lectura autorizada bajo RLS.
+    public boolean puedeVerificarIntegridadPublicacion() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT NOT (
+                pg_catalog.row_security_active('public.inm_proyectos'::regclass)
+                OR pg_catalog.row_security_active('public.inm_lotes'::regclass)
+                OR pg_catalog.row_security_active('public.inm_lotes_precios'::regclass)
+                OR pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass)
+                OR pg_catalog.row_security_active('public.inm_configuracion_comercial_borradores'::regclass)
+                OR pg_catalog.row_security_active('public.inm_ajustes_tipo_lote'::regclass)
+                OR pg_catalog.row_security_active('public.inm_etapas_comerciales'::regclass)
+                OR pg_catalog.row_security_active('public.inm_etapas'::regclass)
+                OR pg_catalog.row_security_active('public.inm_manzanas'::regclass)
+                OR pg_catalog.row_security_active('public.inm_zonas'::regclass)
+                OR pg_catalog.row_security_active('public.cfg_estados_lote'::regclass)
+                OR pg_catalog.row_security_active('public.cfg_monedas'::regclass)
+                OR pg_catalog.row_security_active('public.ven_reservas'::regclass)
+                OR pg_catalog.row_security_active('public.ven_ventas'::regclass)
+                OR pg_catalog.row_security_active('public.cfg_estados_reserva'::regclass)
+                OR pg_catalog.row_security_active('public.cfg_estados_venta'::regclass)
+            )
+            """, Boolean.class));
+    }
+
     public int versionPublicada(Long proyecto) {
         return jdbc.queryForObject("""
             SELECT coalesce(max(version),0) FROM public.inm_politicas_comerciales_publicadas WHERE id_proyecto=?

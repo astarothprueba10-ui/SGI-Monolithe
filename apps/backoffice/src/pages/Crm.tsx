@@ -1,3 +1,4 @@
+import { CrmLoteInteresPanel } from '../components/crm/CrmLoteInteresPanel';
 import { LeadPhoneField } from '../components/crm/LeadPhoneField';
 import { serializeLeadPhone } from '../lib/leadPhone';
 import { LeadDocumentFields } from '../components/crm/LeadDocumentFields';
@@ -58,7 +59,6 @@ import {
   type CrmVisitaPeriodo,
 } from '../services/crmBackend';
 import { cn } from '../utils/cn';
-import { currency } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
 import {
   CrmPeriodoGlobal,
@@ -239,25 +239,11 @@ const KPI_CRM = [
 ] as const;
 
 export function Crm() {
-  const { user, can } = useAuth();
+  const { can } = useAuth();
 
-  const puedeVerGestionGlobal = user.roles.some(
-    (rol) => rol === 'Administrador' || rol === 'Gerencia' || rol === 'Supervisor comercial'
-  );
-
-  const puedeElegirAsesor = user.roles.some(
-    (rol) =>
-      rol === 'Administrador' ||
-      rol === 'Gerencia' ||
-      rol === 'Supervisor comercial'
-  );
-
-  const puedeGestionarRetrocesos = user.roles.some(
-    (rol) =>
-      rol === 'Gerencia' ||
-      rol === 'Supervisor comercial' ||
-      rol === 'Administrador'
-  );
+  const puedeVerGestionGlobal = can('crm.view') && can('crm.scope_all');
+  const puedeElegirAsesor = can('crm.assign_advisor') && can('crm.edit');
+  const puedeGestionarRetrocesos = can('crm.approve_stage_change') && can('crm.view');
 
   const [tab, setTab] = useState('leads');
   const [query, setQuery] = useState('');
@@ -419,7 +405,6 @@ export function Crm() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [followUpsList, setFollowUpsList] = useState<CrmFollowUpItem[]>([]);
   const [isLoadingFollowUps, setIsLoadingFollowUps] = useState(false);
-  const [detailVisitsList, setDetailVisitsList] = useState<CrmVisit[]>([]);
   const [assignmentsList, setAssignmentsList] = useState<CrmAssignment[]>([]);
 
   // Modales de gestion
@@ -920,18 +905,15 @@ export function Crm() {
     setIsLoadingFollowUps(true);
     setLeadDetail(null);
     setFollowUpsList([]);
-    setDetailVisitsList([]);
     setAssignmentsList([]);
     try {
-      const [det, follows, visits, assignments] = await Promise.all([
+      const [det, follows, assignments] = await Promise.all([
         crmBackend.detalle(id),
         crmBackend.listarSeguimientos(id, 100).catch(() => []),
-        crmBackend.visitas(id).catch(() => []),
         crmBackend.listarAsignaciones(id).catch(() => [])
       ]);
       setLeadDetail(det);
       setFollowUpsList(follows || []);
-      setDetailVisitsList(visits || []);
       setAssignmentsList(assignments || []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'No se pudo obtener el expediente.';
@@ -1118,13 +1100,11 @@ export function Crm() {
   const refreshVisitDetails = async (targetId: number) => {
     await loadVisits(targetId);
     if (leadDetail && leadDetail.prospecto.id_prospecto === targetId) {
-      const [det, v, follows] = await Promise.all([
+      const [det, follows] = await Promise.all([
         crmBackend.detalle(targetId),
-        crmBackend.visitas(targetId),
         crmBackend.listarSeguimientos(targetId, 100).catch(() => [])
       ]);
       setLeadDetail(det);
-      setDetailVisitsList(v || []);
       setFollowUpsList(follows || []);
     }
     await Promise.all([loadLeads(), loadCatalogsAndAdvisors()]);
@@ -2494,14 +2474,10 @@ export function Crm() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-2">
               <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Seguimientos</p>
                 <p className="text-lg font-bold text-brand-900">{leadDetail.totalSeguimientos}</p>
-              </div>
-              <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
-                <p className="text-[11px] text-brand-400">Visitas guiadas</p>
-                <p className="text-lg font-bold text-brand-900">{leadDetail.totalVisitas}</p>
               </div>
               <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm">
                 <p className="text-[11px] text-brand-400">Comprador</p>
@@ -2641,92 +2617,10 @@ export function Crm() {
               )}
             </div>
 
-            {/* Visitas guiadas en el Expediente */}
-            <div className="rounded-xl border border-brand-100 bg-white p-3 shadow-sm sm:p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <h4 className="text-[12px] font-semibold uppercase tracking-wide text-brand-700">
-                  Visitas guiadas ({detailVisitsList.length})
-                </h4>
-                {CRM_VISITAS_HABILITADAS && (
-                  <Gate permission="crm.edit">
-                    <Button
-                      size="sm"
-                      icon={CalendarIcon}
-                      onClick={() => {
-                        setVisitForm({
-                          prospectId: leadDetail.prospecto.id_prospecto,
-                          projectId: leadDetail.intereses?.[0]?.idProyecto || catalogs?.proyectos?.[0]?.id || 1,
-                          advisorId: leadDetail.prospecto.id_asesor || advisorsList[0]?.id_asesor || 0,
-                          visitDate: '',
-                          shift: '11:00',
-                          meetingPoint: 'Oficina de Ventas - Lurin',
-                          notes: ''
-                        });
-                        setIsNewVisitOpen(true);
-                      }}
-                    >
-                      Agendar visita
-                    </Button>
-                  </Gate>
-                )}
-              </div>
-              {detailVisitsList.length === 0 ? (
-                <p className="text-xs text-brand-400 bg-brand-50 p-3 rounded text-center">
-                  Sin visitas guiadas programadas para este prospecto.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {detailVisitsList.map((v) => (
-                    <div
-                      key={v.id_visita}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-100 bg-slate-50/50 p-3 text-xs"
-                    >
-                      <div>
-                        <p className="font-semibold text-brand-900">
-                          {formatDateLima(v.fecha_visita)} (Turno {v.turno})
-                        </p>
-                        <p className="text-[11px] text-brand-500">{v.punto_encuentro}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <StatusBadge
-                          status={
-                            v.estado === 'REALIZADA' ? 'Realizada' :
-                              v.estado === 'CONFIRMADA' ? 'Aprobado' :
-                                v.estado === 'CANCELADA' ? 'Rechazado' : 'Pendiente'
-                          }
-                          className={
-                            v.estado === 'REALIZADA'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : undefined
-                          }
-                        />
-                        {v.estado === 'PROGRAMADA' && (
-                          <Gate permission="crm.edit">
-                            <Button size="sm" onClick={() => handleConfirmVisit(v.id_visita)}>
-                              Confirmar
-                            </Button>
-                          </Gate>
-                        )}
-                        {v.estado === 'CONFIRMADA' && (
-                          <Gate permission="crm.edit">
-                            <Button size="sm" onClick={() => handleCompleteVisit(v.id_visita)}>
-                              Realizada
-                            </Button>
-                          </Gate>
-                        )}
-                        {v.estado !== 'CANCELADA' && v.estado !== 'REALIZADA' && (
-                          <Gate permission="crm.edit">
-                            <Button size="sm" onClick={() => handleCancelVisit(v.id_visita)}>
-                              Cancelar
-                            </Button>
-                          </Gate>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CrmLoteInteresPanel key={leadDetail.prospecto.id_prospecto}
+              detalle={leadDetail} puedeEditar={can('crm.edit') && can('lots.view')}
+              onSaved={()=>refreshFollowUpsAndLeads(leadDetail.prospecto.id_prospecto)}/>
+
           </div>
         )}
       </Modal>

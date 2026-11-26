@@ -122,8 +122,11 @@ public class EmailService {
       helper.setSubject("Restablecimiento de contraseña - MONOLITHE");
 
       helper.setText(
-          construirCuerpoHtml(urlRecuperacion, minutosExpiracion),
-          true);
+          "MONOLITHE - Restablecimiento de contraseña\n\n"
+              + "Abre este enlace para continuar: " + urlRecuperacion
+              + "\nVálido durante " + minutosExpiracion + " minutos y de un solo uso."
+              + "\nSi no solicitaste el cambio, ignora este mensaje.",
+          construirCuerpoHtml(HtmlUtils.htmlEscape(urlRecuperacion), minutosExpiracion));
 
       mailSender.send(mensaje);
 
@@ -151,8 +154,11 @@ public class EmailService {
       helper.setSubject("Código de verificación - MONOLITHE");
 
       helper.setText(
-          construirCuerpoOtpHtml(codigoOtp, minutosExpiracion),
-          true);
+          "MONOLITHE - Código de verificación\n\n"
+              + "Tu código es: " + codigoOtp
+              + "\nVálido durante " + minutosExpiracion + " minutos."
+              + "\nNo compartas este código con nadie.",
+          construirCuerpoOtpHtml(HtmlUtils.htmlEscape(codigoOtp), minutosExpiracion));
 
       mailSender.send(mensaje);
 
@@ -202,8 +208,11 @@ public class EmailService {
       helper.setTo(destinatario);
       helper.setSubject("Confirmación de cambio de correo - MONOLITHE");
       helper.setText(
-          construirCuerpoConfirmacionCambioCorreoHtml(urlConfirmacion, minutosExpiracion),
-          true);
+          "MONOLITHE - Confirmación de cambio de correo\n\n"
+              + "Abre este enlace para confirmar: " + urlConfirmacion
+              + "\nVálido durante " + minutosExpiracion + " minutos y de un solo uso."
+              + "\nSi no solicitaste el cambio, ignora este mensaje.",
+          construirCuerpoConfirmacionCambioCorreoHtml(HtmlUtils.htmlEscape(urlConfirmacion), minutosExpiracion));
       mailSender.send(mensaje);
     } catch (MessagingException e) {
       log.error("Error al construir el correo de confirmación de cambio de correo");
@@ -316,7 +325,7 @@ public class EmailService {
                                 color:#4a5568;
                                 line-height:1.6;">
                         Recibimos una solicitud para restablecer la contraseña
-                        asociada a tu cuenta. Si fuiste tú, usa el botón a
+                        asociada a tu cuenta. Si fuiste tú, usa el botón
                         para continuar.
                       </p>
 

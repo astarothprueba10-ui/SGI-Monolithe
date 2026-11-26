@@ -31,9 +31,9 @@ jobs:
         working-directory: ${{ matrix.app }}
         run: npm install
 
-      - name: TypeScript strict validation (Portal Cliente)
-        if: matrix.app == 'apps/portal-cliente'
-        working-directory: apps/portal-cliente
+      - name: TypeScript strict validation
+        if: matrix.app == 'apps/portal-cliente' || matrix.app == 'apps/backoffice'
+        working-directory: ${{ matrix.app }}
         run: npx --no-install tsc --noEmit -p tsconfig.json
 
       - name: Verify Portal Cliente integration wiring
@@ -114,7 +114,7 @@ jobs:
       - name: Validate sales period labels
         if: matrix.app == 'apps/backoffice'
         working-directory: apps/backoffice
-        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs
+        run: node --require ./tests/register-types.cjs --test tests/ventasComercial.test.cjs tests/pagosSeparacion.test.cjs
 
       - name: Validate French financing and down-payment rules
         if: matrix.app == 'apps/backoffice'
@@ -131,7 +131,7 @@ jobs:
           node-version: 20
       - name: Test CRM form rules
         working-directory: apps/backoffice
-        run: node --test tests/crm_bloque4.test.mjs tests/crm_unit.test.mjs
+        run: node --test tests/crm_bloque4.test.mjs tests/crm_unit.test.mjs tests/ventasRecompra.test.mjs tests/finanzasCobrosVentas.test.mjs tests/separacionesVencidas.test.mjs tests/finanzasCobrosConciliacion.test.mjs tests/finanzasCuentaSubsanacion.test.mjs tests/ventasAgrupadas.test.mjs tests/finanzasDesgloseVenta.test.mjs
 
   mfa-login-browser-tests:
     name: MFA login - Backoffice y Portal Cliente
@@ -390,6 +390,37 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/126_planos_grants_core_service_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_core_grants_v1_pg_test.sql
 
+  separaciones-acumuladas-postgres:
+    name: Separaciones acumuladas - PostgreSQL 17 aislado
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: separaciones_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: separaciones_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d separaciones_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: separaciones_ci_password
+      PGDATABASE: separaciones_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probar registro, revisión y conciliación acumulados
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/separaciones_acumuladas_154_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/154_separaciones_pago_acumulado_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/separaciones_acumuladas_154_pg_test.sql
+
   crm-postgres-validation:
     name: CRM cartera y riesgo - PostgreSQL 17 aislado
     runs-on: ubuntu-latest
@@ -432,6 +463,11 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/crm_compradores_unicos_131_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/132_crm_fuentes_captacion_historico_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/crm_fuentes_historico_132_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/133_ventas_recompra_comprador_existente_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/ventas_recompra_133_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/134_fin_bandeja_cobros_ventas_pendientes_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/135_fin_cobros_pendientes_alias_paginacion.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fin_cobros_ventas_pendientes_135_pg_test.sql
 
   deploy-oracle:
     name: Deploy to Oracle Cloud

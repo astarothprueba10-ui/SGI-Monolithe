@@ -18,6 +18,6 @@ export const projectSvgService = {
     return coreApi.get<PlanoSvgProyectoResponse | null>(`/planos/proyecto/${proyecto}/svg`);
   },
   guardar(proyecto: number, documento: PlanoSvgDocumento): Promise<PlanoSvgProyectoResponse> {
-    return coreApi.put<PlanoSvgProyectoResponse>(`/planos/proyecto/${proyecto}/svg`, documento);
+    return coreApi.put<PlanoSvgProyectoResponse>(`/planos/proyecto/${proyecto}/svg`, {...documento});
   }
 };

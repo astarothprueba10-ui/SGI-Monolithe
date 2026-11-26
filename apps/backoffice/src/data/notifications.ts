@@ -7,7 +7,7 @@ export interface Notification {
   title: string;
   description: string;
   time: string;
-  module: 'financing';
+  module: 'financing' | 'sales';
   to: string;
   tone: 'warning' | 'danger';
 }

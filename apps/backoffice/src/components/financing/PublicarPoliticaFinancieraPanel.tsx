@@ -4,6 +4,8 @@ import { formatSoles } from '../../utils/financeMoney';
 import { Alert } from '../ui/Feedback';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
+import { Modal } from '../ui/Modal';
+import { ApiError } from '../../lib/apiClient';
 import type { PoliticaFinanciamientoActual } from '../../services/financingConfigService';
 import {
   crearBorradorPolitica,
@@ -11,6 +13,25 @@ import {
   type BorradorFinanciero,
   type VistaPreviaPolitica
 } from '../../services/financingPolicyPublicationService';
+
+type ErrorFinanciero = { titulo: string; mensaje: string; reintentarCodigo: boolean };
+function interpretarErrorFinanciero(e: unknown, etapa: 'validacion' | 'totp' | 'publicacion'): ErrorFinanciero {
+  const status = e instanceof ApiError ? e.status : undefined;
+  const mensaje = e instanceof Error ? e.message : '';
+  if (etapa === 'totp' && status === 400 && /código de autenticación inválido/i.test(mensaje))
+    return {titulo:'Código del autenticador rechazado',mensaje:'El código es incorrecto, ha caducado o ya fue utilizado. Ingresa un código nuevo de 6 dígitos. Tu propuesta sigue validada.',reintentarCodigo:true};
+  if (status === 429)
+    return {titulo:'Autenticador bloqueado temporalmente',mensaje:'La protección por intentos fallidos está activa. Espera a que termine el bloqueo antes de intentarlo de nuevo.',reintentarCodigo:false};
+  if (status === 401 || status === 403)
+    return {titulo:'No se pudo autorizar la operación',mensaje:mensaje && !/^Error HTTP/i.test(mensaje) ? mensaje : 'Comprueba que tu sesión de Gerencia esté vigente y que el autenticador esté habilitado. Si persiste, vuelve a iniciar sesión.',reintentarCodigo:false};
+  if (status === 423)
+    return {titulo:'Publicación no habilitada',mensaje:'La autorización de publicación está bloqueada. Consulta con el administrador y vuelve a validar la propuesta.',reintentarCodigo:false};
+  if (status === 409)
+    return {titulo:'La operación requiere una nueva validación',mensaje:mensaje && !/^Error HTTP/i.test(mensaje) ? mensaje : 'La versión o autorización ya no es vigente. Consulta la política actual y vuelve a validar.',reintentarCodigo:false};
+  if (etapa === 'publicacion' && (status === undefined || status >= 500))
+    return {titulo:'No se pudo confirmar la publicación',mensaje:'Consulta el historial y la versión vigente antes de volver a publicar. No se ha confirmado el resultado de la operación.',reintentarCodigo:false};
+  return {titulo:'No se completó la operación',mensaje:mensaje && !/^Error HTTP/i.test(mensaje) && status !== undefined && status < 500 ? mensaje : 'No se pudo completar la solicitud. Revisa la conexión y vuelve a validar las condiciones.',reintentarCodigo:false};
+}
 
 type CampoNumero = 'montoSeparacion' | 'inicialMinima' | 'inicialMaxima' |
   'inicialFija' | 'tasaNominalAnualPct' | 'cuotasMin' | 'cuotasMax' |
@@ -29,7 +50,7 @@ export function PublicarPoliticaFinancieraPanel({
   const [codigo, setCodigo] = useState('');
   const [ensayoValidado, setEnsayoValidado] = useState(false);
   const [ocupado, setOcupado] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ErrorFinanciero | null>(null);
   const [mensaje, setMensaje] = useState('');
 
   useEffect(() => {
@@ -39,7 +60,7 @@ export function PublicarPoliticaFinancieraPanel({
     setCodigo('');
     setEnsayoValidado(false);
     setFrase('');
-    setError('');
+    setError(null);
   }, [politica.idPolitica]);
 
   function actualizar(cambio: Partial<BorradorFinanciero>) {
@@ -49,7 +70,7 @@ export function PublicarPoliticaFinancieraPanel({
     setFrase('');
     setCodigo('');
     setEnsayoValidado(false);
-    setError('');
+    setError(null);
     setMensaje('');
   }
   function numero(campo: CampoNumero, valor: string) {
@@ -65,20 +86,20 @@ export function PublicarPoliticaFinancieraPanel({
   }
 
   const previsualizar=async()=>{
-    setOcupado(true);setError('');setMensaje('');setCodigo('');setEnsayoValidado(false);
+    setOcupado(true);setError(null);setMensaje('');setCodigo('');setEnsayoValidado(false);
     try {
       const r=await financingPolicyPublicationService.previsualizar(politica.version,borrador);
       setVista(r);
     } catch(e) {
       setVista(null);
-      setError(e instanceof Error?e.message:'No se pudo validar el borrador financiero.');
+      setError(interpretarErrorFinanciero(e,'validacion'));
     } finally {setOcupado(false);}
   };
 
   /** Firma de prueba ligada a la huella SQL, sin crear recibo publicador ni nueva versión. */
   const ensayarTotp=async()=>{
     if(!vista || vista.publicacionHabilitada || ensayoValidado || !/^[0-9]{6}$/.test(codigo)) return;
-    setOcupado(true);setError('');setMensaje('');
+    setOcupado(true);setError(null);setMensaje('');
     const codigoTemporal=codigo;
     setCodigo('');
     try {
@@ -92,24 +113,26 @@ export function PublicarPoliticaFinancieraPanel({
       setEnsayoValidado(true);
       setMensaje('Verificación de seguridad correcta. La propuesta continúa sin publicarse.');
     } catch(e) {
-      setError(e instanceof Error?e.message:'No se pudo completar el ensayo TOTP.');
+      setError(interpretarErrorFinanciero(e,'totp'));
     } finally {setOcupado(false);}
   };
 
   const publicar=async()=>{
     if(!vista?.publicacionHabilitada || !confirmado ||
        frase!==`PUBLICAR V${vista.versionNueva}` || !/^[0-9]{6}$/.test(codigo)) return;
-    setOcupado(true);setError('');setMensaje('');
+    setOcupado(true);setError(null);setMensaje('');
     const firmaTotp=codigo;
     const propuesta={...borrador};
     const comprobacion={...vista};
     setCodigo(''); // El código no permanece en la pantalla después de enviarlo.
+    let etapa: 'totp' | 'publicacion' = 'totp';
     try {
       const nonce=crypto.randomUUID();
       const recibo=await financingPolicyPublicationService.autorizar(
         politica.version,propuesta,firmaTotp,nonce);
       if(!recibo.publicacionHabilitada || recibo.hashPropuesta!==comprobacion.hashPropuesta)
         throw new Error('La propuesta cambió durante la autorización. Revalide los datos.');
+      etapa = 'publicacion';
       const resultado=await financingPolicyPublicationService.publicar(
         politica.version,propuesta,recibo.autorizacionId,nonce);
       if(!resultado.publicado || resultado.version!==comprobacion.versionNueva ||
@@ -120,9 +143,12 @@ export function PublicarPoliticaFinancieraPanel({
       setMensaje(`Política financiera versión ${resultado.version} publicada y auditada.`);
       onPublicada();
     } catch(e) {
-      setVista(null);
-      setConfirmado(false);setFrase('');
-      setError(e instanceof Error?e.message:'No se pudo publicar la nueva política.');
+      const detalle = interpretarErrorFinanciero(e,etapa);
+      if (!detalle.reintentarCodigo) {
+        setVista(null);
+        setConfirmado(false);setFrase('');
+      }
+      setError(detalle);
       // Un TOTP autorizado no se reintenta ni se reutiliza.
       // No asumimos éxito ni borramos el borrador ante un error de red.
     } finally {setOcupado(false);}
@@ -140,9 +166,11 @@ export function PublicarPoliticaFinancieraPanel({
     'tasaNominalAnualPct','cuotasMin','cuotasMax','diasVencimientoSeparacion'
   ];
   const cambiosPendientes = camposEditables.filter(c => borrador[c] !== politica[c]).length +
-    Number(borrador.modoInicial !== politica.modoInicial);
+    Number(borrador.modoInicial !== politica.modoInicial) + Number(borrador.modoAplicacion !== politica.modoAplicacion);
 
   const comparacion = vista ? [
+    { etiqueta: 'Aplicación', actual: politica.modoAplicacion??'GENERAL', nueva: vista.condiciones.modoAplicacion??'GENERAL',
+      cambia: Boolean(politica.idProyecto && politica.modoAplicacion!==vista.condiciones.modoAplicacion) },
     { etiqueta: 'Separación', actual: formatSoles(politica.montoSeparacion),
       nueva: formatSoles(vista.condiciones.montoSeparacion),
       cambia: politica.montoSeparacion !== vista.condiciones.montoSeparacion },
@@ -174,7 +202,7 @@ export function PublicarPoliticaFinancieraPanel({
     </span>
     <Input type="number"
       className="mt-1 w-full tabular-nums"
-      value={borrador[campo]??''} min={min} step={step} disabled={ocupado}
+      value={borrador[campo]??''} min={min} step={step} disabled={ocupado || borrador.modoAplicacion==='GENERAL'}
       onChange={e=>numero(campo,e.target.value)}/>
   </label>;
 
@@ -187,7 +215,7 @@ export function PublicarPoliticaFinancieraPanel({
             Versión a actualizar
           </p>
           <h3 id="version-financiera-nueva" className="mt-1 text-xl font-bold text-brand-950">
-            Propuesta · Versión {politica.version + 1}
+            Propuesta · Versión {politica.versionSiguiente ?? politica.version + 1}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-brand-500">
             Ajuste las condiciones y revise los cambios antes de solicitar autorización.
@@ -209,9 +237,24 @@ export function PublicarPoliticaFinancieraPanel({
         <span className="font-semibold">{cambiosPendientes} {cambiosPendientes===1 ? 'campo modificado' : 'campos modificados'}</span>
       </div>
 
-      {error && <Alert tone="danger" title="No se completó la operación">{error}</Alert>}
-      {mensaje && <Alert tone="success" title="Confirmación">{mensaje}</Alert>}
+       {mensaje && <Alert tone="success" title="Confirmación">{mensaje}</Alert>}
 
+      {politica.idProyecto && <label className="block text-xs font-medium text-brand-700">
+        Aplicación de la política
+        <select disabled={ocupado} value={borrador.modoAplicacion}
+          className="mt-1 min-h-9 w-full rounded-md border border-brand-200 bg-white px-3"
+          onChange={e=>{
+            const modo=e.target.value as 'GENERAL'|'PROPIA';
+            if(modo==='GENERAL' && politica.politicaGeneral){
+              const g=crearBorradorPolitica(politica.politicaGeneral);
+              actualizar({...g,modoAplicacion:modo,motivoPublicacion:borrador.motivoPublicacion});
+            } else actualizar({modoAplicacion:modo});
+          }}>
+          <option value="GENERAL">Heredar política general vigente</option>
+          <option value="PROPIA">Política propia del proyecto</option>
+        </select>
+        <span className="mt-1 block text-brand-500">Hasta 36 cuotas en esta fase. La política propia no cambia las operaciones existentes.</span>
+      </label>}
       <div className="grid grid-cols-1 gap-x-3 gap-y-4 sm:grid-cols-2">
         {entrada('Cuota de separación (S/)', 'montoSeparacion','0.01','0.01')}
         <label className="block min-w-0 text-xs font-medium text-brand-700">
@@ -219,7 +262,7 @@ export function PublicarPoliticaFinancieraPanel({
             <span>Modalidad de inicial</span>
             {borrador.modoInicial !== politica.modoInicial && <span className="font-semibold text-amber-700">Modificado</span>}
           </span>
-          <select disabled={ocupado} value={borrador.modoInicial}
+          <select disabled={ocupado || borrador.modoAplicacion==='GENERAL'} value={borrador.modoInicial}
             className="mt-1 min-h-9 w-full rounded-md border border-brand-200 bg-white px-3 text-sm text-brand-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             onChange={e=>modoInicial(e.target.value as BorradorFinanciero['modoInicial'])}>
             <option value="MINIMA">Inicial mínima</option>
@@ -253,12 +296,14 @@ export function PublicarPoliticaFinancieraPanel({
         </span>
       </label>
 
-      <Button variant="primary" className="w-full sm:w-auto"
-        onClick={()=>void previsualizar()}
-        disabled={ocupado || cambiosPendientes===0 || borrador.motivoPublicacion.trim().length<12}>
-        <FileCheck2Icon className="h-4 w-4" aria-hidden="true"/>
-        {ocupado ? 'Validando condiciones…' : 'Validar propuesta'}
-      </Button>
+      <div className="flex flex-wrap items-center justify-start gap-3 pt-2">
+        <Button variant="primary" icon={FileCheck2Icon}
+          className="w-full min-h-11 px-4 py-2 sm:h-auto sm:min-h-11 sm:w-auto sm:py-2"
+          onClick={()=>void previsualizar()}
+          disabled={ocupado || cambiosPendientes===0 || borrador.motivoPublicacion.trim().length<12}>
+          {ocupado ? 'Validando condiciones…' : 'Validar propuesta'}
+        </Button>
+      </div>
 
       {vista && <div className="space-y-4 rounded-xl border border-sky-200 bg-sky-50/50 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -292,7 +337,7 @@ export function PublicarPoliticaFinancieraPanel({
           <p className="mt-1 break-all font-mono">{vista.hashPropuesta}</p>
         </details>
 
-        {!vista.publicacionHabilitada ? <div className="space-y-3">
+         {!vista.publicacionHabilitada ? <div className="space-y-3">
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <LockKeyholeIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true"/>
             <div>
@@ -338,15 +383,16 @@ export function PublicarPoliticaFinancieraPanel({
             He revisado las condiciones y confirmo que solo aplicarán a nuevas operaciones.
           </label>
           <label className="block text-xs font-medium text-brand-800">
-            Escriba PUBLICAR V{vista.versionNueva} para confirmar
+            Escriba “PUBLICAR V{vista.versionNueva}” para confirmar
             <Input className="mt-1 w-full" value={frase} disabled={ocupado}
               onChange={e=>setFrase(e.target.value.toUpperCase())}/>
           </label>
           <label className="block text-xs font-medium text-brand-800">
-            Código TOTP de su autenticador
+            Código TOTP de su autenticador (6 dígitos)
             <Input className="mt-1 w-full" type="text" inputMode="numeric"
               autoComplete="one-time-code" maxLength={6} value={codigo} disabled={ocupado}
               onChange={e=>setCodigo(e.target.value.replace(/\D/g,'').slice(0,6))}/>
+            <span className="mt-1 block text-xs text-brand-500">Utilice un código nuevo y vigente. No vuelva a usar un código ya aceptado.</span>
           </label>
           <Button variant="primary" className="w-full sm:w-auto"
             onClick={()=>void publicar()}
@@ -356,5 +402,12 @@ export function PublicarPoliticaFinancieraPanel({
         </div>}
       </div>}
     </div>
+    <Modal open={error !== null} onClose={()=>setError(null)}
+      title={error?.titulo ?? 'Aviso de publicación'} width="max-w-md"
+      footer={<Button variant="primary" onClick={()=>setError(null)}>
+        {error?.reintentarCodigo ? 'Ingresar nuevo código' : 'Entendido'}
+      </Button>}>
+      {error && <div role="alert"><Alert tone="warning" title="Revise la operación">{error.mensaje}</Alert></div>}
+    </Modal>
   </section>;
 }

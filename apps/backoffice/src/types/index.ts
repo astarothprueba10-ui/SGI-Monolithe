@@ -36,7 +36,24 @@ export type Action =
   | 'projects_visibility'
   | 'publish';
 
-export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review';
+export type Permission = `${ModuleKey}.${Action}` | 'sales.legal.review'
+  | 'crm.scope_all'
+  | 'crm.scope_assigned'
+  | 'crm.assign_advisor'
+  | 'crm.approve_stage_change'
+  | 'crm.request_stage_change'
+  | 'crm.deactivate_prospect'
+  | 'sales.scope_all'
+  | 'sales.contract_scope_all'
+  | 'sales.approve_reservation_change'
+  | 'sales.notify_expiry_all'
+  | 'sales.reassign_advisor'
+  | 'annulments.scope_all'
+  | 'annulments.request_global'
+  | 'crm.operate_advisor'
+  | 'hr.manage_all'
+  | 'hr.approve_reincorporation'
+  | 'hr.approve_documents';
 
 export type RoleName =
   | 'Administrador'
@@ -120,6 +137,8 @@ export interface Lead {
 }
 
 export interface Sale {
+  groupId?:string;
+  groupedLots?:{idReserva:number;codigo:string;lote:string;monto:number;estado:string;fechaVencimiento:string}[];
   id: string;
   code: string;
   type: 'Separación' | 'Venta';

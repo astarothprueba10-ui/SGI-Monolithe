@@ -175,7 +175,7 @@ export function ForgotPassword() {
 
                                 <p className="mt-1 text-[13px] leading-relaxed text-brand-400">
 
-                                    Ingresa tu Usuario Monolithe y te enviaremos
+                                    Ingresa tu Usuario Monolithe o tu correo asociado y te enviaremos
                                     un enlace de recuperación al correo electrónico
                                     asociado a tu cuenta.
 
@@ -211,7 +211,7 @@ export function ForgotPassword() {
 
                                     <FieldLabel htmlFor="usuarioRecuperacion">
 
-                                        Nombre de usuario
+                                        Usuario o correo electrónico
 
                                     </FieldLabel>
 
@@ -227,7 +227,7 @@ export function ForgotPassword() {
                                         }
                                         maxLength={120}
                                         autoComplete="username"
-                                        placeholder="Ingresa tu Usuario Monolithe"
+                                        placeholder="Usuario Monolithe o correo asociado"
                                         disabled={loading}
                                     />
 

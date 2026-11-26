@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.mail.MailException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.server.ResponseStatusException;
+import monolithe.auth_service.exception.MfaFlowException;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -61,7 +62,7 @@ public class FinancingTotpService {
         OffsetDateTime bloqueo, OffsetDateTime habilitado) {}
 
     private static ResponseStatusException fallo(HttpStatus status, String mensaje) {
-        return new ResponseStatusException(status, mensaje);
+        return new MfaFlowException(status, mensaje);
     }
 
     private long actor(Jwt jwt) {
@@ -135,6 +136,7 @@ public class FinancingTotpService {
         auditar(id,n>=5?"MFA_FIN_BLOQUEO":"MFA_FIN_CODIGO_INVALIDO",
             n>=5?"Intentos fallidos: bloqueo temporal TOTP.":"Intento TOTP fallido.");
         if(n>=5) avisarDespuesCommit(id,"BLOQUEO DE AUTENTICADOR POR INTENTOS FALLIDOS");
+        if(n>=5) throw fallo(HttpStatus.TOO_MANY_REQUESTS, "Autenticador bloqueado durante 15 minutos por intentos fallidos.");
         throw fallo(HttpStatus.BAD_REQUEST, "Código de autenticación inválido, caducado o reutilizado.");
     }
 

@@ -5,7 +5,7 @@ import {
 } from '../services/crmBackend';
 import type {RangoCrm} from './crmPeriodo';
 
-const AZUL='0E1F33', DORADO='D9B168', VERDE='4CBB17', SUAVE='F4F7FA', BORDE='E5EDF5';
+const AZUL='0E1F33', SUAVE='F4F7FA', BORDE='E5EDF5';
 const FORMATO_SOLES='"S/ " #,##0.00;[Red]("S/ " #,##0.00)';
 const LIMITE_PAGINAS=1000;
 
@@ -54,7 +54,7 @@ function cabecera(ws:ExcelJS.Worksheet,fila:number,nombres:string[]){
   });
   ws.views=[{state:'frozen',ySplit:fila}];
   ws.autoFilter={from:{row:fila,column:1},to:{row:fila,column:nombres.length}};
-  ws.printTitlesRow=`1:${fila}`;
+  ws.pageSetup.printTitlesRow=`1:${fila}`;
 }
 function filaEstilo(ws:ExcelJS.Worksheet,indice:number,monedas:number[],fechas:number[],estado?:{col:number,tipo:string}){
   const row=ws.getRow(indice);row.height=25;

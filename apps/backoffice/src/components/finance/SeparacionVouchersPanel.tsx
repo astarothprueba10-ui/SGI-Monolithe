@@ -79,11 +79,11 @@ export function SeparacionVouchersPanel() {
     if (!approvingItem) return;
     setProcessingAction(true);
     try {
-      await crmBackend.revisarVoucherSeparacion(approvingItem.id_voucher, {
+      const resultado=await crmBackend.revisarVoucherSeparacion(approvingItem.id_voucher, {
         aprobar: true
       });
       toast.success('Comprobante aprobado exitosamente', {
-        description: `Pago confirmado y reserva ${approvingItem.codigo_reserva} activada.`
+        description: resultado?.message || 'Abono confirmado.'
       });
       setApprovingItem(null);
       await fetchVouchers();
@@ -103,13 +103,13 @@ export function SeparacionVouchersPanel() {
     }
     setProcessingAction(true);
     try {
-      await crmBackend.revisarVoucherSeparacion(rejectingItem.id_voucher, {
+      const resultado=await crmBackend.revisarVoucherSeparacion(rejectingItem.id_voucher, {
         aprobar: false,
         motivo: rejectMotive.trim(),
         observaciones: rejectNotes.trim() || undefined
       });
       toast.success('Comprobante rechazado', {
-        description: `Pago anulado y reserva ${rejectingItem.codigo_reserva} cancelada.`
+        description: resultado?.message || 'Comprobante rechazado.'
       });
       setRejectingItem(null);
       setRejectMotive('');
@@ -196,7 +196,7 @@ export function SeparacionVouchersPanel() {
                   <p className="text-[11px] text-brand-500 font-mono">{row.documento_cliente}</p>
                 </TD>
                 <TD className="text-xs font-medium text-brand-800">
-                  {row.codigo_lote || `Lote #${row.id_lote}`}
+                  {row.lotes_grupo || row.codigo_lote || `Lote #${row.id_lote}`}{row.id_grupo&&<p className="text-xs text-brand-500">Operación acumulada</p>}
                 </TD>
                 <TD className="text-xs">
                   <p className="font-medium text-brand-900">{row.nombre_metodo_pago || row.metodo_pago}</p>
@@ -205,7 +205,7 @@ export function SeparacionVouchersPanel() {
                   )}
                 </TD>
                 <TD align="right" className="font-bold text-xs text-brand-900">
-                  {currency(row.monto ?? 500)}
+                  {currency(row.monto)}
                 </TD>
                 <TD className="text-xs text-brand-600">
                   {row.fecha_carga ? new Date(row.fecha_carga).toLocaleDateString('es-PE', {
@@ -244,7 +244,7 @@ export function SeparacionVouchersPanel() {
                           size="sm"
                           icon={CheckCircleIcon}
                           onClick={() => setApprovingItem(row)}
-                          title="Aprobar pago y activar reserva"
+                          title="Aprobar comprobante"
                         >
                           Aprobar
                         </Button>
@@ -257,7 +257,7 @@ export function SeparacionVouchersPanel() {
                             setRejectMotive('');
                             setRejectNotes('');
                           }}
-                          title="Rechazar voucher y cancelar reserva"
+                          title="Rechazar comprobante"
                         >
                           Rechazar
                         </Button>
@@ -302,7 +302,7 @@ export function SeparacionVouchersPanel() {
         open={approvingItem !== null}
         onClose={() => setApprovingItem(null)}
         title="Confirmar Aprobacion de Separacion"
-        description="Esta accion confirmara el pago reglamentario de S/ 500.00 PEN y activara la reserva formalmente."
+        description="Confirma el importe real del comprobante. Revisa los datos antes de aprobar."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setApprovingItem(null)}>
@@ -321,11 +321,11 @@ export function SeparacionVouchersPanel() {
         {approvingItem && (
           <div className="space-y-3 text-xs text-brand-800">
             <p><span className="font-semibold text-brand-950">Cliente:</span> {approvingItem.nombre_cliente}</p>
-            <p><span className="font-semibold text-brand-950">Lote:</span> {approvingItem.codigo_lote}</p>
-            <p><span className="font-semibold text-brand-950">Monto:</span> {currency(approvingItem.monto ?? 500)} PEN</p>
+            <p><span className="font-semibold text-brand-950">Lote:</span> {approvingItem.lotes_grupo || approvingItem.codigo_lote}</p>
+            <p><span className="font-semibold text-brand-950">Monto:</span> {currency(approvingItem.monto)} PEN</p>
             <p><span className="font-semibold text-brand-950">Metodo:</span> {approvingItem.nombre_metodo_pago || approvingItem.metodo_pago} {approvingItem.numero_operacion ? `(OP: ${approvingItem.numero_operacion})` : ''}</p>
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900">
-              Al aprobar, el voucher pasara a estado APROBADO, el pago a CONFIRMADO y la reserva a VIGENTE.
+              {approvingItem.id_grupo?'Se confirma este abono. Las reservas pasan a VIGENTE cuando todos los abonos se aprueban y no han vencido.':'Al aprobar, se confirma el pago. Si la reserva venció, permanece anulada; en caso contrario pasa a VIGENTE.'}
             </div>
           </div>
         )}
@@ -336,7 +336,7 @@ export function SeparacionVouchersPanel() {
         open={rejectingItem !== null}
         onClose={() => setRejectingItem(null)}
         title="Rechazar Comprobante de Separacion"
-        description="Esta accion anulara el pago registrado, cancelara la reserva y liberara el lote a DISPONIBLE (salvo que exista una venta en curso)."
+        description={rejectingItem?.id_grupo?'Se rechaza este abono. Los lotes quedarán retenidos para revisión de la operación completa.':'Se anulará el pago y cancelará la reserva, según las reglas vigentes.'}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setRejectingItem(null)}>
@@ -377,7 +377,7 @@ export function SeparacionVouchersPanel() {
               />
             </div>
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-900">
-              Al confirmar el rechazo, el voucher pasara a RECHAZADO, el pago a ANULADO y la reserva a CANCELADA.
+              {rejectingItem.id_grupo?'El voucher pasará a RECHAZADO y este pago a ANULADO. No se liberarán automáticamente los lotes ni se anularán los demás abonos.':'El voucher pasa a RECHAZADO, el pago a ANULADO y la reserva a CANCELADA.'}
             </div>
           </div>
         )}

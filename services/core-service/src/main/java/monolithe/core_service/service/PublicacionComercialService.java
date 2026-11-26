@@ -8,6 +8,8 @@ import monolithe.core_service.entity.AjusteTipoLote;
 import monolithe.core_service.exception.*;
 import monolithe.core_service.repository.*;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
@@ -27,6 +29,7 @@ public class PublicacionComercialService {
 
     @Transactional(readOnly=true)
     public PublicacionComercialResponse previsualizar(Long proyecto, PublicacionComercialRequest request) {
+        exigirIntegridadPublicacion();
         if (!repository.proyectoHabilitado(proyecto)) throw new ReglaNegocioException("Proyecto no habilitado.");
         var config = configuracion.obtener(proyecto);
         int publicada = repository.versionPublicada(proyecto);
@@ -42,6 +45,7 @@ public class PublicacionComercialService {
 
     @Transactional
     public PublicacionComercialResponse publicar(Long proyecto, Long actor, PublicacionComercialRequest request) {
+        exigirIntegridadPublicacion();
         repository.bloquearProyecto(proyecto);
         var previo = previsualizar(proyecto,request);
         if (!previo.huella().equals(request.huella())) throw new ConflictoNegocioException("La revisión cambió. Valida de nuevo.");
@@ -50,6 +54,13 @@ public class PublicacionComercialService {
         repository.publicar(proyecto,previo.version(),actor);
         previo.lotes().forEach(f -> registrar(proyecto,previo.version(),actor,f));
         return new PublicacionComercialResponse(previo.version(),previo.version(),previo.huella(),true,previo.lotes());
+    }
+
+    private void exigirIntegridadPublicacion() {
+        if (!repository.puedeVerificarIntegridadPublicacion()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No se puede verificar la integridad de la publicación comercial. No se realizaron cambios.");
+        }
     }
 
     public int versionPublicada(Long proyecto) {

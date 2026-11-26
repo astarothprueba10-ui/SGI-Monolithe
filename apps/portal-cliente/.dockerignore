@@ -3,3 +3,11 @@ dist/
 .git/
 *.log
 .env.local
+
+# Excluir configuracion privada del contexto de build
+.env
+.env.*
+.secret/
+secrets/
+*.pem
+*.key

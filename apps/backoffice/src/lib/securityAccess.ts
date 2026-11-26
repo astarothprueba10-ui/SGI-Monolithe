@@ -5,7 +5,7 @@ export function tieneRolAdministradorDeCuentas(roles: readonly RoleName[]): bool
 }
 
 export function puedeAdministrarCuentas(
-  roles: readonly RoleName[],
+  _roles: readonly RoleName[],
   permisos: ReadonlySet<Permission>,
   permisosRequeridos: Permission | readonly Permission[]
 ): boolean {
@@ -13,6 +13,5 @@ export function puedeAdministrarCuentas(
     ? permisosRequeridos
     : [permisosRequeridos];
 
-  return tieneRolAdministradorDeCuentas(roles) &&
-    requeridos.every((permiso) => permisos.has(permiso));
+  return requeridos.every((permiso) => permisos.has(permiso));
 }

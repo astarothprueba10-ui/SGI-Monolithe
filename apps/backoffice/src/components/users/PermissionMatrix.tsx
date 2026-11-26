@@ -36,7 +36,22 @@ const ACTION_LABELS: Record<string, string> = {
   activate: 'Activar',
   deactivate: 'Desactivar',
   assign_role: 'Asignar rol',
-  assign_permissions: 'Asignar permisos'
+  assign_permissions: 'Asignar permisos',
+  manage_all: 'Gestión laboral integral',
+  approve_reincorporation: 'Resolver reincorporaciones',
+  approve_documents: 'Revisar correcciones documentales',
+  request_global: 'Solicitar de toda la cartera',
+  operate_advisor: 'Habilitar como asesor',
+  scope_all: 'Alcance global',
+  scope_assigned: 'Cartera asignada',
+  assign_advisor: 'Asignar asesores',
+  approve_stage_change: 'Resolver cambios de etapa',
+  request_stage_change: 'Solicitar cambios de etapa',
+  deactivate_prospect: 'Desactivar prospectos',
+  contract_scope_all: 'Consultar toda la documentación contractual',
+  approve_reservation_change: 'Resolver cambios de reserva',
+  notify_expiry_all: 'Recibir todos los vencimientos',
+  reassign_advisor: 'Reasignar asesor al formalizar'
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -67,9 +82,8 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const rrhhDelegado = user.roles.includes('RRHH')
-    && !user.roles.includes('Administrador')
-    && !user.roles.includes('Gerencia');
+  const rrhhDelegado = !effectivePermissions.has('roles.assign_permissions') || (!user.roles.includes('Administrador')
+    && !user.roles.includes('Gerencia'));
   const editable =
     puedeAdministrarCuentas(user.roles, effectivePermissions, 'roles.assign_permissions') &&
     !(rrhhDelegado && esSistema) &&
@@ -98,7 +112,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
 
   const actions = useMemo(
     () =>
-      ACTION_ORDER.filter((action) =>
+      [...new Set([...ACTION_ORDER, ...permissions.map(p => p.accion)])].filter((action) =>
         permissions.some((permission) => permission.accion === action)
       ),
     [permissions]
@@ -120,7 +134,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
   }, [granted, originalGranted]);
 
   const toggle = (codigo: string) => {
-    if (!editable || saving || (rrhhDelegado && /^(users|roles|permissions|audit)\./.test(codigo))) return;
+    if (!editable || saving || codigo === 'financing.configure' || (rrhhDelegado && (['hr.manage_all','hr.approve_reincorporation','hr.approve_documents'].includes(codigo) || /^(users|roles|permissions|audit)\./.test(codigo) || !effectivePermissions.has(codigo as import('../../types').Permission)))) return;
 
     setGranted((prev) => {
       const next = new Set(prev);
@@ -138,7 +152,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
   const guardar = async () => {
     if (!editable || !dirty || saving) return;
     if (rrhhDelegado && Array.from(granted).some((codigo) => /^(users|roles|permissions|audit)\./.test(codigo))) {
-      toast.error('RRHH no puede delegar permisos de seguridad.');
+      toast.error('La administración delegada no puede conceder privilegios de seguridad.');
       return;
     }
 
@@ -254,7 +268,7 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
                   </th>
 
                   {actions.map((action) => {
-                    const permission = modulePermissions.find(
+                    const matching = modulePermissions.filter(
                       (item) => item.accion === action
                     );
 
@@ -263,16 +277,19 @@ export function PermissionMatrix({ roleCode, esSistema = false }: { roleCode: st
                         key={action}
                         className="min-w-[94px] whitespace-nowrap px-3 py-3 text-center align-middle"
                       >
-                        {permission ? (
+                        {matching.length ? matching.map(permission => (
+                          <label key={permission.codigo} className="flex flex-col items-center gap-1" title={permission.descripcion || permission.nombre}>
                           <input
                             type="checkbox"
                             checked={granted.has(permission.codigo)}
-                            disabled={!editable || saving || (rrhhDelegado && /^(users|roles|permissions|audit)\./.test(permission.codigo))}
+                            disabled={!editable || saving || permission.codigo === 'financing.configure' || (rrhhDelegado && (['hr.manage_all','hr.approve_reincorporation','hr.approve_documents'].includes(permission.codigo) || /^(users|roles|permissions|audit)\./.test(permission.codigo) || !effectivePermissions.has(permission.codigo as import('../../types').Permission)))}
                             onChange={() => toggle(permission.codigo)}
-                            aria-label={`${ACTION_LABELS[action] ?? action} en ${MODULE_LABELS[module] ?? module}`}
+                            aria-label={permission.nombre || permission.codigo}
                             className="h-4 w-4 rounded border-brand-300 accent-brand-700 disabled:cursor-not-allowed"
                           />
-                        ) : (
+                          {matching.length > 1 && <span className="text-[10px]">{permission.nombre}</span>}
+                          </label>
+                        )) : (
                           <span
                             className="text-brand-200"
                             aria-hidden="true"

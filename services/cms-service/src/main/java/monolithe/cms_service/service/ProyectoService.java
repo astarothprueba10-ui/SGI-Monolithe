@@ -63,8 +63,6 @@ public class ProyectoService {
                         .provincia(proyecto.getProvincia())
                         .departamento(proyecto.getDepartamento())
                         .areaTotal(proyecto.getAreaTotalM2())
-                        .latitud(proyecto.getLatitud())
-                        .longitud(proyecto.getLongitud())
                         .activo(proyecto.getActivo());
 
         // Conserva la presentación CMS existente si tiene página publicada.
