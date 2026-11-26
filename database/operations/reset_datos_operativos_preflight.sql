@@ -1,17 +1,22 @@
 -- Preflight de mantenimiento. No ejecuta cambios de datos ni de esquema.
 -- Ejecutar en el proyecto existente, antes de cualquier reset operativo.
 -- Las clasificaciones son propuestas; nunca se usan para ejecutar borrados.
+-- Alcance revisado: conservar los identificadores de Gerencia, su registro laboral y MFA.
+-- Conservar historiales inmutables y sus referencias; no reasignar autores ni desactivar triggers.
+-- Los catalogos de roles de sistema requieren tratamiento compatible con sus reglas de negocio.
+-- El ensayo anterior permanece suspendido. Este informe no lo habilita.
 BEGIN TRANSACTION READ ONLY;
 
 WITH inventario AS (
     SELECT c.oid, n.nspname AS esquema, c.relname AS tabla,
            c.relrowsecurity AS rls,
            CASE
-               WHEN n.nspname = 'auth_mfa' THEN 'OPERATIVO'
-               WHEN c.relname IN ('cms_paginas','cms_secciones') THEN 'REINICIALIZAR_CMS'
+               WHEN n.nspname = 'auth_mfa' THEN 'CONSERVAR_Y_REVISAR_ACCESO'
                WHEN c.relname IN ('cfg_fin_politicas_versiones','cfg_fin_politica_activa',
-                                  'cfg_fin_publicacion_control') THEN 'REINICIALIZAR_FINANZAS'
-               WHEN c.relname = 'cfg_fin_politica_proyecto_activa' THEN 'OPERATIVO'
+                                  'cfg_fin_publicacion_control','cfg_fin_politica_proyecto_activa',
+                                  'cms_paginas','cms_secciones') THEN 'CONSERVAR_Y_REVISAR_HISTORIAL'
+               WHEN c.relname ~* '(historial|auditoria|bitacora|version|publicacion)' OR c.relname LIKE 'aud\_%' ESCAPE '\' THEN 'CONSERVAR_Y_REVISAR_HISTORIAL'
+               WHEN c.relname ~ '^(seg|core_personas|rrhh_trabajadores)' THEN 'CONSERVAR_Y_REVISAR_IDENTIDAD'
                WHEN c.relname LIKE 'cfg\_%' ESCAPE '\'
                     OR c.relname IN ('seg_roles','seg_permisos','seg_roles_permisos',
                         'rrhh_areas','rrhh_cargos','rrhh_horarios','rrhh_horarios_detalle',
