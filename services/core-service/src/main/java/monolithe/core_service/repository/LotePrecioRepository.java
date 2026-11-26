@@ -11,6 +11,21 @@ import java.util.Optional;
 
 public interface LotePrecioRepository extends JpaRepository<LotePrecio, Long> {
 
+    // Protección transitoria: una consulta filtrada por RLS no demuestra ausencia de operaciones.
+    // No modifica RLS ni cambia la identidad de la conexión.
+    @Query(value = """
+        SELECT NOT (
+            pg_catalog.row_security_active('public.inm_lotes'::regclass)
+            OR pg_catalog.row_security_active('public.inm_lotes_precios'::regclass)
+            OR pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass)
+            OR pg_catalog.row_security_active('public.ven_reservas'::regclass)
+            OR pg_catalog.row_security_active('public.ven_ventas'::regclass)
+            OR pg_catalog.row_security_active('public.cfg_estados_reserva'::regclass)
+            OR pg_catalog.row_security_active('public.cfg_estados_venta'::regclass)
+        )
+    """, nativeQuery = true)
+    boolean puedeVerificarIntegridadPrecio();
+
     @Query(value="SELECT id_lote FROM public.inm_lotes WHERE id_lote=:lote FOR UPDATE", nativeQuery=true)
     Long bloquearLoteParaPrecio(@Param("lote") Long lote);
 
