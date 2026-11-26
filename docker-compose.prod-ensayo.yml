@@ -8,6 +8,8 @@ services:
       dockerfile: "Dockerfile"
     ports:
       - "127.0.0.1:18081:8081"
+    env_file:
+      - .secret/prod-ensayo/keys/financing-mfa.env
     environment:
       SERVER_PORT: 8081
       DB_URL: "jdbc:postgresql://aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require&escapeSyntaxCallMode=callIfNoReturn"
