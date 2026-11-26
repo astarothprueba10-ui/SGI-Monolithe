@@ -1,6 +1,7 @@
 -- Ensayo de reinicio operativo: nunca confirma modificaciones.
 -- Proyecto existente, exclusivamente durante mantenimiento. No es una migracion.
--- No borra objetos Storage, no crea cuentas reales ni rota claves.
+-- No borra objetos Storage ni rota claves. Conserva una cuenta de Gerencia existente
+-- sin leer, copiar ni cambiar sus credenciales. Conserva documento y contacto verificados.
 -- Conserva exclusivamente los seis roles aprobados para el reinicio.
 -- Conserva sus IDs, atributos de sistema y matriz de permisos; no modifica roles PostgreSQL.
 BEGIN;
@@ -194,6 +195,12 @@ DECLARE
     v_fingerprint text;
     v_original text;
     v_total integer := 0;
+    v_usuario bigint;
+    v_persona bigint;
+    v_login varchar;
+    v_tipo varchar;
+    v_documento varchar;
+    v_resuelto varchar;
     v_actual text[];
     v_esperado text[];
 BEGIN
@@ -217,6 +224,28 @@ BEGIN
            OR (SELECT count(*) FROM public.seg_roles WHERE codigo = ANY(v_roles_eliminar)) <> 8
            OR (SELECT count(*) FROM public.seg_roles) <> 14 THEN
             RAISE EXCEPTION 'Catalogo de roles distinto del auditado';
+        END IF;
+
+        -- La cuenta elegida debe ser unica, activa y con documento principal verificado.
+        SELECT count(*), min(u.id_usuario), min(u.id_persona)
+          INTO v_cantidad, v_usuario, v_persona
+          FROM public.seg_usuarios u JOIN public.cfg_estados_usuario e USING(id_estado_usuario)
+          JOIN public.core_personas p USING(id_persona)
+         WHERE p.activo AND e.codigo='ACTIVO' AND e.activo AND e.permite_acceso
+           AND NOT u.requiere_cambio_password
+           AND EXISTS (SELECT 1 FROM public.seg_usuarios_roles ur JOIN public.seg_roles r USING(id_rol)
+                       WHERE ur.id_usuario=u.id_usuario AND ur.activo AND ur.fecha_revocacion IS NULL
+                         AND r.activo AND r.codigo='GERENCIA')
+           AND EXISTS (SELECT 1 FROM public.core_personas_documentos d
+                       WHERE d.id_persona=u.id_persona AND d.principal AND d.activo AND d.verificado);
+        IF v_cantidad <> 1 OR v_usuario=1 OR v_persona=1 THEN
+            RAISE EXCEPTION 'Cuenta inicial no identificada univocamente o ID ya reiniciado';
+        END IF;
+        IF (SELECT count(*) FROM public.core_personas_documentos
+            WHERE id_persona=v_persona AND principal AND activo AND verificado) <> 1
+           OR (SELECT count(*) FROM public.core_personas_contactos
+            WHERE id_persona=v_persona AND activo AND verificado) <> 1 THEN
+            RAISE EXCEPTION 'Documento o contacto de Gerencia no coincide con auditoria';
         END IF;
 
         CREATE TEMP TABLE reset_preservadas(tabla text PRIMARY KEY, huella text)
@@ -294,10 +323,8 @@ BEGIN
             public.com_comisiones,
             public.com_reglas_comision,
             public.com_ventas_asesores,
-            public.core_personas_contactos,
             public.core_personas_conyuges,
             public.core_personas_direcciones,
-            public.core_personas_documentos,
             public.core_solicitudes_correccion_identidad,
             public.core_verificaciones_cambio_correo,
             public.crm_anulaciones_evidencias_legales,
@@ -394,8 +421,38 @@ BEGIN
         SET CONSTRAINTS ALL IMMEDIATE;
         UPDATE public.seg_roles_permisos SET asignado_por = NULL WHERE asignado_por IS NOT NULL;
         UPDATE public.not_plantillas SET id_usuario_registro = NULL WHERE id_usuario_registro IS NOT NULL;
-        DELETE FROM public.seg_usuarios;
-        DELETE FROM public.core_personas;
+        -- Mantener la cuenta existente y su credencial sin consultar su contenido.
+        DELETE FROM public.seg_usuarios WHERE id_usuario <> v_usuario;
+        DELETE FROM public.core_personas_documentos
+        WHERE id_persona <> v_persona OR NOT (principal AND activo AND verificado);
+        DELETE FROM public.core_personas_contactos
+        WHERE id_persona <> v_persona OR NOT (activo AND verificado);
+        DELETE FROM public.core_personas WHERE id_persona <> v_persona;
+        ALTER TABLE public.core_personas ALTER COLUMN id_persona RESTART WITH 1;
+        INSERT INTO public.core_personas(nombres, apellido_paterno, apellido_materno, fecha_nacimiento, estado_civil_codigo)
+        SELECT nombres, apellido_paterno, apellido_materno, fecha_nacimiento, estado_civil_codigo
+        FROM public.core_personas WHERE id_persona=v_persona;
+        ALTER TABLE public.core_personas_documentos ALTER COLUMN id_persona_documento RESTART WITH 1;
+        UPDATE public.core_personas_documentos SET id_persona=1, id_persona_documento=DEFAULT
+        WHERE id_persona=v_persona;
+        ALTER TABLE public.core_personas_contactos ALTER COLUMN id_persona_contacto RESTART WITH 1;
+        UPDATE public.core_personas_contactos SET id_persona=1, id_persona_contacto=DEFAULT
+        WHERE id_persona=v_persona;
+        ALTER TABLE public.seg_usuarios ALTER COLUMN id_usuario RESTART WITH 1;
+        UPDATE public.seg_usuarios SET id_usuario=DEFAULT, id_persona=1,
+            intentos_fallidos=0, bloqueado_hasta=NULL, ultimo_acceso=NULL
+        WHERE id_usuario=v_usuario;
+        DELETE FROM public.core_personas WHERE id_persona=v_persona;
+        INSERT INTO public.seg_usuarios_roles(id_usuario,id_rol)
+        SELECT 1,id_rol FROM public.seg_roles WHERE codigo='GERENCIA' AND activo;
+        SELECT usuario_login INTO v_login FROM public.seg_usuarios WHERE id_usuario=1;
+        SELECT t.codigo,d.numero_documento INTO v_tipo,v_documento
+        FROM public.core_personas_documentos d JOIN public.cfg_tipos_documento t USING(id_tipo_documento)
+        WHERE d.id_persona=1 AND d.principal AND d.activo AND d.verificado;
+        CALL public.sp_resolver_login_documento(v_tipo,v_documento,v_resuelto);
+        IF v_resuelto IS NULL OR v_resuelto IS DISTINCT FROM v_login THEN
+            RAISE EXCEPTION 'Resolucion de login documental no valida';
+        END IF;
         -- Las asignaciones de usuarios ya estan vacias. Conservar todos los permisos del catalogo.
         DELETE FROM public.seg_roles_permisos rp USING public.seg_roles r
         WHERE rp.id_rol = r.id_rol AND r.codigo = ANY(v_roles_eliminar);
@@ -404,8 +461,6 @@ BEGIN
            OR EXISTS (SELECT 1 FROM public.seg_roles WHERE NOT (codigo = ANY(v_roles_base))) THEN
             RAISE EXCEPTION 'Catalogo de roles resultante incorrecto';
         END IF;
-        ALTER TABLE public.seg_usuarios ALTER COLUMN id_usuario RESTART WITH 1;
-        ALTER TABLE public.core_personas ALTER COLUMN id_persona RESTART WITH 1;
         ALTER SEQUENCE public.inm_proyectos_codigo_seq RESTART WITH 1;
         ALTER SEQUENCE public.rrhh_trabajadores_codigo_seq RESTART WITH 1;
         ALTER SEQUENCE public.ven_operaciones_agrupadas_codigo_seq RESTART WITH 1;
@@ -432,7 +487,7 @@ BEGIN
         FROM reset_cms_secciones s CROSS JOIN public.cms_paginas p WHERE p.codigo = 'INICIO';
 
         FOREACH v_tabla IN ARRAY v_vaciar LOOP
-            IF v_tabla = ANY(v_reconstruir) THEN CONTINUE; END IF;
+            IF v_tabla = ANY(v_reconstruir || ARRAY['public.seg_usuarios','public.core_personas','public.core_personas_documentos','public.core_personas_contactos','public.seg_usuarios_roles']) THEN CONTINUE; END IF;
             EXECUTE format('SELECT count(*) FROM %s', v_tabla) INTO v_cantidad;
             IF v_cantidad <> 0 THEN RAISE EXCEPTION 'Tabla no vacia: %', v_tabla; END IF;
             v_total := v_total + 1;
@@ -457,7 +512,17 @@ BEGIN
            OR (SELECT count(*) FROM public.cfg_fin_politicas_versiones WHERE id_politica=1 AND version=1) <> 1
            OR (SELECT count(*) FROM public.cfg_fin_publicacion_control WHERE NOT habilitado) <> 1
            OR (SELECT count(*) FROM public.seg_roles_permisos WHERE asignado_por IS NOT NULL) <> 0
-           OR v_total <> 113 THEN
+           OR v_total <> 108
+           OR (SELECT count(*) FROM public.seg_usuarios WHERE id_usuario=1 AND id_persona=1) <> 1
+           OR (SELECT count(*) FROM public.seg_usuarios) <> 1
+           OR (SELECT count(*) FROM public.core_personas WHERE id_persona=1) <> 1
+           OR (SELECT count(*) FROM public.core_personas) <> 1
+           OR (SELECT count(*) FROM public.core_personas_documentos WHERE id_persona=1 AND verificado) <> 1
+           OR (SELECT count(*) FROM public.core_personas_contactos WHERE id_persona=1 AND verificado) <> 1
+           OR (SELECT count(*) FROM public.seg_usuarios_roles ur JOIN public.seg_roles r USING(id_rol)
+               WHERE ur.id_usuario=1 AND ur.activo AND r.codigo='GERENCIA') <> 1
+           OR (SELECT count(*) FROM public.seg_usuarios_roles) <> 1
+           OR NOT public.fn_seguridad_token_vigente(1,(SELECT version_sesiones FROM public.seg_usuarios WHERE id_usuario=1)) THEN
             RAISE EXCEPTION 'No se cumplen las condiciones del ensayo';
         END IF;
         IF (SELECT count(*) FROM pg_trigger WHERE
@@ -470,7 +535,7 @@ BEGIN
         RAISE EXCEPTION USING ERRCODE = 'ZX001', MESSAGE = 'ENSAYO_RESET_VALIDADO_REVERTIR';
     EXCEPTION WHEN SQLSTATE 'ZX001' THEN
         IF SQLERRM <> 'ENSAYO_RESET_VALIDADO_REVERTIR' THEN RAISE; END IF;
-        RAISE NOTICE 'Ensayo revertido: 113 tablas vacias, 54 configuraciones verificadas con seis roles base, 5 reconstruidas';
+        RAISE NOTICE 'Ensayo revertido: 108 tablas vacias, 54 configuraciones verificadas, CMS y finanzas reconstruidos, Gerencia ID 1';
     END;
 END;
 $ensayo$;
