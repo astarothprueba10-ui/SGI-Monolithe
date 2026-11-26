@@ -52,3 +52,17 @@ Se excluyen archivos .env, .env.*, .secret, secrets y claves PEM/KEY de los cont
 ## Políticas de lectura de catálogos
 
 Se instalaron cinco políticas SELECT para los roles técnicos sgi_backend_user y sigi_app_user en rrhh_areas, rrhh_cargos, rrhh_horarios, cfg_estados_trabajador y cfg_tipos_vinculo_laboral. No hay acceso de anon/authenticated a esas tablas. Los ocho catálogos de CatalogoService (estados de proyecto, etapa, manzana y lote, tipos de lote, monedas, tipos de tarifa y de ajuste de precio) ya tenían políticas de lectura y no requieren otra. La consulta de prueba desde la conexión administrativa con SET ROLE fue denegada; falta comprobar acceso efectivo desde identidades de servicio autorizadas. No alterar membresías para eludir esta restricción.
+
+## Generación de claves exclusivas para ensayo
+
+Desde la raíz de la rama de trabajo actualizada:
+
+```sh
+node scripts/preparar-claves-prod-ensayo.mjs
+```
+
+Utiliza Node.js y su módulo crypto nativo. Genera un par RSA-2048 (privada PKCS#8 y pública SPKI), una clave AES de 32 bytes para MFA de autenticación y otra independiente para MFA financiero, ambas codificadas en Base64. La última se guarda en `.secret/prod-ensayo/keys/financing-mfa.env` y el Compose de ensayo la carga exclusivamente en auth-service mediante un env_file propio, sin cargar el .env anterior. No se muestran claves en consola ni se sobrescriben archivos existentes. Si el conjunto es incompleto o inválido, se detiene. No copiar las claves fuera del directorio privado ni sincronizarlo con servicios externos; en Windows verificar los permisos NTFS del directorio y limitar el acceso a la cuenta operadora (los modos POSIX no garantizan ACL en Windows).
+
+Validación realizada con Node.js 22 en directorio temporal: sintaxis, generación, concordancia del par RSA, longitud e independencia de claves MFA, segunda ejecución sin cambios y rechazo de conjunto incompleto sin sobrescritura. El blob probado coincide con el publicado en GitHub. No se generaron claves reales del entorno de producción ni se ejecutó Docker en el equipo de la operadora.
+
+Pendiente: aprovisionar identidades JDBC de servicio autorizadas, probar sus operaciones con RLS y completar la configuración privada. Los roles técnicos existentes siguen NOLOGIN; la creación de claves de cifrado no habilita acceso a PostgreSQL ni crea cuentas de Gerencia. No iniciar el entorno contra la nueva base hasta validar estos requisitos.
