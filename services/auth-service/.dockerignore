@@ -6,3 +6,11 @@ target/
 .mvn/
 mvnw
 mvnw.cmd
+
+# Excluir configuracion privada del contexto de build
+.env
+.env.*
+.secret/
+secrets/
+*.pem
+*.key
