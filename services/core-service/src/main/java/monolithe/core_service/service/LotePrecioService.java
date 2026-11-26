@@ -10,6 +10,8 @@ import monolithe.core_service.exception.RecursoNoEncontradoException;
 import monolithe.core_service.exception.ReglaNegocioException;
 import monolithe.core_service.repository.*;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -97,6 +99,7 @@ public class LotePrecioService {
 
     @Transactional
     public LotePrecioResponse calcularYRegistrar(LotePrecioRequest request) {
+        exigirVerificacionIntegridadPrecio();
         ContextoPrecio ctx = resolverContexto(request);
         validarEdicionComercial(ctx.lote());
         ResultadoCalculo resultado = calcular(ctx);
@@ -127,6 +130,7 @@ public class LotePrecioService {
                             "y tener como máximo dos decimales.");
         }
 
+        exigirVerificacionIntegridadPrecio();
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
 
@@ -175,6 +179,7 @@ public class LotePrecioService {
             Long idLote,
             ActualizarPrecioManualRequest request) {
         validarMontoPrecio(request.monto());
+        exigirVerificacionIntegridadPrecio();
         Lote lote = obtenerLote(idLote);
         validarEdicionComercial(lote);
         validarOperacionesLoteParaPrecio(lote);
@@ -190,6 +195,13 @@ public class LotePrecioService {
         LotePrecio nuevo = crearEntidadPrecioManual(
                 lote, moneda, request.monto(), request.observaciones(), ahora);
         return toResponse(lotePrecioRepository.saveAndFlush(nuevo));
+    }
+
+    private void exigirVerificacionIntegridadPrecio() {
+        if (!lotePrecioRepository.puedeVerificarIntegridadPrecio()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No se puede verificar la integridad comercial del lote. No se modificó el precio.");
+        }
     }
 
     private void validarEdicionComercial(Lote lote) {
