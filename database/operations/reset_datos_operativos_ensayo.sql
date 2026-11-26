@@ -1,7 +1,8 @@
 -- Ensayo de reinicio operativo: nunca confirma modificaciones.
 -- Proyecto existente, exclusivamente durante mantenimiento. No es una migracion.
 -- No borra objetos Storage, no crea cuentas reales ni rota claves.
--- Mantiene todos los roles hasta que se apruebe la lista definitiva.
+-- Conserva exclusivamente los seis roles aprobados para el reinicio.
+-- Conserva sus IDs, atributos de sistema y matriz de permisos; no modifica roles PostgreSQL.
 BEGIN;
 SET LOCAL lock_timeout = '2s';
 SET LOCAL statement_timeout = '25s';
@@ -185,6 +186,8 @@ DECLARE
         'public.seg_roles_permisos'
     ];
     v_reconstruir text[] := ARRAY['public.cfg_fin_politica_activa', 'public.cfg_fin_politicas_versiones', 'public.cfg_fin_publicacion_control', 'public.cms_paginas', 'public.cms_secciones'];
+    v_roles_base text[] := ARRAY['ADMINISTRADOR','GERENCIA','SUPERVISOR_COMERCIAL','ASESOR','CLIENTE','RRHH'];
+    v_roles_eliminar text[] := ARRAY['MARKETING','FINANZAS','LOGISTICA','OPERACIONES','ADMINISTRACION','ASESORIA_LEGAL','AGUA','ROL1'];
     v_tabla text;
     v_cantidad bigint;
     v_politica bigint;
@@ -207,17 +210,28 @@ BEGIN
         END IF;
         -- NOWAIT: no esperar por aplicaciones que esten utilizando las tablas.
         EXECUTE 'LOCK TABLE ' || array_to_string(v_vaciar ||
-            ARRAY['public.seg_roles_permisos','public.not_plantillas'], ', ')
+            ARRAY['public.seg_roles','public.seg_roles_permisos','public.not_plantillas'], ', ')
             || ' IN ACCESS EXCLUSIVE MODE NOWAIT';
+
+        IF (SELECT count(*) FROM public.seg_roles WHERE codigo = ANY(v_roles_base)) <> 6
+           OR (SELECT count(*) FROM public.seg_roles WHERE codigo = ANY(v_roles_eliminar)) <> 8
+           OR (SELECT count(*) FROM public.seg_roles) <> 14 THEN
+            RAISE EXCEPTION 'Catalogo de roles distinto del auditado';
+        END IF;
 
         CREATE TEMP TABLE reset_preservadas(tabla text PRIMARY KEY, huella text)
         ON COMMIT DROP;
         FOREACH v_tabla IN ARRAY v_conservar LOOP
             -- Solo se excluyen las atribuciones que deben quedar sin usuario previo.
-            EXECUTE format('SELECT md5(coalesce(string_agg(j::text, chr(10) ORDER BY j::text), '''')) FROM (SELECT to_jsonb(t) %s AS j FROM %s t) q',
+            EXECUTE format('SELECT md5(coalesce(string_agg(j::text, chr(10) ORDER BY j::text), '''')) FROM (SELECT to_jsonb(t) %s AS j FROM %s t %s) q',
                 CASE v_tabla WHEN 'public.seg_roles_permisos' THEN '- ''asignado_por'''
                 WHEN 'public.not_plantillas' THEN '- ''id_usuario_registro''' ELSE '' END,
-                v_tabla) INTO v_fingerprint;
+                v_tabla,
+                CASE v_tabla WHEN 'public.seg_roles' THEN 'WHERE t.codigo = ANY($1)'
+                WHEN 'public.seg_roles_permisos' THEN
+                    'WHERE t.id_rol IN (SELECT id_rol FROM public.seg_roles WHERE codigo = ANY($1))'
+                ELSE '' END)
+                INTO v_fingerprint USING v_roles_base;
             INSERT INTO reset_preservadas(tabla, huella) VALUES(v_tabla, v_fingerprint);
         END LOOP;
 
@@ -382,6 +396,14 @@ BEGIN
         UPDATE public.not_plantillas SET id_usuario_registro = NULL WHERE id_usuario_registro IS NOT NULL;
         DELETE FROM public.seg_usuarios;
         DELETE FROM public.core_personas;
+        -- Las asignaciones de usuarios ya estan vacias. Conservar todos los permisos del catalogo.
+        DELETE FROM public.seg_roles_permisos rp USING public.seg_roles r
+        WHERE rp.id_rol = r.id_rol AND r.codigo = ANY(v_roles_eliminar);
+        DELETE FROM public.seg_roles WHERE codigo = ANY(v_roles_eliminar);
+        IF (SELECT count(*) FROM public.seg_roles) <> 6
+           OR EXISTS (SELECT 1 FROM public.seg_roles WHERE NOT (codigo = ANY(v_roles_base))) THEN
+            RAISE EXCEPTION 'Catalogo de roles resultante incorrecto';
+        END IF;
         ALTER TABLE public.seg_usuarios ALTER COLUMN id_usuario RESTART WITH 1;
         ALTER TABLE public.core_personas ALTER COLUMN id_persona RESTART WITH 1;
         ALTER SEQUENCE public.inm_proyectos_codigo_seq RESTART WITH 1;
@@ -417,10 +439,15 @@ BEGIN
         END LOOP;
         FOREACH v_tabla IN ARRAY v_conservar LOOP
             SELECT huella INTO v_original FROM reset_preservadas WHERE tabla = v_tabla;
-            EXECUTE format('SELECT md5(coalesce(string_agg(j::text, chr(10) ORDER BY j::text), '''')) FROM (SELECT to_jsonb(t) %s AS j FROM %s t) q',
+            EXECUTE format('SELECT md5(coalesce(string_agg(j::text, chr(10) ORDER BY j::text), '''')) FROM (SELECT to_jsonb(t) %s AS j FROM %s t %s) q',
                 CASE v_tabla WHEN 'public.seg_roles_permisos' THEN '- ''asignado_por'''
                 WHEN 'public.not_plantillas' THEN '- ''id_usuario_registro''' ELSE '' END,
-                v_tabla) INTO v_fingerprint;
+                v_tabla,
+                CASE v_tabla WHEN 'public.seg_roles' THEN 'WHERE t.codigo = ANY($1)'
+                WHEN 'public.seg_roles_permisos' THEN
+                    'WHERE t.id_rol IN (SELECT id_rol FROM public.seg_roles WHERE codigo = ANY($1))'
+                ELSE '' END)
+                INTO v_fingerprint USING v_roles_base;
             IF v_fingerprint IS DISTINCT FROM v_original THEN
                 RAISE EXCEPTION 'Configuracion alterada: %', v_tabla;
             END IF;
@@ -443,7 +470,7 @@ BEGIN
         RAISE EXCEPTION USING ERRCODE = 'ZX001', MESSAGE = 'ENSAYO_RESET_VALIDADO_REVERTIR';
     EXCEPTION WHEN SQLSTATE 'ZX001' THEN
         IF SQLERRM <> 'ENSAYO_RESET_VALIDADO_REVERTIR' THEN RAISE; END IF;
-        RAISE NOTICE 'Ensayo revertido: 113 tablas vacias, 54 configuraciones conservadas, 5 reconstruidas';
+        RAISE NOTICE 'Ensayo revertido: 113 tablas vacias, 54 configuraciones verificadas con seis roles base, 5 reconstruidas';
     END;
 END;
 $ensayo$;
