@@ -48,16 +48,20 @@ public class LoteComercialService {
  }
  @Transactional(readOnly=true)
  public Listado listar(Long proyecto){
-   var catalogo=bloques.listar(proyecto);var c=config.obtener(proyecto);
-   var filas=filasComerciales(proyecto,c.version(),c.datos(),catalogo.publicado(),catalogo.etapas());
-   var sugerencias=new HashMap<Long,Identidad>();
-   for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
+   long inicio=System.nanoTime();
+   var c=config.obtenerLecturaMapa(proyecto);
+   var catalogo=bloques.listar(proyecto,c);
+   var filas=filasMapa(proyecto,c,inicio);
+   var sugerencias=sugerencias(proyecto,catalogo.manzanas());
+   org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle lotes proyecto={} filas={} totalMs={}",proyecto,filas.size(),(System.nanoTime()-inicio)/1_000_000);
    return new Listado(catalogo,filas,sugerencias);
  }
  @Transactional(readOnly=true)
  public List<Fila> listarMapa(Long proyecto){
    long inicio=System.nanoTime();
-   var c=config.obtenerLecturaMapa(proyecto);
+   return filasMapa(proyecto,config.obtenerLecturaMapa(proyecto),inicio);
+ }
+ private List<Fila> filasMapa(Long proyecto,ConfiguracionProyectoService.LecturaMapa c,long inicio){
    var etapas=c.datos().etapas().stream().map(e->new ManzanaComercialDto.Etapa(e.codigo(),e.nombre(),c.abiertas().contains(e.codigo()))).toList();
    long configuracionLista=System.nanoTime();
    var meta=new HashMap<Long,MetaMapa>();
@@ -134,25 +138,32 @@ public class LoteComercialService {
    boolean comprometido=protegido||"PROTEGIDA".equals(situacion);
    return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),publicado&&e!=null,e!=null&&e.habilitada(),!comprometido&&disponible),precio,comprometido);
  }
- private List<Fila> filasComerciales(Long proyecto,int version,ConfiguracionProyectoRequest.Datos datos,boolean publicado,List<ManzanaComercialDto.Etapa> etapas){
-   var reglas=new HashMap<Long,PublicacionComercialRepository.Regla>();
-   if(publicado)for(var r:publicaciones.reglas(proyecto,version))reglas.put(r.id(),r);
-   var protegidos=new HashSet<>(publicaciones.protegidos(proyecto));
-   var disponibles=new HashSet<>(lotes.listarComercializables(proyecto));
-   var precios=new HashMap<Long,BigDecimal>();
+ private Map<Long,Identidad> sugerencias(Long proyecto,List<ManzanaComercialDto.Fila> manzanas){
+   var numeros=new HashMap<Long,List<String>>();
    jdbc.query("""
-     SELECT DISTINCT ON(p.id_lote) p.id_lote,p.precio FROM public.inm_lotes_precios p
-     JOIN public.inm_lotes l USING(id_lote) JOIN public.cfg_monedas m USING(id_moneda)
-     WHERE l.id_proyecto=? AND p.activo AND m.activo AND m.codigo='PEN' AND p.fecha_desde<=now()
-       AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
-     ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
-     """,(org.springframework.jdbc.core.RowCallbackHandler)r->precios.put(r.getLong(1),r.getBigDecimal(2)),proyecto);
-   var inventario=lotes.buscar(new LoteFiltroRequest(proyecto,null,null,null,null,null,null,null,null,true));
-   return inventario.stream().map(l->{
-      var regla=reglas.get(l.idLote());
-      return filaComercial(l,datos,publicado,etapas,regla==null?null:regla.etapa(),regla==null?null:regla.situacion(),
-          protegidos.contains(l.idLote()),disponibles.contains(l.idLote()),precios.get(l.idLote()));
-   }).toList();
+      SELECT l.id_manzana,l.numero FROM public.inm_lotes l JOIN public.inm_manzanas m USING(id_manzana)
+      WHERE m.id_proyecto=?
+      """,(org.springframework.jdbc.core.RowCallbackHandler)rs->numeros.computeIfAbsent(rs.getLong(1),k->new ArrayList<>()).add(rs.getString(2)),proyecto);
+   var pendientes=new ArrayList<>(manzanas.stream().filter(ManzanaComercialDto.Fila::activa).toList());
+   var resultado=new HashMap<Long,Identidad>();
+   var named=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+   while(!pendientes.isEmpty()){
+      var candidatos=new HashMap<Long,Identidad>();
+      for(var m:pendientes){
+         var ns=numeros.computeIfAbsent(m.id(),k->new ArrayList<>());
+         String numero=siguienteNumero(ns),codigo=m.codigo()+"-L"+numero;
+         if(codigo.length()>40||numero.length()>20)throw new ReglaNegocioException("Se agotó la numeración de la manzana.");
+         candidatos.put(m.id(),new Identidad(codigo,numero));
+      }
+      var ocupados=new HashSet<>(named.queryForList("SELECT codigo FROM public.inm_lotes WHERE codigo IN (:codigos)",
+          Map.of("codigos",candidatos.values().stream().map(Identidad::codigo).toList()),String.class));
+      pendientes.removeIf(m->{
+         var id=candidatos.get(m.id());
+         if(ocupados.contains(id.codigo())){numeros.get(m.id()).add(id.numero());return false;}
+         resultado.put(m.id(),id);return true;
+      });
+   }
+   return resultado;
  }
  private Identidad identidad(ManzanaComercialDto.Fila m){
    var numeros=new ArrayList<>(repo.findByManzana_IdManzanaOrderByNumeroAsc(m.id()).stream().map(Lote::getNumero).toList());
