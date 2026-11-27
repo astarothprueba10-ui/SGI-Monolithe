@@ -1,11 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { codigoLoteVinculado, vincularFigura, totalVinculados, asociacionesLote, figuraVinculable } = require('../src/lib/projectSvg.ts');
+const { codigoLoteVinculado, vincularFigura, totalVinculados, asociacionesLote, figuraVinculable, motivoFiguraNoVinculable } = require('../src/lib/projectSvg.ts');
 const lotes = [{codigo:'ALM-L001'}, {codigo:'ALM-L002'}];
 function plano() {
   return { nombreArchivo:'alameda.svg', viewBox:[0,0,1000,600], elementos:[
     { tipo:'rect', atributos:{x:'1',y:'1',width:'10',height:'10'}, texto:null, codigoLote:'ALM-L001' },
-    { tipo:'path', atributos:{d:'M0 0L10 10'}, texto:null, codigoLote:null }
+    { tipo:'path', atributos:{d:'M0 0L10 0L10 10Z',fill:'#c4f1dc'}, texto:null, codigoLote:null }
   ] };
 }
 test('identifica lotes reales por codigo sin crear inventario duplicado',()=>{
@@ -50,4 +50,28 @@ test('el visor separa arrastre de clic y configura asociaciones explícitamente'
   assert.match(svg,/setPointerCapture/);
   assert.match(svg,/onClickCapture/);
   assert.match(svg,/pointerEvents=\{interactivo\?'visiblePainted':'none'\}/);
+});
+
+test('el fondo de Los Cocos conserva su color y nunca cuenta como lote asociado',()=>{
+  const doc={nombreArchivo:'cocos.svg',viewBox:[0,0,951.15,2343.45],elementos:[
+    {tipo:'rect',atributos:{x:'0',y:'0',width:'951.15',height:'2343.45',fill:'#f4f8fb'},texto:null,codigoLote:'ALM-L001'},
+    {tipo:'polygon',atributos:{points:'534.63,290.17 537.08,252 613.37,257.69 610.92,295.86',fill:'#c4f1dc'},texto:null,codigoLote:null}
+  ]};
+  assert.equal(motivoFiguraNoVinculable(doc.elementos[0],doc.viewBox),'Fondo general del plano');
+  assert.equal(totalVinculados(doc,lotes),0);
+  assert.throws(()=>vincularFigura(doc,0,'ALM-L002',lotes),/Fondo general/);
+  assert.equal(figuraVinculable(doc.elementos[1],doc.viewBox),true);
+  const reparado=vincularFigura(doc,1,'ALM-L001',lotes,true);
+  assert.equal(reparado.elementos[0].codigoLote,null);
+  assert.equal(reparado.elementos[0].atributos.fill,'#f4f8fb');
+  assert.equal(totalVinculados(reparado,lotes),1);
+  assert.equal(doc.elementos[0].codigoLote,'ALM-L001');
+});
+test('descarta trazos abiertos, círculos decorativos y polígonos de fondo',()=>{
+  const box=[0,0,100,100];
+  const figura=(tipo,atributos)=>({tipo,atributos,codigoLote:null,texto:null});
+  assert.equal(figuraVinculable(figura('path',{d:'M0 0L10 10',fill:'#ffffff'}),box),false);
+  assert.equal(figuraVinculable(figura('circle',{r:'3',fill:'#43b174'}),box),false);
+  assert.equal(figuraVinculable(figura('polygon',{points:'0,0 100,0 100,100 0,100'}),box),false);
+  assert.equal(figuraVinculable(figura('polygon',{points:'10,10 20,10 20,20 10,20',fill:'#c4f1dc'}),box),true);
 });
