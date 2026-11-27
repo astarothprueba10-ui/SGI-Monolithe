@@ -4,7 +4,7 @@ INSERT INTO public.inm_gestion_comercial_eventos(id_proyecto,version_publicada,t
 SET LOCAL ROLE sigi_app_user;
 UPDATE public.inm_politicas_comerciales_lotes SET codigo_etapa='E3' WHERE id_lote=11;
 RESET ROLE;
-DO $
+DO $$
 BEGIN
  BEGIN
   INSERT INTO public.inm_gestion_comercial_eventos(id_proyecto,version_publicada,tipo,id_usuario,nuevo) VALUES(1,1,'ETAPAS',NULL,'{}');
