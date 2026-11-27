@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Field';
 import { PlanSvgShapes } from './PlanSvgShapes';
-import { leerSvgVectorial, totalVinculados, vincularFigura, asociacionesLote, figuraVinculable } from '../../../lib/projectSvg';
+import { leerSvgVectorial, totalVinculados, vincularFigura, asociacionesLote, motivoFiguraNoVinculable } from '../../../lib/projectSvg';
 import { projectSvgService } from '../../../services/projectSvgService';
 import type { LoteResponse } from '../../../types/core';
 import type { ArchivoCadInfo, PlanoSvgDocumento } from '../../../types/projectSvg';
@@ -31,7 +31,10 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
   const escala=actual&&box?actual.viewBox[2]/box[2]:1;
   const asociaciones=useMemo(()=>actual&&loteVincular?asociacionesLote(actual,loteVincular):[],[actual,loteVincular]);
   const otras=asociaciones.filter(i=>i!==figura);
-  const errores=useMemo(()=>actual?actual.elementos.flatMap((f,i)=>f.codigoLote&&!figuraVinculable(f)?[{i,codigo:f.codigoLote,tipo:f.tipo}]:[]):[],[actual]);
+  const errores=useMemo(()=>actual?actual.elementos.flatMap((f,i)=>{
+    const motivo=f.codigoLote?motivoFiguraNoVinculable(f,actual.viewBox):null;
+    return f.codigoLote&&motivo?[{i,codigo:f.codigoLote,tipo:f.tipo,motivo}]:[];
+  }):[],[actual]);
   function moverVista(v:number[]){
     if(!actual)return;
     const [x,y,w,h]=actual.viewBox;
@@ -87,6 +90,7 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
 
   async function guardar() {
     if(!borrador || guardando)return;
+    if(errores.length){setError('Retira las asociaciones incorrectas antes de guardar.');return;}
     setGuardando(true);setError('');
     try{
       // El original se guarda separado del JSON sanitizado de visualización.
@@ -141,7 +145,7 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
           className="hidden" aria-label="Archivo de plano DWG o SVG"
           onChange={e=>{const file=e.target.files?.[0];if(file)void importar(file);e.target.value='';}}/>
         <Button icon={FileUpIcon} disabled={guardando} onClick={()=>input.current?.click()}>Importar DWG / SVG</Button>
-        <Button icon={SaveIcon} variant="primary" disabled={!borrador || guardando}
+        <Button icon={SaveIcon} variant="primary" disabled={!borrador || guardando || errores.length>0}
           onClick={()=>void guardar()}>{guardando?'Guardando…':'Guardar vista SVG'}</Button>
       </div>}
     </div>
@@ -172,10 +176,10 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
       <p className="w-full text-xs text-brand-500">Amplía con + y arrastra el plano para desplazarte. Un clic selecciona la figura.</p>
     </div>}
     {actual && puedeConfigurar && errores.length>0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <p className="text-sm font-semibold text-amber-900">Asociaciones a textos o líneas ({errores.length})</p>
+      <p className="text-sm font-semibold text-amber-900">Asociaciones incorrectas ({errores.length})</p>
       <p className="text-xs text-amber-900">Puedes retirar estos vínculos y asociar la superficie correcta. Los cambios no se guardan hasta confirmar.</p>
       {errores.map(e=><div key={e.i} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span>{e.codigo} · Figura {e.i+1} ({e.tipo})</span>
+        <span>{e.codigo} · Figura {e.i+1} ({e.tipo}) · {e.motivo}</span>
         <Button size="sm" disabled={guardando} onClick={()=>{desvincular(e.i);setEditando(true);}}>Desvincular</Button>
       </div>)}
     </section>}
