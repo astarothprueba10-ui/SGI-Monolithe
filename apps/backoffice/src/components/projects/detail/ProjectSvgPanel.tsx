@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DownloadIcon, FileArchiveIcon, FileUpIcon, Link2Icon, SaveIcon, ShieldCheckIcon, PlusIcon, MinusIcon, MaximizeIcon } from 'lucide-react';
+import { DownloadIcon, FileArchiveIcon, FileUpIcon, Link2Icon, SaveIcon, ShieldCheckIcon, PlusIcon, MinusIcon, MaximizeIcon, Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Field';
@@ -12,7 +12,7 @@ import type { ArchivoCadInfo, PlanoSvgDocumento } from '../../../types/projectSv
 export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, seleccionado, onSelect,
   puedeConfigurar, soloMiniatura=false, revision=null }: {
   proyecto:number; lotes:LoteResponse[]; documento:PlanoSvgDocumento|null;
-  revision?:string|null; onSave:(doc:PlanoSvgDocumento,revision?:string)=>void; seleccionado:number|null;
+  revision?:string|null; onSave:(doc:PlanoSvgDocumento|null,revision?:string)=>void; seleccionado:number|null;
   onSelect:(id:number)=>void; puedeConfigurar:boolean; soloMiniatura?:boolean;
 }) {
   const [borrador,setBorrador]=useState<PlanoSvgDocumento|null>(null);
@@ -21,6 +21,7 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
   const [figura,setFigura]=useState<number|null>(null);
   const [loteVincular,setLoteVincular]=useState('');
   const [guardando,setGuardando]=useState(false);
+  const [archivoEliminar,setArchivoEliminar]=useState<ArchivoCadInfo|null>(null);
   const [error,setError]=useState('');
   const [editando,setEditando]=useState(false);
   const [vista,setVista]=useState<number[]|null>(null);
@@ -127,6 +128,21 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
     }catch(e:unknown){setError(e instanceof Error?e.message:'No se pudo vincular el lote.');}
   }
 
+  async function eliminarArchivo(){
+    if(!archivoEliminar||!puedeConfigurar||guardando||borrador)return;
+    setGuardando(true);setError('');
+    try{
+      const resultado=await projectSvgService.eliminarOriginal(proyecto,archivoEliminar.id);
+      setOriginales(prev=>prev.filter(f=>f.id!==archivoEliminar.id));
+      if(resultado.vistaEliminada){
+        onSave(null);setVista(null);setFigura(null);setLoteVincular('');setEditando(false);
+      }
+      setArchivoEliminar(null);
+      toast.success('Archivo eliminado correctamente.');
+    }catch(e:unknown){setError(e instanceof Error?e.message:'No se pudo eliminar el archivo.');}
+    finally{setGuardando(false);}
+  }
+
   async function descargar(id:number) {
     try {
       const respuesta=await projectSvgService.enlaceDescarga(proyecto,id);
@@ -168,8 +184,24 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
             <span className="font-semibold text-brand-900">v{f.version} · {f.nombre}</span>
             <span className="ml-2 text-brand-500">{f.formato} · {(f.bytes/1024/1024).toFixed(2)} MB</span>
           </div>
-          <Button size="sm" icon={DownloadIcon} onClick={()=>void descargar(f.id)}>Descargar</Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" icon={DownloadIcon} disabled={guardando} onClick={()=>void descargar(f.id)}>Descargar</Button>
+            {puedeConfigurar && <button type="button" aria-label={`Eliminar ${f.nombre}`} title={borrador?'Guarda los cambios antes de eliminar':'Eliminar archivo'}
+              disabled={guardando||!!borrador} onClick={()=>{setArchivoEliminar(f);setError('');}}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <Trash2Icon className="h-4 w-4"/>
+            </button>}
+          </div>
         </div>)}
+      </div>
+    </section>}
+    {archivoEliminar && <section role="alert" className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">
+      <p className="text-sm font-semibold text-red-900">¿Eliminar {archivoEliminar.nombre}?</p>
+      <p className="text-xs text-red-800">Se eliminará el archivo original y su registro. Si corresponde a la vista SVG actual, también se retirará esa vista y sus vínculos. Los lotes, precios y ventas no se modifican.</p>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" disabled={guardando} onClick={()=>setArchivoEliminar(null)}>Cancelar</Button>
+        <button type="button" disabled={guardando||!!borrador} onClick={()=>void eliminarArchivo()}
+          className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{guardando?'Eliminando…':'Eliminar definitivamente'}</button>
       </div>
     </section>}
     {actual && <div className="flex flex-wrap items-center justify-between gap-2">
