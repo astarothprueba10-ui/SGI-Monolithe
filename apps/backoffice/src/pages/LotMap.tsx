@@ -30,14 +30,13 @@ import { ApiError } from '../lib/apiClient';
 
 import { area as fmtArea, number } from '../utils/format';
 import { cn } from '../utils/cn';
-import { bounds, overlaps, rectangle, roundedLotPath, naturalCompare, buildDisplayGeometries, type DisplayGeometria, type Point } from '../lib/lotMatrixGeometry';
+import { bounds, overlaps, roundedLotPath, naturalCompare, buildDisplayGeometries, type DisplayGeometria } from '../lib/lotMatrixGeometry';
 import { MAP_STATUSES, MAP_SELECTED, mapStatus, mapLotColors } from '../lib/lotMapPalette';
 
 import type {
   ProyectoResponse,
   LoteResponse,
-  PlanoInteractivoDetalleResponse,
-  LoteGeometriaResponse
+  PlanoInteractivoDetalleResponse
 } from '../types/core';
 
 interface DragState {
