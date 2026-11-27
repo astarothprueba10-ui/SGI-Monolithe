@@ -73,6 +73,12 @@ public class LoteService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<LoteResponse> listarActivosParaMapa(Long proyecto) {
+        return loteRepository.findByIdProyectoAndActivoTrueOrderByCodigoAsc(proyecto)
+                .stream().map(this::toResponse).toList();
+    }
+
     @Transactional
     public LoteResponse crear(LoteRequest request) {
 
