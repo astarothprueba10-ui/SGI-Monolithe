@@ -11,6 +11,7 @@ export const estadoLote=(s:string)=>({DISPONIBLE:'Disponible',NO_DISPONIBLE:'No 
 export const soles=(n:number|null|undefined)=>n==null?'—':new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'}).format(n);
 const ruta=(id:number)=>`/proyectos/${id}/lotes-comerciales`;
 export const commercialLotService={
+ listarMapa:(id:number)=>coreApi.get<FilaLote[]>(ruta(id)+'/mapa'),
  listar:(id:number)=>coreApi.get<ListadoLotes>(ruta(id)),
  revisar:(id:number,q:ConsultaLote)=>coreApi.post<VistaLote>(ruta(id)+'/revisar',{...q}),
  guardar:(id:number,q:CambioLote)=>coreApi.put<ListadoLotes>(ruta(id),{...q})
