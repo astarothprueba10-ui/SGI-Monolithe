@@ -50,6 +50,40 @@ public class ConfiguracionProyectoService {
         return new ConfiguracionMapa(version.map(v -> v.numero()).orElse(0),publicada > 0,datos);
     }
 
+    public record LecturaMapa(int version, boolean publicado, Datos datos, List<String> abiertas) {}
+
+    @Transactional(readOnly = true)
+    public LecturaMapa obtenerLecturaMapa(Long proyecto) {
+        var lectura = repository.lecturaMapa(proyecto);
+        if (!lectura.existe()) throw new RecursoNoEncontradoException("Proyecto no encontrado.");
+        if (!lectura.publicacionVisible() || !lectura.integridad())
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                "No se puede verificar la integridad de la publicación comercial.");
+        boolean publicada = lectura.publicada() > 0;
+        if (publicada && lectura.borrador() == null)
+            throw new ConflictoNegocioException("No se encontró la configuración de la publicación vigente.");
+        var datos = lectura.borrador() == null
+            ? new Datos(repository.etapas(proyecto),List.of(),List.of()) : leer(lectura.borrador());
+        if (publicada && lectura.asignaciones() != null) {
+            var estado = mapper.readValue(lectura.asignaciones(),monolithe.core_service.dto.GestionComercialDto.Estado.class);
+            datos = new Datos(datos.etapas(),estado.manzanas(),estado.lotes());
+        }
+        if (publicada && lectura.etapas() != null) {
+            var etapas = mapper.readValue(lectura.etapas(),ConfiguracionProyectoRequest.Etapa[].class);
+            datos = new Datos(List.of(etapas),datos.manzanas(),datos.lotes());
+        }
+        List<String> abiertas = List.of();
+        if (publicada) {
+            if (lectura.abiertas() == null)
+                throw new ConflictoNegocioException("No se encontró la disponibilidad de la publicación vigente.");
+            var valores = mapper.readValue(lectura.abiertas(),String[].class);
+            if (valores == null)
+                throw new ConflictoNegocioException("La disponibilidad de la publicación vigente es inválida.");
+            abiertas = List.of(valores);
+        }
+        return new LecturaMapa(lectura.versionBorrador()==null?0:lectura.versionBorrador(),publicada,datos,abiertas);
+    }
+
     @Transactional(readOnly = true)
     public ConfiguracionProyectoResponse obtener(Long proyecto) {
         obtenerProyecto(proyecto);
