@@ -1,6 +1,7 @@
 import { memo, useMemo, type SVGProps } from 'react';
 import type { PlanoSvgDocumento, SvgFigura } from '../../../types/projectSvg';
 import type { LoteResponse } from '../../../types/core';
+import { mapLotColors } from '../../../lib/lotMapPalette';
 
 const numero=(figura: SvgFigura,campo: string) => Number(figura.atributos[campo] ?? 0);
 function propsSvg(figura: SvgFigura): Pick<SVGProps<SVGElement>, 'fill' | 'stroke' | 'strokeWidth' | 'fillOpacity' | 'strokeOpacity' | 'opacity' | 'transform' | 'strokeLinecap' | 'strokeLinejoin'> {
@@ -51,9 +52,7 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
     {documento.elementos.map((figura,index)=>{
       const lote=figura.codigoLote ? referencias.get(figura.codigoLote) : undefined;
       const activo=lote?.idLote===seleccionado;
-      const color=lote ? ({DISPONIBLE:'#089d67', RESERVADO:'#fbbf24',
-        VENDIDO:'#dc2626', BLOQUEADO:'#f97316', BLOQUEADO_COMERCIALMENTE:'#d97706', NO_DISPONIBLE:'#94a3b8'}
-      )[lote.codigoEstadoLote??'NO_DISPONIBLE'] : undefined;
+      const colors=mapLotColors(lote?.codigoEstadoLote,activo);
       return <g key={index} role={miniatura?'presentation':'button'}
         tabIndex={miniatura?-1:0} aria-label={lote ? `Lote ${lote.codigo}` : `Figura sin vincular ${index+1}`}
         className={miniatura?'':'cursor-pointer focus:outline-none'}
@@ -61,10 +60,10 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
         onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();lote ? alSeleccionar?.(lote.idLote) : alElegirFigura?.(index);}}}>
         <Figura figura={lote && figura.tipo!=='text'
           ? {...figura,atributos:{...figura.atributos,
-            fill:activo?'#2563eb':color ?? figura.atributos.fill ?? '#e2e8f0',
-            stroke:activo?'#1d4ed8':'#ffffff',
+            fill:colors.fill,
+            stroke:colors.stroke,
             'stroke-width':activo?'3':'1.5'}}
-          : figura}/>
+          : lote && figura.tipo==='text' ? {...figura,atributos:{...figura.atributos,fill:colors.text,stroke:'none'}} : figura}/>
         {!miniatura && <title>{lote ? `${lote.codigo} · ${lote.nombreEstadoLote??lote.codigoEstadoLote}`
           : 'Figura sin vínculo: selecciónala para asociar un lote'}</title>}
       </g>;
