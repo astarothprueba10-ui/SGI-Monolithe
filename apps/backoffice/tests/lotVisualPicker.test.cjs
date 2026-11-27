@@ -1,7 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
-const {selectedVisualLot,focusBox,hasSvgLot}=require('../src/lib/lotVisualFocus.ts');
+const {selectedVisualLot,focusBox,hasSvgLot,fitVisualBox,clampVisualBox,zoomVisualBox,matrixFocusBox}=require('../src/lib/lotVisualFocus.ts');
 const lot=(id,project=2,activo=true)=>({idLote:id,idProyecto:project,idManzana:1,codigo:'L'+id,activo});
 const lots=[lot(1),lot(2),lot(3,3),lot(4,2,false)];
 test('previsualiza candidatos antes de confirmar y limita al inventario autorizado del proyecto',()=>{
@@ -38,4 +38,35 @@ test('el visor es de solo lectura y permanece fuera del formulario de registro',
   assert.match(panel,/\},\[project,retry\]\)/);
   assert.match(panel,/miniatura vista=/);
   assert.doesNotMatch(panel,/crmBackend|guardarAsociaciones|saveLotMatrix|registrarSeparacion/);
+});
+
+test('las tarjetas permiten consultar principal o adicionales sin cambiar la selección comercial',()=>{
+  assert.equal(selectedVisualLot(lots,2,'1',false,'',false,'',2,[2])?.idLote,2);
+  assert.equal(selectedVisualLot(lots,2,'1',false,'',false,'',1,[2])?.idLote,1);
+  assert.equal(selectedVisualLot(lots,2,'1',false,'',false,'',2,[])?.idLote,1);
+  assert.equal(selectedVisualLot(lots,2,'1',false,'',false,'',3,[3]),null);
+  const sales=fs.readFileSync(path.resolve(__dirname,'../src/pages/Sales.tsx'),'utf8');
+  assert.match(sales,/onClick=\{\(\)=>consultarUbicacion\(lotePrincipal.idLote\)\}/);
+  assert.match(sales,/onClick=\{\(\)=>consultarUbicacion\(l.idLote\)\}/);
+  assert.match(sales,/consultarUbicacion\(lote.idLote\);/);
+  assert.match(sales,/focusRevision=\{revisionEnfoque\}/);
+});
+test('la cámara conserva proporciones, acota el desplazamiento y permite ampliar ambas vistas',()=>{
+  const full=fitVisualBox([0,0,1000,800],1.5);
+  assert.equal(full[2]/full[3],1.5);
+  const focus=clampVisualBox(full,fitVisualBox(matrixFocusBox([0,0,1000,800],[400,300,68,55]),1.5));
+  assert.ok(focus[2]<full[2]&&focus[3]<full[3]);
+  assert.ok(focus[0]<=400&&focus[0]+focus[2]>=468);
+  const bigger=zoomVisualBox(full,focus,1.35);
+  assert.ok(bigger[2]<focus[2]);
+  const smaller=zoomVisualBox(full,bigger,1/1.35);
+  assert.ok(Math.abs(smaller[2]-focus[2])<1e-6);
+  const dragged=clampVisualBox(full,[-10000,10000,bigger[2],bigger[3]]);
+  assert.ok(dragged[0]>=full[0]&&dragged[1]+dragged[3]<=full[1]+full[3]+1e-6);
+  assert.deepEqual(zoomVisualBox(full,focus,.0001),full);
+  assert.ok(Math.abs(zoomVisualBox(full,focus,1000)[2]-full[2]/24)<1e-6);
+  const read=p=>fs.readFileSync(path.resolve(__dirname,'../src/components/sales',p),'utf8');
+  assert.equal((read('LotVisualPickerPanel.tsx').match(/<LotVisualViewport /g)||[]).length,2);
+  assert.match(read('LotVisualViewport.tsx'),/setPointerCapture/);
+  assert.match(read('LotVisualViewport.tsx'),/getScreenCTM/);
 });
