@@ -500,8 +500,9 @@ export function ZoneFormModal({
 
         <div>
           <FieldLabel htmlFor="zona-descripcion">
-            Descripción
+            Descripción de la ubicación
           </FieldLabel>
+          <p className="mb-2 text-xs text-brand-600">Describe las características de la zona sin indicar importes. Los recargos se administran en Gestión comercial.</p>
 
           <textarea
             id="zona-descripcion"
@@ -517,7 +518,7 @@ export function ZoneFormModal({
                   .value
               )
             }
-            placeholder="Descripción opcional de la zona..."
+            placeholder="Ej. Lotes próximos al acceso principal"
             maxLength={255}
             rows={3}
             className={`w-full rounded-md border px-3 py-2 text-sm text-brand-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
