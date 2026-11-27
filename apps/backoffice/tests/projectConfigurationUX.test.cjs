@@ -72,7 +72,7 @@ test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un moda
   const config = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   assert.match(detalle,/label: 'Etapas comerciales'/);
   assert.doesNotMatch(tab,/StageFormModal|getStagesByProject/);
-  assert.match(tab,/useProjectConfiguration\(project.idProyecto\)/);
+  assert.match(tab,/useProjectConfiguration\(project.idProyecto,true\)/);
   assert.match(tab,/model.guardar\(next,true\)/);
   assert.match(tab,/projectConfigurationService.guardarEtapas/);
   assert.doesNotMatch(tab,/readOnly=\{[^}]*guardando/);
@@ -326,4 +326,14 @@ test('supervisor consulta etapas sin habilitar configuración ni acciones de edi
  assert.match(etapas,/readOnly=\{!puedeEditar/);
  assert.match(etapas,/if\(!puedeEditar\)return false/);
  assert.match(zonas,/tarifasError\?'No consultado'/);
+});
+
+test('etapas y zonas comparten detalle comercial sin duplicar las consultas',()=>{
+ const etapas=archivo('components/projects/detail/ProjectStagesTab.tsx');
+ const zonas=archivo('components/projects/detail/ProjectZonesTab.tsx');
+ const hook=archivo('hooks/useProjectConfiguration.ts');
+ assert.doesNotMatch(etapas,/projectConfigurationService\.gestion\(/);
+ assert.match(hook,/if\(soloDetalle\)[\s\S]*?projectConfigurationService\.detalle\(idProyecto\)/);
+ assert.match(zonas,/Promise\.allSettled\(\[\s*coreService\.getZonesByProject\(project.idProyecto\),projectConfigurationService\.detalle/);
+ assert.doesNotMatch(zonas,/projectConfigurationService\.(gestion|obtener|versionPublicada)\(/);
 });
