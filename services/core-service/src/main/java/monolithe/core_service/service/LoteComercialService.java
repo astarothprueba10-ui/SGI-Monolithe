@@ -49,8 +49,22 @@ public class LoteComercialService {
  @Transactional(readOnly=true)
  public Listado listar(Long proyecto){
    var catalogo=bloques.listar(proyecto);var c=config.obtener(proyecto);
+   var filas=filasComerciales(proyecto,c,catalogo.publicado(),catalogo.etapas());
+   var sugerencias=new HashMap<Long,Identidad>();
+   for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
+   return new Listado(catalogo,filas,sugerencias);
+ }
+ @Transactional(readOnly=true)
+ public List<Fila> listarMapa(Long proyecto){
+   var c=config.obtener(proyecto);
+   boolean publicado=config.versionPublicada(proyecto)>0;
+   var abiertas=publicado?comercial.gestion(proyecto).estado().etapasHabilitadas():List.<String>of();
+   var etapas=c.datos().etapas().stream().map(e->new ManzanaComercialDto.Etapa(e.codigo(),e.nombre(),abiertas.contains(e.codigo()))).toList();
+   return filasComerciales(proyecto,c,publicado,etapas).stream().filter(f->Boolean.TRUE.equals(f.lote().activo())).toList();
+ }
+ private List<Fila> filasComerciales(Long proyecto,ConfiguracionProyectoResponse c,boolean publicado,List<ManzanaComercialDto.Etapa> etapas){
    var reglas=new HashMap<Long,PublicacionComercialRepository.Regla>();
-   if(catalogo.publicado())for(var r:publicaciones.reglas(proyecto,c.version()))reglas.put(r.id(),r);
+   if(publicado)for(var r:publicaciones.reglas(proyecto,c.version()))reglas.put(r.id(),r);
    var protegidos=new HashSet<>(publicaciones.protegidos(proyecto));
    var disponibles=new HashSet<>(lotes.listarComercializables(proyecto));
    var precios=new HashMap<Long,BigDecimal>();
@@ -61,15 +75,12 @@ public class LoteComercialService {
        AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
      ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
      """,(org.springframework.jdbc.core.RowCallbackHandler)r->precios.put(r.getLong(1),r.getBigDecimal(2)),proyecto);
-   var filas=lotes.buscar(new LoteFiltroRequest(proyecto,null,null,null,null,null,null,null,null,true)).stream().map(l->{
+   return lotes.buscar(new LoteFiltroRequest(proyecto,null,null,null,null,null,null,null,null,true)).stream().map(l->{
       var regla=reglas.get(l.idLote());String codigo=regla!=null&&regla.etapa()!=null?regla.etapa():etapa(c.datos(),l);
-      var e=catalogo.etapas().stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
+      var e=etapas.stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
       boolean protegido=protegidos.contains(l.idLote())||regla!=null&&"PROTEGIDA".equals(regla.situacion());
-      return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),catalogo.publicado()&&e!=null,e!=null&&e.habilitada(),!protegido&&disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
+      return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),publicado&&e!=null,e!=null&&e.habilitada(),!protegido&&disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
    }).toList();
-   var sugerencias=new HashMap<Long,Identidad>();
-   for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
-   return new Listado(catalogo,filas,sugerencias);
  }
  private Identidad identidad(ManzanaComercialDto.Fila m){
    var numeros=new ArrayList<>(repo.findByManzana_IdManzanaOrderByNumeroAsc(m.id()).stream().map(Lote::getNumero).toList());
