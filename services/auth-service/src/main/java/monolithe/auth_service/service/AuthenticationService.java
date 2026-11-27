@@ -106,10 +106,10 @@ public class AuthenticationService {
                         refreshTokenService.revocarTodasLasSesiones(principal.getIdUsuario(), "VINCULACION_MFA");
                         principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(principal.getUsername());
                 }
-                LoginResponse login = crearSesionVerificada(principal, ip, agent);
+                // Consulta el historial antes de actualizar el último acceso.
                 String device = loginDevices.register(principal, verified.portal(), token,
                                 solicitud.recordarDispositivo(), OffsetDateTime.now(ZoneOffset.UTC));
-                return LoginFlow.completed(login, device);
+                return LoginFlow.completed(crearSesionVerificada(principal, ip, agent), device);
         }
 
         private UserPrincipal autenticarContrasena(String login, String password, String ip, String agent) {

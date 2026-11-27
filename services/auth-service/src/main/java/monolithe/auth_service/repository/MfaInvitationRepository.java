@@ -33,7 +33,7 @@ public class MfaInvitationRepository {
               .optional();
     }
 
-    /** Para notificaciones posteriores, se exige una dirección que ya demostró posesión. */
+    /** Correo que demostró posesión para el flujo de restablecimiento del autenticador. */
     public Optional<String> correoVerificado(long usuario) {
         return correoPrincipal(usuario).filter(ContactoCorreo::verificado).map(ContactoCorreo::direccion);
     }
