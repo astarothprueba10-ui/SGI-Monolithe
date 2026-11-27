@@ -16,8 +16,11 @@ export function useProjectImport(project: ProyectoResponse, onImportCompleted?: 
     if (ocupado) return;
     setOcupado(true); setError(''); setResultado(null); setSolicitud(null); setAceptado(false);
     try {
+      const inicio=performance.now();
       const datos = await leerArchivoProyecto(file, project.codigo);
+      const lectura=performance.now();
       const respuesta = await projectImportService.validar(project.idProyecto, datos);
+      console.info('[Importacion proyecto] lecturaMs:',Math.round(lectura-inicio),'validacionHttpMs:',Math.round(performance.now()-lectura));
       setSolicitud(datos); setResultado(respuesta);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo leer el archivo.');
