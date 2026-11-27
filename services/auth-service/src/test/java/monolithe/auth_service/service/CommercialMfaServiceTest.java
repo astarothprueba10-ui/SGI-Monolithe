@@ -40,7 +40,7 @@ class CommercialMfaServiceTest {
     }
     @Test void nombreRealDelProyectoSeUsaEnCorreoYRespuesta(){
         when(db.query(contains("SELECT nombre FROM public.inm_proyectos"),any(RowMapper.class),eq(2L))).thenReturn(List.of("Residencial Campestre Los Cocos"));
-        when(db.queryForObject(contains("SELECT count(*) FROM public.seg_mfa_comercial"),eq(Integer.class),eq(5L))).thenReturn(0);
+        when(db.queryForObject(contains("SELECT count(*)>=5"),eq(Boolean.class),eq(5L))).thenReturn(false);
         when(passwords.encode(anyString())).thenReturn("hash-code");
         var resultado=mfa.iniciar(jwt,2,"MATRIZ",huella);
         assertEquals("Residencial Campestre Los Cocos",resultado.get("proyectoNombre"));
