@@ -198,4 +198,16 @@ class ImportacionProyectoServiceTest {
         assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()),3L));
         verify(configuracion, never()).guardar(anyLong(), anyLong(), any());
     }
+    @Test
+    void consultaCodigosEnBloqueYRechazaColisionConOtroProyecto() {
+        when(repo.manzanas(2L)).thenReturn(List.of(new Referencia(12L,"ET-01"+(char)31+"M-A",true)));
+        when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L,"Z-A",true)));
+        when(repo.lotesPorCodigos(List.of("M-A-L01","M-A-L02"))).thenReturn(Map.of(
+            "M-A-L01",new ImportacionProyectoRepository.LoteExistente(77L,3L,99L,"01",true)));
+        var previo=service.previsualizar(2L,solicitud(List.of(loteCocos(2,"M-A","01"),loteCocos(3,"M-A","02")),null));
+        assertEquals(List.of("ERROR","NUEVO"),previo.filas().stream().map(f->f.estado()).toList());
+        verify(repo).lotesPorCodigos(List.of("M-A-L01","M-A-L02"));
+        verify(repo,never()).lote(anyString());
+        verifyNoInteractions(lotes);
+    }
 }
