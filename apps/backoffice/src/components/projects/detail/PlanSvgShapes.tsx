@@ -89,7 +89,7 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
       const colors=mapLotColors(lote?.codigoEstadoLote,activo);
       const elegido=figuraActiva===index;
       const seleccionar=()=>{if(editing)alElegirFigura?.(index);if(lote)alSeleccionar?.(lote.idLote);};
-      return <g key={index} role={interactivo?'button':'presentation'}
+      return <g key={index} data-lot-id={superficie&&lote?lote.idLote:undefined} role={interactivo?'button':'presentation'}
         tabIndex={interactivo?0:-1} aria-label={interactivo?(lote ? `Lote ${lote.codigo}` : `Figura sin vincular ${index+1}`):undefined}
         pointerEvents={interactivo?'visiblePainted':'none'}
         className={interactivo?(zoom?'cursor-grab':'cursor-pointer'):undefined}
