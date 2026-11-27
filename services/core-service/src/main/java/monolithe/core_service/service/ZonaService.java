@@ -27,18 +27,17 @@ public class ZonaService {
 
     @Transactional(readOnly = true)
     public List<ZonaResponse> listarPorProyecto(Long idProyecto) {
+        long inicio=System.nanoTime();
         obtenerProyecto(idProyecto);
-        return zonaRepository.findByProyecto_IdProyectoOrderByNumeroOrdenAsc(idProyecto).stream()
-                .map(this::toResponse)
-                .toList();
+        var filas=listarConConteos(idProyecto,zonaRepository.findByProyecto_IdProyectoOrderByNumeroOrdenAsc(idProyecto));
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle zonas proyecto={} filas={} totalMs={}",idProyecto,filas.size(),(System.nanoTime()-inicio)/1_000_000);
+        return filas;
     }
 
     @Transactional(readOnly = true)
     public List<ZonaResponse> listarActivasPorProyecto(Long idProyecto) {
         obtenerProyecto(idProyecto);
-        return zonaRepository.findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(idProyecto).stream()
-                .map(this::toResponse)
-                .toList();
+        return listarConConteos(idProyecto,zonaRepository.findByProyecto_IdProyectoAndActivoTrueOrderByNumeroOrdenAsc(idProyecto));
     }
 
     @Transactional(readOnly = true)
@@ -155,7 +154,16 @@ public class ZonaService {
         return texto != null ? texto.trim() : null;
     }
 
+    private List<ZonaResponse> listarConConteos(Long proyecto,List<Zona> zonas) {
+        var conteos=new java.util.HashMap<Long,Long>();
+        for(var c:loteRepository.contarActivosPorZonasProyecto(proyecto))conteos.put(c.getIdZona(),c.getCantidad());
+        return zonas.stream().map(z->toResponse(z,conteos.getOrDefault(z.getIdZona(),0L))).toList();
+    }
+
     private ZonaResponse toResponse(Zona zona) {
+        return toResponse(zona,loteRepository.countByZona_IdZonaAndActivoTrue(zona.getIdZona()));
+    }
+    private ZonaResponse toResponse(Zona zona,long cantidad) {
         Proyecto proyecto = zona.getProyecto();
         return new ZonaResponse(
                 zona.getIdZona(),
@@ -167,7 +175,7 @@ public class ZonaService {
                 zona.getDescripcion(),
                 zona.getNumeroOrden(),
                 zona.getActivo(),
-                loteRepository.countByZona_IdZonaAndActivoTrue(zona.getIdZona())
+                cantidad
         );
     }
 }
