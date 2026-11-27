@@ -66,5 +66,15 @@ public interface LoteRepository extends
     boolean existsByManzana_Etapa_IdEtapaAndActivoTrue(Long idEtapa);
     boolean existsByIdProyectoAndActivoTrue(Long idProyecto);
     boolean existsByZona_IdZonaAndActivoTrue(Long idZona);
+    interface ConteoZona {
+        Long getIdZona();
+        long getCantidad();
+    }
+    @org.springframework.data.jpa.repository.Query(value="""
+        SELECT l.id_zona AS "idZona",count(*) AS cantidad FROM public.inm_lotes l
+        JOIN public.inm_zonas z ON z.id_zona=l.id_zona
+        WHERE z.id_proyecto=:proyecto AND l.activo GROUP BY l.id_zona
+        """,nativeQuery=true)
+    List<ConteoZona> contarActivosPorZonasProyecto(@org.springframework.data.repository.query.Param("proyecto") Long proyecto);
     long countByZona_IdZonaAndActivoTrue(Long idZona);
 }
