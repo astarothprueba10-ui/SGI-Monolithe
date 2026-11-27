@@ -253,3 +253,17 @@ test('operaciones sensibles pasan por confirmacion comercial y la previsualizaci
  assert.doesNotMatch(m,/localStorage|sessionStorage/);
  assert.match(archivo('components/projects/CommercialMfaModal.tsx'),/commercialMfaService.verificar/);
 });
+
+test('manzanas usa etapas comerciales y un solo formulario con zonas',()=>{
+ const tab=archivo('components/projects/detail/ProjectBlocksTab.tsx');
+ assert.match(tab,/commercialBlockService.listar/);
+ assert.match(tab,/Zonas asociadas/);
+ assert.match(tab,/Lotes asociados/);
+ assert.doesNotMatch(tab,/getStagesByProject|getBlocksByStage|CommercialAssignmentModal/);
+ const form=archivo('components/projects/CommercialBlockFormModal.tsx');
+ assert.match(form,/codigoSugerido/);
+ assert.match(form,/nombreSugerido/);
+ assert.match(form,/Zonas asociadas/);
+ assert.doesNotMatch(form,/manzana-descripcion|manzana-numero-orden|manzana-activa/);
+ assert.match(archivo('services/commercialBlockService.ts'),/commercialMutation<ListadoManzanas>/);
+});
