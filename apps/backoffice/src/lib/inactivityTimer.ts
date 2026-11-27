@@ -1,4 +1,4 @@
-export const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+export const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface SessionActivity {
   lastActivity: number;

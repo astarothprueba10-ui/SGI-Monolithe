@@ -1,6 +1,10 @@
 package monolithe.auth_service.controller;
 
+import jakarta.servlet.http.Cookie;
+import java.util.List;
 import monolithe.auth_service.dto.MfaChallenge;
+import monolithe.auth_service.dto.LoginFlow;
+import monolithe.auth_service.dto.LoginResponse;
 import monolithe.auth_service.exception.GlobalExceptionHandler;
 import monolithe.auth_service.service.AuditService;
 import monolithe.auth_service.service.AuthenticationService;
@@ -17,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.containsString;
 
 class LoginSecurityValidationTest {
 
@@ -195,8 +201,8 @@ class LoginSecurityValidationTest {
             "PASAPORTE, PASSPORT123456789012"
     })
     void formatosValidosLleganAlServicioDeAutenticacion(String tipo, String documento) throws Exception {
-        when(authenticationService.autenticar(any(), any(), any()))
-                .thenReturn(crearRespuestaExitosa());
+        when(authenticationService.autenticar(any(), any(), any(), any()))
+                .thenReturn(LoginFlow.pending(crearRespuestaExitosa()));
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -207,13 +213,13 @@ class LoginSecurityValidationTest {
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist());
 
-        verify(authenticationService).autenticar(any(), any(), any());
+        verify(authenticationService).autenticar(any(), any(), any(), any());
     }
 
     @Test
     void contrasenaConCaracteresEspecialesLegitimosEsAceptada() throws Exception {
-        when(authenticationService.autenticar(any(), any(), any()))
-                .thenReturn(crearRespuestaExitosa());
+        when(authenticationService.autenticar(any(), any(), any(), any()))
+                .thenReturn(LoginFlow.pending(crearRespuestaExitosa()));
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +230,40 @@ class LoginSecurityValidationTest {
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist());
 
-        verify(authenticationService).autenticar(any(), any(), any());
+        verify(authenticationService).autenticar(any(), any(), any(), any());
+    }
+
+    @Test
+    void elLoginRecordadoEnvuelveLaSesionYLeeLaCookieDelNavegador() throws Exception {
+        String device = "D".repeat(43);
+        when(authenticationService.autenticar(any(), any(), any(), eq(device)))
+                .thenReturn(LoginFlow.completed(sesionDePrueba(), null));
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .cookie(new Cookie("__Host-monolithe-device", device))
+                .content(aJson("12345678", "Password123!")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.sesionRecordada.accessToken").value("jwt-prueba"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist());
+    }
+
+    @Test
+    void elDispositivoViajaEnUnaCookieSeguraTrasVerificarElCodigo() throws Exception {
+        when(authenticationService.confirmarMfa(any(), any(), any(), any()))
+                .thenReturn(LoginFlow.completed(sesionDePrueba(), "D".repeat(43)));
+        mockMvc.perform(post("/api/auth/mfa/verificar").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reto\":\"" + "A".repeat(43) + "\",\"codigo\":\"654321\",\"recordarDispositivo\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", containsString("__Host-monolithe-device=")))
+                .andExpect(header().string("Set-Cookie", containsString("Secure")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(jsonPath("$.accessToken").value("jwt-prueba"))
+                .andExpect(jsonPath("$.deviceToken").doesNotExist());
+    }
+
+    private LoginResponse sesionDePrueba() {
+        return new LoginResponse(1L, "prueba", "Persona de prueba", "PP", List.of("ROLE_RRHH"),
+                false, "jwt-prueba", "refresh-prueba", "Bearer", 900, "Autenticación exitosa");
     }
 
     @Test

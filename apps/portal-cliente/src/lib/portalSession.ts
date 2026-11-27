@@ -51,11 +51,26 @@ export function getPortalAccessToken(): string | null {
     sessionStorage.getItem('monolithe_access_token');
 }
 
+export function getPortalRefreshToken(): string | null {
+  return localStorage.getItem('monolithe_refresh_token') ??
+    sessionStorage.getItem('monolithe_refresh_token');
+}
+
+/** Conserva la sesión actual si una renovación termina después de salir. */
+export function updatePortalTokens(next: { accessToken: string; refreshToken: string }, previous: string): boolean {
+  if (getPortalRefreshToken() !== previous) return false;
+  const storage = localStorage.getItem('monolithe_refresh_token') !== null ? localStorage : sessionStorage;
+  storage.setItem('monolithe_access_token', next.accessToken);
+  storage.setItem('monolithe_refresh_token', next.refreshToken);
+  return true;
+}
+
 export function clearPortalSession(): void {
   for (const key of [
     'monolithe_access_token',
     'monolithe_refresh_token',
-    'monolithe_user'
+    'monolithe_user',
+    'monolithe_session_id'
   ]) {
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);

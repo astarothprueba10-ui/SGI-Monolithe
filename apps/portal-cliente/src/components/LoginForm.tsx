@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, authApi } from '../lib/apiClient';
 import { MfaLoginForm } from './auth/MfaLoginForm';
-import { requireMfaChallenge, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
+import { beginSessionActivity } from '../lib/inactivitySession';
+import { startLogin, isLoginSession, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
 import {
   AlertCircleIcon,
   CheckIcon,
@@ -129,11 +130,12 @@ export function LoginForm() {
   async function solicitarReto() {
     setLoading(true);
     try {
-      const data = await authApi.post<MfaChallenge>('/login', {
+      const data = await startLogin({
         usuario: usuario.trim(), tipoDocumento, contrasena: password, portal: 'CLIENTE'
       });
-      setChallenge(requireMfaChallenge(data));
       setPassword('');
+      if (isLoginSession(data)) await finalizarSesion(data);
+      else setChallenge(data);
     } catch (problem) {
       setError(problem instanceof ApiError ? resolverMensajeErrorLogin(problem)
         : 'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.');
@@ -155,6 +157,7 @@ export function LoginForm() {
     storage.setItem('monolithe_access_token', accessToken);
     storage.setItem('monolithe_refresh_token', refreshToken);
     storage.setItem('monolithe_user', JSON.stringify(user));
+    beginSessionActivity(storage);
     setChallenge(null);
     setCambioObligatorio(data.requiereCambioPassword);
     setSignedIn(true);
@@ -301,7 +304,7 @@ export function LoginForm() {
           />
           <CheckIcon className="pointer-events-none absolute h-3 w-3 stroke-[3] text-white opacity-0 peer-checked:opacity-100" aria-hidden="true" />
         </span>
-        <span className="text-[13.5px] text-ink-700">Recordarme en este equipo</span>
+        <span className="text-[13.5px] text-ink-700">Mantener mi sesión en este equipo</span>
       </label>
 
       <button

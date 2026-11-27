@@ -6,7 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
-import monolithe.auth_service.dto.MfaChallenge;
+import monolithe.auth_service.dto.LoginFlow;
+import monolithe.auth_service.security.LoginDeviceCookie;
 import monolithe.auth_service.dto.MfaCodeRequest;
 import monolithe.auth_service.dto.MfaEnrollment;
 import monolithe.auth_service.dto.MfaInvitationRequest;
@@ -36,12 +37,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import monolithe.auth_service.exception.MfaFlowException;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Optional;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -54,21 +58,19 @@ public class AuthController {
         private final PasswordResetService passwordResetService;
         private final AuditService auditService;
 
-        /** Valida la contraseña y devuelve un reto temporal para el segundo factor. */
-        @PostMapping("/login")
-        public ResponseEntity<MfaChallenge> login(
-                        @Valid @RequestBody LoginRequest solicitud,
+        /** Valida la contraseña y devuelve una sesión o un reto temporal. */
+        @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
+        public ResponseEntity<?> login(@Valid @RequestBody LoginRequest solicitud,
                         HttpServletRequest request) {
-
-                String ipOrigen = request.getRemoteAddr();
-                String userAgent = request.getHeader("User-Agent");
-
-                MfaChallenge respuesta = authenticationService.autenticar(
-                                solicitud,
-                                ipOrigen,
-                                userAgent);
-
-                return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(respuesta);
+                String ip = request.getRemoteAddr();
+                String agent = request.getHeader("User-Agent");
+                LoginFlow result = authenticationService.autenticar(solicitud, ip, agent, LoginDeviceCookie.read(request));
+                if (result.challenge() != null) {
+                        return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(result.challenge());
+                }
+                auditService.registrar(result.session().getIdUsuario(), "LOGIN_EXITOSO", "EXITOSO",
+                                "Inicio de sesión en un equipo recordado", ip, agent, "POST", "/api/auth/login");
+                return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("sesionRecordada", result.session()));
         }
 
         /** Reenvía la invitación únicamente tras verificar contraseña y reto vigente. */
@@ -92,15 +94,19 @@ public class AuthController {
         }
 
         /** Emite la sesión una vez verificado el código del autenticador. */
-        @PostMapping("/mfa/verificar")
+        @PostMapping(value = "/mfa/verificar", consumes = MediaType.APPLICATION_JSON_VALUE)
         public ResponseEntity<LoginResponse> verifyMfa(@Valid @RequestBody MfaCodeRequest solicitud,
                         HttpServletRequest request) {
                 String ip = request.getRemoteAddr();
                 String agent = request.getHeader("User-Agent");
-                LoginResponse login = authenticationService.confirmarMfa(solicitud, ip, agent);
-                auditService.registrar(login.getIdUsuario(), "LOGIN_EXITOSO", "EXITOSO",
+                var result = authenticationService.confirmarMfa(solicitud, ip, agent, LoginDeviceCookie.read(request));
+                auditService.registrar(result.session().getIdUsuario(), "LOGIN_EXITOSO", "EXITOSO",
                                 "Inicio de sesión con dos factores", ip, agent, "POST", "/api/auth/mfa/verificar");
-                return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(login);
+                var response = ResponseEntity.ok().cacheControl(CacheControl.noStore());
+                if (result.deviceToken() != null) {
+                        response.header(HttpHeaders.SET_COOKIE, LoginDeviceCookie.write(result.deviceToken()).toString());
+                }
+                return response.body(result.session());
         }
 
         @PostMapping("/refresh")

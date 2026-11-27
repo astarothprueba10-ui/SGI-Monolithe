@@ -6,6 +6,7 @@ import monolithe.auth_service.dto.MfaPortal;
 import monolithe.auth_service.exception.MfaException;
 import monolithe.auth_service.repository.MfaRepository;
 import monolithe.auth_service.service.MfaLoginService;
+import monolithe.auth_service.service.LoginDeviceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,7 +47,7 @@ class MfaLoginServiceTest {
         Path key = temporary.resolve("test.key");
         Files.writeString(key, Base64.getEncoder().encodeToString(new byte[32]));
         crypto = new MfaCrypto(key.toString());
-        service = new MfaLoginService(repository, users, crypto, new MfaQrCode());
+        service = new MfaLoginService(repository, users, crypto, new MfaQrCode(), mock(LoginDeviceService.class));
         when(repository.findUser(any())).thenReturn(Optional.of(ID));
         when(repository.lockAccount(ID)).thenReturn(Optional.of(account));
         when(users.loadUserByUsername("persona")).thenReturn(principal);

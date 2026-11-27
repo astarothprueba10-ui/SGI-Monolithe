@@ -20,6 +20,7 @@ type Flow = {
     enrollment: MfaEnrollment | null;
     recovering: boolean;
     saved: boolean;
+    rememberDevice: boolean;
     code: string;
     busy: boolean;
     error: string;
@@ -28,7 +29,7 @@ type Flow = {
     invitationError: string;
 };
 type Update = Dispatch<SetStateAction<Flow>>;
-const INITIAL: Flow = { enrollment: null, recovering: false, saved: false, code: '', busy: false, error: '', invitationSending: false, invitationStatus: '', invitationError: '' };
+const INITIAL: Flow = { enrollment: null, recovering: false, saved: false, rememberDevice: false, code: '', busy: false, error: '', invitationSending: false, invitationStatus: '', invitationError: '' };
 
 function EnrollmentDetails({ enrollment, saved, setSaved }: {
     enrollment: MfaEnrollment; saved: boolean; setSaved: (saved: boolean) => void;
@@ -101,7 +102,7 @@ async function submitMfa(props: Props, flow: Flow, phase: Phase, update: Update)
     update(current => ({ ...current, busy: true, error: '' }));
     try {
         const reto = flow.enrollment?.reto ?? props.challenge.reto;
-        if (isOtp(phase)) await props.onSuccess(await verifyMfa(reto, flow.code));
+        if (isOtp(phase)) await props.onSuccess(await verifyMfa(reto, flow.code, flow.rememberDevice));
         else {
             const enrollment = await prepareMfa(reto, flow.code.trim());
             update(current => ({ ...current, enrollment, code: '' }));
@@ -155,9 +156,24 @@ function ActivationEmail({ props, flow, update }: { props: Props; flow: Flow; up
     );
 }
 
+function RememberDevice({ flow, update }: { flow: Flow; update: Update }) {
+    return (
+        <label className="flex items-start gap-2 text-sm text-brand-800">
+            <input type="checkbox" checked={flow.rememberDevice} disabled={flow.busy}
+                onChange={event => update(current => ({ ...current, rememberDevice: event.target.checked }))}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-800" />
+            <span>
+                Recordar en este equipo por todo el día
+                <span className="mt-0.5 block text-xs">Hasta la medianoche de Perú. Úsalo en un equipo de confianza.</span>
+            </span>
+        </label>
+    );
+}
+
 function LoginActions({ props, flow, phase, update }: { props: Props; flow: Flow; phase: Phase; update: Update }) {
     return (
         <>
+            {isOtp(phase) && <RememberDevice flow={flow} update={update} />}
             <button type="submit" disabled={!canSubmit(flow, phase)}
                 className="min-h-11 w-full rounded-lg bg-brand-800 hover:bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {flow.busy ? 'Verificando…' : isOtp(phase) ? 'Verificar e ingresar' : 'Continuar'}

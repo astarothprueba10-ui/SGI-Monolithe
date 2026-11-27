@@ -6,6 +6,7 @@ const { createHash } = require('node:crypto');
 const { PGlite } = require('@electric-sql/pglite');
 
 const migration = readFileSync(resolve(__dirname, '../migrations/106_auth_totp_dos_factores.sql'), 'utf8');
+const devices = readFileSync(resolve(__dirname, '../migrations/170_auth_dispositivos_mfa.sql'), 'utf8');
 const issue = readFileSync(resolve(__dirname, '../operations/emitir_codigo_activacion_mfa.sql'), 'utf8');
 const reset = readFileSync(resolve(__dirname, '../operations/restablecer_factor_mfa.sql'), 'utf8');
 
@@ -48,6 +49,29 @@ test('el estado del segundo factor solo está disponible al backend autorizado',
     const { rows } = await db.query('SELECT id_usuario FROM auth_mfa.estado');
     assert.equal(Number(rows[0].id_usuario), 1);
     await assert.rejects(db.query('DELETE FROM auth_mfa.estado WHERE id_usuario = 1'), { code: '42501' });
+  } finally { await db.close(); }
+});
+
+test('los permisos de equipo solo se guardan y consultan desde el backend autorizado', async () => {
+  const db = await database();
+  try {
+    await db.exec('CREATE ROLE sigi_app_user');
+    await db.exec(devices);
+    await db.exec(devices);
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      await db.exec('SET ROLE ' + role);
+      await assert.rejects(db.query('SELECT id_usuario FROM auth_mfa.dispositivos'), { code: '42501' });
+    }
+    await db.exec('SET ROLE sigi_app_user');
+    await db.exec(`
+      INSERT INTO auth_mfa.dispositivos
+        (id_usuario, portal, dispositivo_hash, version_sesiones, password_hash_ref, confiable_hasta)
+      VALUES (1, 'CLIENTE', sha256('test'::bytea), 3, sha256('pass'::bytea), NOW() + interval '1 hour');
+    `);
+    await assert.rejects(db.query('DELETE FROM auth_mfa.dispositivos WHERE id_usuario = 1'), { code: '42501' });
+    await db.exec('RESET ROLE; DELETE FROM public.seg_usuarios WHERE id_usuario = 1');
+    const { rows } = await db.query('SELECT id_usuario FROM auth_mfa.dispositivos');
+    assert.deepEqual(rows, []);
   } finally { await db.close(); }
 });
 

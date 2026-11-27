@@ -3,11 +3,14 @@ package monolithe.auth_service.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.net.URI;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.CredentialMailContext;
+import monolithe.auth_service.dto.MfaPortal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -52,6 +55,25 @@ public class EmailService {
       mailSender.send(mensaje);
     } catch (MessagingException e) {
       throw new MailException("No se pudo preparar el correo de activación MFA.", e) {};
+    }
+  }
+
+  /** Notifica un acceso confirmado desde un navegador nuevo para la cuenta. */
+  public void enviarAvisoNuevoDispositivo(String destinatario, MfaPortal portal, OffsetDateTime hora) {
+    try {
+      MimeMessage mensaje = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mensaje, false, "UTF-8");
+      helper.setFrom(remitente);
+      helper.setTo(monolithe.auth_service.validation.EmailAddressPolicy.normalizeRequired(destinatario));
+      helper.setSubject("Inicio de sesión en un dispositivo nuevo - MONOLITHE");
+      String sitio = portal == MfaPortal.CLIENTE ? "Portal Cliente" : "Backoffice";
+      String fecha = hora.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+      helper.setText("Iniciaste sesión en Monolithe desde un dispositivo diferente.\n\n"
+          + "Portal: " + sitio + "\nFecha y hora de Perú: " + fecha + "\n\n"
+          + "Si no reconoces este acceso, cambia tu contraseña y comunícate con soporte.", false);
+      mailSender.send(mensaje);
+    } catch (MessagingException e) {
+      throw new MailException("No se pudo preparar la alerta de inicio de sesión.", e) {};
     }
   }
 

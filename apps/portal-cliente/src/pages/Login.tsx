@@ -1,9 +1,11 @@
 import { HelpCircleIcon } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../components/BrandPanel';
 import { LoginForm } from '../components/LoginForm';
 import { Logo } from '../components/Logo';
 
 export function Login() {
+  const [params] = useSearchParams();
   return (
     <div className="grid min-h-screen w-full grid-cols-1 bg-slateux-50 lg:grid-cols-[minmax(0,1fr)_minmax(520px,44%)] xl:grid-cols-[minmax(0,1fr)_600px]">
       <BrandPanel />
@@ -36,6 +38,11 @@ export function Login() {
                 comprador para continuar.
               </p>
 
+              {params.get('motivo') === 'inactividad' && (
+                <p role="status" className="mt-4 rounded-field bg-slateux-50 p-3 text-sm text-ink-700">
+                  Tu sesión se cerró después de 30 minutos sin actividad. Ingresa nuevamente.
+                </p>
+              )}
               <LoginForm />
             </div>
 

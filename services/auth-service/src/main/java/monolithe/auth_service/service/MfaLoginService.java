@@ -37,20 +37,18 @@ public class MfaLoginService {
     private final CustomUserDetailsService users;
     private final MfaCrypto crypto;
     private final MfaQrCode qrCode;
+    private final LoginDeviceService devices;
 
     private record Pending(MfaRepository.Account account, MfaRepository.State state,
                            UserPrincipal principal, OffsetDateTime now) {}
 
     /** Identidad actual y tipo de verificación que se completó. */
-    public record Verified(UserPrincipal principal, boolean factorChanged) {}
+    public record Verified(UserPrincipal principal, boolean factorChanged, MfaPortal portal) {}
 
     /** Abre un reto ligado a la contraseña verificada y el portal solicitado. */
     @Transactional
     public MfaChallenge start(UserPrincipal principal, MfaPortal portal) {
-        checkPortal(principal, portal);
-        var account = repository.lockAccount(principal.getIdUsuario()).orElseThrow(MfaException::expired);
-        if (account.version() != principal.getVersionSesiones()
-                || !same(account.passwordDigest(), digest(principal.getPassword()))) throw MfaException.expired();
+        var account = lockVerifiedAccount(principal, portal);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         var stored = repository.lockState(account.id());
         stored.ifPresent(state -> checkLock(state, now));
@@ -59,6 +57,25 @@ public class MfaLoginService {
         var step = stored.filter(state -> state.encryptedSeed() != null).isPresent()
                 ? MfaChallenge.Paso.CODIGO : MfaChallenge.Paso.ACTIVACION;
         return new MfaChallenge(challenge, step, CHALLENGE_SECONDS);
+    }
+
+    /** Evalúa la confianza con la cuenta bloqueada hasta que se emita la sesión. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean trustedDevice(UserPrincipal principal, MfaPortal portal, String token) {
+        var account = lockVerifiedAccount(principal, portal);
+        var state = repository.lockState(account.id()).orElse(null);
+        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (state == null || state.encryptedSeed() == null || state.pendingSeed() != null) return false;
+        checkLock(state, now);
+        return !principal.isRequiereCambioPassword() && devices.trusted(account, portal, token, now);
+    }
+
+    private MfaRepository.Account lockVerifiedAccount(UserPrincipal principal, MfaPortal portal) {
+        checkPortal(principal, portal);
+        var account = repository.lockAccount(principal.getIdUsuario()).orElseThrow(MfaException::expired);
+        if (account.version() != principal.getVersionSesiones()
+                || !same(account.passwordDigest(), digest(principal.getPassword()))) throw MfaException.expired();
+        return account;
     }
 
     /** Solo un reto posterior a la contraseña puede solicitar la invitación inicial. */
@@ -94,7 +111,7 @@ public class MfaLoginService {
         long lastStep = enrolling ? -1 : state.lastStep();
         long step = matchStep(pending, encrypted, request.codigo(), lastStep);
         repository.consume(pending.account().id(), step);
-        return new Verified(pending.principal(), enrolling);
+        return new Verified(pending.principal(), enrolling, state.portal());
     }
 
     private Pending resolve(String challenge) {

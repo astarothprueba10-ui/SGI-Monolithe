@@ -7,7 +7,12 @@ import jakarta.validation.constraints.Size;
 /** Prueba de posesión asociada al reto temporal de inicio de sesión. */
 public record MfaCodeRequest(
         @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{43}") String reto,
-        @NotBlank @Size(max = 48) String codigo) {
+        @NotBlank @Size(max = 48) String codigo,
+        boolean recordarDispositivo) {
+
+    public MfaCodeRequest(String reto, String codigo) {
+        this(reto, codigo, false);
+    }
 
     @Override
     public String toString() {
