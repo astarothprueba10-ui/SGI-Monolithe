@@ -34,22 +34,28 @@ public class LoginDeviceRepository {
                 .param("hash", device).query(Boolean.class).single();
     }
 
-    /** El primer navegador establece la referencia. Uno nuevo se detecta tras otro registro. */
+    /** Detecta un navegador sin registrar en una cuenta que ya inició sesión. */
     public boolean differentDevice(long user, byte[] device) {
         return jdbc.sql("""
-                SELECT EXISTS (SELECT 1 FROM auth_mfa.dispositivos WHERE id_usuario = :user)
-                   AND NOT EXISTS (
+                SELECT NOT EXISTS (
                        SELECT 1 FROM auth_mfa.dispositivos WHERE id_usuario = :user AND dispositivo_hash = :hash
+                   )
+                   AND (
+                       EXISTS (SELECT 1 FROM auth_mfa.dispositivos WHERE id_usuario = :user)
+                       OR EXISTS (
+                           SELECT 1 FROM public.seg_usuarios WHERE id_usuario = :user AND ultimo_acceso IS NOT NULL
+                       )
                    )
                 """).param("user", user).param("hash", device).query(Boolean.class).single();
     }
 
     /** Esta escritura se ejecuta con la cuenta ya bloqueada por la verificación TOTP. */
-    public void record(Registration device) {
+    public void record(Registration device, OffsetDateTime aviso) {
         jdbc.sql("""
                 INSERT INTO auth_mfa.dispositivos
-                    (id_usuario, portal, dispositivo_hash, version_sesiones, password_hash_ref, confiable_hasta)
-                VALUES (:user, :portal, :hash, :version, :password, :until)
+                    (id_usuario, portal, dispositivo_hash, version_sesiones, password_hash_ref, confiable_hasta,
+                     aviso_acceso_en, aviso_intentar_en)
+                VALUES (:user, :portal, :hash, :version, :password, :until, :aviso, :aviso)
                 ON CONFLICT (id_usuario, portal, dispositivo_hash) DO UPDATE
                     SET version_sesiones = EXCLUDED.version_sesiones,
                         password_hash_ref = EXCLUDED.password_hash_ref,
@@ -58,6 +64,6 @@ public class LoginDeviceRepository {
                 """).param("user", device.user()).param("portal", device.portal().name())
                 .param("hash", device.device()).param("version", device.version())
                 .param("password", device.passwordDigest())
-                .param("until", device.trustedUntil()).update();
+                .param("until", device.trustedUntil()).param("aviso", aviso).update();
     }
 }
