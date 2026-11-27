@@ -3,6 +3,7 @@ package monolithe.core_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.ConfiguracionProyectoRequest;
+import monolithe.core_service.dto.GestionComercialDto.*;
 import monolithe.core_service.dto.ConfiguracionProyectoResponse;
 import monolithe.core_service.service.ConfiguracionProyectoService;
 import monolithe.core_service.service.SimulacionComercialService;
@@ -46,7 +47,7 @@ public class ConfiguracionProyectoController {
     @GetMapping("/publicacion")
     public java.util.Map<String,Integer> estadoPublicacion(@PathVariable Long idProyecto) {
         return java.util.Map.of("version",service.versionPublicada(idProyecto),
-            "lotesRegistrados",service.contarLotesRegistrados(idProyecto));
+            "lotesRegistrados",service.contarLotesRegistrados(idProyecto),"importacionRealizada",service.importacionRealizada(idProyecto)?1:0);
     }
 
     @PostMapping("/publicacion/validar")
@@ -61,6 +62,24 @@ public class ConfiguracionProyectoController {
     public PublicacionComercialResponse publicar(@PathVariable Long idProyecto,
             @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request) {
         return publicacion.publicar(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @GetMapping("/gestion")
+    public Respuesta gestion(@PathVariable Long idProyecto) { return publicacion.gestion(idProyecto); }
+
+    @GetMapping("/gestion/historial")
+    public java.util.List<Evento> historial(@PathVariable Long idProyecto) { return publicacion.historial(idProyecto); }
+
+    @PutMapping("/gestion/disponibilidad")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta disponibilidad(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Disponibilidad request) {
+        return publicacion.guardarDisponibilidad(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @PutMapping("/gestion/tarifa")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta tarifa(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioTarifa request) {
+        return publicacion.guardarTarifa(idProyecto,obtenerActor(jwt),request);
     }
 
     private Long obtenerActor(Jwt jwt) {

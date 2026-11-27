@@ -43,6 +43,22 @@ public class ConfiguracionProyectoRepository {
         return version;
     }
 
+    public boolean importacionRealizada(Long proyecto) {
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_catalog.row_security_active('public.inm_gestion_comercial_eventos'::regclass)",Boolean.class)))
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                "No se puede verificar la importación inicial.");
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM public.inm_gestion_comercial_eventos WHERE id_proyecto=? AND tipo='IMPORTACION')
+            """,Boolean.class,proyecto));
+    }
+
+    public void registrarImportacion(Long proyecto,Long actor,String huella,int filas) {
+        jdbc.update("""
+            INSERT INTO public.inm_gestion_comercial_eventos(id_proyecto,tipo,id_usuario,nuevo)
+            VALUES (?,'IMPORTACION',?,jsonb_build_object('huella',CAST(? AS text),'filas',CAST(? AS integer)))
+            """,proyecto,actor,huella,filas);
+    }
+
     public int contarLotesRegistrados(Long proyecto) {
         Integer total = jdbc.queryForObject("""
             SELECT CASE WHEN pg_catalog.row_security_active('public.inm_lotes'::regclass)

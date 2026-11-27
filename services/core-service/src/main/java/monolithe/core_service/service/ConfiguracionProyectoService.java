@@ -61,7 +61,18 @@ public class ConfiguracionProyectoService {
         return repository.contarLotesRegistrados(proyecto);
     }
 
+    public boolean importacionRealizada(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.importacionRealizada(proyecto);
+    }
+
+    public void registrarImportacion(Long proyecto,Long actor,String huella,int filas) {
+        repository.registrarImportacion(proyecto,actor,huella,filas);
+    }
+
     public void exigirImportacionInicial(Long proyecto) {
+        if (importacionRealizada(proyecto))
+            throw new ConflictoNegocioException("La importación inicial ya fue confirmada. Utiliza los formularios de gestión.");
         if (contarLotesRegistrados(proyecto) >= 10)
             throw new ConflictoNegocioException("La carga masiva solo está disponible para proyectos con menos de 10 lotes registrados. Utiliza los formularios de gestión.");
     }

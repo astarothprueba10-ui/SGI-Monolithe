@@ -57,6 +57,9 @@ public class ImportacionProyectoService {
         registrarEstructura(id, filas, previo, contexto);
         if (base != null) ejecutarGuardado("Borrador comercial del proyecto", () ->
             guardarComercial(id, actor, filas, base, contexto));
+        if (previo.filas().stream().noneMatch(f -> f.estado().equals("NUEVO") || f.estado().equals("BORRADOR")))
+            throw new ReglaNegocioException("La importación no contiene registros nuevos ni reglas comerciales.");
+        configuracion.registrarImportacion(id,actor,previo.huella(),previo.filas().size());
         return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
     }
 

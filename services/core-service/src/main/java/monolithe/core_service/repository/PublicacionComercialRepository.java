@@ -6,6 +6,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+import monolithe.core_service.dto.GestionComercialDto.Evento;
 
 @Repository
 @RequiredArgsConstructor
@@ -18,6 +20,8 @@ public class PublicacionComercialRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             SELECT NOT (
                 pg_catalog.row_security_active('public.inm_proyectos'::regclass)
+                OR pg_catalog.row_security_active('public.inm_gestion_comercial_eventos'::regclass)
+                OR pg_catalog.row_security_active('public.inm_politicas_comerciales_lotes'::regclass)
                 OR pg_catalog.row_security_active('public.inm_lotes'::regclass)
                 OR pg_catalog.row_security_active('public.inm_lotes_precios'::regclass)
                 OR pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass)
@@ -74,6 +78,78 @@ public class PublicacionComercialRepository {
               AND p.fecha_desde<=now() AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
             ORDER BY p.fecha_desde DESC,p.id_lote_precio DESC LIMIT 1
             """, (r,n)->r.getBigDecimal(1), id).stream().findFirst().orElse(null);
+    }
+
+    public record EventoEstado(long id,String json) {}
+    public record Regla(Long id,String etapa,String situacion,Long precio,boolean precioValido) {}
+
+    public Optional<EventoEstado> ultimoEstado(Long proyecto,int version) {
+        return jdbc.query("""
+            SELECT id_evento, (nuevo->'estado')::text AS estado
+            FROM public.inm_gestion_comercial_eventos
+            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS')
+            ORDER BY id_evento DESC LIMIT 1
+            """,(r,n)->new EventoEstado(r.getLong("id_evento"),r.getString("estado")),proyecto,version).stream().findFirst();
+    }
+
+    public List<Evento> historial(Long proyecto) {
+        return jdbc.query("""
+            SELECT id_evento,tipo,id_usuario,fecha::text,anterior::text,nuevo::text
+            FROM public.inm_gestion_comercial_eventos WHERE id_proyecto=? ORDER BY id_evento DESC LIMIT 50
+            """,(r,n)->new Evento(r.getLong(1),r.getString(2),r.getLong(3),r.getString(4),r.getString(5),r.getString(6)),proyecto);
+    }
+
+    public void evento(Long proyecto,int version,Long actor,String tipo,String anterior,String nuevo) {
+        jdbc.update("""
+            INSERT INTO public.inm_gestion_comercial_eventos(id_proyecto,version_publicada,id_usuario,tipo,anterior,nuevo)
+            VALUES (?,?,?,?,CAST(? AS jsonb),CAST(? AS jsonb))
+            """,proyecto,version,actor,tipo,anterior,nuevo);
+    }
+
+    public List<String> etapasHistoricas(Long proyecto,int version) {
+        return jdbc.queryForList("""
+            SELECT DISTINCT codigo_etapa FROM public.inm_politicas_comerciales_lotes
+            WHERE id_proyecto=? AND version=? AND situacion='HABILITADA' AND codigo_etapa IS NOT NULL ORDER BY codigo_etapa
+            """,String.class,proyecto,version);
+    }
+
+    public List<Regla> reglas(Long proyecto,int version) {
+        return jdbc.query("""
+            SELECT pl.id_lote,pl.codigo_etapa,pl.situacion,pl.id_lote_precio,
+              coalesce(p.activo AND m.activo AND m.codigo='PEN' AND p.id_lote=pl.id_lote
+                AND p.precio=pl.precio_final AND p.precio>0 AND p.fecha_desde<=now()
+                AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
+                AND (pl.vigente_hasta IS NULL OR pl.vigente_hasta >= (now() AT TIME ZONE 'America/Lima')::date),false) precio_valido
+            FROM public.inm_politicas_comerciales_lotes pl
+            LEFT JOIN public.inm_lotes_precios p ON p.id_lote_precio=pl.id_lote_precio
+            LEFT JOIN public.cfg_monedas m ON m.id_moneda=p.id_moneda
+            WHERE pl.id_proyecto=? AND pl.version=? ORDER BY pl.id_lote
+            """,(r,n)->new Regla(r.getLong(1),r.getString(2),r.getString(3),r.getObject(4,Long.class),r.getBoolean(5)),proyecto,version);
+    }
+
+    public String foto(Long proyecto,int version) {
+        return jdbc.queryForObject("""
+            SELECT coalesce(jsonb_agg(to_jsonb(pl)||jsonb_build_object('estadoInventario',el.codigo) ORDER BY pl.id_lote),'[]'::jsonb)::text
+            FROM public.inm_politicas_comerciales_lotes pl JOIN public.inm_lotes l USING(id_lote)
+            JOIN public.cfg_estados_lote el USING(id_estado_lote)
+            WHERE pl.id_proyecto=? AND pl.version=?
+            """,String.class,proyecto,version);
+    }
+
+    public void cambiarSituacion(Long proyecto,int version,Long id,String situacion) {
+        if (jdbc.update("""
+            UPDATE public.inm_politicas_comerciales_lotes SET situacion=?
+            WHERE id_proyecto=? AND version=? AND id_lote=? AND situacion IN ('HABILITADA','BLOQUEADA')
+            """,situacion,proyecto,version,id)!=1) throw new monolithe.core_service.exception.ConflictoNegocioException("La regla del lote cambió.");
+    }
+
+    public void actualizarPrecioRegla(Long proyecto,int version,Fila f,Long precio,String situacion) {
+        if (jdbc.update("""
+            UPDATE public.inm_politicas_comerciales_lotes SET id_lote_precio=?,precio_lista=?,descuento=?,precio_final=?,vigente_hasta=?,situacion=?
+            WHERE id_proyecto=? AND version=? AND id_lote=? AND codigo_etapa=? AND situacion IN ('HABILITADA','BLOQUEADA')
+            """,precio,f.base().add(f.ajuste()),f.descuento(),f.precioFinal(),f.vigenteHasta(),situacion,
+            proyecto,version,f.idLote(),f.codigoEtapa())!=1)
+            throw new monolithe.core_service.exception.ConflictoNegocioException("La regla comercial del lote cambió.");
     }
 
     public void publicar(Long proyecto, int version, Long actor) {
