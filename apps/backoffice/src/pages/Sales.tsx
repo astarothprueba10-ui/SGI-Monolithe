@@ -624,15 +624,16 @@ export function Sales() {
       const preferencias:typeof preferenciasLote={};
       for(const i of detalle.intereses??[]) {
         if(!preferencias[i.idProyecto]) preferencias[i.idProyecto]={
-          id:i.idLoteInteres??null,codigo:i.codigoLoteInteres??null,comentario:i.comentario??null
+          id:i.idLoteInteres==null?null:Number(i.idLoteInteres),codigo:i.codigoLoteInteres??null,comentario:i.comentario??null
         };
       }
       setPreferenciasLote(preferencias);
       setProspectsList(prev => prev.map(p => p.id_prospecto === id ? {...p,...detalle.prospecto} : p));
       // Una persona convertida puede comprar en otro proyecto; DB revalida permisos y disponibilidad.
       const compradorExistente = (detalle.prospecto.estado_codigo ?? '').toUpperCase() === 'CONVERTIDO';
-      const elegibles = proyectos.filter((p) =>
-        p.activo && (compradorExistente || intereses.has(p.idProyecto) || puedeEditarInteres)
+      const elegibles = proyectos.map(p=>({...p,idProyecto:Number(p.idProyecto)})).filter((p) =>
+        Number.isSafeInteger(p.idProyecto)&&p.idProyecto>0&&p.activo &&
+        (compradorExistente || intereses.has(p.idProyecto) || puedeEditarInteres)
       );
       setAvailableProjects(elegibles);
       setReservasVigentes(consultaReservas.reservas ?? []);
