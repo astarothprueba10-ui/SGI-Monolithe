@@ -18,7 +18,11 @@ public class ConfiguracionProyectoRepository {
     public record Version(int numero, String json) {}
 
     public record LecturaMapa(boolean existe, boolean publicacionVisible, boolean integridad,
-            int publicada, Integer versionBorrador, String borrador, String asignaciones, String etapas, String abiertas) {}
+            int publicada, Integer versionBorrador, String borrador, String asignaciones, String etapas, String abiertas, long revision) {
+        public LecturaMapa(boolean existe,boolean visible,boolean integridad,int publicada,Integer version,String borrador,String asignaciones,String etapas,String abiertas){
+            this(existe,visible,integridad,publicada,version,borrador,asignaciones,etapas,abiertas,0L);
+        }
+    }
 
     public LecturaMapa lecturaMapa(Long proyecto) {
         return jdbc.queryForObject("""
@@ -47,7 +51,7 @@ public class ConfiguracionProyectoRepository {
                             OR pg_catalog.row_security_active('public.cfg_estados_venta'::regclass)
                         ) ELSE true END integridad,
                pub.version publicada, b.version borrador_version,b.configuracion::text borrador,
-               a.estado::text asignaciones, e.etapas::text etapas,
+               a.estado::text asignaciones, e.etapas::text etapas, coalesce(u.id_evento,0) revision,
                CASE WHEN u.id_evento IS NOT NULL THEN (u.estado->'etapasHabilitadas')::text
                  ELSE (SELECT coalesce(jsonb_agg(h.codigo_etapa ORDER BY h.codigo_etapa),'[]'::jsonb)::text
                    FROM (SELECT DISTINCT l.codigo_etapa FROM public.inm_politicas_comerciales_lotes l
@@ -68,7 +72,7 @@ public class ConfiguracionProyectoRepository {
                 ORDER BY id_evento DESC LIMIT 1) u ON true
             """, (rs,n)->new LecturaMapa(rs.getBoolean("existe"),rs.getBoolean("publicacion_visible"),
                 rs.getBoolean("integridad"),rs.getInt("publicada"),rs.getObject("borrador_version",Integer.class),
-                rs.getString("borrador"),rs.getString("asignaciones"),rs.getString("etapas"),rs.getString("abiertas")),proyecto);
+                rs.getString("borrador"),rs.getString("asignaciones"),rs.getString("etapas"),rs.getString("abiertas"),rs.getLong("revision")),proyecto);
     }
 
     public Optional<Version> vigente(Long proyecto) {
