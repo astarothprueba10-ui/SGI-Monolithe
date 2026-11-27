@@ -334,8 +334,13 @@ public class CrmVentaService {
     @Transactional
     public JsonNode cambiarLoteInteres(Long actor, Long prospecto, Long proyecto, Long lote, Long anterior, String motivo) {
         validarActor(actor);
-        if (prospecto==null || proyecto==null || lote==null || motivo==null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione el lote e indique el motivo.");
+        if (prospecto==null || proyecto==null || lote==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Seleccione el lote de interés.");
+        // La primera asignación tiene un motivo de auditoría generado por el sistema.
+        // El procedimiento SQL verifica que el anterior coincida con el interés real.
+        if(anterior==null) motivo="Registro inicial de lote de interés desde Separaciones y Ventas";
+        else if(motivo==null||motivo.trim().length()<5||motivo.trim().length()>500)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Indique el motivo del cambio de lote.");
         return ejecutar("""
             SELECT public.sp_crm_cambiar_lote_interes_v1(CAST(? AS bigint),CAST(? AS bigint),
                 CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text))::text
