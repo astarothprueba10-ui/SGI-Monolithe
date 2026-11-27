@@ -72,7 +72,8 @@ function SvgPreview({document,lots,selected,overview,onUnavailable,selectable,on
     for(const el of elements){const box=measure(el);if(box)boxes.set(Number(el.dataset.lotId),box);}
     measurements.current={document,lots,boxes};
     }
-    const boxes=measurements.current.boxes;
+    const boxes=measurements.current?.boxes;
+    if(!boxes){onUnavailable();return;}
     const target=boxes.get(selected.idLote);
     if(!target){onUnavailable();return;}
     const neighbors=lots.filter(l=>blockKey(l)===block).map(l=>boxes.get(l.idLote)).filter((v):v is VisualBox=>v!==undefined);
@@ -99,6 +100,7 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
   const [retry,setRetry]=useState(0);
   const selectionKey=`${selected?.idLote??'none'}-${focusRevision}`;
   const [overviewKey,setOverviewKey]=useState<string|null>(null);
+  const [navigationRevision,setNavigationRevision]=useState(0);
   const overview=overviewKey===selectionKey;
   const [unavailableId,setUnavailableId]=useState<number|null>(null);
   useEffect(()=>{
@@ -120,7 +122,7 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
     }).catch(()=>{if(active)setSvg({status:'error',value:null});});
     return ()=>{active=false;};
   },[project,retry]);
-  const resetKey=`${selectionKey}-${overview}`;
+  const resetKey=`${selectionKey}-${navigationRevision}`;
   const lots=useMemo(()=>rows.value.map(f=>({...f.lote,codigoEstadoLote:f.estado,nombreEstadoLote:estadoLote(f.estado),
     nombreEtapa:f.nombreEtapa??undefined,codigoEtapa:f.codigoEtapa??undefined})),[rows.value]);
   const row=rows.value.find(f=>f.lote.idLote===selected?.idLote);
@@ -133,7 +135,7 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="flex items-center gap-2 text-sm font-semibold text-brand-900"><MapIcon className="h-4 w-4"/> Vista del lote</h3>
       <p className="mt-1 text-xs text-brand-500">Ubicación y entorno comercial</p></div>
-      <button type="button" disabled={!selected} onClick={()=>setOverviewKey(v=>v===selectionKey?null:selectionKey)} className="inline-flex items-center gap-1 rounded-md border border-brand-200 px-2 py-1.5 text-xs text-brand-700 disabled:opacity-50"><RotateCcwIcon className="h-3 w-3"/>{overview?'Centrar lote':'Ver proyecto'}</button>
+      <button type="button" disabled={!selected} onClick={()=>{setOverviewKey(v=>v===selectionKey?null:selectionKey);setNavigationRevision(v=>v+1);}} className="inline-flex items-center gap-1 rounded-md border border-brand-200 px-2 py-1.5 text-xs text-brand-700 disabled:opacity-50"><RotateCcwIcon className="h-3 w-3"/>{overview?'Centrar lote':'Ver proyecto'}</button>
     </div>
     <div className="flex flex-wrap gap-1 rounded-lg bg-brand-50 p-1" role="group" aria-label="Tipo de vista">
       {(['auto','svg','matriz'] as const).map(m=><button key={m} type="button" aria-pressed={mode===m} disabled={m==='svg'&&!svgUsable} onClick={()=>setMode(m)}
