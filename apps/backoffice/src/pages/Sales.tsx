@@ -1360,6 +1360,10 @@ export function Sales() {
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
   const mostrarVisorSeparacion=opType==='Separacion' && can('lots.view');
   const mostrarVisorOperacion=can('lots.view');
+  const irASeccionOperacion=(id:string)=>{
+    const destino=document.getElementById(id);
+    if(destino){destino.focus({preventScroll:true});destino.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
+  };
   // En venta se usa exactamente el listado autorizado por cliente y etapa, no el inventario del mapa.
   const lotesVisorOperacion=opType==='Venta'?availableLots:lotesDisponiblesProyecto;
   const idsAdicionales=lotesAdicionales.map(l=>l.idLote);
@@ -2348,7 +2352,7 @@ export function Sales() {
             Cargando prospectos y lotes disponibles…
           </div>
         ) : (
-          <div className={mostrarVisorOperacion?'grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]':'min-w-0'}>
+          <div className={mostrarVisorOperacion?'grid items-start gap-4 lg:gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]':'min-w-0'}>
           <form className="min-w-0" onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
             {<header className="flex items-start gap-3 pb-1">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
@@ -2498,10 +2502,11 @@ export function Sales() {
                 )}
             </div>
 
-            {<header className="flex items-start gap-3 border-t border-brand-100 pt-5">
+            {<header id="operacion-lotes-formulario" tabIndex={-1} className="flex flex-wrap items-start gap-3 border-t border-brand-100 pt-5 scroll-mt-2 focus:outline-none">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">2</span>
-              <div><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
+              <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-brand-900">Lotes seleccionados</h3>
                 <p className="text-xs text-brand-500">{opType==='Venta' ? 'Revisa el lote reservado y sus condiciones comerciales.' : 'Revisa el lote de interés y añade otros si el cliente lo solicita.'}</p></div>
+              {mostrarVisorOperacion&&<button type="button" className="shrink-0 rounded-md border border-brand-200 px-3 py-2 text-xs font-medium text-brand-700 lg:hidden" onClick={()=>irASeccionOperacion('operacion-lotes-visor')}>Ver plano</button>}
             </header>}
             {tieneReservasVenta && selectedProspectId && <ReservasVentaPanel
               idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
@@ -2564,7 +2569,7 @@ export function Sales() {
 
               {opType==='Separacion' ? <div className="space-y-2">
                 {(loadingProjects||loadingStages||loadingLots) ? <p role="status" className="py-3 text-sm text-brand-500">Consultando interés e inventario del proyecto…</p>
-                : lotePrincipal ? <div className={`rounded-xl border bg-white p-3 ${mostrarVisorSeparacion&&loteVisual?.idLote===lotePrincipal.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
+                : lotePrincipal ? <div className={`rounded-xl border bg-white p-3 motion-safe:transition-colors ${mostrarVisorSeparacion&&loteVisual?.idLote===lotePrincipal.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
                   <button type="button" disabled={!mostrarVisorSeparacion} aria-label={`Consultar ubicación de ${lotePrincipal.codigo}`}
                     aria-pressed={mostrarVisorSeparacion&&loteVisual?.idLote===lotePrincipal.idLote} onClick={()=>consultarUbicacion(lotePrincipal.idLote)}
                     className="flex w-full flex-wrap items-start justify-between gap-x-4 gap-y-2 text-left rounded-md enabled:cursor-pointer enabled:hover:bg-brand-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
@@ -2611,7 +2616,7 @@ export function Sales() {
                       onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
                   </div>
                 </div>}
-                {lotesAdicionales.map(l=><div key={l.idLote} className={`rounded-xl border bg-white p-3 ${mostrarVisorSeparacion&&loteVisual?.idLote===l.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
+                {lotesAdicionales.map(l=><div key={l.idLote} className={`rounded-xl border bg-white p-3 motion-safe:transition-colors ${mostrarVisorSeparacion&&loteVisual?.idLote===l.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
                   <button type="button" disabled={!mostrarVisorSeparacion} aria-label={`Consultar ubicación de ${l.codigo}`}
                     aria-pressed={mostrarVisorSeparacion&&loteVisual?.idLote===l.idLote} onClick={()=>consultarUbicacion(l.idLote)}
                     className="flex w-full flex-wrap items-start justify-between gap-x-4 gap-y-2 text-left rounded-md enabled:cursor-pointer enabled:hover:bg-brand-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
@@ -3133,7 +3138,8 @@ export function Sales() {
               />
             </div>
           </fieldset></form>
-          {mostrarVisorOperacion&&<aside className="min-w-0 lg:sticky lg:top-0">
+          {mostrarVisorOperacion&&<aside id="operacion-lotes-visor" tabIndex={-1} className="min-w-0 scroll-mt-2 focus:outline-none lg:sticky lg:top-0 lg:max-h-[max(280px,calc(100dvh-220px))] lg:overflow-y-auto lg:overscroll-contain">
+            <button type="button" className="mb-2 w-full rounded-md border border-brand-200 px-3 py-2 text-xs font-medium text-brand-700 lg:hidden" onClick={()=>irASeccionOperacion('operacion-lotes-formulario')}>Volver a lotes seleccionados</button>
             {selectedProspectId&&formProjectId&&proyectoConInteres
               ? <LotVisualPickerPanel key={formProjectId} project={Number(formProjectId)} selected={loteVisual}
                   stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined} focusRevision={revisionEnfoque} selectable={lotesSeleccionablesVisor} onPick={seleccionarDesdePlano} selectionHint={ayudaVisor}/>
