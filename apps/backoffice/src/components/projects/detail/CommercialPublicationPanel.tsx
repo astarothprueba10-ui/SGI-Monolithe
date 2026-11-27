@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldCheckIcon } from 'lucide-react';
+import { CommercialZoneLegend } from './CommercialZoneLegend';
 import { Button } from '../../ui/Button';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
@@ -128,6 +129,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPublished
       const abierta = etapasSeleccionadas.includes(e.codigo);
       return <span key={e.codigo} className={`rounded-md border px-2 py-1 text-xs ${abierta ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-100 text-gray-600'}`}>{e.nombre}: {abierta ? 'Abierta' : 'Cerrada'}</span>;
     })}</div>
+    <CommercialZoneLegend projectId={project.idProyecto} codigos={config.zonas}/>
     {ocupado && <p role="status" className="text-sm text-brand-600">Validando configuración con el servidor…</p>}
     {!puedeConsultar && <p className="text-sm text-brand-600">Guarda la configuración y verifica tus permisos antes de finalizar.</p>}
     {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" disabled={ocupado} onClick={() => setIntento(n => n+1)}>Reintentar validación</Button></div>}

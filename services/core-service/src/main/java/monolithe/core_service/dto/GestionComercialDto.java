@@ -12,5 +12,5 @@ public final class GestionComercialDto {
     public record Disponibilidad(@NotNull @Min(0) Long revision,
         @NotNull @Size(max=100) List<@NotBlank String> etapasHabilitadas) {}
     public record CambioTarifa(@NotNull @Min(0) Long revision, @NotNull @Valid Tarifa tarifa) {}
-    public record Evento(long id, String tipo, Long actor, String fecha, String anterior, String nuevo) {}
+    public record Evento(long id, String tipo, Long actor, String fecha, String anterior, String nuevo, String actorNombre) {}
 }

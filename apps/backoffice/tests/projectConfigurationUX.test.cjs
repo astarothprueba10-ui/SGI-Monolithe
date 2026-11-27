@@ -144,3 +144,26 @@ test('gestión permanente usa operaciones independientes y muestra checks persis
   assert.match(api,/gestion\/tarifa/);
   assert.doesNotMatch(gestion,/projectConfigurationService.publicar\(/);
 });
+
+test('estructura importada solo se consulta en asistente y las matrices muestran leyenda real',()=>{
+ const ui=archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+ assert.match(ui,/const estructuraCerrada = !importacionPermitida/);
+ assert.match(ui,/readOnly=\{bloqueado \|\| estructuraCerrada\}/);
+ assert.match(ui,/readOnly=\{estructuraCerrada\}/);
+ assert.match(ui,/<CommercialZoneLegend/);
+ assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/<CommercialZoneLegend/);
+ assert.match(archivo('components/projects/detail/CommercialPublicationPanel.tsx'),/<CommercialZoneLegend/);
+ assert.match(archivo('components/projects/detail/CommercialZoneLegend.tsx'),/coreService.getZonesByProject/);
+ assert.match(archivo('components/projects/detail/ProjectBlocksTab.tsx'),/<CommercialAssignmentModal/);
+ assert.match(archivo('components/projects/detail/ProjectLotsTab.tsx'),/<CommercialAssignmentModal/);
+});
+test('historial presenta cambios y nombre, no JSON técnico',()=>{
+ const ui=archivo('components/projects/detail/CommercialManagementPanel.tsx');
+ assert.doesNotMatch(ui,/formatearEvento|<pre/);
+ const detalle=archivo('components/projects/detail/CommercialHistoryEntry.tsx');
+ assert.match(detalle,/e.actorNombre/);
+ const {resumirEvento}=require('../src/lib/commercialHistory.ts');
+ const r=resumirEvento({anterior:JSON.stringify({estado:{etapasHabilitadas:['E1']},lotes:[{id_lote:1,estadoInventario:'DISPONIBLE',precio_final:26000}]}),nuevo:JSON.stringify({estado:{etapasHabilitadas:['E2']},lotes:[{id_lote:1,estadoInventario:'NO_DISPONIBLE',precio_final:26000}]})});
+ assert.deepEqual(r.abrieron,['E2']);assert.deepEqual(r.cerraron,['E1']);assert.equal(r.lotes.length,1);
+ assert.equal(resumirEvento({anterior:'?',nuevo:'{}'}),null);
+});

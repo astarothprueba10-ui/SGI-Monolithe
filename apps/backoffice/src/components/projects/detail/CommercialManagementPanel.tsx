@@ -6,13 +6,14 @@ import { Input, Select, FieldLabel } from '../../ui/Field';
 import { Modal } from '../../ui/Modal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
+import { CommercialZoneLegend } from './CommercialZoneLegend';
+import { CommercialHistoryEntry } from './CommercialHistoryEntry';
 import { inventarioPorEtapa } from '../../../lib/commercialPresentation';
 import type { ConfiguracionProyectoResponse, GestionComercialResponse, EventoComercial, TarifaComercial } from '../../../types/projectConfiguration';
 import type { ProyectoResponse } from '../../../types/core';
 
 const soles = (v: number) => new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'}).format(v);
 const hoy = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-const tipos: Record<string,string> = { IMPORTACION:'Importación inicial', INICIAL:'Configuración inicial', DISPONIBILIDAD:'Disponibilidad', TARIFAS:'Tarifas' };
 
 export function CommercialManagementPanel({ config, version, project }: { config: ConfiguracionProyectoResponse; version: number; project: ProyectoResponse }) {
   const { can } = useAuth();
@@ -115,6 +116,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
     </section>}
     {seccion === 'tarifas' && <section className="space-y-4">
       <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
+      <CommercialZoneLegend projectId={id} codigos={config.zonas}/>
       <p className="text-sm text-brand-600">Edita una combinación de etapa y zona. El sistema aplica el cambio a los lotes correspondientes, sin reabrir etapas ni modificar ventas y reservas. Moneda PEN.</p>
       <div className="max-w-sm"><FieldLabel htmlFor="gestion-etapa">Etapa comercial</FieldLabel><Select id="gestion-etapa" disabled={ocupado} value={etapa} onChange={e=>setEtapa(e.target.value)}>{config.datos.etapas.map(e=><option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
       <div className="overflow-auto rounded-lg border border-brand-200"><table className="w-full text-left text-sm">
@@ -129,10 +131,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
     {seccion === 'historial' && <section className="space-y-3">
       <h3 className="font-semibold text-brand-900">Historial comercial</h3>
       <p className="text-xs text-brand-500">Últimos 50 eventos registrados. Las publicaciones anteriores a esta función no cuentan con el nuevo detalle de auditoría.</p>
-      {!historial?<p>Cargando historial…</p>:historial.length===0?<p>No hay eventos registrados.</p>:historial.map(e=><details key={e.id} className="rounded-md border border-brand-200 p-3">
-        <summary className="cursor-pointer text-sm font-medium text-brand-900">{tipos[e.tipo]??e.tipo} · Usuario #{e.actor} · {e.fecha}</summary>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">{[['Antes',e.anterior],['Después',e.nuevo]].map(([titulo,json])=><div key={titulo} className="min-w-0"><p className="text-xs font-semibold text-brand-700">{titulo}</p><pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-brand-50 p-2 text-xs">{formatearEvento(json)}</pre></div>)}</div>
-      </details>)}
+      {!historial?<p>Cargando historial…</p>:historial.length===0?<p>No hay eventos registrados.</p>:historial.map(e=><CommercialHistoryEntry key={e.id} evento={e} config={inventario}/>)}
     </section>}
     <Modal open={tarifa!==null} title="Actualizar tarifa" onClose={()=>{if(!ocupado){setTarifa(null);setError('');}}}
       description="El cambio se aplica al precio comercial, no a la disponibilidad."
@@ -150,6 +149,3 @@ export function CommercialManagementPanel({ config, version, project }: { config
   </Card>;
 }
 
-function formatearEvento(json:string):string {
-  try {const datos=JSON.parse(json);return JSON.stringify(datos,null,2);} catch {return 'Detalle no disponible';}
-}

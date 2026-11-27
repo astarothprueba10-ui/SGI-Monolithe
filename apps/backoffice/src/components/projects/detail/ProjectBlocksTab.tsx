@@ -9,6 +9,7 @@ import { Badge } from '../../ui/Badge';
 import { EmptyState } from '../../ui/Feedback';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coreService } from '../../../services/coreService';
+import { CommercialAssignmentModal } from './CommercialAssignmentModal';
 import { BlockFormModal } from '../BlockFormModal';
 import { cn } from '../../../utils/cn';
 import type {
@@ -24,7 +25,9 @@ interface Props {
 type StatusFilterOption = 'TODOS' | 'ACTIVO' | 'INACTIVO';
 
 export function ProjectBlocksTab({ project }: Props) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const canAssign = can('projects.edit') && can('lots.edit') && user.roles.includes('Gerencia');
+  const [asignando,setAsignando]=useState<ManzanaResponse|null>(null);
   const canEdit = can('projects.edit');
 
   const [stages, setStages] = useState<EtapaResponse[]>([]);
@@ -151,6 +154,7 @@ export function ProjectBlocksTab({ project }: Props) {
 
   return (
     <div className="space-y-6">
+      {asignando && <CommercialAssignmentModal projectId={project.idProyecto} tipo="manzanas" id={asignando.idManzana} codigo={asignando.codigo} onClose={()=>setAsignando(null)}/>}
       <BlockFormModal
         open={formOpen}
         onClose={handleCloseForm}
@@ -380,6 +384,7 @@ export function ProjectBlocksTab({ project }: Props) {
                         >
                           Editar
                         </Button>
+                        {canAssign && blk.activo && <Button size="sm" onClick={()=>setAsignando(blk)}>Etapa comercial</Button>}
                       </TD>
                     )}
                   </TR>

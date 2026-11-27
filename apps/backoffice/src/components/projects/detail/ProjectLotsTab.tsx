@@ -9,6 +9,7 @@ import { Pagination } from '../../ui/Pagination';
 import { EmptyState } from '../../ui/Feedback';
 import { useAuth } from '../../../contexts/AuthContext';
 import { coreService } from '../../../services/coreService';
+import { CommercialAssignmentModal } from './CommercialAssignmentModal';
 import { LotFormModal } from '../LotFormModal';
 import { LotStatusModal } from '../LotStatusModal';
 import type {
@@ -79,7 +80,9 @@ function LotStatusBadge({ lot }: { lot: LoteResponse }) {
 }
 
 export function ProjectLotsTab({ project }: Props) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const canAssign = can('projects.edit') && can('lots.edit') && user.roles.includes('Gerencia');
+  const [asignando,setAsignando]=useState<LoteResponse|null>(null);
   const canEdit = can('lots.edit');
   const canViewLots = can('lots.view');
 
@@ -252,6 +255,7 @@ export function ProjectLotsTab({ project }: Props) {
 
   return (
     <div className="space-y-4">
+      {asignando && <CommercialAssignmentModal projectId={project.idProyecto} tipo="lotes" id={asignando.idLote} codigo={asignando.codigo} onClose={()=>setAsignando(null)}/>}
       <LotFormModal
         open={formOpen}
         onClose={handleCloseForm}
@@ -463,6 +467,7 @@ export function ProjectLotsTab({ project }: Props) {
                             Estado
                           </Button>
                         )}
+                        {canAssign && <Button size="sm" onClick={()=>setAsignando(lot)}>Etapa comercial</Button>}
                         {canEdit && (
                           <Button
                             size="sm"

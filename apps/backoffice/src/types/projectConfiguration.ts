@@ -89,5 +89,5 @@ export interface GestionComercialResponse {
   estado: { etapasHabilitadas: string[]; tarifas: TarifaComercial[] };
 }
 export interface EventoComercial {
-  id: number; tipo: string; actor: number; fecha: string; anterior: string; nuevo: string;
+  id: number; tipo: string; actor: number; actorNombre?: string | null; fecha: string; anterior: string; nuevo: string;
 }

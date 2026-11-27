@@ -103,9 +103,15 @@ public class PublicacionComercialRepository {
 
     public List<Evento> historial(Long proyecto) {
         return jdbc.query("""
-            SELECT id_evento,tipo,id_usuario,fecha::text,anterior::text,nuevo::text
-            FROM public.inm_gestion_comercial_eventos WHERE id_proyecto=? ORDER BY id_evento DESC LIMIT 50
-            """,(r,n)->new Evento(r.getLong(1),r.getString(2),r.getLong(3),r.getString(4),r.getString(5),r.getString(6)),proyecto);
+            SELECT e.id_evento,e.tipo,e.id_usuario,
+              to_char(e.fecha AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+              e.anterior::text,e.nuevo::text,
+              nullif(trim(concat_ws(' ',p.nombres,p.apellido_paterno,p.apellido_materno)),'') AS actor_nombre
+            FROM public.inm_gestion_comercial_eventos e
+            LEFT JOIN public.seg_usuarios u ON u.id_usuario=e.id_usuario
+            LEFT JOIN public.core_personas p ON p.id_persona=u.id_persona
+            WHERE e.id_proyecto=? ORDER BY e.id_evento DESC LIMIT 50
+            """,(r,n)->new Evento(r.getLong(1),r.getString(2),r.getLong(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),proyecto);
     }
 
     public void evento(Long proyecto,int version,Long actor,String tipo,String anterior,String nuevo) {
