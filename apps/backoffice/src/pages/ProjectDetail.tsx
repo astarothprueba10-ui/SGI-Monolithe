@@ -32,6 +32,8 @@ export function ProjectDetail() {
   const canViewLots = can('lots.view');
   const canConfigure = canEdit && can('projects.view') && user.roles.includes('Gerencia');
 
+  const canViewCommercial = canConfigure || (can('projects.view') && canViewLots && user.roles.includes('Supervisor comercial'));
+
   const [project, setProject] = useState<ProyectoResponse | null>(null);
   useNavigationDetail(project?.idProyecto === Number(idProyecto) ? project.nombre : 'Proyecto');
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export function ProjectDetail() {
   const tabItems = useMemo(() => {
     const items = [
       { id: 'resumen', label: 'Resumen' },
-      ...(canConfigure ? [{ id: 'etapas', label: 'Etapas comerciales' }] : []),
+      ...(canViewCommercial ? [{ id: 'etapas', label: 'Etapas comerciales' }] : []),
       { id: 'zonas', label: 'Zonas' },
       { id: 'manzanas', label: 'Manzanas' }
     ];
@@ -79,7 +81,7 @@ export function ProjectDetail() {
     }
     if (canConfigure) items.push({ id: 'configuracion', label: 'Configuración comercial' });
     return items;
-  }, [canViewLots, canConfigure]);
+  }, [canViewLots, canConfigure, canViewCommercial]);
 
   if (loading) {
     return (
@@ -192,7 +194,7 @@ export function ProjectDetail() {
       {/* Contenido según tab activo */}
       <div className="mt-4">
         {activeTab === 'resumen' && <ProjectSummaryTab project={project} />}
-        {activeTab === 'etapas' && canConfigure && <ProjectStagesTab key={project.idProyecto} project={project} />}
+        {activeTab === 'etapas' && canViewCommercial && <ProjectStagesTab key={project.idProyecto} project={project} />}
         {activeTab === 'zonas' && <ProjectZonesTab project={project} />}
         {activeTab === 'manzanas' && <ProjectBlocksTab project={project} />}
         {activeTab === 'lotes' && canViewLots && <ProjectLotsTab project={project} />}
