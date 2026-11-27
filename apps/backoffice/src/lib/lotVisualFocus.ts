@@ -65,3 +65,13 @@ export function visualLotAction(id:number,project:number,lots:readonly LoteRespo
   if(!options.principal)return 'principal';
   return options.puedeAgregar?'adicional':'ninguna';
 }
+
+// Interpolación de cámara: la proporción permanece constante cuando ambas vistas la comparten.
+export function interpolateVisualBox(from:VisualBox,to:VisualBox,progress:number):VisualBox {
+  const t=Math.max(0,Math.min(1,progress));
+  const eased=1-Math.pow(1-t,3);
+  return from.map((n,i)=>n+(to[i]-n)*eased) as VisualBox;
+}
+export function sameVisualBox(a:VisualBox,b:VisualBox):boolean {
+  return a.every((n,i)=>Math.abs(n-b[i])<=1e-6);
+}
