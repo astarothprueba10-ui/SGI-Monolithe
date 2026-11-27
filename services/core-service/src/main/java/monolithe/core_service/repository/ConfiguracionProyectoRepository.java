@@ -57,7 +57,7 @@ public class ConfiguracionProyectoRepository {
             SELECT codigo, nombre FROM public.inm_etapas_comerciales
             WHERE id_proyecto = ? AND activo ORDER BY numero_orden, codigo
             """, (rs, n) -> new Etapa(rs.getString("codigo"), rs.getString("nombre"),
-                Disponibilidad.REGULAR, TipoDescuento.NINGUNO, BigDecimal.ZERO), proyecto);
+                Disponibilidad.BLOQUEADA, TipoDescuento.NINGUNO, BigDecimal.ZERO), proyecto);
     }
 
     public List<String> zonas(Long proyecto) {
