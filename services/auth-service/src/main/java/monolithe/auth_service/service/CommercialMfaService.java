@@ -74,14 +74,17 @@ public class CommercialMfaService {
     }
     @Transactional
     public Map<String,Object> iniciar(Jwt jwt,long proyecto,String accion,String huella){
+        long inicio=System.nanoTime();
         long actor=actor(jwt);
         if(proyecto<=0||!ACCIONES.contains(accion)||huella==null||!huella.matches("[a-f0-9]{64}"))throw fallo(HttpStatus.BAD_REQUEST,"Operación inválida.");
         String nombreProyecto=db.query("SELECT nombre FROM public.inm_proyectos WHERE id_proyecto=?",(rs,n)->rs.getString(1),proyecto)
             .stream().findFirst().filter(n->!n.isBlank()).orElseThrow(()->fallo(HttpStatus.NOT_FOUND,"Proyecto no encontrado."));
         db.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended('mfa-comercial:'||CAST(? AS text),0))",(r,n)->Boolean.TRUE,actor);
-        int recientes=db.queryForObject("SELECT count(*) FROM public.seg_mfa_comercial WHERE actor=? AND creado>now()-interval '15 minutes'",Integer.class,actor);
-        Boolean inmediato=db.queryForObject("SELECT EXISTS(SELECT 1 FROM public.seg_mfa_comercial WHERE actor=? AND creado>now()-interval '60 seconds')",Boolean.class,actor);
-        if(recientes>=5||Boolean.TRUE.equals(inmediato))throw fallo(HttpStatus.TOO_MANY_REQUESTS,"Espera antes de solicitar otro código (máximo cinco cada 15 minutos).");
+        Boolean limitado=db.queryForObject("""
+            SELECT count(*)>=5 OR coalesce(bool_or(creado>now()-interval '60 seconds'),false)
+            FROM public.seg_mfa_comercial WHERE actor=? AND creado>now()-interval '15 minutes'
+            """,Boolean.class,actor);
+        if(Boolean.TRUE.equals(limitado))throw fallo(HttpStatus.TOO_MANY_REQUESTS,"Espera antes de solicitar otro código (máximo cinco cada 15 minutos).");
         String destino=email(actor);
         UUID id=UUID.randomUUID();
         String codigo=String.format(Locale.ROOT,"%06d",random.nextInt(1_000_000));
@@ -91,8 +94,13 @@ public class CommercialMfaService {
             VALUES(?,?,?,?,?,?,?,?,now()+interval '5 minutes')
             """,id,actor,jwt.getId(),proyecto,accion,huella,hash(destino),passwords.encode(codigo));
         db.update("DELETE FROM public.seg_mfa_comercial WHERE actor=? AND creado<now()-interval '7 days'",actor);
+        long inicioCorreo=System.nanoTime();
         try{correo.enviarCodigoMfaComercial(destino,codigo,accion,nombreProyecto);}
         catch(RuntimeException e){throw fallo(HttpStatus.SERVICE_UNAVAILABLE,"No se pudo enviar el código de confirmación.");}
+        finally {
+            org.slf4j.LoggerFactory.getLogger(getClass()).info("MFA comercial accion={} preparacionMs={} smtpMs={} totalMs={}",accion,
+                (inicioCorreo-inicio)/1_000_000,(System.nanoTime()-inicioCorreo)/1_000_000,(System.nanoTime()-inicio)/1_000_000);
+        }
         int arroba=destino.indexOf('@');
         String oculto=destino.substring(0,1)+"***"+(arroba>0?destino.substring(arroba):"");
         return Map.of("challengeId",id.toString(),"correo",oculto,"proyectoNombre",nombreProyecto,"expiraEn",300,"reenviarEn",60);
