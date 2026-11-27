@@ -194,6 +194,8 @@ export function LotMap() {
   const [editorSize,setEditorSize]=useState({width:1200,height:1000});
   const [snapEnabled,setSnapEnabled]=useState(true);
   const [loadError,setLoadError]=useState(false);
+  const [projectsError,setProjectsError]=useState(false);
+  const [projectsRetry,setProjectsRetry]=useState(0);
 
   const [projects, setProjects] = useState<ProyectoResponse[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -225,10 +227,14 @@ export function LotMap() {
   useEffect(() => {
     let isMounted = true;
     setLoadingProjects(true);
+    setProjectsError(false);
     coreService
       .getActiveProjects()
       .then((res) => {
         if (!isMounted) return;
+        if(!Array.isArray(res) || res.some(p=>!p || !Number.isFinite(p.idProyecto))){
+          throw new Error('Respuesta inválida del listado de proyectos.');
+        }
         setProjects(res);
         if (res.length > 0) {
           setSelectedProjectId(res[0].idProyecto);
@@ -236,7 +242,9 @@ export function LotMap() {
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
-        const msg = err instanceof ApiError ? err.message : 'Error al cargar proyectos activos';
+        setProjectsError(true);
+        console.error('[Plano] Error al cargar proyectos',err);
+        const msg = err instanceof Error ? err.message : 'Error al cargar proyectos activos';
         toast.error(msg);
       })
       .finally(() => {
@@ -246,7 +254,7 @@ export function LotMap() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [projectsRetry]);
 
   const loadProjectData = useCallback((projectId: number, preserveSelection = false) => {
     if(preserveSelection&&refreshInFlight.current)return ()=>{};
@@ -267,9 +275,20 @@ export function LotMap() {
       refreshInFlight.current=false;setRefreshingPlan(false);setLoadingPlan(false);lastRefresh.current=Date.now();
       if(lotsResult.status!=='fulfilled'||planResult.status!=='fulfilled'){
         setLoadError(true);setCommercializable(new Set());
+        console.error('[Plano] Error de consulta',lotsResult.status==='rejected'?lotsResult.reason:planResult.status==='rejected'?planResult.reason:undefined);
         toast.error('No se pudo consultar el inventario comercial o las posiciones del plano.');return;
       }
-      const rows=lotsResult.value.filter(f=>f.lote.activo);
+      const inventory=lotsResult.value;
+      const plan=planResult.value;
+      if(!Array.isArray(inventory)||inventory.some(f=>!f?.lote||typeof f.lote.codigo!=='string'||!Number.isFinite(f.lote.idLote))
+        || (plan!=null && (!plan.plano||!Array.isArray(plan.lotes)||plan.lotes.some(g=>!g||!Array.isArray(g.puntos)
+          ||g.puntos.length<3||g.puntos.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)))))){
+        setLoadError(true);setCommercializable(new Set());
+        console.error('[Plano] Estructura inesperada del inventario o geometrías');
+        toast.error('El servidor devolvió datos de plano inválidos. Reintenta la consulta.');
+        return;
+      }
+      const rows=inventory.filter(f=>f.lote.activo);
       setLots(rows.map(f=>({...f.lote,codigoEtapa:f.codigoEtapa??undefined,nombreEtapa:f.nombreEtapa??'Sin asignar',
         codigoEstadoLote:f.estado,nombreEstadoLote:estadoLote(f.estado)})));
       setPricesMap(new Map(rows.flatMap(f=>f.precio==null?[]:[[f.lote.idLote,f.precio] as const])));
@@ -287,8 +306,14 @@ export function LotMap() {
     if(!selectedProjectId){setSvgLoading(false);return;}
     setSvgLoading(true);
     projectSvgService.obtener(selectedProjectId).then(res=>{
-      if(active)setSvgDocument(res?.documento??null);
-    }).catch(()=>{if(active)setSvgError(true);})
+      if(!active)return;
+      const doc=res?.documento??null;
+      if(doc&&(!Array.isArray(doc.viewBox)||doc.viewBox.length!==4||!Array.isArray(doc.elementos)
+        ||doc.elementos.some(f=>!f||!f.atributos))){
+        throw new Error('Documento SVG con estructura inválida.');
+      }
+      setSvgDocument(doc);
+    }).catch((err:unknown)=>{if(active){setSvgError(true);console.error('[Plano] Error al consultar SVG',err);}})
       .finally(()=>{if(active)setSvgLoading(false);});
     return ()=>{active=false;};
   },[selectedProjectId,svgRetry]);
@@ -659,6 +684,12 @@ export function LotMap() {
     );
   }
 
+  if (projectsError) {
+    return <div className="space-y-4"><PageHeader title="Plano interactivo"/>
+      <EmptyState title="No se pudieron cargar los proyectos" description="Verifica la conexión con Core Service e intenta nuevamente."
+        action={<Button onClick={()=>setProjectsRetry(v=>v+1)}>Reintentar</Button>}/></div>;
+  }
+
   if (projects.length === 0) {
     return (
       <div>
@@ -833,7 +864,7 @@ export function LotMap() {
             </div>
             <div className="p-4">
               {loadingPlan ? <div className="p-20 text-center text-sm text-brand-500">Cargando lotes…</div>
-                : loadError ? <EmptyState title="No se pudo consultar el mapa" description="Vuelve a enfocar la ventana para reintentar." icon={MapPinIcon}/>
+                : loadError ? <EmptyState title="No se pudo consultar el mapa" description="No se pudo obtener el inventario o las posiciones." icon={MapPinIcon} action={<Button onClick={()=>{if(selectedProjectId)loadProjectData(selectedProjectId,false);}}>Reintentar</Button>}/>
                 : lots.length===0 ? <EmptyState title="Proyecto sin lotes" description="Registra lotes antes de visualizar el plano." icon={MapPinIcon}/>
                 : <div className="space-y-3">
                   {isEditingPlan && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
