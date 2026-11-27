@@ -1,7 +1,7 @@
 import {coreApi} from '../lib/apiClient';
 import type {LoteResponse} from '../types/core';
 import type {ListadoManzanas} from './commercialBlockService';
-export interface FilaLote {lote:LoteResponse;codigoEtapa:string|null;nombreEtapa:string|null;estado:string;precio:number|null;protegido:boolean}
+export interface FilaLote {lote:LoteResponse;codigoEtapa:string|null;nombreEtapa:string|null;estado:string;precio:number|null;protegido:boolean;promocionAplicada?:number|null}
 export interface IdentidadLote {codigo:string;numero:string}
 export interface ListadoLotes {catalogo:ListadoManzanas;lotes:FilaLote[];sugerencias:Record<string,IdentidadLote>}
 export interface ConsultaLote {idLote:number|null;idManzana:number;idZona:number;codigoEtapa:string;areaM2:number}
