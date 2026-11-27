@@ -40,7 +40,13 @@ public class CrmProspectoController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "La identidad del JWT no es valida.");
         }
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(servicio.registrarProspecto(idActor, solicitud));
+        long inicio=System.nanoTime();
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(servicio.registrarProspecto(idActor, solicitud));
+        } finally {
+            org.slf4j.LoggerFactory.getLogger(CrmProspectoController.class)
+                    .info("Captacion CRM totalServicioMs={}",(System.nanoTime()-inicio)/1_000_000);
+        }
     }
 }
