@@ -74,6 +74,14 @@ public class PlanoInteractivoController {
                                 planoInteractivoService.guardarGeometria(request));
         }
 
+        @PutMapping("/{idPlano}/matriz")
+        @PreAuthorize("hasAuthority('lots.configure')")
+        public ResponseEntity<PlanoInteractivoDetalleResponse> guardarMatriz(
+                        @PathVariable @Positive Long idPlano,
+                        @RequestBody @jakarta.validation.constraints.NotEmpty List<@Valid LoteGeometriaRequest> cambios) {
+                return ResponseEntity.ok(planoInteractivoService.guardarMatriz(idPlano, cambios));
+        }
+
         @DeleteMapping("/geometrias/{idLoteGeometria}")
 @PreAuthorize("hasAuthority('lots.configure')")
         public ResponseEntity<Void> desactivarGeometria(
