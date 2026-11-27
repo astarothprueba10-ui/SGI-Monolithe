@@ -6,6 +6,8 @@ import { Button } from '../ui/Button';
 import { FieldLabel, Select } from '../ui/Field';
 
 import { coreService } from '../../services/coreService';
+import { estadoLote } from '../../services/commercialLotService';
+import type { FilaLote } from '../../services/commercialLotService';
 
 import { HistorialLotePanel } from '../lots/HistorialLotePanel';
 import { HistorialComercialLotePanel } from '../lots/HistorialComercialLotePanel';
@@ -20,6 +22,7 @@ interface Props {
   onClose: () => void;
   onSuccess: () => Promise<void> | void;
   lot: LoteResponse | null;
+  comercial: Pick<FilaLote, 'codigoEtapa' | 'nombreEtapa' | 'estado'> | null;
   statuses: EstadoLoteResponse[];
   canEdit: boolean;
 }
@@ -29,6 +32,7 @@ export function LotStatusModal({
   onClose,
   onSuccess,
   lot,
+  comercial,
   statuses,
   canEdit
 }: Props) {
@@ -120,13 +124,13 @@ export function LotStatusModal({
   const isSold = lot.codigoEstadoLote === 'VENDIDO';
 
   return (
-    <Modal open={open} onClose={onClose} title="Estado del Lote" width="max-w-2xl">
+    <Modal open={open} onClose={onClose} title="Historial del lote" width="max-w-2xl">
       <div className="space-y-6">
         <div className="bg-gray-50 p-4 rounded-md">
           <p className="text-sm text-gray-700 font-medium">Lote: {lot.codigo} {lot.numero ? `- ${lot.numero}` : ''}</p>
           <p className="text-sm text-gray-600">Manzana: {lot.nombreManzana} ({lot.codigoManzana})</p>
-          <p className="text-sm text-gray-600">Etapa: {lot.nombreEtapa} ({lot.codigoEtapa})</p>
-          <p className="text-sm text-gray-600 font-medium mt-2">Estado actual: {lot.nombreEstadoLote}</p>
+          <p className="text-sm text-gray-600">Etapa comercial: {comercial?.nombreEtapa || comercial?.codigoEtapa || 'Sin asignar'}{comercial?.nombreEtapa && comercial.codigoEtapa ? ` (${comercial.codigoEtapa})` : ''}</p>
+          <p className="text-sm text-gray-600 font-medium mt-2">Estado actual: {comercial ? estadoLote(comercial.estado) : (lot.nombreEstadoLote ?? 'Sin estado')}</p>
         </div>
 
         {canEdit && isReserved && (

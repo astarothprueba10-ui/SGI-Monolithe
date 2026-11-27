@@ -37,7 +37,7 @@ export interface ConfiguracionProyectoResponse {
   monedas: string[];
   datos: ConfiguracionComercial;
   manzanas: { id: number; codigo: string; nombre: string }[];
-  lotes: { id: number; idManzana: number; codigo: string }[];
+  lotes: { id: number; idManzana: number; codigo: string; estadoInventario?: string | null; codigoZona?: string | null }[];
 }
 
 export interface SimulacionComercialResponse {
@@ -72,6 +72,7 @@ export interface PublicacionComercialFila {
   precioFinal: number | null;
   vigenteHasta: string | null;
   habilitarInventario: boolean;
+  bloquearInventario?: boolean;
 }
 export interface PublicacionComercialResponse {
   version: number;
@@ -79,4 +80,17 @@ export interface PublicacionComercialResponse {
   huella: string;
   publicado: boolean;
   lotes: PublicacionComercialFila[];
+}
+
+export interface MatrizBase { precioBase:number; recargos:Record<string,number>; vigenteDesde:string; vigenteHasta:string|null }
+export interface TarifarioComercial { general:MatrizBase|null; personalizadas:string[] }
+export type AlcanceMatriz = 'GENERAL'|'ETAPA'|'HEREDAR';
+export interface GestionComercialResponse {
+  version: number;
+  revision: number;
+  inferida: boolean;
+  estado: { etapasHabilitadas: string[]; tarifas: TarifaComercial[]; tarifario?:TarifarioComercial|null };
+}
+export interface EventoComercial {
+  id: number; tipo: string; actor: number | null; actorNombre?: string | null; fecha: string; anterior: string; nuevo: string;
 }

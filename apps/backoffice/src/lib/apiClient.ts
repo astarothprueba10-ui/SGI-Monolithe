@@ -110,18 +110,25 @@ function createApiClient(
       return (await response.blob()) as T;
     }
 
-    const data = contentType.includes('application/json')
-      ? await response.json()
+    const esJson = contentType.includes('application/json') || contentType.includes('+json');
+    const data = esJson
+      ? await response.json().catch(() => null)
       : await response.text();
 
     if (!response.ok) {
-      const message =
-        typeof data === 'object' &&
-          data !== null &&
-          'message' in data &&
-          typeof data.message === 'string'
-          ? data.message
-          : `Error HTTP ${response.status}`;
+      const payload = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {};
+      const fallback = response.status === 401 ? 'Tu sesión no es válida. Inicia sesión nuevamente.'
+        : response.status === 403 ? 'No tienes permisos para realizar esta operación.'
+        : response.status === 409 ? 'Los datos entran en conflicto con registros existentes. Recarga y verifica.'
+        : response.status === 503 ? 'El servicio no está disponible. Intenta nuevamente.'
+        : response.status >= 500 ? 'El servidor no pudo completar la operación. Contacta al soporte.'
+        : 'No se pudo procesar la solicitud. Revisa los datos ingresados.';
+      const principal = typeof payload.message === 'string' && payload.message.trim() ? payload.message
+        : typeof payload.mensaje === 'string' && payload.mensaje.trim() ? payload.mensaje : fallback;
+      const campos = payload.errores && typeof payload.errores === 'object'
+        ? Object.entries(payload.errores).filter(([, value]) => typeof value === 'string')
+            .slice(0, 5).map(([campo, value]) => `${campo}: ${value}`).join('; ') : '';
+      const message = campos ? `${principal}. ${campos}` : principal;
 
       throw new ApiError(
         response.status,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useProjectImport } from '../../../hooks/useProjectImport';
 import { ProjectImportPreview } from './ProjectImportPreview';
@@ -8,14 +8,16 @@ import { Button } from '../../ui/Button';
 import { descargarPlantillaConfiguracion } from '../../../utils/projectConfigurationExcel';
 import type { ProyectoResponse } from '../../../types/core';
 
-export function ProjectImportPreparation({ project, onImportCompleted, disabledByDraft = false }: {
+export function ProjectImportPreparation({ project, onImportCompleted, disabledByDraft = false, onBusyChange }: {
   project: ProyectoResponse;
   onImportCompleted?: () => void;
   disabledByDraft?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [descargando, setDescargando] = useState(false);
   const { can } = useAuth();
   const model = useProjectImport(project, onImportCompleted);
+  useEffect(() => { onBusyChange?.(model.ocupado || descargando); return () => onBusyChange?.(false); }, [model.ocupado, descargando, onBusyChange]);
   const puedeImportar = project.activo && can('lots.edit') && !disabledByDraft;
   async function descargar() {
     if (descargando) return;

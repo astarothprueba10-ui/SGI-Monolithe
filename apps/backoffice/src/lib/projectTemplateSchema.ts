@@ -20,7 +20,7 @@ export const INSTRUCCIONES_PLANTILLA = [
   'No incluyas fórmulas, celdas combinadas, filas de totales ni macros.',
   'Un lote nuevo no puede quedar disponible para vender hasta que se valide su precio y se publique su configuración comercial.',
   'Las etapas físicas y comerciales son independientes. Una excepción de lote prevalece sobre la asignación de manzana.',
-  'Los descuentos solo se aplican a etapas con disponibilidad PROMOCION. Los porcentajes deben ser menores que 100.',
+  'En EtapasComerciales, la columna disponibilidad (nombre técnico v1) admite REGULAR o PROMOCION para configurar el precio; no libera ventas. Solo PROMOCION admite descuentos; los porcentajes deben ser menores que 100.',
   'MONTO_FIJO en descuentos se expresa en PEN. POR_M2 y MONTO_FIJO son los modos de tarifa.',
   'Las ocho hojas pueden importarse. Las reglas y tarifas solo se guardan en el borrador; una fila de tarifa actualiza la combinación zona, etapa y moneda del borrador. Vigente_desde es obligatoria; vigente_hasta es opcional.'
 ] as const;

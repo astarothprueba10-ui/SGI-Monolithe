@@ -45,6 +45,7 @@ public class ImportacionProyectoRepository {
             SELECT EXISTS (SELECT 1 FROM public.inm_lotes WHERE id_manzana=? AND numero=?)
             """, Boolean.class, manzana, numero));
     }
+    // La restricción ux_los_cocos_numero_unico_activo exige números únicos en todo PROY-001 (id 2).
     public List<String> estadosEtapa() {
         return jdbc.queryForList("SELECT codigo FROM public.cfg_estados_etapa WHERE activo", String.class);
     }

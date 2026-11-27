@@ -55,6 +55,49 @@ class ImportacionProyectoServiceTest {
     }
 
     @Test
+    void impideImportarInventarioExistente() {
+        doThrow(new ConflictoNegocioException("Menos de 10 lotes")).when(configuracion).exigirImportacionInicial(2L);
+        var request = solicitud(List.of(zona(2,"Z-A")), null);
+        assertThrows(ConflictoNegocioException.class, () -> service.previsualizar(2L, request));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L, request, 1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    @Test
+    void impideImportarProyectoPublicadoInclusoSinHojasComerciales() {
+        doThrow(new ConflictoNegocioException("Proyecto publicado"))
+            .when(configuracion).exigirSinPublicacion(2L, false);
+        doThrow(new ConflictoNegocioException("Proyecto publicado"))
+            .when(configuracion).exigirSinPublicacion(2L, true);
+        var request = solicitud(List.of(zona(2,"Z-A")), null);
+        assertThrows(ConflictoNegocioException.class, () -> service.previsualizar(2L, request));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L, request, 1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    private Fila loteCocos(int fila, String manzana, String numero) {
+        return new Fila("Lotes", fila, Map.ofEntries(
+            Map.entry("codigo_etapa_fisica","ET-01"), Map.entry("codigo_manzana",manzana),
+            Map.entry("codigo",manzana+"-L"+numero), Map.entry("numero",numero),
+            Map.entry("codigo_zona","Z-A"), Map.entry("codigo_tipo_lote","REGULAR"),
+            Map.entry("area_m2","450"), Map.entry("frente_m",""), Map.entry("fondo_m",""),
+            Map.entry("lateral_derecho_m",""), Map.entry("lateral_izquierdo_m",""), Map.entry("observaciones","")));
+    }
+
+    @Test
+    void permiteNumerosIgualesEnManzanasDistintasPeroNoEnLaMisma() {
+        when(repo.manzanas(2L)).thenReturn(List.of(
+            new Referencia(12L,"ET-01"+(char)31+"M-A",true),
+            new Referencia(13L,"ET-01"+(char)31+"M-B",true)));
+        when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L,"Z-A",true)));
+        var filas = List.of(loteCocos(2,"M-A","01"), loteCocos(3,"M-B","01"), loteCocos(4,"M-B","01"));
+        var previo = service.previsualizar(2L, solicitud(filas,null));
+        assertEquals(List.of("NUEVO","NUEVO","ERROR"),previo.filas().stream().map(f->f.estado()).toList());
+        assertThrows(ReglaNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()),1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    @Test
     void vistaPreviaNoRegistraYDetectaExistentes() {
         when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L, "Z-A", true)));
         var r = service.previsualizar(2L, solicitud(List.of(zona(2,"Z-A"),zona(3,"Z-B")), null));
@@ -70,6 +113,7 @@ class ImportacionProyectoServiceTest {
         var previo = service.previsualizar(2L, solicitud(filas,null));
         assertTrue(service.confirmar(2L, solicitud(filas,previo.huella()), 1L).confirmado());
         verify(zonas, times(1)).crear(argThat(z -> z.codigo().equals("Z-B")));
+        verify(configuracion).registrarImportacion(2L,1L,previo.huella(),2);
         verifyNoInteractions(etapas, manzanas, lotes);
     }
 
@@ -133,6 +177,7 @@ class ImportacionProyectoServiceTest {
         service.confirmar(2L, solicitud(filas,previo.huella()), 3L);
         var captor = ArgumentCaptor.forClass(ConfiguracionProyectoRequest.class);
         verify(configuracion).guardar(eq(2L), eq(3L), captor.capture());
+        verify(configuracion).registrarImportacion(2L,3L,previo.huella(),4);
         assertEquals(4, captor.getValue().version());
         assertEquals(12L, captor.getValue().datos().manzanas().getFirst().id());
         assertEquals(14L, captor.getValue().datos().lotes().getFirst().id());

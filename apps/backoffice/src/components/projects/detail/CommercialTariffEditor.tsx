@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarRangeIcon, LayersIcon, PlusIcon, Trash2Icon, WandSparklesIcon } from 'lucide-react';
+import { Modal } from '../../ui/Modal';
+import { contarZonaEtapa } from '../../../lib/commercialZoneUsage';
 import { Button } from '../../ui/Button';
 import { Input, Select, FieldLabel } from '../../ui/Field';
 import { admiteMatrizRecargos, aplicarVigenciaTarifas, calcularMatrizTarifas, completarEtapasConTarifas,
   tarifaDeZona, actualizarTarifa, vigenciaValida } from '../../../lib/projectTariffMatrix';
 import type { ConfiguracionComercial, ConfiguracionProyectoResponse, TarifaComercial } from '../../../types/projectConfiguration';
 
-type Props = { datos: ConfiguracionComercial; catalogos: ConfiguracionProyectoResponse; onChange: (datos: ConfiguracionComercial) => void };
+type Props = { datos: ConfiguracionComercial; catalogos: ConfiguracionProyectoResponse; onChange: (datos: ConfiguracionComercial) => void; readOnly?: boolean };
 const dinero = (n: number, moneda: string) => new Intl.NumberFormat('es-PE',
   { style: 'currency', currency: moneda }).format(n);
 
-export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
+export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = false }: Props) {
   const [etapa, setEtapa] = useState(datos.etapas[0]?.codigo ?? '');
   const [moneda, setMoneda] = useState(catalogos.monedas.includes('PEN') ? 'PEN' : catalogos.monedas[0] ?? '');
   const [desde, setDesde] = useState('');
@@ -18,6 +20,10 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
   const [base, setBase] = useState(0);
   const [recargos, setRecargos] = useState({ A: 0, B: 0, C: 0 });
   const [aviso, setAviso] = useState('');
+  const [soloUsadas,setSoloUsadas]=useState(true);
+  const [pendienteQuitar,setPendienteQuitar]=useState<string|null>(null);
+  const uso=contarZonaEtapa({...catalogos,datos},etapa);
+  const visibles=catalogos.zonas.filter(z=>!soloUsadas || (uso.get(z)??0)>0);
   const [error, setError] = useState('');
   const tarifas = datos.tarifas ?? [];
   const etapaActual = datos.etapas.find(e => e.codigo === etapa);
@@ -48,7 +54,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
 
   function editar(tarifa: TarifaComercial) {
     onChange({ ...datos, tarifas: actualizarTarifa(tarifas, tarifa) });
-    setAviso('Hay precios por guardar. Utiliza «Guardar cambios» al terminar.');
+    setAviso('Hay precios por guardar. Utiliza «Validar precios y continuar» al terminar.');
     setError('');
   }
 
@@ -61,9 +67,10 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
   }
 
   function quitar(zona: string) {
+    setPendienteQuitar(null);
     onChange({ ...datos, tarifas: tarifas.filter(t => !(
       t.codigoEtapa === etapa && t.moneda === moneda && t.codigoZona === zona)) });
-    setAviso('Tarifa retirada del borrador. No modifica precios vigentes hasta la publicación.');
+    setAviso('Tarifa retirada del borrador. Debe existir una tarifa válida para los lotes asociados antes de finalizar.');
   }
 
   function fechas(enTodas: boolean) {
@@ -98,11 +105,27 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
       onChange({ ...datos, tarifas: actualizadas });
       setError('');
       setAviso(enTodas ? `Matriz generada para ${etapas.length} etapas (${actualizadas.length} tarifas en el borrador).`
-        : `Matriz generada para ${etapaActual?.nombre ?? etapa}. Guarda los cambios cuando termines.`);
+        : `Matriz generada para ${etapaActual?.nombre ?? etapa}. Valida los precios cuando termines.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar la matriz.');
     }
   }
+
+  if (readOnly) return <section className="space-y-4">
+    <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
+    <p className="text-sm text-brand-600">Consulta las tarifas de la configuración inicial publicada. El precio vigente individual puede diferir; los cambios de precios requieren una operación independiente, sin republicar.</p>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div><FieldLabel>Etapa comercial</FieldLabel><Select value={etapa} onChange={e => setEtapa(e.target.value)}>{datos.etapas.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
+      <div><FieldLabel>Moneda</FieldLabel><Select value={moneda} onChange={e => setMoneda(e.target.value)}>{catalogos.monedas.map(m => <option key={m} value={m}>{m}</option>)}</Select></div>
+    </div>
+    <div className="overflow-auto rounded-lg border border-brand-200"><table className="w-full text-left text-sm">
+      <thead className="bg-brand-50"><tr>{['Zona','Tarifa','Modalidad','Vigencia'].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
+      <tbody>{catalogos.zonas.map(z => { const t = tarifaDeZona(tarifas, etapa, moneda, z); return <tr key={z} className="border-t border-brand-100">
+        <td className="p-3">{z}</td><td className="p-3">{t ? dinero(t.valor, moneda) : 'Sin tarifa'}</td>
+        <td className="p-3">{t ? t.tipoTarifa === 'POR_M2' ? 'Por m²' : 'Por lote' : '—'}</td>
+        <td className="p-3">{t ? t.vigenteDesde + ' — ' + (t.vigenteHasta ?? 'Sin fin') : '—'}</td></tr>; })}</tbody>
+    </table></div>
+  </section>;
 
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -144,17 +167,19 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
       </div>
     </div>
 
+    <label className="flex items-center gap-2 text-sm text-brand-700"><input type="checkbox" checked={soloUsadas} onChange={e=>setSoloUsadas(e.target.checked)}/> Mostrar solo zonas utilizadas</label>
+    {!visibles.length&&<p className="text-sm text-brand-600">No hay zonas utilizadas. Desmarca el filtro para preparar tarifas.</p>}
     <div className="overflow-x-auto rounded-lg border border-brand-200">
       <table className="min-w-[680px] w-full text-left text-sm">
         <thead className="bg-brand-50 text-brand-700">
-          <tr><th className="p-3">Zona</th><th className="p-3">Precio / tarifa</th>
+          <tr><th className="p-3">Zona</th><th className="p-3">Lotes asociados</th><th className="p-3">Precio / tarifa</th>
             <th className="p-3">Modalidad</th><th className="p-3">Vigencia</th><th className="p-3 text-right">Acción</th></tr>
         </thead>
         <tbody>
-          {catalogos.zonas.map(zona => {
+          {visibles.map(zona => {
             const tarifa = tarifaDeZona(tarifas, etapa, moneda, zona);
             return <tr key={zona} className="border-t border-brand-100 hover:bg-brand-50/40">
-              <td className="p-3 align-top"><span className="font-semibold text-brand-900">{zona}</span></td>
+              <td className="p-3 align-top"><span className="font-semibold text-brand-900">{zona}</span></td><td className="p-3">{uso.get(zona)??0}</td>
               {tarifa ? <>
                 <td className="p-2 align-top">
                   <Input aria-label={`Precio zona ${zona}, etapa ${etapa}`} type="number" min="0.0001" step="0.0001"
@@ -174,11 +199,11 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
                 </td>
                 <td className="p-2 align-top text-right">
                   <Button size="sm" variant="ghost" icon={Trash2Icon}
-                    aria-label={`Quitar tarifa zona ${zona}`} onClick={() => quitar(zona)}>Quitar</Button>
+                    aria-label={`Quitar tarifa zona ${zona}`} onClick={() => setPendienteQuitar(zona)}>Quitar</Button>
                 </td>
               </> : <td className="p-3" colSpan={4}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-amber-800">Sin tarifa configurada para esta etapa.</span>
+                  <span className="text-xs text-amber-800">{(uso.get(zona)??0)>0?'Sin tarifa configurada para esta etapa.':'Opcional: zona sin lotes.'}</span>
                   <Button size="sm" icon={PlusIcon} onClick={() => agregar(zona)}>Crear tarifa</Button>
                 </div>
               </td>}
@@ -254,11 +279,12 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
           <Button icon={WandSparklesIcon} onClick={() => generar(true)}>Generar para todas las etapas</Button>
         </div>
         <p className="text-xs text-brand-500">
-          Estas acciones solo actualizan el borrador, no los precios publicados. Revisa la tabla y guarda los cambios arriba.
+          Estas acciones solo actualizan el borrador, no los precios publicados. Revisa la tabla y continúa para validar y guardar.
         </p>
       </div>
     </details>}
 
+    <Modal open={pendienteQuitar!==null} title="Quitar tarifa del borrador" onClose={()=>setPendienteQuitar(null)} footer={<><Button onClick={()=>setPendienteQuitar(null)}>Cancelar</Button><Button variant="danger" onClick={()=>{if(pendienteQuitar)quitar(pendienteQuitar);}}>Quitar tarifa</Button></>}><p className="text-sm">Zona {pendienteQuitar} · {etapaActual?.nombre}. Si tiene lotes elegibles, necesitará otra tarifa vigente antes de finalizar.</p></Modal>
     {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {aviso && <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{aviso}</p>}
   </section>;

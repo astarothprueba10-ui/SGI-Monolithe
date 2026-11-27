@@ -37,6 +37,19 @@ class PublicacionComercialServiceIntegridadTest {
         verificarSinCambios();
     }
 
+    @Test
+    void rechazaNuevaPublicacionAunqueExistaOtroBorrador() {
+        when(repository.puedeVerificarIntegridadPublicacion()).thenReturn(true);
+        when(repository.proyectoHabilitado(1L)).thenReturn(true);
+        when(repository.versionPublicada(1L)).thenReturn(1);
+        assertThrows(monolithe.core_service.exception.ConflictoNegocioException.class,
+            () -> service.previsualizar(1L, new PublicacionComercialRequest(2, List.of(), null)));
+        assertThrows(monolithe.core_service.exception.ConflictoNegocioException.class,
+            () -> service.publicar(1L, 1L, new PublicacionComercialRequest(2, List.of(), null)));
+        verify(repository, never()).publicar(anyLong(), anyInt(), anyLong());
+        verifyNoInteractions(configuracion, lotes, ajustes, simulacion);
+    }
+
     private void verificarSinCambios() {
         verify(repository).puedeVerificarIntegridadPublicacion();
         verifyNoMoreInteractions(repository);

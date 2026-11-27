@@ -37,3 +37,10 @@ test('la publicación distingue precio configurado de inventario liberado', () =
   assert.deepEqual(r, { preciosPreparados: 3, habilitarInventario: 1, sinHabilitar: 1,
     yaDisponibles: 2, bloqueados: 1, protegidos: 0, errores: 0 });
 });
+
+test('la selección inicial usa inventario real y conserva cierres históricos', () => {
+  const { seleccionInicial, inventarioPorEtapa } = require('../src/lib/commercialPresentation.ts');
+  const c = {...config, datos: {...config.datos, etapas:[{codigo:'ALM-C01',disponibilidad:'REGULAR'},{codigo:'ALM-C02',disponibilidad:'BLOQUEADA'}]}, lotes:config.lotes.map(l=>({...l,estadoInventario:l.id===2?'RESERVADO':'DISPONIBLE'}))};
+  assert.deepEqual(seleccionInicial(c),['ALM-C01']);
+  assert.deepEqual(inventarioPorEtapa(c,'ALM-C02'),{total:2,disponibles:1,protegidos:1});
+});

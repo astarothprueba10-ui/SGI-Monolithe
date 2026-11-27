@@ -26,7 +26,6 @@ interface FormState {
   codigo: string;
   nombre: string;
   descripcion: string;
-  numeroOrden: string;
   activo: boolean;
 }
 
@@ -48,7 +47,6 @@ function initForm(
       codigo: '',
       nombre: '',
       descripcion: '',
-      numeroOrden: '1',
       activo: true
     };
   }
@@ -57,29 +55,10 @@ function initForm(
     codigo: zone.codigo ?? '',
     nombre: zone.nombre ?? '',
     descripcion: zone.descripcion ?? '',
-    numeroOrden:
-      zone.numeroOrden != null
-        ? String(zone.numeroOrden)
-        : '1',
     activo: zone.activo ?? true
   };
 }
 
-function parseOptionalNumber(
-  value: string
-): number | null {
-  const trimmed = value.trim();
-
-  if (trimmed === '') {
-    return null;
-  }
-
-  const numberValue = Number(trimmed);
-
-  return Number.isNaN(numberValue)
-    ? null
-    : numberValue;
-}
 
 function parseOptionalString(
   value: string
@@ -102,9 +81,7 @@ function buildRequest(
     descripcion: parseOptionalString(
       form.descripcion
     ),
-    numeroOrden: parseOptionalNumber(
-      form.numeroOrden
-    ),
+    numeroOrden: null,
     activo: form.activo
   };
 }
@@ -141,22 +118,6 @@ function validate(
       'La descripción no debe superar 255 caracteres.';
   }
 
-  if (
-    form.numeroOrden.trim() !== ''
-  ) {
-    const orden = Number(
-      form.numeroOrden
-    );
-
-    if (
-      Number.isNaN(orden) ||
-      !Number.isInteger(orden) ||
-      orden < 1
-    ) {
-      errors.numeroOrden =
-        'Debe ser un número entero mayor o igual a 1.';
-    }
-  }
 
   return errors;
 }
@@ -185,7 +146,6 @@ function mapBackendFieldErrors(
     'codigo',
     'nombre',
     'descripcion',
-    'numeroOrden',
     'activo'
   ];
 
@@ -433,11 +393,12 @@ export function ZoneFormModal({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <FieldLabel htmlFor="zona-codigo">
-              Código *
+              Código comercial *
             </FieldLabel>
 
             <Input
               id="zona-codigo"
+              disabled={isEditing}
               value={
                 form.codigo
               }
@@ -505,44 +466,7 @@ export function ZoneFormModal({
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="zona-numero-orden">
-              Número de orden
-            </FieldLabel>
-
-            <Input
-              id="zona-numero-orden"
-              type="number"
-              min={1}
-              step={1}
-              value={
-                form.numeroOrden
-              }
-              onChange={(event) =>
-                handleChange(
-                  'numeroOrden',
-                  event.target
-                    .value
-                )
-              }
-              placeholder="1"
-              className={
-                errors.numeroOrden
-                  ? 'border-red-400 focus:border-red-500'
-                  : ''
-              }
-            />
-
-            {errors.numeroOrden && (
-              <p className="mt-1 text-xs text-red-600">
-                {
-                  errors.numeroOrden
-                }
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center pt-6">
+          <div className="flex items-center pt-2">
             <label
               htmlFor="zona-activa"
               className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-brand-800"
@@ -553,6 +477,7 @@ export function ZoneFormModal({
                 checked={
                   form.activo
                 }
+                disabled={!!zone?.activo && (zone.lotesActivos??0)>0}
                 onChange={(
                   event
                 ) =>
@@ -570,12 +495,14 @@ export function ZoneFormModal({
               </span>
             </label>
           </div>
+          {!!zone?.activo && (zone.lotesActivos??0)>0 && <p className="text-xs text-brand-600">No se puede desactivar: {zone.lotesActivos} lotes activos asociados.</p>}
         </div>
 
         <div>
           <FieldLabel htmlFor="zona-descripcion">
-            Descripción
+            Descripción de la ubicación
           </FieldLabel>
+          <p className="mb-2 text-xs text-brand-600">Describe las características de la zona sin indicar importes. Los recargos se administran en Gestión comercial.</p>
 
           <textarea
             id="zona-descripcion"
@@ -591,7 +518,7 @@ export function ZoneFormModal({
                   .value
               )
             }
-            placeholder="Descripción opcional de la zona..."
+            placeholder="Ej. Lotes próximos al acceso principal"
             maxLength={255}
             rows={3}
             className={`w-full rounded-md border px-3 py-2 text-sm text-brand-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${

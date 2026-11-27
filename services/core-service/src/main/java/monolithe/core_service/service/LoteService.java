@@ -139,6 +139,7 @@ public class LoteService {
         Long idProyecto = manzana.getEtapa().getProyecto().getIdProyecto();
 
         Zona zona = resolverZonaValida(request.idZona(), idProyecto);
+        validarZonaManzana(manzana.getIdManzana(),request.idZona());
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
         EstadoLote estado = obtenerEstadoActivo(request.codigoEstadoLote());
 
@@ -172,6 +173,11 @@ public class LoteService {
 
     @Transactional
     public LoteResponse actualizar(Long idLote, LoteRequest request) {
+        return actualizarComercial(idLote,request,false);
+    }
+
+    // Solo el servicio comercial transaccional puede recalcular una tarifa junto con los cambios físicos.
+    LoteResponse actualizarComercial(Long idLote,LoteRequest request,boolean recalcular){
         Lote lote = obtenerLote(idLote);
         Manzana manzanaDestino = obtenerManzanaActiva(request.idManzana());
         Long idProyectoDestino = manzanaDestino.getEtapa().getProyecto().getIdProyecto();
@@ -181,8 +187,10 @@ public class LoteService {
         }
 
         Zona zona = resolverZonaValida(request.idZona(), idProyectoDestino);
+        if(!java.util.Objects.equals(lote.getManzana().getIdManzana(),manzanaDestino.getIdManzana())||!java.util.Objects.equals(lote.getZona()==null?null:lote.getZona().getIdZona(),request.idZona()))
+            validarZonaManzana(manzanaDestino.getIdManzana(),request.idZona());
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
-        validarCambiosConPrecioActivo(lote, request, zona, tipo);
+        if(!recalcular)validarCambiosConPrecioActivo(lote, request, zona, tipo);
 
         EstadoLote estadoActual = lote.getEstadoLote();
         String codigoEstadoSolicitado = normalizarCodigo(request.codigoEstadoLote());
@@ -377,6 +385,10 @@ public class LoteService {
             throw new ReglaNegocioException("El tipo de lote no está activo: " + codigoNormalizado);
         }
         return tipo;
+    }
+
+    private void validarZonaManzana(Long manzana,Long zona){
+        if(manzanaRepository.zonaNoPermitida(manzana,zona))throw new ReglaNegocioException("La zona no está asociada a esta manzana. Revisa sus zonas en el CRUD de manzanas.");
     }
 
     private Zona resolverZonaValida(Long idZona, Long idProyecto) {

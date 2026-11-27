@@ -27,14 +27,25 @@ class SeleccionEtapasPublicacionTest {
         assertFalse(SeleccionEtapasPublicacion.liberarInventario(null, "NO_DISPONIBLE", seleccion));
     }
 
-    @Test void rechazaCodigosDesconocidosDuplicadosYBloqueados() {
-        for (var seleccion : List.of(List.of("DESCONOCIDA"),List.of("ALM-C04"),
+    @Test void rechazaCodigosDesconocidosYDuplicados() {
+        for (var seleccion : List.of(List.of("DESCONOCIDA"),
                 List.of("ALM-C01","ALM-C01"))) {
             assertThrows(ReglaNegocioException.class,
                 () -> SeleccionEtapasPublicacion.validar(seleccion, etapas));
         }
         assertThrows(ReglaNegocioException.class,
             () -> SeleccionEtapasPublicacion.validar(null, etapas));
+    }
+
+    @Test void permiteSeleccionarEtapaHistoricamenteBloqueadaYProtegeEstados() {
+        var seleccion = SeleccionEtapasPublicacion.validar(List.of("ALM-C04"),etapas);
+        assertTrue(SeleccionEtapasPublicacion.liberarInventario("ALM-C04","NO_DISPONIBLE",seleccion));
+        assertTrue(SeleccionEtapasPublicacion.bloquearInventario("ALM-C01","DISPONIBLE",seleccion));
+        assertFalse(SeleccionEtapasPublicacion.bloquearInventario("ALM-C04","DISPONIBLE",seleccion));
+        for (var estado : List.of("RESERVADO","VENDIDO","BLOQUEADO")) {
+            assertFalse(SeleccionEtapasPublicacion.bloquearInventario("ALM-C01",estado,seleccion));
+            assertFalse(SeleccionEtapasPublicacion.liberarInventario("ALM-C04",estado,seleccion));
+        }
     }
 
     @Test void ordenCanonicoParaConfirmacion() {

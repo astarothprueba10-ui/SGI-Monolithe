@@ -3,6 +3,7 @@ package monolithe.core_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import monolithe.core_service.dto.ConfiguracionProyectoRequest;
+import monolithe.core_service.dto.GestionComercialDto.*;
 import monolithe.core_service.dto.ConfiguracionProyectoResponse;
 import monolithe.core_service.service.ConfiguracionProyectoService;
 import monolithe.core_service.service.SimulacionComercialService;
@@ -25,6 +26,7 @@ public class ConfiguracionProyectoController {
     private final ConfiguracionProyectoService service;
     private final SimulacionComercialService simulacion;
     private final PublicacionComercialService publicacion;
+    private final monolithe.core_service.service.CommercialMfaClient mfa;
 
     @GetMapping
     public ConfiguracionProyectoResponse obtener(@PathVariable Long idProyecto) {
@@ -33,7 +35,13 @@ public class ConfiguracionProyectoController {
 
     @PutMapping
     public ConfiguracionProyectoResponse guardar(@PathVariable Long idProyecto,
-            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ConfiguracionProyectoRequest request) {
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ConfiguracionProyectoRequest request,
+            @RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        var actual=service.obtener(idProyecto);
+        if(!request.version().equals(actual.version()))throw new monolithe.core_service.exception.ConflictoNegocioException("La configuración cambió. Recarga antes de guardar.");
+        if(service.cambianEtapas(actual.datos(),request.datos())){
+            mfa.exigir(jwt,idProyecto,"ETAPAS",request,approval);
+        }
         return service.guardar(idProyecto, obtenerActor(jwt), request);
     }
 
@@ -45,7 +53,8 @@ public class ConfiguracionProyectoController {
 
     @GetMapping("/publicacion")
     public java.util.Map<String,Integer> estadoPublicacion(@PathVariable Long idProyecto) {
-        return java.util.Map.of("version",publicacion.versionPublicada(idProyecto));
+        return java.util.Map.of("version",service.versionPublicada(idProyecto),
+            "lotesRegistrados",service.contarLotesRegistrados(idProyecto),"importacionRealizada",service.importacionRealizada(idProyecto)?1:0);
     }
 
     @PostMapping("/publicacion/validar")
@@ -58,8 +67,49 @@ public class ConfiguracionProyectoController {
     @PostMapping("/publicacion")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
     public PublicacionComercialResponse publicar(@PathVariable Long idProyecto,
-            @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request) {
+            @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"PUBLICACION",request,approval);
         return publicacion.publicar(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @GetMapping("/gestion")
+    public Respuesta gestion(@PathVariable Long idProyecto) { return publicacion.gestion(idProyecto); }
+
+    @GetMapping("/gestion/historial")
+    public java.util.List<Evento> historial(@PathVariable Long idProyecto) { return publicacion.historial(idProyecto); }
+
+    @PutMapping("/gestion/disponibilidad")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta disponibilidad(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Disponibilidad request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"DISPONIBILIDAD",request,approval);
+        return publicacion.guardarDisponibilidad(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @PutMapping("/gestion/asignacion")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta asignacion(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioAsignacion request) {
+        return publicacion.guardarAsignacion(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @PutMapping("/gestion/etapas")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta etapas(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioEtapas request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"ETAPAS",request,approval);
+        return publicacion.guardarEtapas(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @PutMapping("/gestion/matriz")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta matriz(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioMatriz request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"MATRIZ",request,approval);
+        return publicacion.guardarMatriz(idProyecto,obtenerActor(jwt),request);
+    }
+
+    @PutMapping("/gestion/tarifa")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta tarifa(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioTarifa request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"TARIFA",request,approval);
+        return publicacion.guardarTarifa(idProyecto,obtenerActor(jwt),request);
     }
 
     private Long obtenerActor(Jwt jwt) {

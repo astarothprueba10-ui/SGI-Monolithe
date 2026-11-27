@@ -29,6 +29,8 @@ public class ImportacionProyectoService {
     @Transactional(readOnly = true)
     public ImportacionProyectoResponse previsualizar(Long id, ImportacionProyectoRequest solicitud) {
         validarProyecto(id, solicitud);
+        configuracion.exigirSinPublicacion(id, false);
+        configuracion.exigirImportacionInicial(id);
         var contexto = new ImportacionProyectoContexto(repo, id);
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
@@ -40,6 +42,8 @@ public class ImportacionProyectoService {
 
     @Transactional
     public ImportacionProyectoResponse confirmar(Long id, ImportacionProyectoRequest solicitud, Long actor) {
+        configuracion.exigirSinPublicacion(id, true);
+        configuracion.exigirImportacionInicial(id);
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
         var previo = previsualizar(id, solicitud);
@@ -49,7 +53,11 @@ public class ImportacionProyectoService {
         if (previo.filas().stream().anyMatch(r -> r.estado().equals("ERROR"))) throw new ReglaNegocioException("Corrige todas las filas con errores.");
         var contexto = new ImportacionProyectoContexto(repo, id);
         registrarEstructura(id, filas, previo, contexto);
-        if (base != null) guardarComercial(id, actor, filas, base, contexto);
+        if (base != null) ejecutarGuardado("Borrador comercial del proyecto", () ->
+            guardarComercial(id, actor, filas, base, contexto));
+        if (previo.filas().stream().noneMatch(f -> f.estado().equals("NUEVO") || f.estado().equals("BORRADOR")))
+            throw new ReglaNegocioException("La importación no contiene registros nuevos ni reglas comerciales.");
+        configuracion.registrarImportacion(id,actor,previo.huella(),previo.filas().size());
         return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
     }
 
@@ -77,7 +85,25 @@ public class ImportacionProyectoService {
     private void registrarEstructura(Long id, List<ImportacionProyectoFila> filas,
             ImportacionProyectoResponse previo, ImportacionProyectoContexto contexto) {
         for (int i = 0; i < filas.size(); i++) {
-            if (previo.filas().get(i).estado().equals("NUEVO")) registrar(id, filas.get(i), contexto);
+            if (previo.filas().get(i).estado().equals("NUEVO")) {
+                var fila = filas.get(i);
+                ejecutarGuardado("Hoja " + fila.hoja() + ", fila " + fila.numero() + ", código " + fila.codigo("codigo"),
+                    () -> registrar(id, fila, contexto));
+            }
+        }
+    }
+
+    private void ejecutarGuardado(String contexto, Runnable operacion) {
+        try {
+            operacion.run();
+        } catch (ReglaNegocioException ex) {
+            throw new ReglaNegocioException(contexto + ": " + ex.getMessage());
+        } catch (ConflictoNegocioException ex) {
+            throw new ConflictoNegocioException(contexto + ": " + ex.getMessage());
+        } catch (RecursoNoEncontradoException ex) {
+            throw new ReglaNegocioException(contexto + ": " + ex.getMessage());
+        } catch (org.springframework.dao.DataAccessException | org.springframework.transaction.TransactionException ex) {
+            throw new ImportacionPersistenciaException(contexto, ex);
         }
     }
 
@@ -161,10 +187,14 @@ public class ImportacionProyectoService {
         c.referencia(c.zonas, f.codigo("codigo_zona"));
         c.catalogo(c.tiposLote, f.codigo("codigo_tipo_lote"));
         validar(f.lote(1L, 1L));
+        String numero = f.codigo("numero");
         var existentes = repo.lote(f.codigo("codigo"));
         if (!existentes.isEmpty()) {
             var lote = existentes.getFirst();
-            if (lote.proyecto().equals(id) && lote.manzana().equals(manzana.id()) && lote.numero().equals(f.codigo("numero"))) return false;
+            if (lote.proyecto().equals(id) && lote.manzana().equals(manzana.id()) && lote.numero().equals(numero)) {
+                c.referencia(c.lotes, f.codigo("codigo"));
+                return false;
+            }
             ImportacionProyectoFila.error("Código de lote existente con otra ubicación o proyecto.");
         }
         if (manzana.id() > 0 && repo.numeroExiste(manzana.id(), f.codigo("numero"))) ImportacionProyectoFila.error("Número de lote ya registrado con otro código.");

@@ -45,7 +45,7 @@ async function catalogos(wb: ExcelJS.Workbook, idProyecto: number) {
   const grupos = [['estado_etapa', estadosEtapa], ['estado_manzana', estadosManzana],
     ['tipo_lote', tipos], ['etapa_fisica_existente', etapas], ['zona_existente', zonas]] as const;
   grupos.forEach(([nombre, items]) => items.filter(i => i.activo).forEach(i => ws.addRow([nombre, i.codigo, i.nombre])));
-  ['PROMOCION', 'REGULAR', 'ANTICIPADA', 'BLOQUEADA'].forEach(v => ws.addRow(['disponibilidad', v, v]));
+  ['PROMOCION', 'REGULAR'].forEach(v => ws.addRow(['disponibilidad', v, v === 'PROMOCION' ? 'Precio promocional' : 'Precio regular']));
   ['NINGUNO', 'PORCENTAJE', 'MONTO_FIJO'].forEach(v => ws.addRow(['tipo_descuento', v, v]));
   ['POR_M2', 'MONTO_FIJO'].forEach(v => ws.addRow(['tipo_tarifa', v, v]));
   ws.getColumn(3).width = 45;

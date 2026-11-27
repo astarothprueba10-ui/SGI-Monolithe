@@ -22,6 +22,7 @@ import { Audit } from './pages/Audit';
 import { Unauthorized } from './pages/Unauthorized';
 import { NotFound } from './pages/NotFound';
 import type { ReactElement } from 'react';
+import { CommercialMfaModal } from './components/projects/CommercialMfaModal';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
 import { ResetPassword } from './pages/ResetPassword';
@@ -257,6 +258,7 @@ export function App({
           </Route>
         </Routes>
 
+        <CommercialMfaModal />
         <ToastHost />
       </BrowserRouter>
     </AuthProvider>

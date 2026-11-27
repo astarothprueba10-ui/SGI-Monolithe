@@ -61,4 +61,5 @@ public interface LoteRepository extends
     boolean existsByManzana_Etapa_IdEtapaAndActivoTrue(Long idEtapa);
     boolean existsByIdProyectoAndActivoTrue(Long idProyecto);
     boolean existsByZona_IdZonaAndActivoTrue(Long idZona);
+    long countByZona_IdZonaAndActivoTrue(Long idZona);
 }

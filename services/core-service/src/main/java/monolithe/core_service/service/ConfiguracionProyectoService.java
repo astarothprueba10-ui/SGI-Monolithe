@@ -26,25 +26,99 @@ public class ConfiguracionProyectoService {
     @Transactional(readOnly = true)
     public ConfiguracionProyectoResponse obtener(Long proyecto) {
         obtenerProyecto(proyecto);
-        var version = repository.vigente(proyecto);
+        int publicada = repository.versionPublicada(proyecto);
+        var version = publicada > 0 ? repository.porVersion(proyecto,publicada) : repository.vigente(proyecto);
+        if (publicada > 0 && version.isEmpty()) throw new ConflictoNegocioException("No se encontró la configuración de la publicación vigente.");
         var datos = version.map(v -> leer(v.json()))
                 .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
+        if (publicada>0) {
+            var tarifas=repository.tarifasVigentes(proyecto,publicada);
+            if(tarifas.isPresent())datos=new Datos(datos.etapas(),datos.manzanas(),datos.lotes(),
+                List.of(mapper.readValue(tarifas.get(),ConfiguracionProyectoRequest.Tarifa[].class)));
+            var asignaciones=repository.asignacionesVigentes(proyecto,publicada);
+            if(asignaciones.isPresent()) {
+                var estado=mapper.readValue(asignaciones.get(),monolithe.core_service.dto.GestionComercialDto.Estado.class);
+                datos=new Datos(datos.etapas(),estado.manzanas(),estado.lotes(),datos.tarifas());
+            }
+            var vigentes=repository.etapasVigentes(proyecto,publicada);
+            if (vigentes.isPresent()) {
+                var etapas=mapper.readValue(vigentes.get(),ConfiguracionProyectoRequest.Etapa[].class);
+                datos=new Datos(List.of(etapas),datos.manzanas(),datos.lotes(),datos.tarifas());
+            }
+        }
         return new ConfiguracionProyectoResponse(version.map(v -> v.numero()).orElse(0), datos,
                 repository.manzanas(proyecto), repository.lotes(proyecto), repository.zonas(proyecto), repository.monedas());
     }
 
     @Transactional
     public ConfiguracionProyectoResponse guardar(Long proyecto, Long actor, ConfiguracionProyectoRequest solicitud) {
+        exigirSinPublicacion(proyecto, true);
         if (!Boolean.TRUE.equals(obtenerProyecto(proyecto).getActivo())) {
             throw new ReglaNegocioException("El proyecto no está habilitado.");
         }
         var actual = obtener(proyecto);
         if (solicitud.version() != actual.version()) conflicto();
-        ConfiguracionProyectoValidator.validar(solicitud.datos(), actual.manzanas(), actual.lotes());
-        ConfiguracionProyectoValidator.validarTarifas(solicitud.datos(), actual.zonas(), actual.monedas());
+        var datos = normalizarCondiciones(solicitud.datos());
+        ConfiguracionProyectoValidator.validar(datos, actual.manzanas(), actual.lotes());
+        ConfiguracionProyectoValidator.validarTarifas(datos, actual.zonas(), actual.monedas());
         int siguiente = actual.version() + 1;
-        if (!repository.insertar(proyecto, siguiente, escribir(solicitud.datos()), actor)) conflicto();
-        return new ConfiguracionProyectoResponse(siguiente, solicitud.datos(), actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
+        if (!repository.insertar(proyecto, siguiente, escribir(datos), actor)) conflicto();
+        return new ConfiguracionProyectoResponse(siguiente, datos, actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
+    }
+
+    // Importar, guardar borrador y publicar comparten el bloqueo por proyecto.
+    public void exigirSinPublicacion(Long proyecto, boolean bloquear) {
+        if (bloquear) repository.bloquearConfiguracion(proyecto);
+        if (repository.versionPublicada(proyecto) > 0)
+            throw new ConflictoNegocioException("El proyecto ya fue publicado. Realiza los ajustes mediante los CRUD.");
+    }
+
+    public int contarLotesRegistrados(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.contarLotesRegistrados(proyecto);
+    }
+
+    public boolean importacionRealizada(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.importacionRealizada(proyecto);
+    }
+
+    public void registrarImportacion(Long proyecto,Long actor,String huella,int filas) {
+        repository.registrarImportacion(proyecto,actor,huella,filas);
+    }
+
+    public void exigirImportacionInicial(Long proyecto) {
+        if (importacionRealizada(proyecto))
+            throw new ConflictoNegocioException("La importación inicial ya fue confirmada. Utiliza los formularios de gestión.");
+        if (contarLotesRegistrados(proyecto) >= 10)
+            throw new ConflictoNegocioException("La carga masiva solo está disponible para proyectos con menos de 10 lotes registrados. Utiliza los formularios de gestión.");
+    }
+
+    public int versionPublicada(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.versionPublicada(proyecto);
+    }
+
+    public boolean cambianEtapas(Datos actual,Datos solicitud){
+        var a=normalizarCondiciones(actual).etapas();
+        var b=normalizarCondiciones(solicitud).etapas();
+        if(a.size()!=b.size())return true;
+        for(int i=0;i<a.size();i++){
+            var x=a.get(i);var y=b.get(i);
+            if(!x.codigo().equals(y.codigo())||!x.nombre().equals(y.nombre())||x.disponibilidad()!=y.disponibilidad()
+                ||x.tipoDescuento()!=y.tipoDescuento()||x.descuento().compareTo(y.descuento())!=0)return true;
+        }
+        return false;
+    }
+
+    // Mantener el contrato v1 y los bloqueos históricos; ANTICIPADA equivale a REGULAR.
+    static Datos normalizarCondiciones(Datos datos) {
+        var etapas = datos.etapas().stream().map(e ->
+            e.disponibilidad() == ConfiguracionProyectoRequest.Disponibilidad.ANTICIPADA
+                ? new ConfiguracionProyectoRequest.Etapa(e.codigo(), e.nombre(),
+                    ConfiguracionProyectoRequest.Disponibilidad.REGULAR, e.tipoDescuento(), e.descuento())
+                : e).toList();
+        return new Datos(etapas, datos.manzanas(), datos.lotes(), datos.tarifas());
     }
 
     private Proyecto obtenerProyecto(Long id) {
