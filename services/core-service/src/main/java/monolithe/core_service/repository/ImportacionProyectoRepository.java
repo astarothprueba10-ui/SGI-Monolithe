@@ -35,6 +35,17 @@ public class ImportacionProyectoRepository {
             WHERE l.id_proyecto=?
             """, (r,n) -> new Referencia(r.getLong(1),r.getString(2),r.getBoolean(3)), proyecto);
     }
+    public java.util.Map<String,LoteExistente> lotesPorCodigos(List<String> codigos) {
+        if(codigos.isEmpty()) return java.util.Map.of();
+        var named=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+        var resultado=new java.util.HashMap<String,LoteExistente>();
+        named.query("""
+            SELECT codigo,id_lote,id_proyecto,id_manzana,numero,activo
+            FROM public.inm_lotes WHERE codigo IN (:codigos)
+            """,java.util.Map.of("codigos",codigos),(org.springframework.jdbc.core.RowCallbackHandler)r ->
+                resultado.put(r.getString(1),new LoteExistente(r.getLong(2),r.getLong(3),r.getLong(4),r.getString(5),r.getBoolean(6))));
+        return resultado;
+    }
     public List<LoteExistente> lote(String codigo) {
         return jdbc.query("""
             SELECT id_lote,id_proyecto,id_manzana,numero,activo FROM public.inm_lotes WHERE codigo=?
