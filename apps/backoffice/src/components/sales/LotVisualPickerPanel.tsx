@@ -15,7 +15,8 @@ type Result<T> = {status:'loading'|'ready'|'error';value:T};
 const pending=<T,>(value:T):Result<T>=>({status:'loading',value});
 const ready=<T,>(value:T):Result<T>=>({status:'ready',value});
 
-function MatrixPreview({lots,plan,selected,overview}:{lots:LoteResponse[];plan:PlanoInteractivoDetalleResponse|null;selected:LoteResponse|null;overview:boolean}){
+type SelectionProps={selectable:ReadonlySet<number>;onPick:(id:number)=>void};
+function MatrixPreview({lots,plan,selected,overview,selectable,onPick}:{lots:LoteResponse[];plan:PlanoInteractivoDetalleResponse|null;selected:LoteResponse|null;overview:boolean}&SelectionProps){
   const geometries=useMemo(()=>buildDisplayGeometries(lots,plan,lots[0]?.idProyecto??null),[lots,plan]);
   const byId=useMemo(()=>new Map(lots.map(l=>[l.idLote,l])),[lots]);
   const items=useMemo(()=>geometries.map(g=>{
@@ -33,11 +34,16 @@ function MatrixPreview({lots,plan,selected,overview}:{lots:LoteResponse[];plan:P
     Math.max(...items.map(i=>i.box[1]+i.box[3]))-minY+28];
   const target=items.find(i=>i.g.idLote===selected?.idLote);
   const focus=!overview&&target?matrixFocusBox(full,target.box):null;
-  return <LotVisualViewport full={full} focus={focus}>{view=><svg viewBox={view.join(' ')} className="h-full w-full" role="img" aria-label="Matriz de lotes por manzanas">
+  return <LotVisualViewport full={full} focus={focus}>{view=><svg viewBox={view.join(' ')} className="h-full w-full" role="group" aria-label="Matriz de lotes por manzanas">
     {labels.map(l=><text key={l.key} x={l.x} y={l.y} fontSize="11" fontWeight="600" fill="#334155">{l.label}</text>)}
     {items.map(({g,box,lot})=>{
       const active=lot.idLote===selected?.idLote,colors=mapLotColors(lot.codigoEstadoLote,active);
-      return <g key={g.idLote}>
+      const enabled=selectable.has(lot.idLote);
+      return <g key={g.idLote} role={enabled?'button':'presentation'} tabIndex={enabled?0:undefined}
+        aria-label={enabled?`Seleccionar lote ${lot.codigo}`:undefined} aria-pressed={enabled?active:undefined}
+        className={enabled?'cursor-pointer focus-visible:outline-none focus-visible:opacity-70':undefined}
+        onClick={enabled?()=>onPick(lot.idLote):undefined}
+        onKeyDown={enabled?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onPick(lot.idLote);}}:undefined}>
         <path d={roundedLotPath(g.puntos)} fill={colors.fill} stroke={colors.stroke} strokeWidth={active?3:1.2}/>
         <text x={g.etiquetaX??box[0]+box[2]/2} y={g.etiquetaY??box[1]+box[3]/2} textAnchor="middle"
           dominantBaseline="middle" fontSize={Math.max(5,Math.min(11,box[2]/Math.max(6,lot.codigo.length*.65)))} fontWeight="700" fill={colors.text}>{lot.codigo}</text>
@@ -47,7 +53,7 @@ function MatrixPreview({lots,plan,selected,overview}:{lots:LoteResponse[];plan:P
   </svg>}</LotVisualViewport>;
 }
 
-function SvgPreview({document,lots,selected,overview,onUnavailable}:{document:PlanoSvgDocumento;lots:LoteResponse[];selected:LoteResponse|null;overview:boolean;onUnavailable:()=>void}){
+function SvgPreview({document,lots,selected,overview,onUnavailable,selectable,onPick}:{document:PlanoSvgDocumento;lots:LoteResponse[];selected:LoteResponse|null;overview:boolean;onUnavailable:()=>void}&SelectionProps){
   const host=useRef<HTMLDivElement>(null);
   const [view,setView]=useState<VisualBox|null>(null);
   const block=selected?blockKey(selected):null;
@@ -66,17 +72,18 @@ function SvgPreview({document,lots,selected,overview,onUnavailable}:{document:Pl
   },[document,lots,selected,block,overview,onUnavailable]);
   return <div ref={host} className="h-full w-full">
     {validBox(document.viewBox)&&<LotVisualViewport full={document.viewBox} focus={overview?null:view}>{camera=>
-      <PlanSvgShapes documento={document} lotes={lots} seleccionado={selected?.idLote??null} miniatura vista={camera}/>}</LotVisualViewport>}
+      <PlanSvgShapes documento={document} lotes={lots} seleccionado={selected?.idLote??null} miniatura vista={camera} lotesSeleccionables={selectable} alSeleccionar={onPick}/>}</LotVisualViewport>}
   </div>;
 }
 
 class PreviewBoundary extends Component<{children:ReactNode},{failed:boolean}> {
   state={failed:false};
   static getDerivedStateFromError(){return {failed:true};}
-  render(){return this.state.failed?<p role="alert" className="p-4 text-sm text-brand-600">No se pudo mostrar el plano. Puedes continuar usando el formulario de separación.</p>:this.props.children;}
+  render(){return this.state.failed?<p role="alert" className="p-4 text-sm text-brand-600">No se pudo mostrar el plano. Puedes continuar usando el formulario de la operación.</p>:this.props.children;}
 }
 
-function LotVisualPicker({project,selected,stageName,focusRevision=0}:{project:number;selected:LoteResponse|null;stageName?:string;focusRevision?:number}){
+type PickerProps={project:number;selected:LoteResponse|null;stageName?:string;focusRevision?:number;selectionHint?:string}&SelectionProps;
+function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,onPick,selectionHint}:PickerProps){
   const [rows,setRows]=useState<Result<FilaLote[]>>(pending([]));
   const [matrix,setMatrix]=useState<Result<PlanoInteractivoDetalleResponse|null>>(pending(null));
   const [svg,setSvg]=useState<Result<PlanoSvgDocumento|null>>(pending(null));
@@ -125,9 +132,10 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0}:{project:n
     <div className="min-w-0">
       {waiting?<p className="flex h-[300px] items-center justify-center rounded-lg bg-brand-50 text-sm text-brand-500">Cargando vista del proyecto…</p>:rows.status==='error'||(!showSvg&&matrix.status==='error')?
         <div className="space-y-2 p-4 text-center"><p className="text-sm text-brand-600">No se pudo consultar el plano.</p><button type="button" className="text-xs font-semibold underline" onClick={()=>setRetry(v=>v+1)}>Reintentar</button></div>:
-        showSvg&&svg.value?<SvgPreview key={`svg-${selected?.idLote}-${focusRevision}-${overview}`} document={svg.value} lots={lots} selected={lot} overview={overview} onUnavailable={markUnavailable}/>:
-          <MatrixPreview key={`matriz-${selected?.idLote}-${focusRevision}-${overview}`} lots={lots} plan={matrix.value} selected={lot} overview={overview}/>}
+        showSvg&&svg.value?<SvgPreview key={`svg-${selected?.idLote}-${focusRevision}-${overview}`} document={svg.value} lots={lots} selected={lot} overview={overview} onUnavailable={markUnavailable} selectable={selectable} onPick={onPick}/>:
+          <MatrixPreview key={`matriz-${selected?.idLote}-${focusRevision}-${overview}`} lots={lots} plan={matrix.value} selected={lot} overview={overview} selectable={selectable} onPick={onPick}/>}
     </div>
+    {selectionHint&&<p className="rounded-lg bg-brand-50 p-2 text-xs text-brand-600">{selectionHint}</p>}
     {mode!=='matriz'&&!showSvg&&svg.status!=='loading'&&<p className="flex items-center gap-1.5 text-xs text-brand-500"><Grid2X2Icon className="h-3.5 w-3.5 shrink-0"/>{svg.status==='error'?'SVG no disponible para consulta.':svg.value&&selected?'Lote sin figura SVG vinculada; se muestra la matriz.':'Se muestra la matriz del proyecto.'}</p>}
     {!showSvg&&matrix.status==='ready'&&!matrix.value&&<p className="text-xs text-brand-500">Distribución referencial por manzanas, sin posiciones guardadas.</p>}
     <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-brand-600">{MAP_STATUSES.map(s=><span key={s.code} className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{background:s.fill}}/>{s.label}</span>)}</div>
@@ -139,10 +147,10 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0}:{project:n
         <div className="flex justify-between gap-2"><dt>Precio oficial consultado</dt><dd className="font-semibold">{soles(row?.precio)}</dd></div>
         {row?.promocionAplicada!=null&&row.promocionAplicada>0&&<div className="flex justify-between gap-2 text-emerald-700"><dt>Promoción aplicada</dt><dd>−{soles(row.promocionAplicada)}</dd></div>}
       </dl><p className="text-[11px] text-brand-500">Vista informativa. Confirma el lote en el formulario para verificar las condiciones vigentes.</p>
-    </div>:<p className="rounded-lg bg-brand-50 p-3 text-xs text-brand-600">Selecciona un lote en la lista para localizarlo en el plano.</p>}
+    </div>:<p className="rounded-lg bg-brand-50 p-3 text-xs text-brand-600">Selecciona un lote autorizado en la lista o en el plano.</p>}
   </section>;
 }
 
-export function LotVisualPickerPanel({project,selected,stageName,focusRevision}:{project:number;selected:LoteResponse|null;stageName?:string;focusRevision?:number}){
-  return <PreviewBoundary key={project}><LotVisualPicker key={project} project={project} selected={selected} stageName={stageName} focusRevision={focusRevision}/></PreviewBoundary>;
+export function LotVisualPickerPanel(props:PickerProps){
+  return <PreviewBoundary key={props.project}><LotVisualPicker key={props.project} {...props}/></PreviewBoundary>;
 }
