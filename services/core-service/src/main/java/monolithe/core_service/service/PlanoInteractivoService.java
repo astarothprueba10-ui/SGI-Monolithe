@@ -122,7 +122,16 @@ public class PlanoInteractivoService {
                         Long idProyecto,
                         Long idEtapa) {
                 PlanoInteractivo plano = resolverVigente(idProyecto, idEtapa);
+                return detalle(plano);
+        }
 
+        @Transactional(readOnly = true)
+        public PlanoInteractivoDetalleResponse obtenerMatrizOpcional(Long idProyecto) {
+                return planoRepo.findFirstByProyecto_IdProyectoAndEtapaIsNullAndVigenteTrue(idProyecto)
+                                .map(this::detalle).orElse(null);
+        }
+
+        private PlanoInteractivoDetalleResponse detalle(PlanoInteractivo plano) {
                 List<LoteGeometriaResponse> geometrias = geometriaRepo
                                 .findByPlanoInteractivo_IdPlanoInteractivoAndActivoTrueOrderByOrdenCapaAsc(
                                                 plano.getIdPlanoInteractivo())
@@ -216,13 +225,19 @@ public class PlanoInteractivoService {
                                 matriz.put(actual.idLote(), actual.puntos());
                         }
                 }
+                var lotesPorId = new java.util.HashMap<Long,Lote>();
+                for (Lote lote : loteRepo.findAllById(cambios.stream()
+                                .filter(java.util.Objects::nonNull).map(LoteGeometriaRequest::idLote)
+                                .filter(java.util.Objects::nonNull).distinct().toList())) {
+                        lotesPorId.put(lote.getIdLote(), lote);
+                }
                 for (LoteGeometriaRequest cambio : cambios) {
                         if (cambio == null || !idPlano.equals(cambio.idPlanoInteractivo())
                                         || !ids.add(cambio.idLote())) {
                                 throw new ReglaNegocioException("La matriz contiene lotes duplicados o de otro plano.");
                         }
-                        Lote lote = loteRepo.findById(cambio.idLote())
-                                        .orElseThrow(() -> new RecursoNoEncontradoException("Lote no encontrado."));
+                        Lote lote = lotesPorId.get(cambio.idLote());
+                        if (lote == null) throw new RecursoNoEncontradoException("Lote no encontrado.");
                         validarLotePertenecePlano(lote, plano);
                         if (!Boolean.TRUE.equals(lote.getActivo())) {
                                 throw new ReglaNegocioException("No se puede posicionar un lote inactivo.");
@@ -259,12 +274,13 @@ public class PlanoInteractivoService {
                         validarPuntos(cambio, plano);
                         validarEtiqueta(cambio, plano);
                 }
+                Long proyecto = plano.getProyecto().getIdProyecto();
                 planoRepo.save(plano);
-                for (LoteGeometriaRequest cambio : cambios) {
-                        guardarGeometria(cambio);
+                int guardados = geometriaRepo.guardarMatrizEnBloque(proyecto, idPlano, objectMapper.writeValueAsString(cambios));
+                if (guardados != cambios.size()) {
+                        throw new ConflictoNegocioException("No se guardaron todas las posiciones de la matriz.");
                 }
-                geometriaRepo.flush();
-                return obtenerDetalleVigente(plano.getProyecto().getIdProyecto(), null);
+                return obtenerDetalleVigente(proyecto, null);
         }
 
         // =========================================================
