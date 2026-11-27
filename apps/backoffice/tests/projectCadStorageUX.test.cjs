@@ -19,3 +19,14 @@ test('el cliente REST envia FormData autenticado sin revelar claves privadas',()
  assert.match(svc,/coreApi\.post/);
  assert.doesNotMatch(svc,/SERVICE_ROLE_KEY/);
 });
+
+test('la papelera requiere permiso y confirmación, elimina por proyecto y limpia la vista cuando corresponde',()=>{
+ const panel=read('components/projects/detail/ProjectSvgPanel.tsx');
+ const svc=read('services/projectSvgService.ts');
+ assert.match(panel,/puedeConfigurar && <button[\s\S]*?Trash2Icon/);
+ assert.match(panel,/Eliminar definitivamente/);
+ assert.match(panel,/projectSvgService\.eliminarOriginal\(proyecto,archivoEliminar\.id\)/);
+ assert.match(panel,/resultado\.vistaEliminada/);
+ assert.match(panel,/onSave\(null\)/);
+ assert.match(svc,/coreApi\.delete/);
+});
