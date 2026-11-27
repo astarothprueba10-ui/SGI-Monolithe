@@ -22,6 +22,13 @@ public class PlanoSvgProyectoController {
         return documento==null ? ResponseEntity.noContent().build() : ResponseEntity.ok(documento);
     }
 
+    @PutMapping("/asociaciones")
+    @PreAuthorize("hasAuthority('lots.configure')")
+    public PlanoSvgProyectoService.ResultadoAsociaciones guardarAsociaciones(@PathVariable Long idProyecto,
+        @Valid @RequestBody PlanoSvgProyectoService.CambiosAsociaciones request) {
+        return service.guardarAsociaciones(idProyecto,request);
+    }
+
     @PutMapping
     @PreAuthorize("hasAuthority('lots.configure')")
     public PlanoSvgProyectoResponse guardar(@PathVariable Long idProyecto,

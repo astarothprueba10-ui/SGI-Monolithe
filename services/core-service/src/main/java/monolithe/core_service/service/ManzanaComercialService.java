@@ -53,10 +53,15 @@ public class ManzanaComercialService {
     static String nombreSugerido(String codigo){return "Manzana "+codigo.replaceFirst("^.*[-_]","");}
     @Transactional(readOnly=true)
     public Listado listar(Long proyecto){
-        var config=configuracion.obtener(proyecto);
-        boolean publicado=configuracion.versionPublicada(proyecto)>0;
-        var gestion=publicado?comercial.gestion(proyecto):null;
-        var abiertas=gestion==null?List.<String>of():gestion.estado().etapasHabilitadas();
+        long inicio=System.nanoTime();
+        var resultado=listar(proyecto,configuracion.obtenerLecturaMapa(proyecto));
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle manzanas proyecto={} filas={} totalMs={}",proyecto,resultado.manzanas().size(),(System.nanoTime()-inicio)/1_000_000);
+        return resultado;
+    }
+
+    Listado listar(Long proyecto,ConfiguracionProyectoService.LecturaMapa config){
+        boolean publicado=config.publicado();
+        var abiertas=config.abiertas();
         var etapas=config.datos().etapas().stream().map(e->new Etapa(e.codigo(),e.nombre(),abiertas.contains(e.codigo()))).toList();
         var catalogo=jdbc.query("SELECT id_zona,codigo,nombre,activo FROM public.inm_zonas WHERE id_proyecto=? ORDER BY numero_orden,codigo",
             (r,n)->new Zona(r.getLong(1),r.getString(2),r.getString(3),r.getBoolean(4)),proyecto);
@@ -82,7 +87,7 @@ public class ManzanaComercialService {
                 vinculadas.stream().filter(x->x.manzana().equals(m.id())).map(Vinculo::zona).toList());
         }).toList();
         String sugerido=siguienteCodigo(bases.stream().map(Base::codigo).toList());
-        return new Listado(gestion==null?config.version():gestion.revision(),publicado,etapas,catalogo,filas,sugerido,nombreSugerido(sugerido));
+        return new Listado(publicado?config.revision():config.version(),publicado,etapas,catalogo,filas,sugerido,nombreSugerido(sugerido));
     }
     @Transactional
     public Listado guardar(Long proyecto,Long actor,Cambio req){

@@ -10,6 +10,9 @@ export const projectConfigurationService = {
   obtener(idProyecto: number) {
     return coreApi.get<ConfiguracionProyectoResponse>(ruta(idProyecto));
   },
+  detalle(idProyecto:number) {
+    return coreApi.get<{configuracion:ConfiguracionProyectoResponse;versionPublicada:number;gestion:GestionComercialResponse|null}>(`${ruta(idProyecto)}/detalle`);
+  },
   simular(idProyecto: number, idLote: number, version: number, moneda: string) {
     return coreApi.get<SimulacionComercialResponse>(`${ruta(idProyecto)}/simulacion?idLote=${idLote}&version=${version}&moneda=${encodeURIComponent(moneda)}`);
   },

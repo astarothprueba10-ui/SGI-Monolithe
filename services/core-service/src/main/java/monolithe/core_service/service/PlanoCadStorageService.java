@@ -109,6 +109,52 @@ public class PlanoCadStorageService {
         }
     }
 
+    public record Eliminacion(boolean vistaEliminada) {}
+    private record ArchivoEliminar(String ruta,String nombre,String formato) {}
+
+    @Transactional
+    public Eliminacion eliminar(Long proyecto,Long idArchivo) {
+        verificarProyecto(proyecto);
+        String base=validarStorage();
+        jdbc.queryForObject("SELECT id_proyecto FROM public.inm_proyectos WHERE id_proyecto=? FOR UPDATE",Long.class,proyecto);
+        var archivo=jdbc.query("""
+            SELECT ruta_archivo,nombre_original,formato FROM public.inm_planos_cad_archivos
+            WHERE id_proyecto=? AND id_plano_archivo=?
+            """,(rs,n)->new ArchivoEliminar(rs.getString(1),rs.getString(2),rs.getString(3)),proyecto,idArchivo)
+            .stream().findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Plano no encontrado."));
+        if(!archivo.ruta().matches("proyectos/"+proyecto+"/originales/[a-f0-9-]{36}\\.(dwg|svg)"))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Ruta del plano inválida.");
+        boolean vistaEliminada=false;
+        if("SVG".equals(archivo.formato())){
+            var nombres=jdbc.queryForList("""
+                SELECT nombre_archivo FROM public.inm_planos_svg_proyecto WHERE id_proyecto=? FOR UPDATE
+                """,String.class,proyecto);
+            if(nombres.contains(archivo.nombre())){
+                Integer iguales=jdbc.queryForObject("""
+                    SELECT count(*) FROM public.inm_planos_cad_archivos
+                    WHERE id_proyecto=? AND formato='SVG' AND nombre_original=?
+                    """,Integer.class,proyecto,archivo.nombre());
+                if(iguales==null||iguales!=1)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"Hay varias versiones con el mismo nombre; no se puede identificar con seguridad la vista vinculada.");
+                vistaEliminada=jdbc.update("""
+                    DELETE FROM public.inm_planos_svg_proyecto WHERE id_proyecto=? AND nombre_archivo=?
+                    """,proyecto,archivo.nombre())==1;
+            }
+        }
+        if(jdbc.update("DELETE FROM public.inm_planos_cad_archivos WHERE id_proyecto=? AND id_plano_archivo=?",proyecto,idArchivo)!=1)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"No se pudo retirar el registro del archivo.");
+        // Si Storage falla, la transacción SQL se revierte. Se usa la API, nunca storage.objects por SQL.
+        try {
+            client.method(HttpMethod.DELETE).uri(base+"/object/"+BUCKET)
+                .header("apikey",key).header("Authorization","Bearer "+key)
+                .contentType(MediaType.APPLICATION_JSON).body(Map.of("prefixes",List.of(archivo.ruta())))
+                .retrieve().toBodilessEntity();
+        } catch(RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,"No se pudo eliminar el archivo de Storage. Reintenta.",ex);
+        }
+        return new Eliminacion(vistaEliminada);
+    }
+
     @Transactional(readOnly=true)
     public Descarga firmarDescarga(Long proyecto,Long idArchivo) {
         verificarProyecto(proyecto);

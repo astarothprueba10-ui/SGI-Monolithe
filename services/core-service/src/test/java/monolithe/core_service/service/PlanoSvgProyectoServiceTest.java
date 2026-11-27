@@ -49,4 +49,20 @@ class PlanoSvgProyectoServiceTest {
             new PlanoSvgProyectoRequest("plano.svg",List.of(0.0,0.0,500.0,500.0),
                 List.of(new Elemento("script",Map.of(),null,null)))));
     }
+    @Test void rechazaAsociacionAlFondoYTexto() {
+        preparar();
+        var fondo = new Elemento("rect",Map.of("x","0","y","0","width","1000","height","650","fill","#f4f8fb"),null,"ALM-L001");
+        var texto = new Elemento("text",Map.of("x","10","y","20"),"450 m2","ALM-L001");
+        for(var e:List.of(fondo,texto)){
+            assertThrows(ReglaNegocioException.class,()->servicio.validar(3L,
+                new PlanoSvgProyectoRequest("loteo.svg",List.of(0.0,0.0,1000.0,650.0),List.of(e))));
+        }
+    }
+    @Test void aceptaSuperficieValidaYFondoSinVinculo() {
+        preparar();
+        var fondo = new Elemento("rect",Map.of("x","0","y","0","width","1000","height","650","fill","#f4f8fb"),null,null);
+        var lote = new Elemento("polygon",Map.of("points","10,10 20,10 20,20 10,20","fill","#c4f1dc"),null,"ALM-L001");
+        assertDoesNotThrow(()->servicio.validar(3L,
+            new PlanoSvgProyectoRequest("loteo.svg",List.of(0.0,0.0,1000.0,650.0),List.of(fondo,lote))));
+    }
 }

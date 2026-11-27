@@ -41,18 +41,66 @@ public class PlanoSvgProyectoService {
             },proyecto).stream().findFirst().orElse(null);
     }
 
+    public record CambioAsociacion(@jakarta.validation.constraints.PositiveOrZero int indice,
+        @jakarta.validation.constraints.Size(max=80) String codigoLote) {}
+    public record CambiosAsociaciones(@jakarta.validation.constraints.NotNull OffsetDateTime revision,
+        @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max=2000)
+        List<@jakarta.validation.constraints.NotNull @jakarta.validation.Valid CambioAsociacion> cambios) {}
+    public record ResultadoAsociaciones(OffsetDateTime fechaActualizacion) {}
+
+    @Transactional
+    public ResultadoAsociaciones guardarAsociaciones(Long proyecto, CambiosAsociaciones request) {
+        long inicio=System.nanoTime();
+        var actual=jdbc.query("""
+            SELECT documento::text,fecha_actualizacion FROM public.inm_planos_svg_proyecto
+            WHERE id_proyecto=? FOR UPDATE
+            """,(rs,n)->new PlanoSvgProyectoResponse(proyecto,
+                mapper.readValue(rs.getString(1),PlanoSvgProyectoRequest.class),
+                rs.getObject(2,OffsetDateTime.class)),proyecto).stream().findFirst()
+            .orElseThrow(()->new RecursoNoEncontradoException("No existe un SVG guardado."));
+        if(!actual.fechaActualizacion().isEqual(request.revision()))
+            throw new monolithe.core_service.exception.ConflictoNegocioException("El SVG cambió en otra sesión. Recarga el plano antes de guardar.");
+        long lectura=System.nanoTime();
+        var elementos=new ArrayList<>(actual.documento().elementos());
+        var indices=new HashSet<Integer>();
+        for(var cambio:request.cambios()){
+            int i=cambio.indice();
+            if(i<0||i>=elementos.size()||!indices.add(i))
+                throw new ReglaNegocioException("Índice de figura inválido o repetido.");
+            var e=elementos.get(i);
+            elementos.set(i,new PlanoSvgProyectoRequest.Elemento(e.tipo(),e.atributos(),e.texto(),cambio.codigoLote()));
+        }
+        var documento=new PlanoSvgProyectoRequest(actual.documento().nombreArchivo(),actual.documento().viewBox(),elementos);
+        validar(proyecto,documento);
+        long validacion=System.nanoTime();
+        var fecha=jdbc.queryForObject("""
+            UPDATE public.inm_planos_svg_proyecto SET documento=CAST(? AS jsonb),fecha_actualizacion=clock_timestamp()
+            WHERE id_proyecto=? RETURNING fecha_actualizacion
+            """,(rs,n)->rs.getObject(1,OffsetDateTime.class),mapper.writeValueAsString(documento),proyecto);
+        org.slf4j.LoggerFactory.getLogger(getClass()).info(
+            "Guardar SVG asociaciones proyecto={} cambios={} lecturaMs={} validacionMs={} escrituraMs={} totalMs={}",
+            proyecto,indices.size(),(lectura-inicio)/1_000_000,(validacion-lectura)/1_000_000,
+            (System.nanoTime()-validacion)/1_000_000,(System.nanoTime()-inicio)/1_000_000);
+        return new ResultadoAsociaciones(fecha);
+    }
+
     @Transactional
     public PlanoSvgProyectoResponse guardar(Long proyecto, PlanoSvgProyectoRequest documento) {
+        long inicio=System.nanoTime();
         validar(proyecto,documento);
+        long validacion=System.nanoTime();
         try {
-            jdbc.update("""
+            var fecha=jdbc.queryForObject("""
                 INSERT INTO public.inm_planos_svg_proyecto(id_proyecto,nombre_archivo,documento,fecha_actualizacion)
                 VALUES(?,?,CAST(? AS jsonb),now())
                 ON CONFLICT(id_proyecto) DO UPDATE SET nombre_archivo=excluded.nombre_archivo,
                   documento=excluded.documento,fecha_actualizacion=now()
-                """, proyecto, documento.nombreArchivo(), mapper.writeValueAsString(documento));
+                RETURNING fecha_actualizacion
+                """, (rs,n)->rs.getObject(1,OffsetDateTime.class),proyecto, documento.nombreArchivo(), mapper.writeValueAsString(documento));
+            org.slf4j.LoggerFactory.getLogger(getClass()).info("Guardar SVG completo proyecto={} validacionMs={} totalMs={}",
+                proyecto,(validacion-inicio)/1_000_000,(System.nanoTime()-inicio)/1_000_000);
+            return new PlanoSvgProyectoResponse(proyecto,documento,fecha);
         } catch (Exception ex) { throw new IllegalStateException("No se pudo guardar el plano SVG.",ex); }
-        return obtener(proyecto);
     }
 
     void validar(Long proyecto, PlanoSvgProyectoRequest documento) {
@@ -75,6 +123,7 @@ public class PlanoSvgProyectoService {
             if(e.codigoLote()!=null) {
                 if(!codigos.contains(e.codigoLote()) || !vinculados.add(e.codigoLote()))
                     throw new ReglaNegocioException("Un lote del SVG no pertenece al proyecto o está repetido: "+e.codigoLote());
+                validarSuperficie(e,box);
             }
             for(var entry:e.atributos().entrySet()) {
                 String key=entry.getKey(),v=entry.getValue();
@@ -84,6 +133,31 @@ public class PlanoSvgProyectoService {
             }
             if(total>2500000) throw new ReglaNegocioException("El SVG excede el tamaño permitido.");
         }
+    }
+
+    private void validarSuperficie(PlanoSvgProyectoRequest.Elemento e,List<Double> box){
+        var a=e.atributos();
+        if(!Set.of("rect","polygon","path").contains(e.tipo())
+            || "none".equalsIgnoreCase(a.get("fill")) || "transparent".equalsIgnoreCase(a.get("fill"))
+            || ("path".equals(e.tipo()) && !a.getOrDefault("d","").strip().matches("(?s).*[zZ]$")))
+            throw new ReglaNegocioException("Solo se pueden asociar superficies de lotes.");
+        double[] b=null;
+        try{
+            if("rect".equals(e.tipo())){
+                double x=Double.parseDouble(a.getOrDefault("x","0")),y=Double.parseDouble(a.getOrDefault("y","0"));
+                b=new double[]{x,y,x+Double.parseDouble(a.get("width")),y+Double.parseDouble(a.get("height"))};
+            }else if("polygon".equals(e.tipo())){
+                var p=a.getOrDefault("points","").trim().split("[\\s,]+");
+                if(p.length>=6&&p.length%2==0){
+                    b=new double[]{Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY};
+                    for(int i=0;i<p.length;i+=2){double x=Double.parseDouble(p[i]),y=Double.parseDouble(p[i+1]);
+                        b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],y);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],y);}
+                }
+            }
+        }catch(IllegalArgumentException|NullPointerException ex){throw new ReglaNegocioException("Dimensiones de figura inválidas.");}
+        if(b!=null && b[0]<=box.get(0)+box.get(2)*.02 && b[1]<=box.get(1)+box.get(3)*.02
+            && b[2]>=box.get(0)+box.get(2)*.98 && b[3]>=box.get(1)+box.get(3)*.98)
+            throw new ReglaNegocioException("No se puede asociar el fondo general del plano.");
     }
 
     private boolean atributoSeguro(String key,String v) {

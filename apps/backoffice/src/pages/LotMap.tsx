@@ -152,6 +152,7 @@ export function LotMap() {
   const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
   const [promotionsMap,setPromotionsMap]=useState<Map<number,number>>(new Map());
   const [svgDocument, setSvgDocument] = useState<PlanoSvgDocumento | null>(null);
+  const [svgRevision,setSvgRevision]=useState<string|null>(null);
   const [svgLoading,setSvgLoading]=useState(false);
   const [svgError,setSvgError]=useState(false);
   const [svgRetry,setSvgRetry]=useState(0);
@@ -248,7 +249,7 @@ export function LotMap() {
   // El documento SVG se descarga una sola vez por proyecto, sin bloquear la matriz.
   useEffect(()=>{
     let active=true;
-    setSvgDocument(null);setSvgError(false);
+    setSvgDocument(null);setSvgRevision(null);setSvgError(false);
     if(!selectedProjectId){setSvgLoading(false);return;}
     setSvgLoading(true);
     projectSvgService.obtener(selectedProjectId).then(res=>{
@@ -258,7 +259,7 @@ export function LotMap() {
         ||doc.elementos.some(f=>!f||!f.atributos))){
         throw new Error('Documento SVG con estructura inválida.');
       }
-      setSvgDocument(doc);
+      setSvgDocument(doc);setSvgRevision(res?.fechaActualizacion??null);
     }).catch((err:unknown)=>{if(active){setSvgError(true);console.error('[Plano] Error al consultar SVG',err);}})
       .finally(()=>{if(active)setSvgLoading(false);});
     return ()=>{active=false;};
@@ -921,7 +922,7 @@ export function LotMap() {
             </div>
           </> : <div className="p-4 sm:p-5">
             {svgLoading || loadingPlan ? <div className="p-16 text-center text-sm text-brand-500">Cargando plano SVG…</div> : svgError ? <div className="p-8 text-center"><p className="mb-3 text-sm text-brand-600">No se pudo consultar el plano SVG.</p><Button onClick={()=>setSvgRetry(v=>v+1)}>Reintentar</Button></div> : selectedProjectId && <ProjectSvgPanel key={selectedProjectId} proyecto={selectedProjectId}
-              lotes={lots} documento={svgDocument} onSave={setSvgDocument}
+              lotes={lots} documento={svgDocument} revision={svgRevision} onSave={(doc,revision)=>{setSvgDocument(doc);setSvgRevision(revision??null);}}
               seleccionado={selectedLotId} onSelect={setSelectedLotId} puedeConfigurar={canConfigurePlan}/>}
           </div>}
           <div className="flex flex-wrap items-center gap-2 border-t border-brand-100 px-4 py-3">

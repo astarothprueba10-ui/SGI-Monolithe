@@ -107,4 +107,24 @@ class MapaLotesLecturaTest {
         assertTrue(resultado.abiertas().isEmpty());
         assertTrue(resultado.datos().etapas().isEmpty());
     }
+    @Test void detalleAgrupaCatalogosYConservaRevision(){
+        var repo=mock(ConfiguracionProyectoRepository.class);
+        when(repo.lecturaMapa(2L)).thenReturn(new ConfiguracionProyectoRepository.LecturaMapa(
+            true,true,true,3,3,"{\"etapas\":[],\"manzanas\":[],\"lotes\":[]}","{\"manzanas\":[],\"lotes\":[]}",null,"[]",9L));
+        when(repo.tarifasVigentes(2L,3)).thenReturn(Optional.of("[]"));
+        when(repo.catalogosDetalle(2L)).thenReturn(new ConfiguracionProyectoRepository.CatalogosDetalle(
+            "[{\"id\":10,\"codigo\":\"MZ-A\",\"nombre\":\"A\"}]",
+            "[{\"id\":71,\"idManzana\":10,\"codigo\":\"L01\",\"estadoInventario\":\"DISPONIBLE\",\"codigoZona\":\"D\"}]",
+            "[\"D\"]","[\"PEN\"]"));
+        var servicio=new ConfiguracionProyectoService(repo,null,JsonMapper.builder().build());
+        var detalle=servicio.obtenerDetalleConsulta(2L);
+        assertEquals(3,detalle.publicada());
+        assertEquals(9L,detalle.revision());
+        assertEquals("D",detalle.configuracion().lotes().get(0).codigoZona());
+        assertEquals(List.of("PEN"),detalle.configuracion().monedas());
+        verify(repo).lecturaMapa(2L);
+        verify(repo).tarifasVigentes(2L,3);
+        verify(repo).catalogosDetalle(2L);
+        verifyNoMoreInteractions(repo);
+    }
 }

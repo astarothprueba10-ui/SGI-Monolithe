@@ -18,7 +18,11 @@ public class ConfiguracionProyectoRepository {
     public record Version(int numero, String json) {}
 
     public record LecturaMapa(boolean existe, boolean publicacionVisible, boolean integridad,
-            int publicada, Integer versionBorrador, String borrador, String asignaciones, String etapas, String abiertas) {}
+            int publicada, Integer versionBorrador, String borrador, String asignaciones, String etapas, String abiertas, long revision) {
+        public LecturaMapa(boolean existe,boolean visible,boolean integridad,int publicada,Integer version,String borrador,String asignaciones,String etapas,String abiertas){
+            this(existe,visible,integridad,publicada,version,borrador,asignaciones,etapas,abiertas,0L);
+        }
+    }
 
     public LecturaMapa lecturaMapa(Long proyecto) {
         return jdbc.queryForObject("""
@@ -47,7 +51,7 @@ public class ConfiguracionProyectoRepository {
                             OR pg_catalog.row_security_active('public.cfg_estados_venta'::regclass)
                         ) ELSE true END integridad,
                pub.version publicada, b.version borrador_version,b.configuracion::text borrador,
-               a.estado::text asignaciones, e.etapas::text etapas,
+               a.estado::text asignaciones, e.etapas::text etapas, coalesce(u.id_evento,0) revision,
                CASE WHEN u.id_evento IS NOT NULL THEN (u.estado->'etapasHabilitadas')::text
                  ELSE (SELECT coalesce(jsonb_agg(h.codigo_etapa ORDER BY h.codigo_etapa),'[]'::jsonb)::text
                    FROM (SELECT DISTINCT l.codigo_etapa FROM public.inm_politicas_comerciales_lotes l
@@ -68,7 +72,7 @@ public class ConfiguracionProyectoRepository {
                 ORDER BY id_evento DESC LIMIT 1) u ON true
             """, (rs,n)->new LecturaMapa(rs.getBoolean("existe"),rs.getBoolean("publicacion_visible"),
                 rs.getBoolean("integridad"),rs.getInt("publicada"),rs.getObject("borrador_version",Integer.class),
-                rs.getString("borrador"),rs.getString("asignaciones"),rs.getString("etapas"),rs.getString("abiertas")),proyecto);
+                rs.getString("borrador"),rs.getString("asignaciones"),rs.getString("etapas"),rs.getString("abiertas"),rs.getLong("revision")),proyecto);
     }
 
     public Optional<Version> vigente(Long proyecto) {
@@ -166,6 +170,28 @@ public class ConfiguracionProyectoRepository {
             VALUES (?, ?, CAST(? AS jsonb), ?)
             ON CONFLICT (id_proyecto, version) DO NOTHING
             """, proyecto, version, json, actor) == 1;
+    }
+
+    public record CatalogosDetalle(String manzanas,String lotes,String zonas,String monedas) {}
+    public CatalogosDetalle catalogosDetalle(Long proyecto){
+        return jdbc.queryForObject("""
+            WITH p AS (SELECT CAST(? AS bigint) id)
+            SELECT
+              (SELECT coalesce(jsonb_agg(jsonb_build_object('id',m.id_manzana,'codigo',m.codigo,'nombre',m.nombre)
+                ORDER BY m.codigo,m.id_manzana),'[]'::jsonb)::text FROM public.inm_manzanas m
+                JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa WHERE m.id_proyecto=p.id AND m.activo AND e.activo) manzanas,
+              (SELECT coalesce(jsonb_agg(jsonb_build_object('id',l.id_lote,'idManzana',l.id_manzana,'codigo',l.codigo,
+                'estadoInventario',el.codigo,'codigoZona',z.codigo) ORDER BY l.codigo,l.id_lote),'[]'::jsonb)::text
+                FROM public.inm_lotes l JOIN public.cfg_estados_lote el ON el.id_estado_lote=l.id_estado_lote
+                LEFT JOIN public.inm_zonas z ON z.id_zona=l.id_zona AND z.id_proyecto=l.id_proyecto
+                JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
+                WHERE l.id_proyecto=p.id AND l.activo AND m.activo AND e.activo) lotes,
+              (SELECT coalesce(jsonb_agg(z.codigo ORDER BY z.codigo),'[]'::jsonb)::text
+                FROM public.inm_zonas z WHERE z.id_proyecto=p.id AND z.activo) zonas,
+              (SELECT coalesce(jsonb_agg(m.codigo ORDER BY m.codigo),'[]'::jsonb)::text
+                FROM public.cfg_monedas m WHERE m.activo) monedas
+            FROM p
+            """,(rs,n)->new CatalogosDetalle(rs.getString("manzanas"),rs.getString("lotes"),rs.getString("zonas"),rs.getString("monedas")),proyecto);
     }
 
     public List<Etapa> etapas(Long proyecto) {

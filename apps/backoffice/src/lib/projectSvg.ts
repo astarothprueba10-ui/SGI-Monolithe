@@ -16,9 +16,45 @@ export function codigoLoteVinculado(texto: string | null | undefined, lotes: rea
   return lotes.find(l => l.codigo.trim().toUpperCase() === clave)?.codigo ?? null;
 }
 
+// Clasificación conservadora: no modifica el dibujo CAD, solo su elegibilidad comercial.
+export function motivoFiguraNoVinculable(figura: SvgFigura, vista?: readonly number[]): string | null {
+  const a=figura.atributos;
+  if(!['rect','polygon','path'].includes(figura.tipo))return 'Texto, línea o símbolo decorativo';
+  if(vista?.length===4 && vista[2]>0 && vista[3]>0){
+    let limites:number[]|null=null;
+    if(figura.tipo==='rect'){
+      const x=Number(a.x??0),y=Number(a.y??0),w=Number(a.width),h=Number(a.height);
+      limites=[x,y,x+w,y+h];
+    }else if(figura.tipo==='polygon'){
+      const nums=(a.points??'').trim().split(/[\s,]+/).map(Number);
+      if(nums.length>=6 && nums.length%2===0 && nums.every(Number.isFinite)){
+        const xs=nums.filter((_,i)=>i%2===0),ys=nums.filter((_,i)=>i%2===1);
+        limites=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+      }
+    }
+    if(limites?.every(Number.isFinite)){
+      const [x,y,w,h]=vista;
+      const [izq,arriba,der,abajo]=limites;
+      if(izq<=x+w*.02&&arriba<=y+h*.02&&der>=x+w*.98&&abajo>=y+h*.98)
+        return 'Fondo general del plano';
+    }
+  }
+  if(figura.tipo==='path'&&!/[zZ]\s*$/.test(a.d??''))return 'Trazo abierto, no superficie';
+  if(a.fill?.toLowerCase()==='none'||a.fill?.toLowerCase()==='transparent')
+    return 'Figura sin relleno';
+  return null;
+}
+
+export function figuraVinculable(figura: SvgFigura,vista?:readonly number[]): boolean {
+  return motivoFiguraNoVinculable(figura,vista)===null;
+}
+export function asociacionesLote(documento:PlanoSvgDocumento,codigo:string):number[] {
+  return documento.elementos.flatMap((e,i)=>e.codigoLote===codigo?[i]:[]);
+}
+
 export function totalVinculados(documento: PlanoSvgDocumento, lotes: readonly Pick<LoteResponse,'codigo'>[]): number {
   const codigos = new Set(lotes.map(l => l.codigo));
-  return new Set(documento.elementos.map(e => e.codigoLote).filter(c => c && codigos.has(c))).size;
+  return new Set(documento.elementos.filter(e=>figuraVinculable(e,documento.viewBox)).map(e => e.codigoLote).filter(c => c && codigos.has(c))).size;
 }
 
 function validarAtributo(clave: string, valor: string): boolean {
@@ -68,7 +104,8 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
       if(transformTotal) atributos.transform=transformTotal;
       const opciones=[node.getAttribute('data-lote'),node.getAttribute('id'),node.getAttribute('data-code')];
       const codigoPropio=opciones.map(x=>codigoLoteVinculado(x,lotes)).find(Boolean) ?? null;
-      const codigo=codigoPropio ?? (codigoGrupo && !usados.has(codigoGrupo) ? codigoGrupo : null);
+      const codigo=figuraVinculable({tipo:etiqueta,atributos,texto:null,codigoLote:null},viewBox)
+        ? codigoPropio ?? (codigoGrupo && !usados.has(codigoGrupo) ? codigoGrupo : null) : null;
       if(codigo && usados.has(codigo)) throw new Error('Un mismo lote figura más de una vez en el SVG: '+codigo);
       if(codigo) usados.add(codigo);
       const texto=etiqueta==='text' ? (node.textContent??'').trim().slice(0,150) : null;
@@ -89,11 +126,13 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
 }
 
 export function vincularFigura(documento: PlanoSvgDocumento, indice: number, codigo: string | null,
-  lotes: readonly Pick<LoteResponse,'codigo'>[]): PlanoSvgDocumento {
+  lotes: readonly Pick<LoteResponse,'codigo'>[], reemplazar=false): PlanoSvgDocumento {
   if(indice<0 || indice>=documento.elementos.length) throw new Error('Figura fuera del plano.');
   const codigoValido=codigo===null ? null : codigoLoteVinculado(codigo,lotes);
   if(codigo!==null && !codigoValido) throw new Error('El lote no pertenece a este proyecto.');
-  if(codigoValido && documento.elementos.some((e,i)=>i!==indice && e.codigoLote===codigoValido))
+  if(codigoValido && !figuraVinculable(documento.elementos[indice],documento.viewBox))
+    throw new Error('Selecciona la superficie del lote. '+motivoFiguraNoVinculable(documento.elementos[indice],documento.viewBox)+'.');
+  if(codigoValido && !reemplazar && documento.elementos.some((e,i)=>i!==indice && e.codigoLote===codigoValido))
     throw new Error('Este lote ya tiene otra figura asociada.');
-  return {...documento,elementos:documento.elementos.map((e,i)=>i===indice ? {...e,codigoLote:codigoValido}:e)};
+  return {...documento,elementos:documento.elementos.map((e,i)=>i===indice ? {...e,codigoLote:codigoValido}:reemplazar && codigoValido && e.codigoLote===codigoValido?{...e,codigoLote:null}:e)};
 }
