@@ -17,6 +17,60 @@ public class ConfiguracionProyectoRepository {
 
     public record Version(int numero, String json) {}
 
+    public record LecturaMapa(boolean existe, boolean publicacionVisible, boolean integridad,
+            int publicada, Integer versionBorrador, String borrador, String asignaciones, String etapas, String abiertas) {}
+
+    public LecturaMapa lecturaMapa(Long proyecto) {
+        return jdbc.queryForObject("""
+            WITH proyecto AS (SELECT CAST(? AS bigint) id),
+             publicacion AS (SELECT coalesce(max(v.version),0) version FROM public.inm_politicas_comerciales_publicadas v JOIN proyecto p ON p.id=v.id_proyecto)
+             SELECT EXISTS(SELECT 1 FROM public.inm_proyectos q WHERE q.id_proyecto=p.id) existe,
+               NOT pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass) publicacion_visible,
+               CASE WHEN pub.version>0 THEN NOT (
+                            pg_catalog.row_security_active('public.inm_proyectos'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_gestion_comercial_eventos'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_politicas_comerciales_lotes'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_lotes'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_lotes_precios'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_configuracion_comercial_borradores'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_ajustes_tipo_lote'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_etapas_comerciales'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_etapas'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_manzanas'::regclass)
+                            OR pg_catalog.row_security_active('public.inm_zonas'::regclass)
+                            OR pg_catalog.row_security_active('public.cfg_estados_lote'::regclass)
+                            OR pg_catalog.row_security_active('public.cfg_monedas'::regclass)
+                            OR pg_catalog.row_security_active('public.ven_reservas'::regclass)
+                            OR pg_catalog.row_security_active('public.ven_ventas'::regclass)
+                            OR pg_catalog.row_security_active('public.cfg_estados_reserva'::regclass)
+                            OR pg_catalog.row_security_active('public.cfg_estados_venta'::regclass)
+                        ) ELSE true END integridad,
+               pub.version publicada, b.version borrador_version,b.configuracion::text borrador,
+               a.estado::text asignaciones, e.etapas::text etapas,
+               CASE WHEN u.id_evento IS NOT NULL THEN (u.estado->'etapasHabilitadas')::text
+                 ELSE (SELECT coalesce(jsonb_agg(h.codigo_etapa ORDER BY h.codigo_etapa),'[]'::jsonb)::text
+                   FROM (SELECT DISTINCT l.codigo_etapa FROM public.inm_politicas_comerciales_lotes l
+                      WHERE l.id_proyecto=p.id AND l.version=pub.version AND l.situacion='HABILITADA' AND l.codigo_etapa IS NOT NULL) h)
+               END abiertas
+             FROM proyecto p CROSS JOIN publicacion pub
+             LEFT JOIN LATERAL (SELECT version,configuracion FROM public.inm_configuracion_comercial_borradores
+                WHERE id_proyecto=p.id AND (pub.version=0 OR version=pub.version) ORDER BY version DESC LIMIT 1) b ON true
+             LEFT JOIN LATERAL (SELECT nuevo->'estado' estado FROM public.inm_gestion_comercial_eventos
+                WHERE id_proyecto=p.id AND version_publicada=pub.version AND pub.version>0 AND tipo IN ('ASIGNACIONES','REPARACION')
+                  AND jsonb_typeof(nuevo->'estado'->'manzanas')='array' AND jsonb_typeof(nuevo->'estado'->'lotes')='array'
+                ORDER BY id_evento DESC LIMIT 1) a ON true
+             LEFT JOIN LATERAL (SELECT nuevo->'estado'->'etapas' etapas FROM public.inm_gestion_comercial_eventos
+                WHERE id_proyecto=p.id AND version_publicada=pub.version AND pub.version>0 AND tipo='ETAPAS'
+                ORDER BY id_evento DESC LIMIT 1) e ON true
+             LEFT JOIN LATERAL (SELECT id_evento,nuevo->'estado' estado FROM public.inm_gestion_comercial_eventos
+                WHERE id_proyecto=p.id AND version_publicada=pub.version AND pub.version>0 AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION','ASIGNACIONES')
+                ORDER BY id_evento DESC LIMIT 1) u ON true
+            """, (rs,n)->new LecturaMapa(rs.getBoolean("existe"),rs.getBoolean("publicacion_visible"),
+                rs.getBoolean("integridad"),rs.getInt("publicada"),rs.getObject("borrador_version",Integer.class),
+                rs.getString("borrador"),rs.getString("asignaciones"),rs.getString("etapas"),rs.getString("abiertas")),proyecto);
+    }
+
     public Optional<Version> vigente(Long proyecto) {
         return jdbc.query("""
             SELECT version, configuracion::text AS json
