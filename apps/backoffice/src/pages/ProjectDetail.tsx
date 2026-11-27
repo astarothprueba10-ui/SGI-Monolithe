@@ -70,7 +70,7 @@ export function ProjectDetail() {
   const tabItems = useMemo(() => {
     const items = [
       { id: 'resumen', label: 'Resumen' },
-      { id: 'etapas', label: 'Etapas' },
+      ...(canConfigure ? [{ id: 'etapas', label: 'Etapas comerciales' }] : []),
       { id: 'zonas', label: 'Zonas' },
       { id: 'manzanas', label: 'Manzanas' }
     ];
@@ -192,7 +192,7 @@ export function ProjectDetail() {
       {/* Contenido según tab activo */}
       <div className="mt-4">
         {activeTab === 'resumen' && <ProjectSummaryTab project={project} />}
-        {activeTab === 'etapas' && <ProjectStagesTab project={project} />}
+        {activeTab === 'etapas' && canConfigure && <ProjectStagesTab key={project.idProyecto} project={project} />}
         {activeTab === 'zonas' && <ProjectZonesTab project={project} />}
         {activeTab === 'manzanas' && <ProjectBlocksTab project={project} />}
         {activeTab === 'lotes' && canViewLots && <ProjectLotsTab project={project} />}

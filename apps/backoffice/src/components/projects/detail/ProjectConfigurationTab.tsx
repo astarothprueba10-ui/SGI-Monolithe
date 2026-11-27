@@ -90,7 +90,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       {seccionVisible === 'excel' && <ProjectImportPreparation project={project} disabledByDraft={hayCambios}
         onImportCompleted={importado}/>}
       {seccionVisible === 'etapas' && <fieldset disabled={bloqueado}>
-        <CommercialStageEditor datos={datos} onChange={model.setDatos}/>
+        <CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado} onChange={model.setDatos}/>
       </fieldset>}
       {seccionVisible === 'asignaciones' && <fieldset disabled={bloqueado}>
         <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>

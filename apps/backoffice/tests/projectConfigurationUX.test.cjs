@@ -63,3 +63,20 @@ test('la configuración publicada oculta importación y no permite guardar otro 
   assert.match(hook, /projectConfigurationService\.versionPublicada\(idProyecto\)/);
   assert.match(hook, /guardando \|\| publicada !== 0/);
 });
+
+test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un modal comercial', () => {
+  const detalle = archivo('pages/ProjectDetail.tsx');
+  const tab = archivo('components/projects/detail/ProjectStagesTab.tsx');
+  const editor = archivo('components/projects/detail/CommercialStageEditor.tsx');
+  const config = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+  assert.match(detalle,/label: 'Etapas comerciales'/);
+  assert.doesNotMatch(tab,/StageFormModal|getStagesByProject/);
+  assert.match(tab,/useProjectConfiguration\(project.idProyecto\)/);
+  assert.match(tab,/onChange=\{model.guardar\}/);
+  assert.match(config,/<CommercialStageEditor/);
+  assert.match(editor,/<Modal/);
+  assert.match(editor,/Condición comercial/);
+  assert.match(editor,/Tipo de descuento/);
+  assert.doesNotMatch(editor,/Planificada|Finalizada|Fecha fin estimada/);
+  assert.match(tab,/publicada > 0/);
+});

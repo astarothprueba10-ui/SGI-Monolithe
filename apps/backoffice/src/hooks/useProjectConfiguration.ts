@@ -23,17 +23,19 @@ export function useProjectConfiguration(idProyecto: number) {
     return () => { vigente = false; };
   }, [idProyecto, intento]);
 
-  async function guardar() {
-    if (!datos || !respuesta || guardando || publicada !== 0) return;
-    const fallo = validarConfiguracion(datos);
-    if (fallo) { setError(fallo); return; }
+  async function guardar(nuevosDatos: ConfiguracionComercial | null = datos): Promise<boolean> {
+    if (!datos || !respuesta || guardando || publicada !== 0 || !nuevosDatos) return false;
+    const fallo = validarConfiguracion(nuevosDatos);
+    if (fallo) { setError(fallo); return false; }
     setGuardando(true); setError('');
     try {
-      const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, datos);
+      const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, nuevosDatos);
       setRespuesta(r); setDatos(r.datos);
       toast.success(`Borrador comercial v${r.version} guardado.`);
+      return true;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el borrador.');
+      return false;
     } finally { setGuardando(false); }
   }
 
