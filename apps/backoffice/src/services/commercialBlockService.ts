@@ -14,5 +14,5 @@ export function estadoManzana(activa:boolean,lotes:number,vendidos:number,habili
 const ruta=(id:number)=>`/proyectos/${id}/manzanas-comerciales`;
 export const commercialBlockService={
  listar:(id:number)=>coreApi.get<ListadoManzanas>(ruta(id)),
- guardar:(id:number,cambio:CambioManzana)=>coreApi.put<ListadoManzanas>(ruta(id),cambio)
+ guardar:(id:number,cambio:CambioManzana)=>coreApi.put<ListadoManzanas>(ruta(id),{...cambio})
 };
