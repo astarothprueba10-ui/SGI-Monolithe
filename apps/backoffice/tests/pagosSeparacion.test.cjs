@@ -30,3 +30,13 @@ test('valida límite de archivos y conserva importe declarado al cambiar el tota
  assert.ok(errorComprobanteSeparacion({name:'voucher.exe',size:100,type:'application/octet-stream'}));
  assert.equal(validarPagosSeparacion(resolverPagosSeparacion([pago(1,'500')],1000),1000).diferencia,50000);
 });
+
+test('efectivo no exige adjuntar archivo y otros métodos conservan la validación',()=>{
+ const sinArchivo={archivo:null,hashSha256:null,referencia:''};
+ assert.equal(validarPagosSeparacion([pago(1,'500',{...sinArchivo,metodo:'EFECTIVO'})],500).valido,true);
+ for(const metodo of ['TRANSFERENCIA','DEPOSITO','YAPE_PLIN','OTRO'])
+   assert.equal(validarPagosSeparacion([pago(1,'500',{...sinArchivo,metodo})],500).valido,false);
+ assert.equal(validarPagosSeparacion([pago(1,'250',{...sinArchivo,metodo:'EFECTIVO'}),pago(2,'250')],500).valido,true);
+ assert.equal(validarPagosSeparacion([pago(1,'499',{...sinArchivo,metodo:'EFECTIVO'})],500).valido,false);
+ assert.equal(validarPagosSeparacion([pago(1,'500',{metodo:'EFECTIVO',hashSha256:null})],500).valido,false);
+});
