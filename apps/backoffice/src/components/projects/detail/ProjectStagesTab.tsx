@@ -24,8 +24,7 @@ export function ProjectStagesTab({ project }: { project: ProyectoResponse }) {
     {error && <Button onClick={model.recargar}>Reintentar</Button>}
   </Card>;
   return <Card className="p-5 space-y-4">
-    {publicada > 0 ? <p className="text-sm text-brand-600">Proyecto publicado. Administra etapas sin volver a publicar. Las etapas nuevas empiezan cerradas. Los cambios de descuento solo afectan lotes no comprometidos.</p>
-      : <p className="text-sm text-brand-600">Borrador comercial. Los cambios se guardan sin publicar precios ni liberar lotes.</p>}
+    {publicada === 0 && <p className="text-sm text-brand-600">Borrador comercial. Los cambios se guardan sin publicar precios ni liberar lotes.</p>}
     {gestionError && <p role="alert" className="text-sm text-red-700">{gestionError}</p>}
     {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre}

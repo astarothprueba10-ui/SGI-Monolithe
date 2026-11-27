@@ -237,6 +237,11 @@ public class PublicacionComercialService {
 
     @Transactional
     public Respuesta guardarAsignacion(Long proyecto,Long actor,CambioAsignacion request) {
+        return guardarAsignacion(proyecto,actor,request,false);
+    }
+
+    // El CRUD de lotes ya tiene la transacción y el bloqueo del proyecto.
+    Respuesta guardarAsignacion(Long proyecto,Long actor,CambioAsignacion request,boolean recalcular) {
         var anterior=bloquearGestion(proyecto,request.revision());
         var config=configuracion.obtener(proyecto);
         var d=config.datos();
@@ -274,7 +279,7 @@ public class PublicacionComercialService {
             String vieja=etapaDe(config,l),nueva=etapaDe(destino,l);
             if(nueva==null)throw new ReglaNegocioException("El lote "+l.codigo()+" quedaría sin etapa comercial.");
             if(regla!=null&&!Objects.equals(vieja,regla.etapa()))throw new ReglaNegocioException("El lote "+l.codigo()+" no tiene una regla coherente con su asignación actual.");
-            if(regla!=null&&Objects.equals(vieja,nueva))continue;
+            if(regla!=null&&Objects.equals(vieja,nueva)&&!recalcular)continue;
             var parcela=lotes.findById(l.id()).orElseThrow(()->new ConflictoNegocioException("El inventario cambió."));
             var r=simulacion.evaluar(destino,parcela,"PEN",ahora,candidatos);
             if(!"SIMULADO".equals(r.resultado())||!precioValido(r)||!nueva.equals(r.codigoEtapa()))

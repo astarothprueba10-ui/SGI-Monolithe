@@ -173,6 +173,11 @@ public class LoteService {
 
     @Transactional
     public LoteResponse actualizar(Long idLote, LoteRequest request) {
+        return actualizarComercial(idLote,request,false);
+    }
+
+    // Solo el servicio comercial transaccional puede recalcular una tarifa junto con los cambios físicos.
+    LoteResponse actualizarComercial(Long idLote,LoteRequest request,boolean recalcular){
         Lote lote = obtenerLote(idLote);
         Manzana manzanaDestino = obtenerManzanaActiva(request.idManzana());
         Long idProyectoDestino = manzanaDestino.getEtapa().getProyecto().getIdProyecto();
@@ -185,7 +190,7 @@ public class LoteService {
         if(!java.util.Objects.equals(lote.getManzana().getIdManzana(),manzanaDestino.getIdManzana())||!java.util.Objects.equals(lote.getZona()==null?null:lote.getZona().getIdZona(),request.idZona()))
             validarZonaManzana(manzanaDestino.getIdManzana(),request.idZona());
         TipoLote tipo = obtenerTipoActivo(request.codigoTipoLote());
-        validarCambiosConPrecioActivo(lote, request, zona, tipo);
+        if(!recalcular)validarCambiosConPrecioActivo(lote, request, zona, tipo);
 
         EstadoLote estadoActual = lote.getEstadoLote();
         String codigoEstadoSolicitado = normalizarCodigo(request.codigoEstadoLote());

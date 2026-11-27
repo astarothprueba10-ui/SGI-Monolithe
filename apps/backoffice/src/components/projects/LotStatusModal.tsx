@@ -120,7 +120,7 @@ export function LotStatusModal({
   const isSold = lot.codigoEstadoLote === 'VENDIDO';
 
   return (
-    <Modal open={open} onClose={onClose} title="Estado del Lote" width="max-w-2xl">
+    <Modal open={open} onClose={onClose} title="Historial del lote" width="max-w-2xl">
       <div className="space-y-6">
         <div className="bg-gray-50 p-4 rounded-md">
           <p className="text-sm text-gray-700 font-medium">Lote: {lot.codigo} {lot.numero ? `- ${lot.numero}` : ''}</p>
