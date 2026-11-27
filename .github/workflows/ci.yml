@@ -388,6 +388,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/migrations/125_planos_cad_storage_v1.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_cad_storage_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/126_planos_grants_core_service_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/155_planos_eliminar_archivos_v1.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/plano_cad_eliminacion_v1_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/plano_core_grants_v1_pg_test.sql
 
   separaciones-acumuladas-postgres:
