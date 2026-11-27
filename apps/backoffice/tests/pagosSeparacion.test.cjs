@@ -53,5 +53,5 @@ test('el formulario conserva la auditoría de cambios y precarga interés sin re
  assert.match(panel,/p\.metodo==='EFECTIVO'\?'\(opcional\)':'\*'/);
  assert.match(read('utils/constanciaEfectivo.tsx'),/No es un comprobante bancario, recibo de caja ni acredita la recepción del dinero/);
  assert.doesNotMatch(sales,/Condiciones contractuales verificadas · Versión/);
- assert.match(sales,/formalizacionMultiple=tieneReservasVenta && !asociacionAgrupadaPendiente/);
+ assert.match(sales,/formalizacionMultiple=opType==='Venta'&&!asociacionAgrupadaPendiente&&\(tieneReservasVenta\|\|ventaDirectos\.length>0\)/);
 });
