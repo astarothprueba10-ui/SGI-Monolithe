@@ -318,6 +318,7 @@ export function Sales() {
   const [ventaDirectos,setVentaDirectos]=useState<LoteResponse[]>([]);
   const [ventaCandidato,setVentaCandidato]=useState('');
   const [editorVentaAdicional,setEditorVentaAdicional]=useState(false);
+  useEffect(()=>{setVentaCandidato('');setEditorVentaAdicional(false);},[formProjectId]);
   const [lotesVentaProyecto,setLotesVentaProyecto]=useState<LoteResponse[]>([]);
   const formalizacionMultiple=opType==='Venta'&&!asociacionAgrupadaPendiente&&(tieneReservasVenta||ventaDirectos.length>0);
   const reservaSeleccionada=reservasVigentes.find(r=>r.idLote===Number(formLotId));
@@ -1395,7 +1396,7 @@ export function Sales() {
     Boolean(tieneReservasVenta||ventaDirectos.length||ventaPrincipalDisponible)&&cantidadVenta<20;
   const agregarDirectoVenta=()=>{
     const candidato=candidatosVenta.find(l=>l.idLote===Number(ventaCandidato));
-    if(!candidato||!puedeAgregarVenta||submitting||loadingLots)return;
+    if(!candidato||!puedeAgregarVenta||submitting||loadingLots||editorInteres||editorAsesor)return;
     setVentaDirectos(prev=>[...(!prev.length&&!tieneReservasVenta&&ventaPrincipalDisponible?[ventaPrincipalDisponible]:prev),candidato]);
     setVentaCandidato('');setEditorVentaAdicional(false);consultarUbicacion(candidato.idLote);
   };
@@ -2743,7 +2744,7 @@ export function Sales() {
                     </label>
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button type="button" variant="secondary" onClick={()=>{setVentaCandidato('');setEditorVentaAdicional(false);}}>Cancelar</Button>
-                      <Button type="button" disabled={!ventaCandidato||!puedeAgregarVenta||loadingLots||submitting} onClick={agregarDirectoVenta}>Añadir lote</Button>
+                      <Button type="button" disabled={!candidatosVenta.some(l=>l.idLote===Number(ventaCandidato))||!puedeAgregarVenta||loadingLots||submitting||editorInteres||editorAsesor} onClick={agregarDirectoVenta}>Añadir lote</Button>
                     </div>
                   </div>}
               </div>}
