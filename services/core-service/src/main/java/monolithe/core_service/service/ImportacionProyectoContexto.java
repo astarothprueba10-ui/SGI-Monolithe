@@ -15,7 +15,6 @@ final class ImportacionProyectoContexto {
     final Set<String> tiposLote;
     final Set<String> clavesArchivo = new HashSet<>();
     final Set<String> numerosArchivo = new HashSet<>();
-    final Set<String> numerosProyectoArchivo = new HashSet<>();
     ImportacionProyectoContexto(ImportacionProyectoRepository repo, Long proyecto) {
         repo.etapas(proyecto).forEach(r -> etapas.put(r.codigo(), r));
         repo.zonas(proyecto).forEach(r -> zonas.put(r.codigo(), r));

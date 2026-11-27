@@ -85,18 +85,14 @@ class ImportacionProyectoServiceTest {
     }
 
     @Test
-    void losCocosDetectaNumeroOcupadoYRepetidoEntreManzanasAntesDeConfirmar() {
+    void permiteNumerosIgualesEnManzanasDistintasPeroNoEnLaMisma() {
         when(repo.manzanas(2L)).thenReturn(List.of(
             new Referencia(12L,"ET-01"+(char)31+"M-A",true),
             new Referencia(13L,"ET-01"+(char)31+"M-B",true)));
         when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L,"Z-A",true)));
-        when(repo.numeroActivoEnProyecto(2L,"01")).thenReturn(true);
-        var filas = List.of(loteCocos(2,"M-A","01"), loteCocos(3,"M-B","01"), loteCocos(4,"M-B","76"));
+        var filas = List.of(loteCocos(2,"M-A","01"), loteCocos(3,"M-B","01"), loteCocos(4,"M-B","01"));
         var previo = service.previsualizar(2L, solicitud(filas,null));
-        assertTrue(previo.filas().stream().allMatch(f -> f.estado().equals("ERROR")));
-        assertTrue(previo.filas().get(0).mensaje().contains("ya pertenece"));
-        assertTrue(previo.filas().get(1).mensaje().contains("repetido"));
-        assertTrue(previo.filas().get(2).mensaje().contains("01 al 75"));
+        assertEquals(List.of("NUEVO","NUEVO","ERROR"),previo.filas().stream().map(f->f.estado()).toList());
         assertThrows(ReglaNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()),1L));
         verifyNoInteractions(etapas, zonas, manzanas, lotes);
     }

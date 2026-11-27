@@ -16,8 +16,6 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ImportacionProyectoService {
-    // Restricción preexistente de inventario de Los Cocos en PostgreSQL.
-    private static final long PROYECTO_LOS_COCOS = 2L;
     private static final List<String> ORDEN = List.of("EtapasFisicas", "Zonas", "Manzanas", "Lotes", "EtapasComerciales", "AsignacionManzanas", "AsignacionLotes", "Tarifas");
     private final ImportacionProyectoRepository repo;
     private final ProyectoRepository proyectos;
@@ -190,13 +188,6 @@ public class ImportacionProyectoService {
         c.catalogo(c.tiposLote, f.codigo("codigo_tipo_lote"));
         validar(f.lote(1L, 1L));
         String numero = f.codigo("numero");
-        boolean losCocos = id.equals(PROYECTO_LOS_COCOS);
-        if (losCocos) {
-            if (!numero.matches("0[1-9]|[1-6][0-9]|7[0-5]"))
-                ImportacionProyectoFila.error("Los Cocos requiere números de lote del 01 al 75.");
-            if (!c.numerosProyectoArchivo.add(numero))
-                ImportacionProyectoFila.error("Número " + numero + " repetido en el proyecto Los Cocos. La numeración no se reinicia por manzana.");
-        }
         var existentes = repo.lote(f.codigo("codigo"));
         if (!existentes.isEmpty()) {
             var lote = existentes.getFirst();
@@ -206,8 +197,6 @@ public class ImportacionProyectoService {
             }
             ImportacionProyectoFila.error("Código de lote existente con otra ubicación o proyecto.");
         }
-        if (losCocos && repo.numeroActivoEnProyecto(id, numero))
-            ImportacionProyectoFila.error("El número " + numero + " ya pertenece a un lote activo de Los Cocos. Revisa el inventario existente antes de importar.");
         if (manzana.id() > 0 && repo.numeroExiste(manzana.id(), f.codigo("numero"))) ImportacionProyectoFila.error("Número de lote ya registrado con otro código.");
         c.nueva(c.lotes, f.codigo("codigo"));
         return true;
