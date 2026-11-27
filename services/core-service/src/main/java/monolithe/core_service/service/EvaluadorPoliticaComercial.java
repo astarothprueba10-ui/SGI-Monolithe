@@ -24,7 +24,10 @@ public final class EvaluadorPoliticaComercial {
             return error(codigo, etapa.disponibilidad(), "BLOQUEADA", "La etapa está bloqueada en el borrador.");
         List<Tarifa> tarifas = datos.tarifas().stream().filter(t -> coincide(t, lote, codigo, moneda, fecha)).toList();
         if (tarifas.size() != 1)
-            return error(codigo, etapa.disponibilidad(), "SIN_TARIFA", "No existe exactamente una tarifa vigente para lote, etapa y moneda.");
+            return error(codigo, etapa.disponibilidad(), "SIN_TARIFA", lote.zona() == null
+                ? "El lote no tiene una zona activa. Corrige su zona en Lotes."
+                : "Etapa " + codigo + ", zona " + lote.zona() + ", moneda " + moneda + ": "
+                    + (tarifas.isEmpty() ? "falta una tarifa vigente. Revisa la matriz de tarifas." : "hay varias tarifas vigentes. Revisa la matriz de tarifas."));
         if (ajustes.size() > 1)
             return error(codigo, etapa.disponibilidad(), "AJUSTE_AMBIGUO", "Hay varios ajustes de tipo aplicables; define uno antes de publicar.");
         return calcular(lote, etapa, tarifas.getFirst(), moneda, ajustes);

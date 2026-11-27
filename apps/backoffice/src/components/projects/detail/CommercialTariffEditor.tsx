@@ -6,11 +6,11 @@ import { admiteMatrizRecargos, aplicarVigenciaTarifas, calcularMatrizTarifas, co
   tarifaDeZona, actualizarTarifa, vigenciaValida } from '../../../lib/projectTariffMatrix';
 import type { ConfiguracionComercial, ConfiguracionProyectoResponse, TarifaComercial } from '../../../types/projectConfiguration';
 
-type Props = { datos: ConfiguracionComercial; catalogos: ConfiguracionProyectoResponse; onChange: (datos: ConfiguracionComercial) => void };
+type Props = { datos: ConfiguracionComercial; catalogos: ConfiguracionProyectoResponse; onChange: (datos: ConfiguracionComercial) => void; readOnly?: boolean };
 const dinero = (n: number, moneda: string) => new Intl.NumberFormat('es-PE',
   { style: 'currency', currency: moneda }).format(n);
 
-export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
+export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = false }: Props) {
   const [etapa, setEtapa] = useState(datos.etapas[0]?.codigo ?? '');
   const [moneda, setMoneda] = useState(catalogos.monedas.includes('PEN') ? 'PEN' : catalogos.monedas[0] ?? '');
   const [desde, setDesde] = useState('');
@@ -103,6 +103,22 @@ export function CommercialTariffEditor({ datos, catalogos, onChange }: Props) {
       setError(e instanceof Error ? e.message : 'No se pudo generar la matriz.');
     }
   }
+
+  if (readOnly) return <section className="space-y-4">
+    <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
+    <p className="text-sm text-brand-600">Consulta las tarifas de la configuración publicada. Los cambios de precios vigentes requieren una operación independiente, sin republicar.</p>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div><FieldLabel>Etapa comercial</FieldLabel><Select value={etapa} onChange={e => setEtapa(e.target.value)}>{datos.etapas.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
+      <div><FieldLabel>Moneda</FieldLabel><Select value={moneda} onChange={e => setMoneda(e.target.value)}>{catalogos.monedas.map(m => <option key={m} value={m}>{m}</option>)}</Select></div>
+    </div>
+    <div className="overflow-auto rounded-lg border border-brand-200"><table className="w-full text-left text-sm">
+      <thead className="bg-brand-50"><tr>{['Zona','Tarifa','Modalidad','Vigencia'].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
+      <tbody>{catalogos.zonas.map(z => { const t = tarifaDeZona(tarifas, etapa, moneda, z); return <tr key={z} className="border-t border-brand-100">
+        <td className="p-3">{z}</td><td className="p-3">{t ? dinero(t.valor, moneda) : 'Sin tarifa'}</td>
+        <td className="p-3">{t ? t.tipoTarifa === 'POR_M2' ? 'Por m²' : 'Por lote' : '—'}</td>
+        <td className="p-3">{t ? t.vigenteDesde + ' — ' + (t.vigenteHasta ?? 'Sin fin') : '—'}</td></tr>; })}</tbody>
+    </table></div>
+  </section>;
 
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">

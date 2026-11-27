@@ -46,7 +46,7 @@ test('la publicación utiliza liberación por etapa y muestra el cambio de inven
   const service = archivo('services/projectConfigurationService.ts');
   assert.match(ui,/<CommercialStageReleaseSelector/);
   assert.match(ui,/etapasHabilitar/);
-  assert.match(ui,/Se habilitarán ahora/);
+  assert.match(ui,/Lotes que se habilitarán/);
   assert.doesNotMatch(ui,/Preparar nueva versión de publicación/);
   assert.match(ui,/publicada === 0 && config.version > 0/);
   assert.match(selector,/Ninguna etapa se libera automáticamente/);
@@ -58,7 +58,8 @@ test('la configuración publicada oculta importación y no permite guardar otro 
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   const hook = archivo('hooks/useProjectConfiguration.ts');
   assert.match(ui, /const esPublicado = publicada > 0/);
-  assert.match(ui, /SECCIONES\.filter\(s => importacionPermitida \|\| s\.id !== 'excel'\)/);
+  assert.match(ui, /const secciones = SECCIONES;/);
+  assert.match(ui, /disabled=\{seccionCerrada\(id\)\}/);
   assert.match(ui, /const bloqueado = guardando \|\| !project\.activo \|\| esPublicado/);
   assert.match(hook, /projectConfigurationService\.versionPublicada\(idProyecto\)/);
   assert.match(hook, /guardando \|\| publicada !== 0/);
@@ -98,4 +99,15 @@ test('el alta comercial separa precio de liberación y conserva bloqueos histór
 test('la carga masiva se oculta desde diez lotes registrados', () => {
  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
  assert.match(ui,/!esPublicado && lotesRegistrados < 10/);
+});
+
+test('mantiene cinco secciones y permite consultar matriz publicada', () => {
+ const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+ const matriz = archivo('components/projects/detail/CommercialTariffEditor.tsx');
+ const pub = archivo('components/projects/detail/CommercialPublicationPanel.tsx');
+ assert.match(ui,/esPublicado && \(id === 'etapas' \|\| id === 'asignaciones'\)/);
+ assert.match(ui,/readOnly=\{esPublicado\}/);
+ assert.match(matriz,/if \(readOnly\) return/);
+ assert.match(pub,/Ver detalle por lote \(opcional\)/);
+ assert.match(pub,/Revisar matriz de tarifas/);
 });

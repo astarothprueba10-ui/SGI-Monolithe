@@ -13,6 +13,7 @@ type Props = {
   config: ConfiguracionProyectoResponse;
   dirty: boolean;
   onPublished: () => void;
+  onReviewTariffs: () => void;
 };
 
 const moneda = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -24,15 +25,16 @@ const etiquetas = {
   ERROR: 'Error de validación'
 };
 
-function Resumen({ r }: { r: PublicacionComercialResponse }) {
+function Resumen({ r, onReviewTariffs }: { r: PublicacionComercialResponse; onReviewTariffs: () => void }) {
   const contadores = resumirPublicacion(r.lotes);
   const errores = r.lotes.filter(l => l.situacion === 'ERROR');
+  const grupos = new Map<string, typeof errores>();
+  errores.forEach(l => grupos.set(l.mensaje, [...(grupos.get(l.mensaje) ?? []), l]));
   const noAsignados = r.lotes.filter(l => l.situacion === 'BLOQUEADA' && !l.codigoEtapa);
   const resumen = [
     { titulo: 'Precios preparados', valor: contadores.preciosPreparados },
-    { titulo: 'Se habilitarán ahora', valor: contadores.habilitarInventario },
-    { titulo: 'Seguirán sin habilitar', valor: contadores.sinHabilitar },
-    { titulo: 'Bloqueados comercialmente', valor: contadores.bloqueados },
+    { titulo: 'Lotes que se habilitarán', valor: contadores.habilitarInventario },
+    { titulo: 'Lotes que se cerrarán', valor: r.lotes.filter(l => l.bloquearInventario).length },
     { titulo: 'Operaciones protegidas', valor: contadores.protegidos },
     { titulo: 'Errores', valor: contadores.errores }
   ];
@@ -49,15 +51,18 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
     {errores.length > 0 && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
       <p className="font-semibold">Publicación detenida: {errores.length} lote(s) requieren corrección.</p>
       <ul className="mt-2 list-disc space-y-1 pl-5">
-        {errores.map(l => <li key={l.idLote}><strong>{l.codigo}</strong>: {l.mensaje}</li>)}
+        {[...grupos.entries()].map(([mensaje, filas]) => <li key={mensaje}><strong>{filas.length} lote(s)</strong>: {mensaje}
+          <details className="mt-1"><summary className="cursor-pointer">Ver lotes afectados</summary><p>{filas.map(f => f.codigo).join(', ')}</p></details></li>)}
       </ul>
+      <Button size="sm" onClick={onReviewTariffs}>Revisar matriz de tarifas</Button>
     </div>}
     {noAsignados.length > 0 && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
       <p className="font-semibold">{noAsignados.length} lote(s) sin etapa comercial quedarán bloqueados comercialmente.</p>
       <p className="mt-1">No podrán separarse ni venderse. Los disponibles pasarán a no habilitado.</p>
       <p className="mt-1 font-medium">{noAsignados.map(l => l.codigo).join(', ')}</p>
     </div>}
-    <div className="max-h-96 overflow-auto rounded-md border border-brand-200">
+    <details className="rounded-md border border-brand-200 p-3"><summary className="cursor-pointer text-sm font-semibold">Ver detalle por lote (opcional)</summary>
+    <div className="mt-3 max-h-96 overflow-auto rounded-md border border-brand-200">
       <table className="min-w-[950px] w-full text-xs text-left">
         <thead className="sticky top-0 bg-brand-50 text-brand-900"><tr>
           {['Lote','Inventario actual','Etapa comercial','Política','Cambio en inventario','Precio actual','Precio final','Descuento','Detalle'].map(h=>
@@ -77,11 +82,11 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
           <td className="p-2">{l.mensaje}{l.vigenteHasta ? ` Vigente hasta ${l.vigenteHasta}.` : ''}</td>
         </tr>)}</tbody>
       </table>
-    </div>
+    </div></details>
   </div>;
 }
 
-export function CommercialPublicationPanel({ project, config, dirty, onPublished }: Props) {
+export function CommercialPublicationPanel({ project, config, dirty, onPublished, onReviewTariffs }: Props) {
   const { can } = useAuth();
   const [publicada, setPublicada] = useState<number | null>(null);
   const [etapasHabilitar, setEtapasHabilitar] = useState<string[]>(() => seleccionInicial(config));
@@ -177,7 +182,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPublished
     </Button>}
 
     {resultado && !dirty && <>
-      <Resumen r={resultado}/>
+      <Resumen r={resultado} onReviewTariffs={onReviewTariffs}/>
       {resultado.publicado
         ? <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
             Política v{resultado.version} publicada. Los precios y las habilitaciones seleccionadas están vigentes.
@@ -188,7 +193,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPublished
               disabled={!puede || resultado.lotes.some(l => l.situacion === 'ERROR')}
               onChange={e => setAceptado(e.target.checked)}/>
             Confirmo los precios y restricciones revisados y la liberación exclusivamente de los lotes indicados
-            en «Se habilitarán ahora», y el cierre de los lotes indicados. Las operaciones protegidas se conservan.
+            en la revisión. Las operaciones protegidas se conservan.
           </label>
           <Button variant="primary" disabled={!puede || !aceptado
             || resultado.lotes.some(l => l.situacion === 'ERROR')}

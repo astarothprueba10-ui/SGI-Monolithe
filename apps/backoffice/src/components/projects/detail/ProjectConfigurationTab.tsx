@@ -35,8 +35,10 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   const esPublicado = publicada > 0;
   const bloqueado = guardando || !project.activo || esPublicado;
   const importacionPermitida = !esPublicado && lotesRegistrados < 10;
-  const seccionVisible = !importacionPermitida && seccion === 'excel' ? 'etapas' : seccion;
-  const secciones = SECCIONES.filter(s => importacionPermitida || s.id !== 'excel');
+  const seccionCerrada = (id: Seccion) => (id === 'excel' && !importacionPermitida)
+    || (esPublicado && (id === 'etapas' || id === 'asignaciones'));
+  const seccionVisible = seccionCerrada(seccion) ? (esPublicado ? 'publicacion' : 'etapas') : seccion;
+  const secciones = SECCIONES;
 
   function importado() {
     model.recargar();
@@ -45,6 +47,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   }
 
   function navegar(id: Seccion) {
+    if (seccionCerrada(id)) return;
     setSeccion(id);
     setImportacionReciente(false);
   }
@@ -56,7 +59,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
         <p className="text-sm text-brand-600">{esPublicado ? 'Proyecto publicado' : `Borrador ${respuesta.version ? `v${respuesta.version}` : 'sin guardar'}`}
           {' · '}{respuesta.lotes.length} lotes{' · '}{datos.etapas.length} etapas comerciales
           {' · '}{(datos.tarifas ?? []).length} tarifas</p>
-        <p className="text-xs text-brand-500">{esPublicado ? 'Configuración inicial cerrada. Realiza ajustes mediante los CRUD.' : 'Revisa las etapas, asignaciones y tarifas antes de publicar.'}</p>
+        <p className="text-xs text-brand-500">{esPublicado ? 'Configuración inicial cerrada. Consulta la matriz de tarifas y la publicación.' : 'Revisa las etapas, asignaciones y tarifas antes de publicar.'}</p>
       </div>
       {!esPublicado && <div className="flex items-center gap-2">
         {hayCambios && <span className="text-xs text-amber-800">Cambios sin guardar</span>}
@@ -73,8 +76,9 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
     <nav aria-label="Secciones de configuración comercial" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
       {secciones.map(({ id, nombre, icono: Icono }) =>
         <button key={id} type="button" aria-current={seccionVisible === id ? 'page' : undefined}
+          disabled={seccionCerrada(id)} title={seccionCerrada(id) ? 'Configuración inicial cerrada' : undefined}
           onClick={() => navegar(id)}
-          className={`flex min-h-12 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${seccionVisible === id
+          className={`flex min-h-12 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${seccionCerrada(id) ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400' : seccionVisible === id
             ? 'border-[#4cbb17] bg-[#4cbb17]/10 text-brand-900 shadow-sm'
             : 'border-brand-200 bg-white text-brand-600 hover:bg-brand-50'}`}>
           <Icono className="h-4 w-4 shrink-0" aria-hidden="true"/>{nombre}
@@ -99,11 +103,11 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       {seccionVisible === 'asignaciones' && <fieldset disabled={bloqueado}>
         <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
       </fieldset>}
-      {seccionVisible === 'tarifas' && <fieldset disabled={bloqueado}>
-        <CommercialTariffEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
+      {seccionVisible === 'tarifas' && <fieldset disabled={guardando || !project.activo}>
+        <CommercialTariffEditor datos={datos} catalogos={respuesta} readOnly={esPublicado} onChange={model.setDatos}/>
       </fieldset>}
       {seccionVisible === 'publicacion' && <CommercialPublicationPanel project={project}
-        config={respuesta} dirty={hayCambios || guardando} onPublished={model.recargar}/>}
+        config={respuesta} dirty={hayCambios || guardando} onPublished={model.recargar} onReviewTariffs={() => navegar('tarifas')}/>}
     </div>
     <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-600">
       {esPublicado ? 'La importación masiva y las nuevas publicaciones están cerradas. La configuración inicial se conserva como referencia histórica.' : 'La importación y los cambios manuales preparan un borrador. Solo «Publicación» aplica la configuración inicial.'}
