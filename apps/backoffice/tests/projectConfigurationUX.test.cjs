@@ -8,8 +8,8 @@ function archivo(path) { return readFileSync(resolve(root,path), 'utf8'); }
 test('el panel elimina el simulador y conserva la navegación por secciones', () => {
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   assert.doesNotMatch(ui,/CommercialSimulationPanel|CalculatorIcon|Ir al simulador/);
-  assert.match(ui,/seccionVisible === 'tarifas' && <fieldset/);
-  assert.match(ui,/seccionVisible === 'excel' && importacionPermitida && <ProjectImportPreparation/);
+  assert.match(ui,/paso === 3 && <fieldset/);
+  assert.match(ui,/importacionPermitida \? <ProjectImportPreparation/);
 });
 
 test('tras confirmar importación el formulario recarga catálogos automáticamente', () => {
@@ -44,11 +44,11 @@ test('la publicación utiliza liberación por etapa y muestra el cambio de inven
   const ui = archivo('components/projects/detail/CommercialPublicationPanel.tsx');
   const selector = archivo('components/projects/detail/CommercialStageReleaseSelector.tsx');
   const service = archivo('services/projectConfigurationService.ts');
-  assert.match(ui,/<CommercialStageReleaseSelector/);
+  assert.match(archivo('components/projects/detail/ProjectConfigurationTab.tsx'),/<CommercialStageReleaseSelector/);
   assert.match(ui,/etapasHabilitar/);
   assert.match(ui,/Lotes que se habilitarán/);
   assert.doesNotMatch(ui,/Preparar nueva versión de publicación/);
-  assert.match(ui,/publicada === 0 && config.version > 0/);
+  assert.match(ui,/config.version > 0/);
   assert.match(selector,/Ninguna etapa se libera automáticamente/);
   assert.match(service,/\{ version, etapasHabilitar \}/);
   assert.doesNotMatch(service,/habilitarNoDisponibles/);
@@ -57,10 +57,10 @@ test('la publicación utiliza liberación por etapa y muestra el cambio de inven
 test('la configuración publicada oculta importación y no permite guardar otro borrador', () => {
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   const hook = archivo('hooks/useProjectConfiguration.ts');
-  assert.match(ui, /const esPublicado = publicada > 0/);
-  assert.match(ui, /const secciones = SECCIONES;/);
-  assert.match(ui, /disabled=\{seccionCerrada\(id\)\}/);
-  assert.match(ui, /const bloqueado = guardando \|\| !project\.activo \|\| esPublicado/);
+  assert.match(ui, /publicada > 0\) return <CommercialManagementPanel/);
+  const gestion = archivo('components/projects/detail/CommercialManagementPanel.tsx');
+  assert.match(gestion,/Importar Excel.*Etapas iniciales.*Asignaciones iniciales/);
+  assert.doesNotMatch(gestion,/ProjectImportPreparation|CommercialPublicationPanel/);
   assert.match(hook, /projectConfigurationService\.versionPublicada\(idProyecto\)/);
   assert.match(hook, /guardando \|\| publicada !== 0/);
 });
@@ -96,9 +96,9 @@ test('el alta comercial separa precio de liberación y conserva bloqueos histór
   assert.match(plantilla,/\['PROMOCION', 'REGULAR'\]/);
 });
 
-test('la carga masiva se oculta desde diez lotes registrados', () => {
+test('la carga masiva se bloquea desde diez lotes registrados', () => {
  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
- assert.match(ui,/!esPublicado && lotesRegistrados < 10/);
+ assert.match(ui,/lotesRegistrados < 10 && !importadoSesion/);
 });
 
 test('mantiene cinco secciones y permite consultar matriz publicada', () => {
@@ -110,4 +110,25 @@ test('mantiene cinco secciones y permite consultar matriz publicada', () => {
  assert.match(matriz,/if \(readOnly\) return/);
  assert.match(pub,/Ver detalle por lote \(opcional\)/);
  assert.match(pub,/Revisar matriz de tarifas/);
+});
+
+test('el asistente no permite saltar pasos y valida precios en el servidor antes de disponibilidad', () => {
+  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+  assert.match(ui,/disabled=\{ocupado \|\| i >= paso\}/);
+  assert.match(ui,/validarPasoInicial\(paso, config\)/);
+  assert.match(ui,/await model\.guardarYObtener\(\)/);
+  assert.match(ui,/revisarPublicacion\(project.idProyecto, guardada.version, \[\]\)/);
+  assert.match(ui,/if \(grupos.length\) \{[\s\S]*?return;/);
+  assert.match(ui,/etapasSeleccionadas=\{etapasHabilitar\}/);
+});
+test('los pasos detectan lotes sin asignación y agrupan incidencias sin duplicarlas por fila', () => {
+  const { validarPasoInicial, agruparIncidencias, filtrarSeleccion } = require('../src/lib/projectSetupWizard.ts');
+  const config = { datos: { etapas:[{codigo:'E1',nombre:'Etapa 1',disponibilidad:'REGULAR',tipoDescuento:'NINGUNO',descuento:0}], manzanas:[{id:10,codigoEtapa:'E1'}], lotes:[], tarifas:[] },
+    lotes:[{id:1,idManzana:10,codigo:'L1',estadoInventario:'DISPONIBLE'},{id:2,idManzana:20,codigo:'L2',estadoInventario:'DISPONIBLE'},{id:3,idManzana:20,codigo:'L3',estadoInventario:'VENDIDO'}] };
+  assert.equal(validarPasoInicial(1,config),null);
+  assert.match(validarPasoInicial(2,config),/1 lote.*L2/);
+  config.datos.lotes.push({id:2,codigoEtapa:'E1'});
+  assert.equal(validarPasoInicial(2,config),null);
+  assert.deepEqual(filtrarSeleccion(['E1','E1','NO'],config),['E1']);
+  assert.deepEqual(agruparIncidencias([{situacion:'ERROR',mensaje:'Falta tarifa',codigo:'L1'},{situacion:'ERROR',mensaje:'Falta tarifa',codigo:'L2'},{situacion:'PROTEGIDA',mensaje:'Venta',codigo:'L3'}]),[{mensaje:'Falta tarifa',lotes:['L1','L2']}]);
 });

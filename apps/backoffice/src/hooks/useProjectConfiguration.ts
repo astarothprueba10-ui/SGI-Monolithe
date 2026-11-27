@@ -24,22 +24,26 @@ export function useProjectConfiguration(idProyecto: number) {
     return () => { vigente = false; };
   }, [idProyecto, intento]);
 
-  async function guardar(nuevosDatos: ConfiguracionComercial | null = datos, propagarError = false): Promise<boolean> {
-    if (!datos || !respuesta || guardando || publicada !== 0 || !nuevosDatos) return false;
+  async function guardarYObtener(nuevosDatos: ConfiguracionComercial | null = datos, propagarError = false): Promise<ConfiguracionProyectoResponse | null> {
+    if (!datos || !respuesta || guardando || publicada !== 0 || !nuevosDatos) return null;
     const fallo = validarConfiguracion(nuevosDatos);
-    if (fallo) { setError(fallo); if (propagarError) throw new Error(fallo); return false; }
+    if (fallo) { setError(fallo); if (propagarError) throw new Error(fallo); return null; }
     setGuardando(true); setError('');
     try {
       const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, nuevosDatos);
       setRespuesta(r); setDatos(r.datos);
       toast.success(`Borrador comercial v${r.version} guardado.`);
-      return true;
+      return r;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el borrador.');
       if (propagarError) throw e;
-      return false;
+      return null;
     } finally { setGuardando(false); }
   }
 
-  return { respuesta, publicada, lotesRegistrados, datos, setDatos, error, guardando, guardar, recargar: () => setIntento(n => n + 1) };
+  async function guardar(nuevosDatos: ConfiguracionComercial | null = datos, propagarError = false): Promise<boolean> {
+    return (await guardarYObtener(nuevosDatos, propagarError)) !== null;
+  }
+
+  return { respuesta, publicada, lotesRegistrados, datos, setDatos, error, guardando, guardar, guardarYObtener, recargar: () => setIntento(n => n + 1) };
 }

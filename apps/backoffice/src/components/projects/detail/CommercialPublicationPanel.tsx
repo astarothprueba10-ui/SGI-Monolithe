@@ -3,8 +3,7 @@ import { ShieldCheckIcon } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
-import { estadoInventarioLegible, resumirPublicacion, seleccionInicial } from '../../../lib/commercialPresentation';
-import { CommercialStageReleaseSelector } from './CommercialStageReleaseSelector';
+import { estadoInventarioLegible, resumirPublicacion } from '../../../lib/commercialPresentation';
 import type { ConfiguracionProyectoResponse, PublicacionComercialResponse } from '../../../types/projectConfiguration';
 import type { ProyectoResponse } from '../../../types/core';
 
@@ -14,6 +13,8 @@ type Props = {
   dirty: boolean;
   onPublished: () => void;
   onReviewTariffs: () => void;
+  etapasSeleccionadas: string[];
+  onBusyChange: (busy: boolean) => void;
 };
 
 const moneda = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -86,121 +87,59 @@ function Resumen({ r, onReviewTariffs }: { r: PublicacionComercialResponse; onRe
   </div>;
 }
 
-export function CommercialPublicationPanel({ project, config, dirty, onPublished, onReviewTariffs }: Props) {
+export function CommercialPublicationPanel({ project, config, dirty, onPublished, onReviewTariffs, etapasSeleccionadas, onBusyChange }: Props) {
   const { can } = useAuth();
-  const [publicada, setPublicada] = useState<number | null>(null);
-  const [etapasHabilitar, setEtapasHabilitar] = useState<string[]>(() => seleccionInicial(config));
   const [resultado, setResultado] = useState<PublicacionComercialResponse | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [aceptado, setAceptado] = useState(false);
   const [error, setError] = useState('');
   const [intento, setIntento] = useState(0);
-  const puede = can('lots.edit') && project.activo && !dirty
-    && publicada === 0 && config.version > 0 && !ocupado;
+  const puedeConsultar = can('lots.edit') && project.activo && !dirty && config.version > 0;
+  const claveSeleccion = JSON.stringify([...etapasSeleccionadas].sort());
+  const puede = puedeConsultar && !ocupado;
 
   useEffect(() => {
-    let activo = true;
-    setPublicada(null);
-    projectConfigurationService.versionPublicada(project.idProyecto)
-      .then(r => { if (activo) setPublicada(r.version); })
-      .catch((e: unknown) => {
-        if (activo) setError(e instanceof Error ? e.message : 'No se pudo consultar la publicación.');
-      });
-    return () => { activo = false; };
-  }, [project.idProyecto, intento]);
-
-  function cambiarEtapa(codigo: string, marcada: boolean) {
-    setEtapasHabilitar(prev => marcada
-      ? [...prev.filter(x => x !== codigo), codigo]
-      : prev.filter(x => x !== codigo));
-    setResultado(null);
-    setAceptado(false);
-  }
-
-  async function revisar() {
-    if (!puede) return;
-    setOcupado(true);
-    setError('');
-    setResultado(null);
-    setAceptado(false);
-    try {
-      setResultado(await projectConfigurationService.revisarPublicacion(
-        project.idProyecto, config.version, etapasHabilitar));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'No se pudo revisar.');
-    } finally { setOcupado(false); }
-  }
+    if (!puedeConsultar) return;
+    let vigente = true;
+    setOcupado(true); onBusyChange(true); setError(''); setResultado(null); setAceptado(false);
+    const etapasHabilitar: string[] = JSON.parse(claveSeleccion);
+    projectConfigurationService.revisarPublicacion(project.idProyecto, config.version, etapasHabilitar)
+      .then(r => { if (vigente) setResultado(r); })
+      .catch((e: unknown) => { if (vigente) setError(e instanceof Error ? e.message : 'No se pudo revisar la configuración.'); })
+      .finally(() => { if (vigente) { setOcupado(false); onBusyChange(false); } });
+    return () => { vigente = false; onBusyChange(false); };
+  }, [project.idProyecto, config.version, claveSeleccion, puedeConsultar, intento, onBusyChange]);
 
   async function publicar() {
-    if (!puede || !aceptado || !resultado || resultado.publicado
-      || resultado.lotes.some(l => l.situacion === 'ERROR')) return;
-    setOcupado(true);
-    setError('');
+    if (!puede || !aceptado || !resultado || resultado.publicado || resultado.lotes.some(l => l.situacion === 'ERROR')) return;
+    setOcupado(true); onBusyChange(true); setError('');
     try {
-      const r = await projectConfigurationService.publicar(
-        project.idProyecto, config.version, etapasHabilitar, resultado.huella);
-      setResultado(r);
-      setPublicada(r.versionPublicada);
-      onPublished();
+      const r = await projectConfigurationService.publicar(project.idProyecto, config.version, etapasSeleccionadas, resultado.huella);
+      setResultado(r); onPublished();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'No se pudo publicar.');
-      setResultado(null);
-    } finally {
-      setOcupado(false);
-      setAceptado(false);
-    }
+      setError(e instanceof Error ? e.message : 'No se pudo finalizar la configuración.'); setResultado(null);
+    } finally { setOcupado(false); onBusyChange(false); setAceptado(false); }
   }
 
   return <section className="space-y-4 rounded-lg border border-brand-200 p-4">
-    <div>
-      <h3 className="font-semibold text-brand-900">Publicación de política comercial</h3>
-      <p className="text-sm text-brand-600">{publicada === null ? 'Consultando política vigente…'
-        : publicada > 0 ? `Política publicada v${publicada}` : 'Sin política publicada'}</p>
-      <p className="mt-1 text-sm text-brand-600">
-        Publicar precios y descuentos no implica habilitar todos los lotes para la venta.
-        Las reservas y ventas existentes se respetan.
-      </p>
-    </div>
-
-    {dirty && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-      Guarda los cambios pendientes antes de revisar una publicación.
-    </p>}
-
-    {publicada !== null && publicada > 0 && <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
-      Proyecto publicado. No se permiten nuevas versiones ni importaciones masivas.
-    </p>}
-
-    {publicada === 0 && <CommercialStageReleaseSelector config={config} seleccion={etapasHabilitar}
-      disabled={!puede} onChange={cambiarEtapa}/>}
-
-    {error && <div role="alert" className="text-sm text-red-700">
-      {error}{publicada === null && <Button size="sm" onClick={() => { setError(''); setIntento(n => n + 1); }}>Reintentar</Button>}
-    </div>}
-
-    {publicada === 0 && <Button disabled={!puede} icon={ShieldCheckIcon} onClick={() => void revisar()}>
-      {ocupado ? 'Procesando…' : 'Revisar publicación'}
-    </Button>}
-
+    <div><h3 className="font-semibold text-brand-900">Finalizar configuración inicial</h3>
+      <p className="text-sm text-brand-600">Revisa el resumen. Los precios y la disponibilidad se aplicarán una sola vez al confirmar.</p></div>
+    <div className="flex flex-wrap gap-2">{config.datos.etapas.map(e => {
+      const abierta = etapasSeleccionadas.includes(e.codigo);
+      return <span key={e.codigo} className={`rounded-md border px-2 py-1 text-xs ${abierta ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-100 text-gray-600'}`}>{e.nombre}: {abierta ? 'Abierta' : 'Cerrada'}</span>;
+    })}</div>
+    {ocupado && <p role="status" className="text-sm text-brand-600">Validando configuración con el servidor…</p>}
+    {!puedeConsultar && <p className="text-sm text-brand-600">Guarda la configuración y verifica tus permisos antes de finalizar.</p>}
+    {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" disabled={ocupado} onClick={() => setIntento(n => n+1)}>Reintentar validación</Button></div>}
     {resultado && !dirty && <>
       <Resumen r={resultado} onReviewTariffs={onReviewTariffs}/>
-      {resultado.publicado
-        ? <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
-            Política v{resultado.version} publicada. Los precios y las habilitaciones seleccionadas están vigentes.
-          </p>
-        : <>
-          <label className="flex items-start gap-2 text-sm text-brand-800">
-            <input type="checkbox" className="mt-1" checked={aceptado}
-              disabled={!puede || resultado.lotes.some(l => l.situacion === 'ERROR')}
-              onChange={e => setAceptado(e.target.checked)}/>
-            Confirmo los precios y restricciones revisados y la liberación exclusivamente de los lotes indicados
-            en la revisión. Las operaciones protegidas se conservan.
-          </label>
-          <Button variant="primary" disabled={!puede || !aceptado
-            || resultado.lotes.some(l => l.situacion === 'ERROR')}
-            onClick={() => void publicar()}>
-            Publicar política comercial
-          </Button>
-        </>}
+      {!resultado.publicado && <>
+        <label className="flex items-start gap-2 text-sm text-brand-800">
+          <input type="checkbox" className="mt-1" checked={aceptado} disabled={!puede || resultado.lotes.some(l => l.situacion === 'ERROR')} onChange={e => setAceptado(e.target.checked)}/>
+          Confirmo los precios y la disponibilidad revisados. Las ventas, reservas y bloqueos individuales se conservan.
+        </label>
+        <Button variant="primary" icon={ShieldCheckIcon} disabled={!puede || !aceptado || resultado.lotes.some(l => l.situacion === 'ERROR')} onClick={() => void publicar()}>Finalizar configuración inicial</Button>
+      </>}
     </>}
   </section>;
 }

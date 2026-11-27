@@ -1,29 +1,32 @@
 import { useState } from 'react';
-import { SaveIcon, FileSpreadsheetIcon, LayersIcon, MapPinnedIcon, TablePropertiesIcon, ShieldCheckIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowRightIcon, CheckCircle2Icon, LockIcon } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useProjectConfiguration } from '../../../hooks/useProjectConfiguration';
+import { projectConfigurationService } from '../../../services/projectConfigurationService';
 import { CommercialStageEditor } from './CommercialStageEditor';
 import { CommercialAssignmentEditor } from './CommercialAssignmentEditor';
 import { ProjectImportPreparation } from './ProjectImportPreparation';
 import { CommercialTariffEditor } from './CommercialTariffEditor';
+import { CommercialStageReleaseSelector } from './CommercialStageReleaseSelector';
 import { CommercialPublicationPanel } from './CommercialPublicationPanel';
+import { CommercialManagementPanel } from './CommercialManagementPanel';
+import { PASOS_CONFIGURACION, validarPasoInicial, agruparIncidencias, filtrarSeleccion } from '../../../lib/projectSetupWizard';
+import { seleccionInicial } from '../../../lib/commercialPresentation';
 import type { ProyectoResponse } from '../../../types/core';
-
-type Seccion = 'excel' | 'etapas' | 'asignaciones' | 'tarifas' | 'publicacion';
-
-const SECCIONES = [
-  { id: 'excel', nombre: 'Importar Excel', icono: FileSpreadsheetIcon },
-  { id: 'etapas', nombre: 'Etapas comerciales', icono: LayersIcon },
-  { id: 'asignaciones', nombre: 'Manzanas y lotes', icono: MapPinnedIcon },
-  { id: 'tarifas', nombre: 'Matriz de tarifas', icono: TablePropertiesIcon },
-  { id: 'publicacion', nombre: 'Publicación', icono: ShieldCheckIcon }
-] as const;
 
 export function ProjectConfigurationTab({ project }: { project: ProyectoResponse }) {
   const model = useProjectConfiguration(project.idProyecto);
-  const [seccion, setSeccion] = useState<Seccion>('excel');
-  const [importacionReciente, setImportacionReciente] = useState(false);
+  const { can } = useAuth();
+  const [paso, setPaso] = useState(0);
+  const [procesando, setProcesando] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [finalizando, setFinalizando] = useState(false);
+  const [importadoSesion, setImportadoSesion] = useState(false);
+  const [seleccion, setSeleccion] = useState<string[] | null>(null);
+  const [aviso, setAviso] = useState('');
+  const [incidencias, setIncidencias] = useState<ReturnType<typeof agruparIncidencias>>([]);
   const { datos, respuesta, publicada, lotesRegistrados, error, guardando } = model;
 
   if (!datos || !respuesta || publicada === null || lotesRegistrados === null) return <Card className="p-5">
@@ -31,86 +34,113 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
     {error && <Button onClick={model.recargar}>Reintentar</Button>}
   </Card>;
 
+  if (publicada > 0) return <CommercialManagementPanel config={respuesta} version={publicada}/>;
+
+  const config = { ...respuesta, datos };
   const hayCambios = JSON.stringify(datos) !== JSON.stringify(respuesta.datos);
-  const esPublicado = publicada > 0;
-  const bloqueado = guardando || !project.activo || esPublicado;
-  const importacionPermitida = !esPublicado && lotesRegistrados < 10;
-  const seccionCerrada = (id: Seccion) => (id === 'excel' && !importacionPermitida)
-    || (esPublicado && (id === 'etapas' || id === 'asignaciones'));
-  const seccionVisible = seccionCerrada(seccion) ? (esPublicado ? 'publicacion' : 'etapas') : seccion;
-  const secciones = SECCIONES;
+  const ocupado = guardando || procesando || importando || finalizando;
+  const editable = project.activo && can('lots.edit');
+  const bloqueado = ocupado || !editable;
+  const importacionPermitida = lotesRegistrados < 10 && !importadoSesion;
+  const etapasHabilitar = filtrarSeleccion(seleccion ?? seleccionInicial(config), config);
 
   function importado() {
     model.recargar();
-    setImportacionReciente(true);
-    setSeccion('etapas');
+    setImportadoSesion(true);
+    setPaso(1);
+    setAviso('');
+    setIncidencias([]);
   }
 
-  function navegar(id: Seccion) {
-    if (seccionCerrada(id)) return;
-    setSeccion(id);
-    setImportacionReciente(false);
+  function volver(destino: number) {
+    if (ocupado || destino >= paso || destino < 0) return;
+    setPaso(destino); setAviso(''); setIncidencias([]);
+  }
+
+  async function continuar() {
+    if (bloqueado || paso >= 5) return;
+    setAviso(''); setIncidencias([]);
+    const fallo = validarPasoInicial(paso, config);
+    if (fallo) { setAviso(fallo); return; }
+    setProcesando(true);
+    try {
+      let guardada = respuesta!;
+      if (hayCambios || (paso === 3 && respuesta!.version === 0)) {
+        const nueva = await model.guardarYObtener();
+        if (!nueva) return;
+        guardada = nueva;
+      }
+      if (paso === 3) {
+        // Consulta de solo lectura: comprueba precios de todas las etapas, incluso las cerradas.
+        const revision = await projectConfigurationService.revisarPublicacion(project.idProyecto, guardada.version, []);
+        const grupos = agruparIncidencias(revision.lotes);
+        if (grupos.length) {
+          setIncidencias(grupos);
+          setAviso('Corrige estas incidencias antes de continuar a Disponibilidad.');
+          return;
+        }
+        setSeleccion(prev => filtrarSeleccion(prev ?? seleccionInicial(guardada), guardada));
+      }
+      setPaso(p => p + 1);
+    } catch (e: unknown) {
+      setAviso(e instanceof Error ? e.message : 'No se pudo validar este paso. Intenta nuevamente.');
+    } finally { setProcesando(false); }
   }
 
   return <Card className="p-5 space-y-5">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-brand-900">Configuración del proyecto</h2>
-        <p className="text-sm text-brand-600">{esPublicado ? 'Proyecto publicado' : `Borrador ${respuesta.version ? `v${respuesta.version}` : 'sin guardar'}`}
-          {' · '}{respuesta.lotes.length} lotes{' · '}{datos.etapas.length} etapas comerciales
-          {' · '}{(datos.tarifas ?? []).length} tarifas</p>
-        <p className="text-xs text-brand-500">{esPublicado ? 'Configuración inicial cerrada. Consulta la matriz de tarifas y la publicación.' : 'Revisa las etapas, asignaciones y tarifas antes de publicar.'}</p>
+    <header className="flex flex-wrap justify-between items-start gap-3">
+      <div>
+        <h2 className="text-lg font-semibold text-brand-900">Configuración inicial del proyecto</h2>
+        <p className="text-sm text-brand-600">Completa los pasos una sola vez para iniciar la comercialización.</p>
+        <p className="mt-1 text-xs text-brand-500">{respuesta.lotes.length} lotes activos · {datos.etapas.length} etapas · {(datos.tarifas ?? []).length} tarifas</p>
       </div>
-      {!esPublicado && <div className="flex items-center gap-2">
-        {hayCambios && <span className="text-xs text-amber-800">Cambios sin guardar</span>}
-        <Button variant="primary" icon={SaveIcon} disabled={bloqueado || !hayCambios}
-          onClick={() => void model.guardar()}>
-          {guardando ? 'Guardando…' : 'Guardar cambios'}
-        </Button>
-      </div>}
-    </div>
-
-    {!importacionPermitida && !esPublicado && <p role="status" className="rounded-md bg-brand-50 p-3 text-sm text-brand-700">
-      Carga masiva cerrada: este proyecto tiene {lotesRegistrados} lotes registrados. Usa los formularios de gestión y revisa la publicación inicial.
-    </p>}
-    <nav aria-label="Secciones de configuración comercial" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
-      {secciones.map(({ id, nombre, icono: Icono }) =>
-        <button key={id} type="button" aria-current={seccionVisible === id ? 'page' : undefined}
-          disabled={seccionCerrada(id)} title={seccionCerrada(id) ? 'Configuración inicial cerrada' : undefined}
-          onClick={() => navegar(id)}
-          className={`flex min-h-12 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${seccionCerrada(id) ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400' : seccionVisible === id
-            ? 'border-[#4cbb17] bg-[#4cbb17]/10 text-brand-900 shadow-sm'
-            : 'border-brand-200 bg-white text-brand-600 hover:bg-brand-50'}`}>
-          <Icono className="h-4 w-4 shrink-0" aria-hidden="true"/>{nombre}
-        </button>)}
+      <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">Paso {paso+1} de {PASOS_CONFIGURACION.length}</span>
+    </header>
+    <nav aria-label="Pasos de configuración inicial">
+      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        {PASOS_CONFIGURACION.map((nombre, i) => <li key={nombre}>
+          <button type="button" disabled={ocupado || i >= paso} onClick={() => volver(i)} aria-current={i === paso ? 'step' : undefined}
+            className={`w-full min-h-16 rounded-lg border p-3 text-left text-xs ${i === paso ? 'border-[#4cbb17] bg-[#4cbb17]/10 text-brand-900' : i < paso ? 'border-brand-200 text-brand-700' : 'border-gray-200 bg-gray-50 text-gray-400'} disabled:cursor-default`}>
+            <span className="flex items-center gap-2 font-semibold">{i < paso ? <CheckCircle2Icon className="h-4 w-4 text-emerald-600"/> : <span>{i+1}.</span>}{nombre}</span>
+            <span className="mt-1 block">{i === paso ? 'En curso' : i < paso ? 'Revisado' : 'Pendiente'}</span>
+          </button>
+        </li>)}
+      </ol>
     </nav>
-
-    {importacionReciente && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-      <span>Importación registrada. Las etapas, lotes y tarifas se han consultado nuevamente; revisa la información antes de publicar.</span>
-      <Button size="sm" onClick={() => navegar('publicacion')}>Preparar publicación</Button>
+    {!editable && <p role="status" className="text-sm text-brand-600">Se requiere un proyecto activo y permiso de edición de lotes para completar la configuración.</p>}
+    {paso === 0 && <section className="space-y-4">
+      <div className="rounded-lg border border-brand-200 p-4">
+        <h3 className="font-semibold text-brand-900">Origen de los datos</h3>
+        <p className="mt-1 text-sm text-brand-600">{lotesRegistrados ? `Se encontraron ${lotesRegistrados} lotes registrados. Puedes continuar con el inventario existente.` : 'Importa el inventario o regístralo desde los formularios del proyecto.'}</p>
+      </div>
+      {importacionPermitida ? <ProjectImportPreparation project={project} disabledByDraft={hayCambios} onImportCompleted={importado} onBusyChange={setImportando}/>
+        : <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-100 p-4 text-gray-500"><LockIcon className="h-5 w-5"/><div><p className="font-medium">Importar Excel</p><p className="text-xs">Carga masiva cerrada. Se conserva el inventario registrado.</p></div></div>}
+    </section>}
+    {paso === 1 && <fieldset disabled={bloqueado}><CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado} onChange={model.setDatos}/></fieldset>}
+    {paso === 2 && <fieldset disabled={bloqueado}>
+      <p className="mb-3 text-sm text-brand-600">Asigna cada manzana a una etapa de venta. Solo crea excepciones si un lote necesita otra etapa.</p>
+      <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
+    </fieldset>}
+    {paso === 3 && <fieldset disabled={bloqueado}>
+      <CommercialTariffEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
+      <p className="mt-3 text-xs text-brand-600">Al continuar se guardarán los cambios y el servidor validará los precios de los lotes antes de abrir etapas.</p>
+    </fieldset>}
+    {paso === 4 && <CommercialStageReleaseSelector config={config} seleccion={etapasHabilitar} disabled={bloqueado}
+      onChange={(codigo, marcada) => setSeleccion(marcada ? [...etapasHabilitar.filter(c => c !== codigo),codigo] : etapasHabilitar.filter(c => c !== codigo))}/>}
+    {paso === 5 && <CommercialPublicationPanel project={project} config={respuesta} dirty={hayCambios || guardando}
+      etapasSeleccionadas={etapasHabilitar} onPublished={model.recargar} onReviewTariffs={() => volver(3)} onBusyChange={setFinalizando}/>}
+    {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" disabled={ocupado} onClick={() => { if (!hayCambios || window.confirm('¿Descartar los cambios sin guardar y recargar?')) model.recargar(); }}>Recargar datos</Button></div>}
+    {aviso && <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{aviso}</p>}
+    {incidencias.length > 0 && <div role="alert" className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      {incidencias.map(g => <details key={g.mensaje}><summary className="cursor-pointer font-medium">{g.mensaje} ({g.lotes.length} lotes)</summary><p className="mt-1">{g.lotes.join(', ')}</p></details>)}
+      <p>Si faltan zonas o existen ajustes de tipo incompatibles, corrige esos registros antes de continuar.</p>
     </div>}
-
-    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
-      {error}<Button size="sm" onClick={model.recargar} disabled={guardando}>Volver a consultar</Button>
-    </div>}
-
-    <div className="min-w-0">
-      {seccionVisible === 'excel' && importacionPermitida && <ProjectImportPreparation project={project} disabledByDraft={hayCambios}
-        onImportCompleted={importado}/>}
-      {seccionVisible === 'etapas' && <fieldset disabled={bloqueado}>
-        <CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado} onChange={model.setDatos}/>
-      </fieldset>}
-      {seccionVisible === 'asignaciones' && <fieldset disabled={bloqueado}>
-        <CommercialAssignmentEditor datos={datos} catalogos={respuesta} onChange={model.setDatos}/>
-      </fieldset>}
-      {seccionVisible === 'tarifas' && <fieldset disabled={guardando || !project.activo}>
-        <CommercialTariffEditor datos={datos} catalogos={respuesta} readOnly={esPublicado} onChange={model.setDatos}/>
-      </fieldset>}
-      {seccionVisible === 'publicacion' && <CommercialPublicationPanel project={project}
-        config={respuesta} dirty={hayCambios || guardando} onPublished={model.recargar} onReviewTariffs={() => navegar('tarifas')}/>}
-    </div>
-    <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-600">
-      {esPublicado ? 'La importación masiva y las nuevas publicaciones están cerradas. La configuración inicial se conserva como referencia histórica.' : 'La importación y los cambios manuales preparan un borrador. Solo «Publicación» aplica la configuración inicial.'}
-    </p>
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 pt-4">
+      <Button icon={ArrowLeftIcon} disabled={paso===0 || ocupado} onClick={() => volver(paso-1)}>Anterior</Button>
+      <span className="text-xs text-brand-500">{hayCambios ? 'Cambios pendientes de guardar' : 'Los cambios se conservan al avanzar'}</span>
+      {paso < 5 && <Button variant="primary" iconRight={ArrowRightIcon} disabled={bloqueado} onClick={() => void continuar()}>
+        {procesando || guardando ? 'Validando…' : paso === 0 ? 'Continuar con inventario' : paso === 3 ? 'Validar precios y continuar' : 'Guardar y continuar'}
+      </Button>}
+    </footer>
   </Card>;
 }

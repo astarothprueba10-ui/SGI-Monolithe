@@ -48,7 +48,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
 
   function editar(tarifa: TarifaComercial) {
     onChange({ ...datos, tarifas: actualizarTarifa(tarifas, tarifa) });
-    setAviso('Hay precios por guardar. Utiliza «Guardar cambios» al terminar.');
+    setAviso('Hay precios por guardar. Utiliza «Validar precios y continuar» al terminar.');
     setError('');
   }
 
@@ -99,7 +99,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
       onChange({ ...datos, tarifas: actualizadas });
       setError('');
       setAviso(enTodas ? `Matriz generada para ${etapas.length} etapas (${actualizadas.length} tarifas en el borrador).`
-        : `Matriz generada para ${etapaActual?.nombre ?? etapa}. Guarda los cambios cuando termines.`);
+        : `Matriz generada para ${etapaActual?.nombre ?? etapa}. Valida los precios cuando termines.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo generar la matriz.');
     }
@@ -271,7 +271,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
           <Button icon={WandSparklesIcon} onClick={() => generar(true)}>Generar para todas las etapas</Button>
         </div>
         <p className="text-xs text-brand-500">
-          Estas acciones solo actualizan el borrador, no los precios publicados. Revisa la tabla y guarda los cambios arriba.
+          Estas acciones solo actualizan el borrador, no los precios publicados. Revisa la tabla y continúa para validar y guardar.
         </p>
       </div>
     </details>}

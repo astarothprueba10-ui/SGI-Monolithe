@@ -86,7 +86,7 @@ export function CommercialStageEditor({ datos, catalogos, onChange, readOnly = f
       </table>
       {datos.etapas.length === 0 && <p className="p-5 text-sm text-brand-500">No hay etapas comerciales registradas.</p>}
     </div>
-    <p className="text-xs text-brand-500">La condición del precio no habilita ventas. Selecciona las etapas que deseas liberar en Publicación. Los bloqueos históricos se conservan.</p>
+    <p className="text-xs text-brand-500">La condición del precio no habilita ventas. Selecciona las etapas que deseas liberar en Disponibilidad. Los bloqueos históricos se conservan.</p>
     <Modal open={!!edicion && !readOnly} onClose={cerrar} title={edicion?.index === -1 ? 'Nueva etapa comercial' : 'Editar etapa comercial'}
       description="Configura el precio regular o promocional de la etapa." width="max-w-2xl"
       footer={<><Button disabled={guardando} onClick={cerrar}>Cancelar</Button><Button variant="primary" disabled={guardando || readOnly} onClick={guardar}>{guardando ? 'Guardando…' : edicion?.index === -1 ? 'Crear etapa comercial' : 'Guardar cambios'}</Button></>}>

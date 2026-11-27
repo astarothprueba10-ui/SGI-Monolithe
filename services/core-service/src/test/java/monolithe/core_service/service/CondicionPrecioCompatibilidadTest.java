@@ -12,12 +12,14 @@ class CondicionPrecioCompatibilidadTest {
             new Etapa("E2","Antigua anticipada",Disponibilidad.ANTICIPADA,TipoDescuento.NINGUNO,BigDecimal.ZERO),
             new Etapa("E3","Bloqueo histórico",Disponibilidad.BLOQUEADA,TipoDescuento.NINGUNO,BigDecimal.ZERO));
         var asignaciones = List.of(new Asignacion(1L,"E2"));
-        var datos = new Datos(etapas,asignaciones,List.of());
+        var tarifas = List.of(new Tarifa("ZONA-A","E2","PEN",TipoTarifa.MONTO_FIJO,BigDecimal.valueOf(31000),java.time.LocalDate.of(2026,11,26),null));
+        var datos = new Datos(etapas,asignaciones,List.of(),tarifas);
         var normalizados = ConfiguracionProyectoService.normalizarCondiciones(datos);
         assertEquals(etapas.get(0),normalizados.etapas().get(0));
         assertEquals(Disponibilidad.REGULAR,normalizados.etapas().get(1).disponibilidad());
         assertEquals(etapas.get(2),normalizados.etapas().get(2));
         assertEquals(asignaciones,normalizados.manzanas());
+        assertEquals(tarifas,normalizados.tarifas());
         assertEquals(Disponibilidad.ANTICIPADA,datos.etapas().get(1).disponibilidad());
     }
 }

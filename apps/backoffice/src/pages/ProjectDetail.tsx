@@ -77,7 +77,7 @@ export function ProjectDetail() {
     if (canViewLots) {
       items.push({ id: 'lotes', label: 'Lotes' });
     }
-    if (canConfigure) items.push({ id: 'configuracion', label: 'Configuración del proyecto' });
+    if (canConfigure) items.push({ id: 'configuracion', label: 'Configuración comercial' });
     return items;
   }, [canViewLots, canConfigure]);
 
