@@ -43,6 +43,17 @@ public class ConfiguracionProyectoRepository {
         return version;
     }
 
+    public int contarLotesRegistrados(Long proyecto) {
+        Integer total = jdbc.queryForObject("""
+            SELECT CASE WHEN pg_catalog.row_security_active('public.inm_lotes'::regclass)
+                THEN NULL ELSE count(*)::integer END
+            FROM public.inm_lotes WHERE id_proyecto=?
+            """, Integer.class, proyecto);
+        if (total == null) throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "No se puede verificar el inventario existente.");
+        return total;
+    }
+
     public boolean insertar(Long proyecto, int version, String json, Long actor) {
         return jdbc.update("""
             INSERT INTO public.inm_configuracion_comercial_borradores
@@ -79,10 +90,11 @@ public class ConfiguracionProyectoRepository {
 
     public List<Lote> lotes(Long proyecto) {
         return jdbc.query("""
-            SELECT l.id_lote, l.id_manzana, l.codigo FROM public.inm_lotes l
+            SELECT l.id_lote, l.id_manzana, l.codigo, el.codigo AS estado FROM public.inm_lotes l
+            JOIN public.cfg_estados_lote el ON el.id_estado_lote=l.id_estado_lote
             JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
             WHERE l.id_proyecto = ? AND l.activo AND m.activo AND e.activo ORDER BY l.codigo, l.id_lote
             """, (rs, n) -> new Lote(rs.getLong("id_lote"), rs.getLong("id_manzana"),
-                rs.getString("codigo")), proyecto);
+                rs.getString("codigo"), rs.getString("estado")), proyecto);
     }
 }

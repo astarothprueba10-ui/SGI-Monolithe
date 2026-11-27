@@ -37,7 +37,7 @@ export interface ConfiguracionProyectoResponse {
   monedas: string[];
   datos: ConfiguracionComercial;
   manzanas: { id: number; codigo: string; nombre: string }[];
-  lotes: { id: number; idManzana: number; codigo: string }[];
+  lotes: { id: number; idManzana: number; codigo: string; estadoInventario?: string | null }[];
 }
 
 export interface SimulacionComercialResponse {
@@ -72,6 +72,7 @@ export interface PublicacionComercialFila {
   precioFinal: number | null;
   vigenteHasta: string | null;
   habilitarInventario: boolean;
+  bloquearInventario?: boolean;
 }
 export interface PublicacionComercialResponse {
   version: number;

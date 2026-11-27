@@ -9,7 +9,7 @@ test('el panel elimina el simulador y conserva la navegación por secciones', ()
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   assert.doesNotMatch(ui,/CommercialSimulationPanel|CalculatorIcon|Ir al simulador/);
   assert.match(ui,/seccionVisible === 'tarifas' && <fieldset/);
-  assert.match(ui,/seccionVisible === 'excel' && <ProjectImportPreparation/);
+  assert.match(ui,/seccionVisible === 'excel' && importacionPermitida && <ProjectImportPreparation/);
 });
 
 test('tras confirmar importación el formulario recarga catálogos automáticamente', () => {
@@ -58,7 +58,7 @@ test('la configuración publicada oculta importación y no permite guardar otro 
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
   const hook = archivo('hooks/useProjectConfiguration.ts');
   assert.match(ui, /const esPublicado = publicada > 0/);
-  assert.match(ui, /SECCIONES\.filter\(s => !esPublicado \|\| s\.id !== 'excel'\)/);
+  assert.match(ui, /SECCIONES\.filter\(s => importacionPermitida \|\| s\.id !== 'excel'\)/);
   assert.match(ui, /const bloqueado = guardando \|\| !project\.activo \|\| esPublicado/);
   assert.match(hook, /projectConfigurationService\.versionPublicada\(idProyecto\)/);
   assert.match(hook, /guardando \|\| publicada !== 0/);
@@ -93,4 +93,9 @@ test('el alta comercial separa precio de liberación y conserva bloqueos histór
   assert.match(editor,/Bloqueo histórico conservado/);
   assert.match(editor,/disabled=\{etapa.disponibilidad === 'BLOQUEADA'\}/);
   assert.match(plantilla,/\['PROMOCION', 'REGULAR'\]/);
+});
+
+test('la carga masiva se oculta desde diez lotes registrados', () => {
+ const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+ assert.match(ui,/!esPublicado && lotesRegistrados < 10/);
 });

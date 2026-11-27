@@ -45,7 +45,8 @@ public class ConfiguracionProyectoController {
 
     @GetMapping("/publicacion")
     public java.util.Map<String,Integer> estadoPublicacion(@PathVariable Long idProyecto) {
-        return java.util.Map.of("version",service.versionPublicada(idProyecto));
+        return java.util.Map.of("version",service.versionPublicada(idProyecto),
+            "lotesRegistrados",service.contarLotesRegistrados(idProyecto));
     }
 
     @PostMapping("/publicacion/validar")

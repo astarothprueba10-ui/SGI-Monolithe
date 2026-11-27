@@ -56,6 +56,16 @@ public class ConfiguracionProyectoService {
             throw new ConflictoNegocioException("El proyecto ya fue publicado. Realiza los ajustes mediante los CRUD.");
     }
 
+    public int contarLotesRegistrados(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.contarLotesRegistrados(proyecto);
+    }
+
+    public void exigirImportacionInicial(Long proyecto) {
+        if (contarLotesRegistrados(proyecto) >= 10)
+            throw new ConflictoNegocioException("La carga masiva solo está disponible para proyectos con menos de 10 lotes registrados. Utiliza los formularios de gestión.");
+    }
+
     public int versionPublicada(Long proyecto) {
         obtenerProyecto(proyecto);
         return repository.versionPublicada(proyecto);

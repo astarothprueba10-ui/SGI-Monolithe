@@ -6,6 +6,7 @@ import type { ConfiguracionComercial, ConfiguracionProyectoResponse } from '../t
 
 export function useProjectConfiguration(idProyecto: number) {
   const [respuesta, setRespuesta] = useState<ConfiguracionProyectoResponse | null>(null);
+  const [lotesRegistrados, setLotesRegistrados] = useState<number | null>(null);
   const [publicada, setPublicada] = useState<number | null>(null);
   const [datos, setDatos] = useState<ConfiguracionComercial | null>(null);
   const [error, setError] = useState('');
@@ -14,9 +15,9 @@ export function useProjectConfiguration(idProyecto: number) {
 
   useEffect(() => {
     let vigente = true;
-    setRespuesta(null); setDatos(null); setPublicada(null); setError('');
+    setRespuesta(null); setDatos(null); setPublicada(null); setLotesRegistrados(null); setError('');
     Promise.all([projectConfigurationService.obtener(idProyecto), projectConfigurationService.versionPublicada(idProyecto)]).then(([r, p]) => {
-      if (vigente) { setRespuesta(r); setDatos(r.datos); setPublicada(p.version); }
+      if (vigente) { setRespuesta(r); setDatos(r.datos); setPublicada(p.version); setLotesRegistrados(p.lotesRegistrados); }
     }).catch((e: unknown) => {
       if (vigente) setError(e instanceof Error ? e.message : 'No se pudo cargar la configuración.');
     });
@@ -40,5 +41,5 @@ export function useProjectConfiguration(idProyecto: number) {
     } finally { setGuardando(false); }
   }
 
-  return { respuesta, publicada, datos, setDatos, error, guardando, guardar, recargar: () => setIntento(n => n + 1) };
+  return { respuesta, publicada, lotesRegistrados, datos, setDatos, error, guardando, guardar, recargar: () => setIntento(n => n + 1) };
 }

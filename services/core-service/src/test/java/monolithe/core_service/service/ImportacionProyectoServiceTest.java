@@ -55,6 +55,15 @@ class ImportacionProyectoServiceTest {
     }
 
     @Test
+    void impideImportarInventarioExistente() {
+        doThrow(new ConflictoNegocioException("Menos de 10 lotes")).when(configuracion).exigirImportacionInicial(2L);
+        var request = solicitud(List.of(zona(2,"Z-A")), null);
+        assertThrows(ConflictoNegocioException.class, () -> service.previsualizar(2L, request));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L, request, 1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    @Test
     void impideImportarProyectoPublicadoInclusoSinHojasComerciales() {
         doThrow(new ConflictoNegocioException("Proyecto publicado"))
             .when(configuracion).exigirSinPublicacion(2L, false);

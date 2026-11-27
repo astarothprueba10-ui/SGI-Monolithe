@@ -32,6 +32,7 @@ public class ImportacionProyectoService {
     public ImportacionProyectoResponse previsualizar(Long id, ImportacionProyectoRequest solicitud) {
         validarProyecto(id, solicitud);
         configuracion.exigirSinPublicacion(id, false);
+        configuracion.exigirImportacionInicial(id);
         var contexto = new ImportacionProyectoContexto(repo, id);
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
@@ -44,6 +45,7 @@ public class ImportacionProyectoService {
     @Transactional
     public ImportacionProyectoResponse confirmar(Long id, ImportacionProyectoRequest solicitud, Long actor) {
         configuracion.exigirSinPublicacion(id, true);
+        configuracion.exigirImportacionInicial(id);
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
         var previo = previsualizar(id, solicitud);

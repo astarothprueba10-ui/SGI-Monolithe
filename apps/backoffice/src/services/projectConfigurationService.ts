@@ -13,7 +13,7 @@ export const projectConfigurationService = {
     return coreApi.get<SimulacionComercialResponse>(`${ruta(idProyecto)}/simulacion?idLote=${idLote}&version=${version}&moneda=${encodeURIComponent(moneda)}`);
   },
   versionPublicada(idProyecto: number) {
-    return coreApi.get<{ version: number }>(`${ruta(idProyecto)}/publicacion`);
+    return coreApi.get<{ version: number; lotesRegistrados: number }>(`${ruta(idProyecto)}/publicacion`);
   },
   revisarPublicacion(idProyecto: number, version: number, etapasHabilitar: string[]) {
     return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion/validar`, { version, etapasHabilitar });

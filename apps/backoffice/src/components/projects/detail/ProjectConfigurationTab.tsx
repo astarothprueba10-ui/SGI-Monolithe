@@ -24,9 +24,9 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   const model = useProjectConfiguration(project.idProyecto);
   const [seccion, setSeccion] = useState<Seccion>('excel');
   const [importacionReciente, setImportacionReciente] = useState(false);
-  const { datos, respuesta, publicada, error, guardando } = model;
+  const { datos, respuesta, publicada, lotesRegistrados, error, guardando } = model;
 
-  if (!datos || !respuesta || publicada === null) return <Card className="p-5">
+  if (!datos || !respuesta || publicada === null || lotesRegistrados === null) return <Card className="p-5">
     <p className="text-sm text-brand-700">{error || 'Cargando configuración comercial…'}</p>
     {error && <Button onClick={model.recargar}>Reintentar</Button>}
   </Card>;
@@ -34,8 +34,9 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   const hayCambios = JSON.stringify(datos) !== JSON.stringify(respuesta.datos);
   const esPublicado = publicada > 0;
   const bloqueado = guardando || !project.activo || esPublicado;
-  const seccionVisible = esPublicado && seccion === 'excel' ? 'etapas' : seccion;
-  const secciones = SECCIONES.filter(s => !esPublicado || s.id !== 'excel');
+  const importacionPermitida = !esPublicado && lotesRegistrados < 10;
+  const seccionVisible = !importacionPermitida && seccion === 'excel' ? 'etapas' : seccion;
+  const secciones = SECCIONES.filter(s => importacionPermitida || s.id !== 'excel');
 
   function importado() {
     model.recargar();
@@ -66,6 +67,9 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       </div>}
     </div>
 
+    {!importacionPermitida && !esPublicado && <p role="status" className="rounded-md bg-brand-50 p-3 text-sm text-brand-700">
+      Carga masiva cerrada: este proyecto tiene {lotesRegistrados} lotes registrados. Usa los formularios de gestión y revisa la publicación inicial.
+    </p>}
     <nav aria-label="Secciones de configuración comercial" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
       {secciones.map(({ id, nombre, icono: Icono }) =>
         <button key={id} type="button" aria-current={seccionVisible === id ? 'page' : undefined}
@@ -87,7 +91,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
     </div>}
 
     <div className="min-w-0">
-      {seccionVisible === 'excel' && <ProjectImportPreparation project={project} disabledByDraft={hayCambios}
+      {seccionVisible === 'excel' && importacionPermitida && <ProjectImportPreparation project={project} disabledByDraft={hayCambios}
         onImportCompleted={importado}/>}
       {seccionVisible === 'etapas' && <fieldset disabled={bloqueado}>
         <CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado} onChange={model.setDatos}/>
