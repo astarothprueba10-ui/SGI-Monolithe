@@ -28,6 +28,7 @@ public class LoteComercialService {
  private final SimulacionComercialService simulacion;
  private final AjusteTipoLoteRepository ajustes;
  private final JdbcTemplate jdbc;
+ private final jakarta.persistence.EntityManager entityManager;
  static String estado(String inventario,boolean publicado,boolean abierta,boolean comercializable){
    if("VENDIDO".equals(inventario)||"RESERVADO".equals(inventario)||"BLOQUEADO".equals(inventario))return inventario;
    if(publicado&&!abierta)return "BLOQUEADO_COMERCIALMENTE";
@@ -64,7 +65,7 @@ public class LoteComercialService {
       var regla=reglas.get(l.idLote());String codigo=regla!=null&&regla.etapa()!=null?regla.etapa():etapa(c.datos(),l);
       var e=catalogo.etapas().stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
       boolean protegido=protegidos.contains(l.idLote())||regla!=null&&"PROTEGIDA".equals(regla.situacion());
-      return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),catalogo.publicado(),e!=null&&e.habilitada(),disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
+      return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),catalogo.publicado()&&e!=null,e!=null&&e.habilitada(),!protegido&&disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
    }).toList();
    var sugerencias=new HashMap<Long,Identidad>();
    for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
@@ -141,6 +142,8 @@ public class LoteComercialService {
      asign.add(new ConfiguracionProyectoRequest.Asignacion(q.idLote(),q.codigoEtapa()));
      config.guardar(proyecto,actor,new ConfiguracionProyectoRequest(x.config().version(),new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),asign,d.tarifas())));
    }
+   // El cambio de inventario por JDBC debe reflejarse en la lectura JPA de la misma transacción.
+   entityManager.clear();
    return listar(proyecto);
  }
  private static boolean mismoPrecio(BigDecimal a,BigDecimal b){return a==null?b==null:b!=null&&a.compareTo(b)==0;}

@@ -81,7 +81,8 @@ test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un moda
   assert.match(editor,/Condición del precio/);
   assert.match(editor,/Tipo de descuento/);
   assert.doesNotMatch(editor,/Planificada|Finalizada|Fecha fin estimada/);
-  assert.match(tab,/publicada > 0/);
+  assert.match(tab,/published=\{publicada>0\}/);
+  assert.doesNotMatch(tab,/Proyecto publicado\. Administra etapas sin volver a publicar/);
 });
 
 test('el alta comercial separa precio de liberación y conserva bloqueos históricos', () => {

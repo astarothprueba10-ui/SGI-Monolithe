@@ -16,6 +16,7 @@ export function CommercialLotFormModal({project,data,fila,etapaInicial,onClose,o
  const [medidas,setMedidas]=useState(()=>Object.fromEntries(dimensiones.map(([k])=>[k,lot?.[k]==null?'':String(lot[k])])) as Record<typeof dimensiones[number][0],string>);
  const [observaciones,setObservaciones]=useState(lot?.observaciones??'');
  const [vista,setVista]=useState<VistaLote|null>(null);
+ const [claveVista,setClaveVista]=useState('');
  const [loading,setLoading]=useState(false);const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');const [revisionError,setRevisionError]=useState('');
  const [retry,setRetry]=useState(0);
@@ -27,20 +28,21 @@ export function CommercialLotFormModal({project,data,fila,etapaInicial,onClose,o
  const validMedidas=dimensiones.every(([k])=>(k!=='areaM2'&&!medidas[k])||(/^\d{1,10}(\.\d{1,2})?$/.test(medidas[k])&&Number(medidas[k])>0));
  const puedeRevisar=!!etapa&&!!manzana&&!!zona&&Number(medidas.areaM2)>0&&/^\d{1,10}(\.\d{1,2})?$/.test(medidas.areaM2)&&!fila?.protegido;
  function consulta():ConsultaLote{return {idLote:lot?.idLote??null,idManzana:Number(manzana),idZona:Number(zona),codigoEtapa:etapa,areaM2:Number(medidas.areaM2)};}
+ const claveConsulta=JSON.stringify(consulta());
  useEffect(()=>{
-   setVista(null);setRevisionError('');setLoading(false);
+   setVista(null);setClaveVista('');setRevisionError('');setLoading(false);
    if(!puedeRevisar)return;
    let vigente=true;setLoading(true);
    const id=window.setTimeout(()=>{
-     commercialLotService.revisar(project.idProyecto,consulta()).then(v=>{if(vigente)setVista(v);}).catch(e=>{if(vigente)setRevisionError(e instanceof Error?e.message:'No se pudo calcular el precio.');}).finally(()=>{if(vigente)setLoading(false);});
+     commercialLotService.revisar(project.idProyecto,consulta()).then(v=>{if(vigente){setVista(v);setClaveVista(claveConsulta);}}).catch(e=>{if(vigente)setRevisionError(e instanceof Error?e.message:'No se pudo calcular el precio.');}).finally(()=>{if(vigente)setLoading(false);});
    },200);
    return()=>{vigente=false;window.clearTimeout(id);};
  },[project.idProyecto,lot?.idLote,etapa,manzana,zona,medidas.areaM2,puedeRevisar,retry]);
  const cambioComercial=!lot||fila?.codigoEtapa!==etapa||lot.idZona!==Number(zona)||lot.areaM2!==Number(medidas.areaM2);
- const permitido=!!vista&&!loading&&!busy&&validMedidas&&puedeRevisar&&(!cat.publicado||!cambioComercial||vista.calculado);
+ const permitido=!!vista&&claveVista===claveConsulta&&!loading&&!busy&&validMedidas&&puedeRevisar&&(!cat.publicado||!cambioComercial||vista.calculado);
  const estado=lot&&!cambioComercial?fila?.estado??'NO_DISPONIBLE':vista?.estado??(cat.publicado&&seleccion&&!seleccion.habilitada?'BLOQUEADO_COMERCIALMENTE':'NO_DISPONIBLE');
  async function guardar(){
-   if(!permitido||!vista)return;setBusy(true);setError('');
+   if(!permitido||!vista||claveVista!==claveConsulta)return;setBusy(true);setError('');
    const opc=(k:typeof dimensiones[number][0])=>medidas[k]?Number(medidas[k]):null;
    try{
      const r=await commercialLotService.guardar(project.idProyecto,{revision:vista.revision,ubicacion:consulta(),frenteM:opc('frenteM'),fondoM:opc('fondoM'),lateralDerechoM:opc('lateralDerechoM'),lateralIzquierdoM:opc('lateralIzquierdoM'),observaciones:observaciones.trim()||null,codigoRevisado:vista.codigo,numeroRevisado:vista.numero,precioRevisado:vista.precioFinal});
