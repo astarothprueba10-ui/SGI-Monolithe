@@ -56,10 +56,19 @@ public class LoteComercialService {
  }
  @Transactional(readOnly=true)
  public List<Fila> listarMapa(Long proyecto){
+   long inicio=System.nanoTime();
    var c=config.obtenerParaMapa(proyecto);
+   long configuracionLista=System.nanoTime();
    var abiertas=c.publicado()?comercial.etapasHabilitadasParaMapa(proyecto,c.version()):List.<String>of();
    var etapas=c.datos().etapas().stream().map(e->new ManzanaComercialDto.Etapa(e.codigo(),e.nombre(),abiertas.contains(e.codigo()))).toList();
-   return filasComerciales(proyecto,c.version(),c.datos(),c.publicado(),etapas,true);
+   long etapasListas=System.nanoTime();
+   var filas=filasComerciales(proyecto,c.version(),c.datos(),c.publicado(),etapas,true);
+   long fin=System.nanoTime();
+   org.slf4j.LoggerFactory.getLogger(LoteComercialService.class).info(
+     "Mapa lotes proyecto={} lotes={} configuracionMs={} etapasMs={} inventarioMs={} totalMs={}",
+     proyecto,filas.size(),(configuracionLista-inicio)/1_000_000,
+     (etapasListas-configuracionLista)/1_000_000,(fin-etapasListas)/1_000_000,(fin-inicio)/1_000_000);
+   return filas;
  }
  private List<Fila> filasComerciales(Long proyecto,int version,ConfiguracionProyectoRequest.Datos datos,boolean publicado,List<ManzanaComercialDto.Etapa> etapas,boolean soloMapa){
    var reglas=new HashMap<Long,PublicacionComercialRepository.Regla>();
