@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { normalizarXlsxProyecto } from './projectImportOoxml';
 import { HOJAS_ESTRUCTURA, VERSION_PLANTILLA } from '../lib/projectTemplateSchema';
 import type { FilaImportacion, SolicitudImportacion } from '../types/projectImport';
 
@@ -65,12 +66,13 @@ export async function leerArchivoProyecto(file: File, codigoProyecto: string): P
     throw new Error('Selecciona un archivo XLSX de hasta 5 MB.');
   const wb = new ExcelJS.Workbook();
   try {
-    await wb.xlsx.load(await file.arrayBuffer());
-  } catch {
-    throw new Error(
-      'No se pudo interpretar la estructura del XLSX. Utiliza la plantilla descargada del Backoffice ' +
-      'o abre el archivo en Excel y guárdalo como Libro de Excel (.xlsx) antes de volver a cargarlo.'
-    );
+    const bytes = await normalizarXlsxProyecto(await file.arrayBuffer());
+    await wb.xlsx.load(bytes);
+  } catch (error) {
+    const mensaje = error instanceof Error ? error.message : '';
+    if (/^El XLSX |^No se admiten declaraciones DTD/.test(mensaje)) throw error;
+    console.warn('Importación XLSX: error de lectura', error instanceof Error ? error.name : 'Error');
+    throw new Error('No se pudo leer el archivo XLSX. Verifica que sea un libro válido, no esté dañado ni protegido con contraseña.');
   }
   return leerLibroProyecto(wb, codigoProyecto);
 }

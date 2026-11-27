@@ -23,6 +23,8 @@
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.49.1",
     "exceljs": "^4.4.0",
+    "jszip": "3.10.2",
+    "saxes": "5.0.1",
     "framer-motion": "^11.5.4",
     "libphonenumber-js": "1.13.15",
     "lucide-react": "0.522.0",
