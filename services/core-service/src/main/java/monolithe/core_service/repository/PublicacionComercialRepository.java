@@ -73,6 +73,18 @@ public class PublicacionComercialRepository {
             """, Long.class, proyecto);
     }
 
+    public java.util.Map<Long,BigDecimal> preciosActuales(Long proyecto) {
+        var resultado=new java.util.HashMap<Long,BigDecimal>();
+        jdbc.query("""
+            SELECT DISTINCT ON (p.id_lote) p.id_lote,p.precio
+            FROM public.inm_lotes_precios p JOIN public.cfg_monedas m USING(id_moneda)
+            JOIN public.inm_lotes l USING(id_lote)
+            WHERE l.id_proyecto=? AND m.codigo='PEN' AND m.activo AND p.activo
+              AND p.fecha_desde<=now() AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
+            ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
+            """,(org.springframework.jdbc.core.RowCallbackHandler)r->resultado.put(r.getLong(1),r.getBigDecimal(2)),proyecto);
+        return resultado;
+    }
     public BigDecimal precioActual(Long id) {
         return jdbc.query("""
             SELECT p.precio FROM public.inm_lotes_precios p JOIN public.cfg_monedas m USING(id_moneda)
