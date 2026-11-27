@@ -83,6 +83,12 @@ public class ConfiguracionProyectoController {
     @PreAuthorize(CONSULTAR)
     public Respuesta gestion(@PathVariable Long idProyecto) { return publicacion.gestion(idProyecto); }
 
+    @GetMapping("/detalle")
+    @PreAuthorize(CONSULTAR)
+    public PublicacionComercialService.ConsultaDetalle detalle(@PathVariable Long idProyecto) {
+        return publicacion.consultarDetalle(idProyecto);
+    }
+
     @GetMapping("/gestion/historial")
     public java.util.List<Evento> historial(@PathVariable Long idProyecto) { return publicacion.historial(idProyecto); }
 
