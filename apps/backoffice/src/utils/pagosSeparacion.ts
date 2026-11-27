@@ -53,7 +53,7 @@ export function validarPagosSeparacion(pagos:PagoSeparacionResuelto[],total:numb
       else refs.set(ref,p.id);
     }
     if(p.errorArchivo)agregar(p.id,p.errorArchivo);
-    else if(!p.archivo)agregar(p.id,'Adjunta el comprobante del abono.');
+    else if(!p.archivo){if(p.metodo!=='EFECTIVO')agregar(p.id,'Adjunta el comprobante del abono.');}
     else if(p.verificandoArchivo)agregar(p.id,'Verificando comprobante…');
     else {
       const error=errorComprobanteSeparacion(p.archivo);
