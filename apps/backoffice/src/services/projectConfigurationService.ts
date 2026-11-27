@@ -32,7 +32,7 @@ export const projectConfigurationService = {
     return commercialMutation<GestionComercialResponse>(idProyecto,'DISPONIBILIDAD',`${ruta(idProyecto)}/gestion/disponibilidad`,'PUT', { revision, etapasHabilitadas });
   },
   guardarAsignacion(idProyecto: number, revision: number, tipo: 'manzanas'|'lotes', id: number, codigoEtapa: string) {
-    return commercialMutation<GestionComercialResponse>(idProyecto,'ASIGNACION',`${ruta(idProyecto)}/gestion/asignacion`,'PUT', { revision, tipo, id, codigoEtapa });
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/asignacion`, { revision, tipo, id, codigoEtapa });
   },
   guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
     return commercialMutation<GestionComercialResponse>(idProyecto,'ETAPAS',`${ruta(idProyecto)}/gestion/etapas`,'PUT', { revision, etapas });
@@ -43,7 +43,8 @@ export const projectConfigurationService = {
   guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
     return commercialMutation<GestionComercialResponse>(idProyecto,'TARIFA',`${ruta(idProyecto)}/gestion/tarifa`,'PUT', { revision, tarifa });
   },
-  guardar(idProyecto: number, version: number, datos: ConfiguracionComercial) {
+  guardar(idProyecto: number, version: number, datos: ConfiguracionComercial, confirmarEtapas = false) {
+    if (confirmarEtapas) return commercialMutation<ConfiguracionProyectoResponse>(idProyecto,'ETAPAS',ruta(idProyecto),'PUT',{version,datos});
     return coreApi.put<ConfiguracionProyectoResponse>(ruta(idProyecto), { version, datos });
   }
 };

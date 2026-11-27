@@ -34,7 +34,7 @@ export function CommercialBlockFormModal({project,listado,block,etapaInicial,onC
    }catch(e){setError(e instanceof Error?e.message:'No se pudo guardar la manzana.');setConfirmar(false);}
    finally{setBusy(false);}
  }
- return <Modal open onClose={()=>{if(!busy)onClose();}} title={confirmar?'Confirmar cambios de manzana':block?'Editar manzana':'Nueva manzana'} width="max-w-2xl" footer={<><Button variant="ghost" disabled={busy} onClick={()=>confirmar?setConfirmar(false):onClose()}>{confirmar?'Volver':'Cancelar'}</Button><Button variant="primary" disabled={!valido||busy} onClick={()=>confirmar?void guardar():setConfirmar(true)}>{busy?'Guardando…':confirmar?'Confirmar y continuar':block?'Guardar cambios':'Crear manzana'}</Button></>}>
+ return <Modal open onClose={()=>{if(!busy)onClose();}} title={confirmar?'Confirmar cambios de manzana':block?'Editar manzana':'Nueva manzana'} width="max-w-2xl" footer={<><Button variant="ghost" disabled={busy} onClick={()=>confirmar?setConfirmar(false):onClose()}>{confirmar?'Volver':'Cancelar'}</Button><Button variant="primary" disabled={!valido||busy} onClick={()=>confirmar?void guardar():setConfirmar(true)}>{busy?'Guardando…':confirmar?'Confirmar y guardar':block?'Guardar cambios':'Crear manzana'}</Button></>}>
    <div className="space-y-4">
     <div className="rounded-lg border border-brand-100 bg-brand-50/50 p-3 text-xs"><p className="text-brand-500">Proyecto</p><strong className="text-sm text-brand-900">{project.nombre}</strong><p className="font-mono text-brand-600">{project.codigo}</p></div>
     {error&&<div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -52,7 +52,7 @@ export function CommercialBlockFormModal({project,listado,block,etapaInicial,onC
        <div className="flex flex-wrap gap-2">{listado.zonas.filter(z=>z.activa||zonas.includes(z.id)).map(z=><label key={z.id} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${zonas.includes(z.id)?'border-brand-400 bg-brand-50':'border-brand-100'}`}><input type="checkbox" checked={zonas.includes(z.id)} disabled={!z.activa&&!zonas.includes(z.id)} onChange={e=>setZonas(p=>e.target.checked?[...p,z.id]:p.filter(id=>id!==z.id))}/><strong>{z.codigo}</strong><span>{z.nombre}{!z.activa?' (inactiva)':''}</span></label>)}</div>
        {!listado.zonas.some(z=>z.activa)&&<p className="text-sm text-amber-700">Crea o activa una zona antes de guardar.</p>}
       </div>
-    </fieldset>:<div className="space-y-3 text-sm"><p><strong>{codigo} · {nombre}</strong></p><p>Etapa comercial: {seleccion?.nombre}</p><p>Estado resultante: {etiquetasManzana[estado]}</p><p>Zonas: {listado.zonas.filter(z=>zonas.includes(z.id)).map(z=>z.codigo).join(', ')}</p>{cambiaEtapa&&<p className="rounded-md bg-amber-50 p-3 text-amber-800">Se revisarán los precios y disponibilidad de los lotes elegibles. Las operaciones protegidas conservan sus condiciones.</p>}<p>Se solicitará confirmación de seguridad por correo antes de guardar.</p></div>}
+    </fieldset>:<div className="space-y-3 text-sm"><p><strong>{codigo} · {nombre}</strong></p><p>Etapa comercial: {seleccion?.nombre}</p><p>Estado resultante: {etiquetasManzana[estado]}</p><p>Zonas: {listado.zonas.filter(z=>zonas.includes(z.id)).map(z=>z.codigo).join(', ')}</p>{cambiaEtapa&&<p className="rounded-md bg-amber-50 p-3 text-amber-800">Se revisarán los precios y disponibilidad de los lotes elegibles. Las operaciones protegidas conservan sus condiciones.</p>}</div>}
    </div>
  </Modal>;
 }

@@ -265,5 +265,14 @@ test('manzanas usa etapas comerciales y un solo formulario con zonas',()=>{
  assert.match(form,/nombreSugerido/);
  assert.match(form,/Zonas asociadas/);
  assert.doesNotMatch(form,/manzana-descripcion|manzana-numero-orden|manzana-activa/);
- assert.match(archivo('services/commercialBlockService.ts'),/commercialMutation<ListadoManzanas>/);
+ assert.match(archivo('services/commercialBlockService.ts'),/coreApi.put<ListadoManzanas>/);
+ assert.doesNotMatch(archivo('services/commercialBlockService.ts'),/commercialMutation/);
+});
+
+test('filtros de manzanas: buscador, etapa con etiqueta arriba, estado',()=>{
+ const tab=archivo('components/projects/detail/ProjectBlocksTab.tsx');
+ assert.ok(tab.indexOf('<SearchInput')<tab.indexOf('<FieldLabel htmlFor="etapa-comercial-manzanas"'));
+ assert.ok(tab.indexOf('<FieldLabel htmlFor="etapa-comercial-manzanas"')<tab.indexOf('<Dropdown'));
+ assert.match(tab,/flex w-full flex-col sm:w-auto/);
+ assert.doesNotMatch(archivo('components/projects/CommercialBlockFormModal.tsx'),/confirmación de seguridad por correo/);
 });

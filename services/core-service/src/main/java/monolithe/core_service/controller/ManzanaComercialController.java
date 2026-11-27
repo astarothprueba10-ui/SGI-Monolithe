@@ -13,15 +13,12 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ManzanaComercialController {
     private final ManzanaComercialService service;
-    private final CommercialMfaClient mfa;
     @GetMapping
     @PreAuthorize("hasAuthority('projects.view')")
     public Listado listar(@PathVariable Long idProyecto){return service.listar(idProyecto);}
     @PutMapping
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Listado guardar(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Cambio req,
-      @RequestHeader(value="X-Commercial-Approval",required=false) String approval){
-        mfa.exigir(jwt,idProyecto,"MANZANA",req,approval);
+    public Listado guardar(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Cambio req){
         return service.guardar(idProyecto,Long.valueOf(jwt.getSubject()),req);
     }
 }

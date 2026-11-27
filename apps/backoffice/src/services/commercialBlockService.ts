@@ -1,5 +1,4 @@
 import {coreApi} from '../lib/apiClient';
-import {commercialMutation} from './commercialMfaService';
 export type EstadoManzana='ACTIVA'|'INACTIVA'|'BLOQUEADA_COMERCIALMENTE'|'VENDIDA';
 export interface ZonaManzana {id:number;codigo:string;nombre:string;activa:boolean}
 export interface EtapaManzana {codigo:string;nombre:string;habilitada:boolean}
@@ -15,5 +14,5 @@ export function estadoManzana(activa:boolean,lotes:number,vendidos:number,habili
 const ruta=(id:number)=>`/proyectos/${id}/manzanas-comerciales`;
 export const commercialBlockService={
  listar:(id:number)=>coreApi.get<ListadoManzanas>(ruta(id)),
- guardar:(id:number,cambio:CambioManzana)=>commercialMutation<ListadoManzanas>(id,'MANZANA',ruta(id),'PUT',{...cambio})
+ guardar:(id:number,cambio:CambioManzana)=>coreApi.put<ListadoManzanas>(ruta(id),cambio)
 };

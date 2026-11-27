@@ -28,9 +28,7 @@ public class CommercialMfaClient {
             case "DISPONIBILIDAD" -> Disponibilidad.class;
             case "IMPORTACION" -> ImportacionProyectoRequest.class;
             case "PUBLICACION" -> PublicacionComercialRequest.class;
-            case "ETAPAS" -> CambioEtapas.class;
-            case "ASIGNACION" -> CambioAsignacion.class;
-            case "MANZANA" -> ManzanaComercialDto.Cambio.class;
+            case "ETAPAS" -> datos.has("datos") ? ConfiguracionProyectoRequest.class : CambioEtapas.class;
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Acción comercial inválida.");
         };
         try{return mapper.treeToValue(datos,tipo);}catch(Exception e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Datos de confirmación inválidos.");}

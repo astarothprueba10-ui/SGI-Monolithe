@@ -100,7 +100,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
   const zonasVisibles = inventario.zonas.filter(z=>!soloUsadas || (uso.get(z)??0)>0);
   return <Card className="p-5 space-y-5">
     <header><h2 className="text-lg font-semibold text-brand-900">Gestión comercial</h2>
-      <p className="text-sm text-brand-600">Configuración inicial finalizada (v{version}). Administra los precios y la disponibilidad sin volver a publicar.</p></header>
+      <p className="text-sm text-brand-600">Configuración inicial finalizada, puedes administrar los precios y la disponibilidad sin volver a publicar.</p></header>
     <div className="grid gap-2 sm:grid-cols-3">
       {['Importar Excel','Etapas iniciales','Asignaciones iniciales'].map(t => <div key={t} className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-100 p-3 text-sm text-gray-500"><LockIcon className="h-4 w-4"/>{t}</div>)}
     </div>

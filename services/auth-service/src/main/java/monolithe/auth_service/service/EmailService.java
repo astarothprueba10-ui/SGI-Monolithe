@@ -92,7 +92,7 @@ public class EmailService {
   }
 
   /** Desafío separado de la contraseña; solo a correo corporativo ya verificado. */
-  public void enviarCodigoMfaComercial(String destinatario,String codigo,String accion,long proyecto) {
+  public void enviarCodigoMfaComercial(String destinatario,String codigo,String accion,String proyectoNombre) {
     try {
       MimeMessage mensaje=mailSender.createMimeMessage();
       MimeMessageHelper helper=new MimeMessageHelper(mensaje,true,"UTF-8");
@@ -104,12 +104,10 @@ public class EmailService {
         case "IMPORTACION" -> "Confirmar importación inicial";
         case "PUBLICACION" -> "Publicar configuración inicial";
         case "ETAPAS" -> "Modificar etapas comerciales";
-        case "ASIGNACION" -> "Modificar asignaciones comerciales";
-        case "MANZANA" -> "Guardar manzana comercial";
         default -> "Confirmación comercial";
       };
       if(!codigo.matches("[0-9]{6}"))throw new IllegalArgumentException("Código inválido");
-      String texto="SIGI MONOLITHE. "+operacion+". Proyecto #"+proyecto+". Código: "+codigo+". Válido por 5 minutos. No compartas este código. Si no solicitaste la operación, contacta a Seguridad.";
+      String texto="SIGI MONOLITHE. "+operacion+". Proyecto: "+proyectoNombre+". Código: "+codigo+". Válido por 5 minutos. No compartas este código. Si no solicitaste la operación, contacta a Seguridad.";
       String html="""
         <!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#152c45">
         <table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:28px 12px">
@@ -121,11 +119,11 @@ public class EmailService {
         <div style="font-size:12px;color:#466580">CÓDIGO DE CONFIRMACIÓN</div>
         <div style="font-family:monospace;font-size:34px;font-weight:bold;letter-spacing:7px;padding:14px 0">%s</div>
         <div style="font-size:13px;color:#31602d">Válido durante 5 minutos</div></div>
-        <p style="font-size:14px;line-height:1.8"><strong>Operación:</strong> %s<br><strong>Proyecto:</strong> #%d</p>
+        <p style="font-size:14px;line-height:1.8"><strong>Operación:</strong> %s<br><strong>Proyecto:</strong> %s</p>
         <p style="font-size:13px;line-height:1.6;color:#475569;border-top:1px solid #dbe4ee;padding-top:16px">Nunca compartas este código. Si no solicitaste esta operación, contacta a Seguridad.</p>
         </td></tr><tr><td style="padding:18px;background:#f8fafc;color:#64748b;text-align:center;font-size:11px">Mensaje automático de SIGI MONOLITHE</td></tr>
         </table></td></tr></table></body></html>
-        """.formatted(codigo,operacion,proyecto);
+        """.formatted(codigo,operacion,HtmlUtils.htmlEscape(proyectoNombre));
       helper.setText(texto,html);
       mailSender.send(mensaje);
     }catch(MessagingException e){throw new MailException("No se pudo preparar el correo comercial.",e){};}

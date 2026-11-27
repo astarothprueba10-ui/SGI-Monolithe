@@ -35,7 +35,13 @@ public class ConfiguracionProyectoController {
 
     @PutMapping
     public ConfiguracionProyectoResponse guardar(@PathVariable Long idProyecto,
-            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ConfiguracionProyectoRequest request) {
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ConfiguracionProyectoRequest request,
+            @RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        var actual=service.obtener(idProyecto);
+        if(!request.version().equals(actual.version()))throw new monolithe.core_service.exception.ConflictoNegocioException("La configuración cambió. Recarga antes de guardar.");
+        if(service.cambianEtapas(actual.datos(),request.datos())){
+            mfa.exigir(jwt,idProyecto,"ETAPAS",request,approval);
+        }
         return service.guardar(idProyecto, obtenerActor(jwt), request);
     }
 
@@ -81,8 +87,7 @@ public class ConfiguracionProyectoController {
 
     @PutMapping("/gestion/asignacion")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta asignacion(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioAsignacion request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
-        mfa.exigir(jwt,idProyecto,"ASIGNACION",request,approval);
+    public Respuesta asignacion(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioAsignacion request) {
         return publicacion.guardarAsignacion(idProyecto,obtenerActor(jwt),request);
     }
 

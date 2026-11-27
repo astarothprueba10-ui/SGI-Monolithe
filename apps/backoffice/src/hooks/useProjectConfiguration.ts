@@ -31,7 +31,8 @@ export function useProjectConfiguration(idProyecto: number) {
     if (fallo) { setError(fallo); if (propagarError) throw new Error(fallo); return null; }
     setGuardando(true); setError('');
     try {
-      const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, nuevosDatos);
+      const confirmarEtapas = JSON.stringify(respuesta.datos.etapas) !== JSON.stringify(nuevosDatos.etapas);
+      const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, nuevosDatos, confirmarEtapas);
       setRespuesta(r); setDatos(r.datos);
       toast.success(`Borrador comercial v${r.version} guardado.`);
       return r;

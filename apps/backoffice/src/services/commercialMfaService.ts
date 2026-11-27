@@ -1,7 +1,7 @@
 import { coreApi } from '../lib/apiClient';
 
-export type CommercialAction='MATRIZ'|'TARIFA'|'DISPONIBILIDAD'|'IMPORTACION'|'PUBLICACION'|'ETAPAS'|'ASIGNACION'|'MANZANA';
-export interface CommercialChallenge {challengeId:string;correo:string;expiraEn:number;reenviarEn:number}
+export type CommercialAction='MATRIZ'|'TARIFA'|'DISPONIBILIDAD'|'IMPORTACION'|'PUBLICACION'|'ETAPAS';
+export interface CommercialChallenge {challengeId:string;correo:string;proyectoNombre:string;expiraEn:number;reenviarEn:number}
 export interface CommercialPrompt {project:number;action:CommercialAction;body:Record<string,unknown>;resolve:(token:string)=>void;reject:(error:Error)=>void}
 let listener:((prompt:CommercialPrompt)=>void)|null=null;
 let pending=false;

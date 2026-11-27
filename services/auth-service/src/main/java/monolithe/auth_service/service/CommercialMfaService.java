@@ -15,7 +15,7 @@ import java.util.*;
 
 @Service
 public class CommercialMfaService {
-    private static final Set<String> ACCIONES=Set.of("MATRIZ","TARIFA","DISPONIBILIDAD","IMPORTACION","PUBLICACION","ETAPAS","ASIGNACION","MANZANA");
+    private static final Set<String> ACCIONES=Set.of("MATRIZ","TARIFA","DISPONIBILIDAD","IMPORTACION","PUBLICACION","ETAPAS");
     private final JdbcTemplate db;
     private final PasswordEncoder passwords;
     private final EmailService correo;
@@ -76,6 +76,8 @@ public class CommercialMfaService {
     public Map<String,Object> iniciar(Jwt jwt,long proyecto,String accion,String huella){
         long actor=actor(jwt);
         if(proyecto<=0||!ACCIONES.contains(accion)||huella==null||!huella.matches("[a-f0-9]{64}"))throw fallo(HttpStatus.BAD_REQUEST,"Operación inválida.");
+        String nombreProyecto=db.query("SELECT nombre FROM public.inm_proyectos WHERE id_proyecto=?",(rs,n)->rs.getString(1),proyecto)
+            .stream().findFirst().filter(n->!n.isBlank()).orElseThrow(()->fallo(HttpStatus.NOT_FOUND,"Proyecto no encontrado."));
         db.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended('mfa-comercial:'||CAST(? AS text),0))",(r,n)->Boolean.TRUE,actor);
         int recientes=db.queryForObject("SELECT count(*) FROM public.seg_mfa_comercial WHERE actor=? AND creado>now()-interval '15 minutes'",Integer.class,actor);
         Boolean inmediato=db.queryForObject("SELECT EXISTS(SELECT 1 FROM public.seg_mfa_comercial WHERE actor=? AND creado>now()-interval '60 seconds')",Boolean.class,actor);
@@ -89,11 +91,11 @@ public class CommercialMfaService {
             VALUES(?,?,?,?,?,?,?,?,now()+interval '5 minutes')
             """,id,actor,jwt.getId(),proyecto,accion,huella,hash(destino),passwords.encode(codigo));
         db.update("DELETE FROM public.seg_mfa_comercial WHERE actor=? AND creado<now()-interval '7 days'",actor);
-        try{correo.enviarCodigoMfaComercial(destino,codigo,accion,proyecto);}
+        try{correo.enviarCodigoMfaComercial(destino,codigo,accion,nombreProyecto);}
         catch(RuntimeException e){throw fallo(HttpStatus.SERVICE_UNAVAILABLE,"No se pudo enviar el código de confirmación.");}
         int arroba=destino.indexOf('@');
         String oculto=destino.substring(0,1)+"***"+(arroba>0?destino.substring(arroba):"");
-        return Map.of("challengeId",id.toString(),"correo",oculto,"expiraEn",300,"reenviarEn",60);
+        return Map.of("challengeId",id.toString(),"correo",oculto,"proyectoNombre",nombreProyecto,"expiraEn",300,"reenviarEn",60);
     }
     @Transactional(noRollbackFor=ResponseStatusException.class)
     public Map<String,String> verificar(Jwt jwt,UUID id,String codigo){

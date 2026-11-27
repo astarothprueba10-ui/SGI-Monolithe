@@ -99,6 +99,18 @@ public class ConfiguracionProyectoService {
         return repository.versionPublicada(proyecto);
     }
 
+    public boolean cambianEtapas(Datos actual,Datos solicitud){
+        var a=normalizarCondiciones(actual).etapas();
+        var b=normalizarCondiciones(solicitud).etapas();
+        if(a.size()!=b.size())return true;
+        for(int i=0;i<a.size();i++){
+            var x=a.get(i);var y=b.get(i);
+            if(!x.codigo().equals(y.codigo())||!x.nombre().equals(y.nombre())||x.disponibilidad()!=y.disponibilidad()
+                ||x.tipoDescuento()!=y.tipoDescuento()||x.descuento().compareTo(y.descuento())!=0)return true;
+        }
+        return false;
+    }
+
     // Mantener el contrato v1 y los bloqueos históricos; ANTICIPADA equivale a REGULAR.
     static Datos normalizarCondiciones(Datos datos) {
         var etapas = datos.etapas().stream().map(e ->
