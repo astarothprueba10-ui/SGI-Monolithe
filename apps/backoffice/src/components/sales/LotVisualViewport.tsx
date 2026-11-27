@@ -4,7 +4,8 @@ import { clampVisualBox, fitVisualBox, zoomVisualBox, type VisualBox } from '../
 
 export function LotVisualViewport({full,focus,children}:{full:VisualBox;focus:VisualBox|null;children:(view:VisualBox)=>ReactNode}){
   const host=useRef<HTMLDivElement>(null);
-  const drag=useRef<{id:number;x:number;y:number;view:VisualBox;inverse:DOMMatrix}|null>(null);
+  const drag=useRef<{id:number;x:number;y:number;view:VisualBox;inverse:DOMMatrix;moving:boolean}|null>(null);
+  const suppressClick=useRef(false);
   const [aspect,setAspect]=useState(1.5);
   const [manual,setManual]=useState<VisualBox|null>(null);
   const [dragging,setDragging]=useState(false);
@@ -25,16 +26,17 @@ export function LotVisualViewport({full,focus,children}:{full:VisualBox;focus:Vi
   const scale=limit[2]/view[2];
   function zoom(factor:number){setManual(zoomVisualBox(limit,view,factor));}
   function down(e:PointerEvent<HTMLDivElement>){
+    suppressClick.current=false;
     if(scale<=1.0001||e.button!==0||!e.isPrimary)return;
     const matrix=e.currentTarget.querySelector('svg')?.getScreenCTM();
     if(!matrix)return;
-    drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,view:[...view],inverse:matrix.inverse()};
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(true);
+    drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,view:[...view],inverse:matrix.inverse(),moving:false};
   }
   function move(e:PointerEvent<HTMLDivElement>){
     const d=drag.current;
     if(!d||d.id!==e.pointerId)return;
+    if(!d.moving&&Math.hypot(e.clientX-d.x,e.clientY-d.y)<5)return;
+    if(!d.moving){d.moving=true;suppressClick.current=true;e.currentTarget.setPointerCapture(e.pointerId);setDragging(true);}
     const a=new DOMPoint(d.x,d.y).matrixTransform(d.inverse),c=new DOMPoint(e.clientX,e.clientY).matrixTransform(d.inverse);
     setManual(clampVisualBox(limit,[d.view[0]+a.x-c.x,d.view[1]+a.y-c.y,d.view[2],d.view[3]]));
   }
@@ -55,7 +57,9 @@ export function LotVisualViewport({full,focus,children}:{full:VisualBox;focus:Vi
     </div>
     <div ref={host} className={`h-[clamp(300px,43vh,440px)] w-full overflow-hidden rounded-lg border border-brand-100 bg-brand-50 ${dragging?'cursor-grabbing':scale>1.0001?'cursor-grab':''}`}
       style={{touchAction:scale>1.0001?'none':'auto',userSelect:'none'}}
-      onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}>
+      onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
+      onPointerLeave={e=>{if(!drag.current?.moving)end(e);}}
+      onClickCapture={e=>{if(suppressClick.current&&e.detail!==0){e.stopPropagation();suppressClick.current=false;}}}>
       {children(view)}
     </div>
   </div>;
