@@ -52,10 +52,15 @@ export type VisualLotAction = 'consultar'|'principal'|'adicional'|'venta'|'ningu
 export function visualLotAction(id:number,project:number,lots:readonly LoteResponse[],options:{
   operation:'Separacion'|'Venta';principal:number;adicionales:readonly number[];
   editorPrincipal:boolean;editorAdicional:boolean;puedeAgregar:boolean;
-  bloqueado:boolean;reservasBloqueadas:boolean;reservas:readonly number[];
+  bloqueado:boolean;reservasBloqueadas:boolean;reservas:readonly number[];ventaMultiple?:boolean;
 }):VisualLotAction {
   if(options.bloqueado||!lots.some(l=>l.idLote===id&&l.idProyecto===project&&l.activo))return 'ninguna';
   if(options.operation==='Venta'){
+    if(options.ventaMultiple){
+      if(id===options.principal||options.adicionales.includes(id)||options.reservas.includes(id))return 'consultar';
+      if(options.reservasBloqueadas||options.principal||options.adicionales.length)return options.puedeAgregar?'adicional':'ninguna';
+      return 'venta';
+    }
     if(options.reservasBloqueadas)return options.reservas.includes(id)?'consultar':'ninguna';
     return id===options.principal?'consultar':'venta';
   }
