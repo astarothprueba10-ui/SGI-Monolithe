@@ -1,4 +1,351 @@
 BEGIN;
+-- Mantener la validación histórica por lote y eliminar únicamente el bloqueo global.
+CREATE OR REPLACE FUNCTION public.sp_crm_validar_formalizacion_v6(p_actor bigint, p_prospecto bigint, p_lote bigint, p_modalidad character varying, p_monto_total numeric, p_monto_inicial numeric, p_numero_cuotas integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_persona BIGINT;
+    v_codigo_prospecto VARCHAR;
+    v_estado VARCHAR;
+    v_asesor BIGINT;
+    v_proyecto BIGINT;
+    v_codigo_lote VARCHAR;
+    v_estado_lote VARCHAR;
+    v_precio NUMERIC;
+    v_id_moneda INTEGER;
+    v_reserva_persona BIGINT;
+    v_monto_reserva NUMERIC;
+BEGIN
+    -- 1. Validar permiso para registrar ventas.
+    IF p_actor IS NULL OR p_actor <= 0
+       OR NOT COALESCE(
+           public.fn_usuario_tiene_permiso_seguridad(
+               p_actor, 'sales.create'
+           ), FALSE
+       )
+    THEN
+        RAISE EXCEPTION
+            'DENEGADO|Se requiere sales.create.';
+    END IF;
+
+    -- 2. Validar datos comerciales recibidos.
+    IF p_prospecto IS NULL OR p_prospecto <= 0
+       OR p_lote IS NULL OR p_lote <= 0
+       OR p_modalidad IS NULL
+       OR p_modalidad NOT IN ('CONTADO','FINANCIADA')
+       OR p_monto_total IS NULL
+       OR p_monto_total <= 0
+       OR p_monto_total <> ROUND(p_monto_total, 2)
+    THEN
+        RAISE EXCEPTION
+            'DATOS_INVALIDOS|Prospecto, lote, modalidad o monto invalido.';
+    END IF;
+
+    -- 3. NUEVO CANDADO DE SEGURIDAD.
+    -- Un asesor solo puede formalizar ventas
+    -- de prospectos de su cartera vigente.
+    -- Gerencia conserva su alcance global.
+    IF NOT COALESCE(
+        public.fn_crm_puede_consultar_prospecto(
+            p_actor,
+            p_prospecto
+        ), FALSE
+    )
+    THEN
+        RAISE EXCEPTION
+            'DENEGADO|No tiene autorizacion comercial sobre este prospecto.';
+    END IF;
+
+    -- Una reserva de otro lote no impide una nueva adquisición; no se traslada su crédito.
+    IF EXISTS(SELECT 1 FROM public.ven_reservas r JOIN public.crm_prospectos p ON p.id_persona=r.id_persona
+        JOIN public.cfg_estados_reserva e USING(id_estado_reserva)
+        WHERE p.id_prospecto=p_prospecto AND p.activo AND r.id_lote=p_lote AND e.codigo='PENDIENTE' AND r.fecha_vencimiento>now())
+    THEN RAISE EXCEPTION 'RESERVA_PENDIENTE|Finanzas debe aprobar la separación antes de formalizar.'; END IF;
+    IF EXISTS(SELECT 1 FROM public.crm_solicitudes_cambio_reserva_v1 c WHERE c.id_prospecto=p_prospecto AND (c.id_lote_anterior=p_lote OR c.id_lote_nuevo=p_lote) AND c.estado='PENDIENTE')
+    THEN RAISE EXCEPTION 'OPERACION_INVALIDA|Existe una solicitud de cambio de este lote pendiente de resolución.'; END IF;
+
+    -- 4. Validar modalidad y condiciones de pago.
+    IF p_modalidad = 'FINANCIADA' THEN
+
+        IF p_monto_inicial IS NULL
+           OR p_monto_inicial <= 0
+           OR p_monto_inicial >= p_monto_total
+           OR p_monto_inicial <> ROUND(p_monto_inicial, 2)
+           OR p_numero_cuotas IS NULL
+           OR p_numero_cuotas NOT BETWEEN 1 AND 36
+        THEN
+            RAISE EXCEPTION
+                'DATOS_INVALIDOS|Condiciones de financiamiento invalidas.';
+        END IF;
+
+    ELSIF COALESCE(p_monto_inicial, 0) <> 0
+       OR p_numero_cuotas IS NOT NULL
+    THEN
+        RAISE EXCEPTION
+            'DATOS_INVALIDOS|La venta al contado no debe incluir cuotas ni inicial.';
+    END IF;
+
+    -- 5. Validar prospecto y estado comercial.
+    SELECT
+        p.id_persona,
+        p.codigo,
+        e.codigo
+    INTO
+        v_persona,
+        v_codigo_prospecto,
+        v_estado
+
+    FROM public.crm_prospectos p
+
+    JOIN public.core_personas per
+        ON per.id_persona = p.id_persona
+       AND per.activo
+
+    JOIN public.cfg_estados_prospecto e
+        ON e.id_estado_prospecto = p.id_estado_prospecto
+
+    WHERE p.id_prospecto = p_prospecto
+      AND p.activo;
+
+    IF NOT FOUND
+       OR v_estado NOT IN ('INTERESADO','NEGOCIACION','CON_RESERVA','CONVERTIDO')
+    THEN
+        RAISE EXCEPTION
+            'PROSPECTO_NO_ELEGIBLE|Se requiere un potencial activo.';
+    END IF;
+
+    -- 6. Una persona CONVERTIDA puede volver a comprar, pero solo si existe contrato formalizado. 
+    --    Conserva el cliente y su identidad; no habilita un prospecto convertido por error.
+    IF v_estado='CONVERTIDO' AND NOT EXISTS (
+        SELECT 1
+        FROM public.crm_clientes c
+
+        JOIN public.ven_ventas_clientes vc
+            ON vc.id_cliente = c.id_cliente
+
+        JOIN public.ven_ventas v
+            ON v.id_venta = vc.id_venta
+
+        JOIN public.cfg_estados_venta ev
+            ON ev.id_estado_venta = v.id_estado_venta
+
+        JOIN public.ven_contratos ct
+            ON ct.id_venta = v.id_venta
+
+        JOIN public.cfg_estados_contrato ec
+            ON ec.id_estado_contrato =
+               ct.id_estado_contrato
+
+        WHERE c.id_persona = v_persona
+          AND c.activo
+
+          AND ev.codigo IN (
+              'CONFIRMADA',
+              'CONTRATADA',
+              'COMPLETADA'
+          )
+
+          AND ec.codigo IN (
+              'VIGENTE',
+              'FINALIZADO'
+          )
+    )
+    THEN
+        RAISE EXCEPTION
+            'PROSPECTO_NO_ELEGIBLE|El comprador convertido no tiene una venta formalizada verificable.';
+    END IF;
+
+    -- 7. Obtener asesor comercial activo.
+    SELECT a.id_asesor
+    INTO v_asesor
+
+    FROM public.com_asignaciones_prospecto a
+
+    JOIN public.com_asesores ca
+        ON ca.id_asesor = a.id_asesor
+
+    JOIN public.cfg_estados_asesor ea
+        ON ea.id_estado_asesor = ca.id_estado_asesor
+
+    WHERE a.id_prospecto = p_prospecto
+      AND a.fecha_fin IS NULL
+      AND ea.codigo = 'ACTIVO'
+      AND ca.fecha_inicio <= CURRENT_DATE
+      AND (
+          ca.fecha_fin IS NULL
+          OR ca.fecha_fin >= CURRENT_DATE
+      )
+
+    ORDER BY
+        a.fecha_asignacion DESC,
+        a.id_asignacion_prospecto DESC
+
+    LIMIT 1;
+
+    IF v_asesor IS NULL THEN
+        RAISE EXCEPTION
+            'ASESOR_INVALIDO|Se requiere un asesor comercial activo asignado.';
+    END IF;
+
+    -- 8. Validar disponibilidad del lote.
+    SELECT
+        l.id_proyecto,
+        l.codigo,
+        el.codigo
+    INTO
+        v_proyecto,
+        v_codigo_lote,
+        v_estado_lote
+
+    FROM public.inm_lotes l
+
+    JOIN public.cfg_estados_lote el
+        ON el.id_estado_lote = l.id_estado_lote
+
+    WHERE l.id_lote = p_lote
+      AND l.activo;
+
+    IF NOT FOUND
+       OR v_estado_lote NOT IN ('DISPONIBLE','RESERVADO')
+    THEN
+        RAISE EXCEPTION
+            'LOTE_NO_DISPONIBLE|El lote no esta disponible para formalizar.';
+    END IF;
+
+    -- 9. Comprobar proyecto de interes.
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.crm_prospectos_intereses i
+        WHERE i.id_prospecto = p_prospecto
+          AND i.id_proyecto = v_proyecto
+          AND i.activo
+    )
+    AND v_estado <> 'CONVERTIDO'
+    THEN
+        RAISE EXCEPTION
+            'PROYECTO_INVALIDO|El lote no pertenece al proyecto de interes.';
+    END IF;
+
+    -- 10. Comprobar ventas anteriores del lote.
+    IF EXISTS (
+        SELECT 1
+        FROM public.ven_ventas v
+
+        JOIN public.cfg_estados_venta ev
+            ON ev.id_estado_venta = v.id_estado_venta
+
+        WHERE v.id_lote = p_lote
+          AND ev.codigo <> 'ANULADA'
+    )
+    THEN
+        RAISE EXCEPTION
+            'VENTA_EXISTENTE|El lote ya tiene una venta no anulada.';
+    END IF;
+
+    -- 11. Verificar reserva vigente.
+    SELECT r.id_persona, r.monto_reserva
+    INTO v_reserva_persona,v_monto_reserva
+
+    FROM public.ven_reservas r
+
+    JOIN public.cfg_estados_reserva er
+        ON er.id_estado_reserva = r.id_estado_reserva
+
+    WHERE r.id_lote = p_lote
+      AND er.codigo = 'VIGENTE'
+      AND r.fecha_vencimiento > NOW()
+
+    ORDER BY r.fecha_reserva DESC
+
+    LIMIT 1;
+
+    IF v_estado_lote = 'RESERVADO' THEN
+
+        IF v_reserva_persona IS NULL
+           OR v_reserva_persona <> v_persona
+        THEN
+            RAISE EXCEPTION
+                'RESERVA_INVALIDA|Se requiere reserva vigente del mismo comprador.';
+        END IF;
+
+        -- La separacion acreditada se descuenta de la inicial, no del capital.
+        IF p_modalidad='FINANCIADA' AND p_monto_inicial<v_monto_reserva THEN
+            RAISE EXCEPTION
+                'INICIAL_INVALIDA|La inicial debe ser al menos el monto de separacion.';
+        END IF;
+
+    ELSIF v_reserva_persona IS NOT NULL THEN
+
+        RAISE EXCEPTION
+            'RESERVA_INVALIDA|El lote tiene una reserva vigente inconsistente.';
+    END IF;
+
+    -- 12. Obtener moneda.
+    SELECT m.id_moneda
+    INTO v_id_moneda
+    FROM public.cfg_monedas m
+    WHERE m.codigo = 'PEN'
+      AND m.activo
+    LIMIT 1;
+
+    IF v_id_moneda IS NULL THEN
+        RAISE EXCEPTION
+            'CONFIGURACION_INVALIDA|Moneda PEN no configurada.';
+    END IF;
+
+    -- 13. Validar precio vigente.
+    SELECT lp.precio
+    INTO v_precio
+
+    FROM public.inm_lotes_precios lp
+
+    WHERE lp.id_lote = p_lote
+      AND lp.activo
+      AND lp.id_moneda = v_id_moneda
+      AND lp.fecha_desde <= NOW()
+      AND (
+          lp.fecha_hasta IS NULL
+          OR lp.fecha_hasta > NOW()
+      )
+
+    ORDER BY
+        lp.fecha_desde DESC,
+        lp.id_lote_precio DESC
+
+    LIMIT 1;
+
+    IF v_precio IS NULL OR v_precio <= 0 THEN
+        RAISE EXCEPTION
+            'PRECIO_NO_DISPONIBLE|El lote no tiene un precio vigente en PEN.';
+    END IF;
+
+    IF ROUND(v_precio, 2) <> p_monto_total THEN
+        RAISE EXCEPTION
+            'PRECIO_NO_COINCIDE|El monto debe coincidir con el precio vigente.';
+    END IF;
+
+    -- 14. Conservar contrato de respuesta JSON.
+    RETURN JSONB_BUILD_OBJECT(
+        'elegible', TRUE,
+        'idProspecto', p_prospecto,
+        'codigoProspecto', v_codigo_prospecto,
+        'idPersona', v_persona,
+        'idAsesor', v_asesor,
+        'idLote', p_lote,
+        'codigoLote', v_codigo_lote,
+        'idProyecto', v_proyecto,
+        'modalidad', p_modalidad,
+        'precioVigente', ROUND(v_precio, 2),
+        'idMoneda', v_id_moneda,
+        'mensaje',
+            'Validacion comercial preliminar satisfactoria.'
+    );
+END;
+$function$;
+
 -- Formalización conjunta de lotes disponibles y reservas propias vigentes.
 -- Se conserva la función histórica v1 para clientes anteriores.
 CREATE OR REPLACE FUNCTION public.sp_crm_registrar_ventas_multiples_v2(p_actor bigint,p_ventas jsonb)
