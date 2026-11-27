@@ -11,6 +11,9 @@ export const projectSvgService = {
     form.append('archivo', archivo, archivo.name);
     return coreApi.post<ArchivoCadInfo>(`/planos/proyecto/${proyecto}/archivos`, form);
   },
+  eliminarOriginal(proyecto:number,id:number):Promise<{vistaEliminada:boolean}> {
+    return coreApi.delete(`/planos/proyecto/${proyecto}/archivos/${id}`);
+  },
   enlaceDescarga(proyecto: number, id: number): Promise<{url:string;caducaSegundos:number;nombre:string}> {
     return coreApi.get(`/planos/proyecto/${proyecto}/archivos/${id}/enlace`);
   },
