@@ -75,3 +75,16 @@ test('descarta trazos abiertos, círculos decorativos y polígonos de fondo',()=
   assert.equal(figuraVinculable(figura('polygon',{points:'0,0 100,0 100,100 0,100'}),box),false);
   assert.equal(figuraVinculable(figura('polygon',{points:'10,10 20,10 20,20 10,20',fill:'#c4f1dc'}),box),true);
 });
+
+test('guardar asociaciones usa cambios mínimos y los símbolos zoom no se duplican',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const leer=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+  const panel=leer('components/projects/detail/ProjectSvgPanel.tsx');
+  const servicio=leer('services/projectSvgService.ts');
+  assert.match(panel,/projectSvgService\.guardarAsociaciones\(proyecto,revision,cambios\)/);
+  assert.match(panel,/e\.codigoLote!==documento\.elementos\[indice\]\?\.codigoLote/);
+  assert.match(servicio,/svg\/asociaciones/);
+  assert.doesNotMatch(panel,/icon=\{MinusIcon\}[^\n]*>−<\/Button>/);
+  assert.doesNotMatch(panel,/icon=\{PlusIcon\}[^\n]*>\+<\/Button>/);
+  assert.ok(panel.indexOf('Guardar vista SVG')>panel.indexOf('Salir de asociaciones'));
+});
