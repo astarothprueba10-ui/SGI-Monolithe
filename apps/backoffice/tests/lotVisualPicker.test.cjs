@@ -1,7 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
-const {selectedVisualLot,focusBox,hasSvgLot,fitVisualBox,clampVisualBox,zoomVisualBox,matrixFocusBox,visualLotAction}=require('../src/lib/lotVisualFocus.ts');
+const {selectedVisualLot,focusBox,hasSvgLot,fitVisualBox,clampVisualBox,zoomVisualBox,matrixFocusBox,visualLotAction,interpolateVisualBox,sameVisualBox}=require('../src/lib/lotVisualFocus.ts');
 const lot=(id,project=2,activo=true)=>({idLote:id,idProyecto:project,idManzana:1,codigo:'L'+id,activo});
 const lots=[lot(1),lot(2),lot(3,3),lot(4,2,false)];
 test('previsualiza candidatos antes de confirmar y limita al inventario autorizado del proyecto',()=>{
@@ -108,4 +108,42 @@ test('la interacción compartida conserva permisos, selección por teclado y sep
   assert.match(svg,/lotesSeleccionables\?\.has\(lote.idLote\)/);
   assert.match(viewport,/Math.hypot\(e.clientX-d.x,e.clientY-d.y\)<5/);
   assert.match(viewport,/onClickCapture/);
+});
+
+test('transición de cámara conserva extremos, proporciones y encuadre dentro del plano',()=>{
+  const full=fitVisualBox([0,0,1000,800],1.5);
+  const target=zoomVisualBox(full,full,3);
+  assert.ok(sameVisualBox(interpolateVisualBox(full,target,0),full));
+  assert.ok(sameVisualBox(interpolateVisualBox(full,target,1),target));
+  assert.ok(sameVisualBox(interpolateVisualBox(full,target,-1),full));
+  assert.ok(sameVisualBox(interpolateVisualBox(full,target,2),target));
+  let last=full;
+  for(let i=1;i<=20;i++){
+    const box=interpolateVisualBox(full,target,i/20);
+    assert.ok(Math.abs(box[2]/box[3]-1.5)<1e-6);
+    assert.ok(box[2]<=last[2]+1e-6);
+    assert.ok(sameVisualBox(box,clampVisualBox(full,box)));
+    last=box;
+  }
+});
+test('el visor conserva las figuras durante el zoom y respeta movimiento reducido',()=>{
+  const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+  const panel=read('components/sales/LotVisualPickerPanel.tsx');
+  const viewport=read('components/sales/LotVisualViewport.tsx');
+  const svg=read('components/projects/detail/PlanSvgShapes.tsx');
+  const sales=read('pages/Sales.tsx');
+  assert.match(viewport,/prefers-reduced-motion: reduce/);
+  assert.match(viewport,/interpolateVisualBox\(previous,next,t\)/);
+  assert.match(viewport,/dragFrame.current===null/);
+  assert.match(viewport,/cancelAnimationFrame/);
+  assert.match(viewport,/manual\?\.key===resetKey/);
+  assert.match(svg,/const figuras=useMemo/);
+  assert.match(panel,/const shapes=<>/);
+  assert.match(panel,/measurements.current=\{document,lots,boxes\}/);
+  assert.doesNotMatch(panel,/key=\{\x60(?:svg|matriz)-\$\{selected/);
+  assert.match(panel,/resetKey=\{resetKey\}/);
+  assert.match(sales,/operacion-lotes-formulario/);
+  assert.match(sales,/operacion-lotes-visor/);
+  assert.match(sales,/lg:overflow-y-auto/);
+  assert.match(sales,/Volver a lotes seleccionados/);
 });
