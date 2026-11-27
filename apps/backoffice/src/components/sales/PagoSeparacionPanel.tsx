@@ -65,11 +65,12 @@ export function PagoSeparacionPanel({pagos,total,validacion,disabled,onChange,nu
           onChange={e=>editar(p.id,{referencia:e.target.value})} placeholder="Referencia de la transacción"/>
       </label>}
       <div className="space-y-2 rounded-lg border border-dashed border-brand-200 p-3">
-        <label className="block text-xs font-semibold text-brand-800" htmlFor={`abono-archivo-${p.id}`}>Comprobante de pago *</label>
+        <label className="block text-xs font-semibold text-brand-800" htmlFor={`abono-archivo-${p.id}`}>Comprobante de pago {p.metodo==='EFECTIVO'?'(opcional)':'*'}</label>
         <input id={`abono-archivo-${p.id}`} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" disabled={disabled}
           className="block w-full min-w-0 text-xs text-brand-700 file:mr-3 file:rounded-md file:border file:border-brand-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold"
           onChange={e=>{const archivo=e.target.files?.[0];e.target.value='';if(archivo)void adjuntar(p.id,archivo)}}/>
         <p className="text-xs text-brand-500">PDF, JPG, PNG o WebP · máximo 5 MB por archivo.</p>
+        {p.metodo==='EFECTIVO'&&!p.archivo&&<p className="text-xs text-brand-600">No necesitas adjuntar un archivo. Se generará una declaración interna pendiente de verificación de caja por Finanzas.</p>}
         {p.archivo&&<div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <span className="min-w-0 break-all text-xs text-brand-700"><FileTextIcon className="mr-1 inline h-4 w-4"/>{p.archivo.name}</span>
           <Button type="button" size="sm" variant="secondary" disabled={disabled} onClick={()=>actualizar(p.id,{archivo:null,hashSha256:null,verificandoArchivo:false,errorArchivo:null})}>Quitar archivo</Button>
@@ -86,7 +87,7 @@ export function PagoSeparacionPanel({pagos,total,validacion,disabled,onChange,nu
       {diferencia!==null&&<div className={`flex flex-wrap justify-between gap-2 border-t border-brand-100 pt-2 ${diferencia===0?'text-emerald-800':'text-amber-800'}`}>
         <span>{diferencia>0?'Importe faltante':diferencia<0?'Exceso de pago':'Importes coinciden'}</span><strong>{formatSoles(Math.abs(diferencia)/100)}</strong>
       </div>}
-      {diferencia===0&&<p className="text-xs text-brand-500">{validacion.valido?'Comprobantes adjuntos; sujetos a revisión por Finanzas.':'Completa las referencias y comprobantes pendientes.'}</p>}
+      {diferencia===0&&<p className="text-xs text-brand-500">{validacion.valido?'Abonos declarados; sujetos a revisión por Finanzas.':'Completa las referencias y los documentos requeridos.'}</p>}
     </div>
   </section>;
 }
