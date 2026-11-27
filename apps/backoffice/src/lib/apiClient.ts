@@ -18,7 +18,8 @@ export class ApiError extends Error {
 }
 
 interface ApiClientOptions extends Omit<RequestInit, 'body'> {
-  body?: BodyInit | Record<string, unknown> | null;
+  // Las operaciones masivas también aceptan arreglos JSON; se serializan igual que los objetos.
+  body?: BodyInit | Record<string, unknown> | readonly unknown[] | null;
 }
 
 type RefreshTokenResponse = {
