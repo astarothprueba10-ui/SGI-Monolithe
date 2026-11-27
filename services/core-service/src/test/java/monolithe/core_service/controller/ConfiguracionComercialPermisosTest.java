@@ -39,9 +39,10 @@ class ConfiguracionComercialPermisosTest {
             ctx.refresh();
             var api=ctx.getBean(ConfiguracionProyectoController.class);
             autenticar("ROLE_SUPERVISOR_COMERCIAL","projects.view","lots.view");
-            assertDoesNotThrow(()->{api.obtener(2L);api.estadoPublicacion(2L);api.gestion(2L);});
+            assertDoesNotThrow(()->{api.obtener(2L);api.estadoPublicacion(2L);api.gestion(2L);api.detalle(2L);});
             verify(config).obtener(2L);
             verify(publicacion).gestion(2L);
+            verify(publicacion).consultarDetalle(2L);
             // Incluso con permisos de edición añadidos, el rol supervisor no puede mutar.
             autenticar("ROLE_SUPERVISOR_COMERCIAL","projects.view","lots.view","projects.edit","lots.edit");
             assertThrows(AccessDeniedException.class,()->api.guardar(2L,null,null,null));
@@ -59,10 +60,11 @@ class ConfiguracionComercialPermisosTest {
             assertThrows(AccessDeniedException.class,()->api.obtener(2L));
             assertThrows(AccessDeniedException.class,()->api.estadoPublicacion(2L));
             assertThrows(AccessDeniedException.class,()->api.gestion(2L));
+            assertThrows(AccessDeniedException.class,()->api.detalle(2L));
             autenticar("ROLE_SUPERVISOR_COMERCIAL","projects.view");
             assertThrows(AccessDeniedException.class,()->api.obtener(2L));
             autenticar("ROLE_GERENCIA","projects.view","projects.edit","lots.edit");
-            assertDoesNotThrow(()->{api.obtener(2L);api.estadoPublicacion(2L);api.gestion(2L);});
+            assertDoesNotThrow(()->{api.obtener(2L);api.estadoPublicacion(2L);api.gestion(2L);api.detalle(2L);});
         }finally{SecurityContextHolder.clearContext();}
     }
 }
