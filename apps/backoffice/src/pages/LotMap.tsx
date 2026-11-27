@@ -113,10 +113,10 @@ const REAL_STATUSES: StatusFilter[] = [
   {
     code: 'BLOQUEADO_COMERCIALMENTE',
     label: 'Bloqueados comercialmente',
-    dotColor: 'bg-gray-400',
-    badgeStyle: 'bg-gray-100 border-gray-300 text-gray-700',
-    polygonFill: '#9ca3af',
-    polygonStroke: '#4b5563'
+    dotColor: 'bg-amber-600',
+    badgeStyle: 'bg-amber-50 border-amber-300 text-amber-800',
+    polygonFill: '#d97706',
+    polygonStroke: '#92400e'
   },
   {
     code: 'NO_DISPONIBLE',
@@ -422,56 +422,35 @@ export function LotMap() {
     }
   };
 
-  const handlePointerMove = (e: React.PointerEvent<SVGPolygonElement>) => {
-    const drag = dragStateRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-
-    const svgPt = clientToSvgPoint(e.clientX, e.clientY);
-    if (!svgPt) return;
-
+  const dragPosition = (e: React.PointerEvent<SVGPolygonElement>, drag: DragState) => {
+    const point=clientToSvgPoint(e.clientX,e.clientY);
+    if(!point)return null;
     const snap=(delta:number)=>snapEnabled?Math.round(delta/SNAP_SIZE)*SNAP_SIZE:Math.round(delta);
     const b=bounds(drag.originalPoints);
-    const dx=Math.max(-b.left,Math.min(editorSize.width-b.right,snap(svgPt.x-drag.startX)));
-    const dy=Math.max(-b.top,Math.min(editorSize.height-b.bottom,snap(svgPt.y-drag.startY)));
-
-    setDraftGeometries((prev) =>
-      prev.map((g) => {
-        if (g.idLote !== drag.idLote) return g;
-
-        return {
-          ...g,
-          puntos: drag.originalPoints.map((p) => ({
-            x: Math.round(p.x + dx),
-            y: Math.round(p.y + dy)
-          })),
-          etiquetaX:
-            drag.originalEtiquetaX != null
-              ? Math.round(drag.originalEtiquetaX + dx)
-              : null,
-          etiquetaY:
-            drag.originalEtiquetaY != null
-              ? Math.round(drag.originalEtiquetaY + dy)
-              : null
-        };
-      })
-    );
+    const dx=Math.max(-b.left,Math.min(editorSize.width-b.right,snap(point.x-drag.startX)));
+    const dy=Math.max(-b.top,Math.min(editorSize.height-b.bottom,snap(point.y-drag.startY)));
+    const round=(v:number)=>Math.round(v*10000)/10000;
+    return {puntos:drag.originalPoints.map(p=>({x:round(p.x+dx),y:round(p.y+dy)})),
+      etiquetaX:drag.originalEtiquetaX==null?null:round(drag.originalEtiquetaX+dx),
+      etiquetaY:drag.originalEtiquetaY==null?null:round(drag.originalEtiquetaY+dy)};
   };
-
+  const handlePointerMove = (e: React.PointerEvent<SVGPolygonElement>) => {
+    const drag=dragStateRef.current;
+    if(!drag||drag.pointerId!==e.pointerId)return;
+    const position=dragPosition(e,drag);
+    if(position)setDraftGeometries(prev=>prev.map(g=>g.idLote===drag.idLote?{...g,...position}:g));
+  };
   const handlePointerUp = (e: React.PointerEvent<SVGPolygonElement>) => {
-    const drag = dragStateRef.current;
-    if (drag && drag.pointerId === e.pointerId) {
-      try {
-        (e.currentTarget as Element).releasePointerCapture(e.pointerId);
-      } catch {
-        // ignore
-      }
-      dragStateRef.current = null;
-      const current=draftGeometries.find(g=>g.idLote===drag.idLote);
-      if(e.type==='pointercancel'||(current&&draftGeometries.some(g=>g.idLote!==drag.idLote&&overlaps(current.puntos,g.puntos)))){
-        setDraftGeometries(prev=>prev.map(g=>g.idLote===drag.idLote?{...g,puntos:drag.originalPoints,etiquetaX:drag.originalEtiquetaX,etiquetaY:drag.originalEtiquetaY}:g));
-        if(e.type!=='pointercancel')toast.info('La posición está ocupada. Suelta el lote en un espacio libre.');
-      }
-    }
+    const drag=dragStateRef.current;
+    if(!drag||drag.pointerId!==e.pointerId)return;
+    const position=e.type==='pointerup'?dragPosition(e,drag):null;
+    const occupied=position&&draftGeometries.some(g=>g.idLote!==drag.idLote&&overlaps(position.puntos,g.puntos));
+    const finalPosition=position&&!occupied?position:{
+      puntos:drag.originalPoints,etiquetaX:drag.originalEtiquetaX,etiquetaY:drag.originalEtiquetaY};
+    dragStateRef.current=null;
+    setDraftGeometries(prev=>prev.map(g=>g.idLote===drag.idLote?{...g,...finalPosition}:g));
+    if(occupied)toast.info('La posición está ocupada. Suelta el lote en un espacio libre.');
+    try{if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}catch{/* captura ya liberada */}
   };
 
   const { persistedCount, autoCount } = useMemo(() => {
@@ -846,7 +825,7 @@ export function LotMap() {
                         patternUnits="userSpaceOnUse"
                       >
                         <path
-                          d="M 20 0 L 0 0 0 20"
+                          d="M 10 0 L 0 0 0 10"
                           fill="none"
                           stroke="#cbd5e1"
                           strokeWidth="0.6"
@@ -921,6 +900,7 @@ export function LotMap() {
                             onPointerMove={handlePointerMove}
                             onPointerUp={handlePointerUp}
                             onPointerCancel={handlePointerUp}
+                            onLostPointerCapture={handlePointerUp}
                           >
                             <title>
                               {geom.codigoLote} - {lote?.nombreEstadoLote || lote?.codigoEstadoLote || 'Sin estado'}
