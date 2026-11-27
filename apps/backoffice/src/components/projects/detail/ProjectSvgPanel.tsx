@@ -10,9 +10,9 @@ import type { LoteResponse } from '../../../types/core';
 import type { ArchivoCadInfo, PlanoSvgDocumento } from '../../../types/projectSvg';
 
 export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, seleccionado, onSelect,
-  puedeConfigurar, soloMiniatura=false }: {
+  puedeConfigurar, soloMiniatura=false, revision=null }: {
   proyecto:number; lotes:LoteResponse[]; documento:PlanoSvgDocumento|null;
-  onSave:(doc:PlanoSvgDocumento)=>void; seleccionado:number|null;
+  revision?:string|null; onSave:(doc:PlanoSvgDocumento,revision?:string)=>void; seleccionado:number|null;
   onSelect:(id:number)=>void; puedeConfigurar:boolean; soloMiniatura?:boolean;
 }) {
   const [borrador,setBorrador]=useState<PlanoSvgDocumento|null>(null);
@@ -92,17 +92,29 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
     if(!borrador || guardando)return;
     if(errores.length){setError('Retira las asociaciones incorrectas antes de guardar.');return;}
     setGuardando(true);setError('');
+    const inicio=performance.now();
     try{
+      if(documento && revision && !archivoSvg){
+        const cambios=borrador.elementos.flatMap((e,indice)=>e.codigoLote!==documento.elementos[indice]?.codigoLote
+          ? [{indice,codigoLote:e.codigoLote}]:[]);
+        if(cambios.length){
+          const respuesta=await projectSvgService.guardarAsociaciones(proyecto,revision,cambios);
+          onSave(borrador,respuesta.fechaActualizacion);
+        }
+        setBorrador(null);setFigura(null);setLoteVincular('');
+        toast.success('Asociaciones guardadas correctamente.');
+        return;
+      }
       // El original se guarda separado del JSON sanitizado de visualización.
       if(archivoSvg){
         const original=await projectSvgService.subirOriginal(proyecto,archivoSvg);
         setOriginales(prev=>[original,...prev.filter(f=>f.id!==original.id)].sort((a,b)=>b.version-a.version));
       }
       const respuesta=await projectSvgService.guardar(proyecto,borrador);
-      onSave(respuesta.documento);setBorrador(null);setArchivoSvg(null);
+      onSave(respuesta.documento,respuesta.fechaActualizacion);setBorrador(null);setArchivoSvg(null);
       toast.success('Plano SVG vinculado al proyecto. Los precios y estados siguen en el inventario.');
     }catch(e:unknown){setError(e instanceof Error?e.message:'No se pudo guardar el plano.');}
-    finally{setGuardando(false);}
+    finally{setGuardando(false);console.info('[SVG] Tiempo de guardado HTTP y cliente (ms)',Math.round(performance.now()-inicio));}
   }
 
   function vincular() {
@@ -145,8 +157,6 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
           className="hidden" aria-label="Archivo de plano DWG o SVG"
           onChange={e=>{const file=e.target.files?.[0];if(file)void importar(file);e.target.value='';}}/>
         <Button icon={FileUpIcon} disabled={guardando} onClick={()=>input.current?.click()}>Importar DWG / SVG</Button>
-        <Button icon={SaveIcon} variant="primary" disabled={!borrador || guardando || errores.length>0}
-          onClick={()=>void guardar()}>{guardando?'Guardando…':'Guardar vista SVG'}</Button>
       </div>}
     </div>
     {originales.length>0 && <section className="space-y-2 rounded-xl border border-brand-200 p-4">
@@ -164,15 +174,18 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
     </section>}
     {actual && <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-2" aria-label="Controles de zoom">
-        <Button size="sm" icon={MinusIcon} disabled={escala<=1.00001} onClick={()=>cambiarZoom(1/1.5)}>−</Button>
+        <Button size="sm" icon={MinusIcon} aria-label="Reducir zoom" title="Reducir zoom" disabled={escala<=1.00001} onClick={()=>cambiarZoom(1/1.5)}/>
         <span className="min-w-16 text-center text-sm font-semibold tabular-nums">{Math.round(escala*100)} %</span>
-        <Button size="sm" icon={PlusIcon} disabled={escala>=15.999} onClick={()=>cambiarZoom(1.5)}>+</Button>
+        <Button size="sm" icon={PlusIcon} aria-label="Ampliar zoom" title="Ampliar zoom" disabled={escala>=15.999} onClick={()=>cambiarZoom(1.5)}/>
         <Button size="sm" icon={MaximizeIcon} onClick={()=>setVista(null)}>Ajustar</Button>
       </div>
-      {puedeConfigurar && <Button size="sm" disabled={guardando} variant={editando?'primary':undefined}
+      {puedeConfigurar && <div className="ml-auto flex flex-wrap items-center justify-end gap-2"><Button size="sm" disabled={guardando} variant={editando?'primary':undefined}
         onClick={()=>{setEditando(v=>!v);setFigura(null);setLoteVincular('');setConfirmarReemplazo(false);setError('');}}>
         {editando?'Salir de asociaciones':'Configurar asociaciones'}
-      </Button>}
+      </Button>
+      <Button size="sm" icon={SaveIcon} variant="primary" disabled={!borrador || guardando || errores.length>0}
+        onClick={()=>void guardar()}>{guardando?'Guardando…':'Guardar vista SVG'}</Button>
+      </div>}
       <p className="w-full text-xs text-brand-500">Amplía con + y arrastra el plano para desplazarte. Un clic selecciona la figura.</p>
     </div>}
     {actual && puedeConfigurar && errores.length>0 && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
