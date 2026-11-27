@@ -153,7 +153,11 @@ public class PublicacionComercialService {
         exigirIntegridadPublicacion();
         int version = repository.versionPublicada(proyecto);
         if (version <= 0) throw new ConflictoNegocioException("Finaliza primero la configuración inicial.");
-        var config = configuracion.obtener(proyecto);
+        return gestionConConfiguracion(proyecto,version,configuracion.obtener(proyecto));
+    }
+
+    // Solo lectura: reutiliza la configuración obtenida en esta petición.
+    private Respuesta gestionConConfiguracion(Long proyecto,int version,ConfiguracionProyectoResponse config) {
         if (config.version()!=version) throw new ConflictoNegocioException("La configuración consultada no coincide con la publicación vigente.");
         var evento = repository.ultimoEstado(proyecto,version);
         if (evento.isPresent()) {
@@ -163,6 +167,21 @@ public class PublicacionComercialService {
         }
         // Las publicaciones anteriores no registraban la selección explícita. Nunca deducirla del inventario.
         return new Respuesta(version,0,true,conTarifario(new Estado(repository.etapasHistoricas(proyecto,version),config.datos().tarifas()),config));
+    }
+
+    public record ConsultaDetalle(ConfiguracionProyectoResponse configuracion,int versionPublicada,Respuesta gestion) {}
+
+    @Transactional(readOnly=true)
+    public ConsultaDetalle consultarDetalle(Long proyecto) {
+        long inicio=System.nanoTime();
+        int version=repository.versionPublicada(proyecto);
+        if(version>0)exigirIntegridadPublicacion();
+        var config=configuracion.obtener(proyecto);
+        var gestion=version>0?gestionConConfiguracion(proyecto,version,config):null;
+        if(repository.versionPublicada(proyecto)!=version)
+            throw new ConflictoNegocioException("La publicación cambió durante la consulta. Reintenta.");
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle comercial proyecto={} totalMs={}",proyecto,(System.nanoTime()-inicio)/1_000_000);
+        return new ConsultaDetalle(config,version,gestion);
     }
 
     @Transactional(readOnly=true)
