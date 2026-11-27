@@ -41,11 +41,12 @@ public class ConfiguracionProyectoService {
         }
         var actual = obtener(proyecto);
         if (solicitud.version() != actual.version()) conflicto();
-        ConfiguracionProyectoValidator.validar(solicitud.datos(), actual.manzanas(), actual.lotes());
-        ConfiguracionProyectoValidator.validarTarifas(solicitud.datos(), actual.zonas(), actual.monedas());
+        var datos = normalizarCondiciones(solicitud.datos());
+        ConfiguracionProyectoValidator.validar(datos, actual.manzanas(), actual.lotes());
+        ConfiguracionProyectoValidator.validarTarifas(datos, actual.zonas(), actual.monedas());
         int siguiente = actual.version() + 1;
-        if (!repository.insertar(proyecto, siguiente, escribir(solicitud.datos()), actor)) conflicto();
-        return new ConfiguracionProyectoResponse(siguiente, solicitud.datos(), actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
+        if (!repository.insertar(proyecto, siguiente, escribir(datos), actor)) conflicto();
+        return new ConfiguracionProyectoResponse(siguiente, datos, actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
     }
 
     // Importar, guardar borrador y publicar comparten el bloqueo por proyecto.
@@ -58,6 +59,16 @@ public class ConfiguracionProyectoService {
     public int versionPublicada(Long proyecto) {
         obtenerProyecto(proyecto);
         return repository.versionPublicada(proyecto);
+    }
+
+    // Mantener el contrato v1 y los bloqueos históricos; ANTICIPADA equivale a REGULAR.
+    static Datos normalizarCondiciones(Datos datos) {
+        var etapas = datos.etapas().stream().map(e ->
+            e.disponibilidad() == ConfiguracionProyectoRequest.Disponibilidad.ANTICIPADA
+                ? new ConfiguracionProyectoRequest.Etapa(e.codigo(), e.nombre(),
+                    ConfiguracionProyectoRequest.Disponibilidad.REGULAR, e.tipoDescuento(), e.descuento())
+                : e).toList();
+        return new Datos(etapas, datos.manzanas(), datos.lotes(), datos.tarifas());
     }
 
     private Proyecto obtenerProyecto(Long id) {

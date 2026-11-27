@@ -13,9 +13,9 @@ export function estadoInventarioLegible(codigo: string): string {
 
 export function condicionComercialLegible(codigo: string | null): string {
   const nombres: Record<string, string> = {
-    PROMOCION: 'Disponible con promoción',
+    PROMOCION: 'Precio promocional',
     REGULAR: 'Precio regular',
-    ANTICIPADA: 'Venta anticipada',
+    ANTICIPADA: 'Precio regular',
     BLOQUEADA: 'Bloqueada comercialmente'
   };
   return codigo ? nombres[codigo] ?? codigo.replace(/_/g, ' ') : 'Sin etapa asignada';

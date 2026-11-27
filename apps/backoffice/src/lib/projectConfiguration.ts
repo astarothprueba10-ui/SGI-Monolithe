@@ -1,10 +1,15 @@
 import type { AsignacionComercial, ConfiguracionComercial, ReglaEtapaComercial } from '../types/projectConfiguration';
 
+// ANTICIPADA se conserva únicamente para leer borradores antiguos.
+export function condicionPrecio(codigo: ReglaEtapaComercial['disponibilidad']): 'REGULAR' | 'PROMOCION' {
+  return codigo === 'PROMOCION' ? 'PROMOCION' : 'REGULAR';
+}
+
 export function nuevaEtapa(etapas: ReglaEtapaComercial[]): ReglaEtapaComercial {
   let numero = 1;
   while (etapas.some(e => e.codigo === `COM-${String(numero).padStart(2, '0')}`)) numero++;
   return { codigo: `COM-${String(numero).padStart(2, '0')}`, nombre: `Etapa comercial ${numero}`,
-    disponibilidad: 'BLOQUEADA', tipoDescuento: 'NINGUNO', descuento: 0 };
+    disponibilidad: 'REGULAR', tipoDescuento: 'NINGUNO', descuento: 0 };
 }
 
 export function asignar(filas: AsignacionComercial[], id: number, codigoEtapa: string): AsignacionComercial[] {

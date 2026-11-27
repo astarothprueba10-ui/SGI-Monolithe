@@ -76,8 +76,21 @@ test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un moda
   assert.doesNotMatch(tab,/readOnly=\{[^}]*guardando/);
   assert.match(config,/<CommercialStageEditor/);
   assert.match(editor,/<Modal/);
-  assert.match(editor,/Condición comercial/);
+  assert.match(editor,/Condición del precio/);
   assert.match(editor,/Tipo de descuento/);
   assert.doesNotMatch(editor,/Planificada|Finalizada|Fecha fin estimada/);
   assert.match(tab,/publicada > 0/);
+});
+
+test('el alta comercial separa precio de liberación y conserva bloqueos históricos', () => {
+  const editor = archivo('components/projects/detail/CommercialStageEditor.tsx');
+  const plantilla = archivo('utils/projectConfigurationExcel.ts');
+  const { nuevaEtapa, condicionPrecio } = require('../src/lib/projectConfiguration.ts');
+  assert.equal(nuevaEtapa([]).disponibilidad,'REGULAR');
+  assert.equal(condicionPrecio('ANTICIPADA'),'REGULAR');
+  assert.equal(condicionPrecio('PROMOCION'),'PROMOCION');
+  assert.doesNotMatch(editor,/Venta anticipada|\['BLOQUEADA', 'Bloqueada'\]/);
+  assert.match(editor,/Bloqueo histórico conservado/);
+  assert.match(editor,/disabled=\{etapa.disponibilidad === 'BLOQUEADA'\}/);
+  assert.match(plantilla,/\['PROMOCION', 'REGULAR'\]/);
 });
