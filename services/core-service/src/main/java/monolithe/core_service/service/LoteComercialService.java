@@ -49,7 +49,7 @@ public class LoteComercialService {
  @Transactional(readOnly=true)
  public Listado listar(Long proyecto){
    var catalogo=bloques.listar(proyecto);var c=config.obtener(proyecto);
-   var filas=filasComerciales(proyecto,c.version(),c.datos(),catalogo.publicado(),catalogo.etapas(),false);
+   var filas=filasComerciales(proyecto,c.version(),c.datos(),catalogo.publicado(),catalogo.etapas());
    var sugerencias=new HashMap<Long,Identidad>();
    for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
    return new Listado(catalogo,filas,sugerencias);
@@ -57,20 +57,80 @@ public class LoteComercialService {
  @Transactional(readOnly=true)
  public List<Fila> listarMapa(Long proyecto){
    long inicio=System.nanoTime();
-   var c=config.obtenerParaMapa(proyecto);
+   var c=config.obtenerLecturaMapa(proyecto);
+   var etapas=c.datos().etapas().stream().map(e->new ManzanaComercialDto.Etapa(e.codigo(),e.nombre(),c.abiertas().contains(e.codigo()))).toList();
    long configuracionLista=System.nanoTime();
-   var abiertas=c.publicado()?comercial.etapasHabilitadasParaMapa(proyecto,c.version()):List.<String>of();
-   var etapas=c.datos().etapas().stream().map(e->new ManzanaComercialDto.Etapa(e.codigo(),e.nombre(),abiertas.contains(e.codigo()))).toList();
-   long etapasListas=System.nanoTime();
-   var filas=filasComerciales(proyecto,c.version(),c.datos(),c.publicado(),etapas,true);
+   var meta=new HashMap<Long,MetaMapa>();
+   jdbc.query("""
+      WITH protegidos AS (
+      SELECT l.id_lote FROM public.inm_lotes l JOIN public.cfg_estados_lote el USING(id_estado_lote)
+                  WHERE l.id_proyecto=? AND (el.codigo IN ('RESERVADO','VENDIDO')
+                    OR EXISTS(SELECT 1 FROM public.ven_reservas r JOIN public.cfg_estados_reserva er USING(id_estado_reserva)
+                      WHERE r.id_lote=l.id_lote AND er.codigo IN ('PENDIENTE','VIGENTE'))
+                    OR EXISTS(SELECT 1 FROM public.ven_ventas v JOIN public.cfg_estados_venta ev USING(id_estado_venta)
+                      WHERE v.id_lote=l.id_lote AND ev.codigo <> 'ANULADA'))
+      ), disponibles AS (
+      SELECT l.id_lote FROM public.inm_lotes l
+              JOIN public.cfg_estados_lote e USING(id_estado_lote)
+              JOIN public.inm_manzanas m USING(id_manzana)
+              JOIN public.inm_etapas ef ON ef.id_etapa=m.id_etapa
+              JOIN public.inm_proyectos pr ON pr.id_proyecto=l.id_proyecto
+              WHERE l.id_proyecto=? AND l.activo AND m.activo AND ef.activo AND pr.activo
+                AND e.codigo='DISPONIBLE' AND e.activo AND (
+                  NOT EXISTS(SELECT 1 FROM public.inm_politicas_comerciales_publicadas pu WHERE pu.id_proyecto=l.id_proyecto)
+                  OR EXISTS(SELECT 1 FROM public.inm_politicas_comerciales_lotes pl
+                    JOIN public.inm_lotes_precios p ON p.id_lote_precio=pl.id_lote_precio AND p.id_lote=l.id_lote
+                    JOIN public.cfg_monedas mo ON mo.id_moneda=p.id_moneda
+                    WHERE pl.id_proyecto=l.id_proyecto AND pl.id_lote=l.id_lote AND pl.situacion='HABILITADA'
+                      AND pl.version=(SELECT max(pu.version) FROM public.inm_politicas_comerciales_publicadas pu WHERE pu.id_proyecto=l.id_proyecto)
+                      AND (pl.vigente_hasta IS NULL OR pl.vigente_hasta >= (now() AT TIME ZONE 'America/Lima')::date)
+                      AND p.activo AND p.precio=pl.precio_final AND mo.codigo='PEN' AND mo.activo
+                      AND p.fecha_desde<=now() AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now()))
+                )
+      ), precios AS (
+      SELECT DISTINCT ON(p.id_lote) p.id_lote,p.precio FROM public.inm_lotes_precios p
+           JOIN public.inm_lotes l USING(id_lote) JOIN public.cfg_monedas m USING(id_moneda)
+           WHERE l.id_proyecto=? AND p.activo AND m.activo AND m.codigo='PEN' AND p.fecha_desde<=now()
+             AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
+           ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
+      ), reglas AS (
+       SELECT id_lote,codigo_etapa,situacion FROM public.inm_politicas_comerciales_lotes
+       WHERE id_proyecto=? AND version=? AND ?
+      )
+      SELECT l.id_lote,r.codigo_etapa,r.situacion,p.precio,
+             pr.id_lote IS NOT NULL protegido,d.id_lote IS NOT NULL disponible
+      FROM public.inm_lotes l
+      LEFT JOIN reglas r USING(id_lote)
+      LEFT JOIN protegidos pr USING(id_lote)
+      LEFT JOIN disponibles d USING(id_lote)
+      LEFT JOIN precios p USING(id_lote)
+      WHERE l.id_proyecto=? AND l.activo
+      """,(org.springframework.jdbc.core.RowCallbackHandler)rs->meta.put(rs.getLong("id_lote"),
+          new MetaMapa(rs.getString("codigo_etapa"),rs.getString("situacion"),rs.getBigDecimal("precio"),
+              rs.getBoolean("protegido"),rs.getBoolean("disponible"))),
+      proyecto,proyecto,proyecto,proyecto,c.version(),c.publicado(),proyecto);
+   long metaLista=System.nanoTime();
+   var filas=lotes.listarActivosParaMapa(proyecto).stream().map(l->{
+       var m=meta.get(l.idLote());
+       if(m==null)throw new ConflictoNegocioException("El inventario cambió mientras se consultaba el mapa. Actualiza la vista.");
+       return filaComercial(l,c.datos(),c.publicado(),etapas,m.etapa(),m.situacion(),m.protegido(),m.disponible(),m.precio());
+   }).toList();
    long fin=System.nanoTime();
    org.slf4j.LoggerFactory.getLogger(LoteComercialService.class).info(
-     "Mapa lotes proyecto={} lotes={} configuracionMs={} etapasMs={} inventarioMs={} totalMs={}",
+     "Mapa lotes proyecto={} lotes={} configuracionYEtapasMs={} disponibilidadYPreciosMs={} inventarioMs={} totalMs={}",
      proyecto,filas.size(),(configuracionLista-inicio)/1_000_000,
-     (etapasListas-configuracionLista)/1_000_000,(fin-etapasListas)/1_000_000,(fin-inicio)/1_000_000);
+     (metaLista-configuracionLista)/1_000_000,(fin-metaLista)/1_000_000,(fin-inicio)/1_000_000);
    return filas;
  }
- private List<Fila> filasComerciales(Long proyecto,int version,ConfiguracionProyectoRequest.Datos datos,boolean publicado,List<ManzanaComercialDto.Etapa> etapas,boolean soloMapa){
+ private record MetaMapa(String etapa,String situacion,BigDecimal precio,boolean protegido,boolean disponible){}
+ private Fila filaComercial(LoteResponse l,ConfiguracionProyectoRequest.Datos datos,boolean publicado,
+     List<ManzanaComercialDto.Etapa> etapas,String etapaRegla,String situacion,boolean protegido,boolean disponible,BigDecimal precio){
+   String codigo=etapaRegla!=null?etapaRegla:etapa(datos,l);
+   var e=etapas.stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
+   boolean comprometido=protegido||"PROTEGIDA".equals(situacion);
+   return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),publicado&&e!=null,e!=null&&e.habilitada(),!comprometido&&disponible),precio,comprometido);
+ }
+ private List<Fila> filasComerciales(Long proyecto,int version,ConfiguracionProyectoRequest.Datos datos,boolean publicado,List<ManzanaComercialDto.Etapa> etapas){
    var reglas=new HashMap<Long,PublicacionComercialRepository.Regla>();
    if(publicado)for(var r:publicaciones.reglas(proyecto,version))reglas.put(r.id(),r);
    var protegidos=new HashSet<>(publicaciones.protegidos(proyecto));
@@ -83,12 +143,11 @@ public class LoteComercialService {
        AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
      ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
      """,(org.springframework.jdbc.core.RowCallbackHandler)r->precios.put(r.getLong(1),r.getBigDecimal(2)),proyecto);
-   var inventario=soloMapa?lotes.listarActivosParaMapa(proyecto):lotes.buscar(new LoteFiltroRequest(proyecto,null,null,null,null,null,null,null,null,true));
+   var inventario=lotes.buscar(new LoteFiltroRequest(proyecto,null,null,null,null,null,null,null,null,true));
    return inventario.stream().map(l->{
-      var regla=reglas.get(l.idLote());String codigo=regla!=null&&regla.etapa()!=null?regla.etapa():etapa(datos,l);
-      var e=etapas.stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
-      boolean protegido=protegidos.contains(l.idLote())||regla!=null&&"PROTEGIDA".equals(regla.situacion());
-      return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),publicado&&e!=null,e!=null&&e.habilitada(),!protegido&&disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
+      var regla=reglas.get(l.idLote());
+      return filaComercial(l,datos,publicado,etapas,regla==null?null:regla.etapa(),regla==null?null:regla.situacion(),
+          protegidos.contains(l.idLote()),disponibles.contains(l.idLote()),precios.get(l.idLote()));
    }).toList();
  }
  private Identidad identidad(ManzanaComercialDto.Fila m){
