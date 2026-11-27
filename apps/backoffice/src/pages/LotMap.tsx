@@ -30,7 +30,7 @@ import { ApiError } from '../lib/apiClient';
 
 import { area as fmtArea, number } from '../utils/format';
 import { cn } from '../utils/cn';
-import { bounds, overlaps, roundedLotPath, naturalCompare, buildDisplayGeometries, type DisplayGeometria } from '../lib/lotMatrixGeometry';
+import { bounds, overlaps, roundedLotPath, lotLabelSize, naturalCompare, buildDisplayGeometries, type DisplayGeometria } from '../lib/lotMatrixGeometry';
 import { MAP_STATUSES, MAP_SELECTED, mapStatus, mapLotColors } from '../lib/lotMapPalette';
 
 import type {
@@ -831,7 +831,7 @@ export function LotMap() {
                               }
                               textAnchor="middle"
                               dominantBaseline="central"
-                              fontSize="12"
+                              fontSize={lotLabelSize(geom.puntos,lote?.codigo??geom.codigoLote??'',geom.rotacionEtiqueta??0)}
                               fontWeight="700"
                               fill={colors.text}
                               pointerEvents="none"
