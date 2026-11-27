@@ -5,7 +5,11 @@ import java.math.BigDecimal;
 import java.util.List;
 public final class LoteComercialDto {
  private LoteComercialDto(){}
- public record Fila(LoteResponse lote,String codigoEtapa,String nombreEtapa,String estado,BigDecimal precio,boolean protegido){}
+ public record Fila(LoteResponse lote,String codigoEtapa,String nombreEtapa,String estado,BigDecimal precio,boolean protegido,BigDecimal promocionAplicada){
+  public Fila(LoteResponse lote,String codigoEtapa,String nombreEtapa,String estado,BigDecimal precio,boolean protegido){
+   this(lote,codigoEtapa,nombreEtapa,estado,precio,protegido,null);
+  }
+ }
  public record Identidad(String codigo,String numero){}
  public record Listado(ManzanaComercialDto.Listado catalogo,List<Fila> lotes,java.util.Map<Long,Identidad> sugerencias){}
  public record Consulta(@Positive Long idLote,@Positive @NotNull Long idManzana,@Positive @NotNull Long idZona,

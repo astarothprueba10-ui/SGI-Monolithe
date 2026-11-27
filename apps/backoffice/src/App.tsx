@@ -21,7 +21,7 @@ import { UsersAndRoles } from './pages/UsersAndRoles';
 import { Audit } from './pages/Audit';
 import { Unauthorized } from './pages/Unauthorized';
 import { NotFound } from './pages/NotFound';
-import type { ReactElement } from 'react';
+import { Component, type ErrorInfo, type ReactElement } from 'react';
 import { CommercialMfaModal } from './components/projects/CommercialMfaModal';
 import { Login } from './pages/Login';
 import { ChangePassword } from './pages/ChangePassword';
@@ -73,6 +73,24 @@ function RequirePasswordChange({
   }
 
   return children;
+}
+
+// Aísla fallos del visor sin desmontar la navegación del backoffice.
+class LotMapErrorBoundary extends Component<{children:ReactElement},{failed:boolean}> {
+  state={failed:false};
+  static getDerivedStateFromError(){return {failed:true};}
+  componentDidCatch(error:Error,info:ErrorInfo){
+    console.error('[Plano] Error de renderizado',error,info.componentStack);
+  }
+  render(){
+    if(!this.state.failed)return this.props.children;
+    return <section role="alert" className="rounded-xl border border-brand-200 bg-white p-6">
+      <h1 className="text-lg font-semibold text-brand-900">No se pudo mostrar el plano interactivo</h1>
+      <p className="mt-2 text-sm text-brand-600">La vista encontró un error. Puedes volver a intentar sin salir del aplicativo.</p>
+      <button type="button" className="mt-4 rounded-md bg-brand-900 px-4 py-2 text-sm font-semibold text-white"
+        onClick={()=>this.setState({failed:false})}>Reintentar plano</button>
+    </section>;
+  }
 }
 
 export function App({
@@ -151,7 +169,7 @@ export function App({
               path="/plano"
               element={
                 <PermissionRoute permission="lots.view">
-                  <LotMap />
+                  <LotMapErrorBoundary><LotMap /></LotMapErrorBoundary>
                 </PermissionRoute>
               }
             />

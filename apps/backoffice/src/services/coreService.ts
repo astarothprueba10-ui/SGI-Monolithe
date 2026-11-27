@@ -556,6 +556,13 @@ export const coreService = {
   createPlanVersion(data: PlanoInteractivoRequest): Promise<PlanoInteractivoResponse> {
     return coreApi.post<PlanoInteractivoResponse>('/planos', data);
   },
+  async getCurrentMatrix(idProyecto: number): Promise<PlanoInteractivoDetalleResponse | null> {
+    const resultado = await coreApi.get<PlanoInteractivoDetalleResponse | null | ''>(`/planos/proyecto/${idProyecto}/matriz`);
+    return resultado === '' || resultado == null ? null : resultado;
+  },
+  saveLotMatrix(idPlano: number, cambios: LoteGeometriaRequest[]): Promise<PlanoInteractivoDetalleResponse> {
+    return coreApi.put<PlanoInteractivoDetalleResponse>(`/planos/${idPlano}/matriz`, cambios);
+  },
   saveLotGeometry(data: LoteGeometriaRequest): Promise<LoteGeometriaResponse> {
     return coreApi.put<LoteGeometriaResponse>('/planos/geometrias', data);
   },

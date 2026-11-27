@@ -66,12 +66,26 @@ public class PlanoInteractivoController {
                                                 idEtapa));
         }
 
+        @GetMapping("/proyecto/{idProyecto}/matriz")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<PlanoInteractivoDetalleResponse> obtenerMatrizOpcional(@PathVariable @Positive Long idProyecto) {
+                return ResponseEntity.ok(planoInteractivoService.obtenerMatrizOpcional(idProyecto));
+        }
+
         @PutMapping("/geometrias")
         @PreAuthorize("hasAuthority('lots.configure')")
         public ResponseEntity<LoteGeometriaResponse> guardarGeometria(
                         @Valid @RequestBody LoteGeometriaRequest request) {
                 return ResponseEntity.ok(
                                 planoInteractivoService.guardarGeometria(request));
+        }
+
+        @PutMapping("/{idPlano}/matriz")
+        @PreAuthorize("hasAuthority('lots.configure')")
+        public ResponseEntity<PlanoInteractivoDetalleResponse> guardarMatriz(
+                        @PathVariable @Positive Long idPlano,
+                        @RequestBody @jakarta.validation.constraints.NotEmpty List<@Valid LoteGeometriaRequest> cambios) {
+                return ResponseEntity.ok(planoInteractivoService.guardarMatriz(idPlano, cambios));
         }
 
         @DeleteMapping("/geometrias/{idLoteGeometria}")

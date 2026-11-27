@@ -122,7 +122,16 @@ public class PlanoInteractivoService {
                         Long idProyecto,
                         Long idEtapa) {
                 PlanoInteractivo plano = resolverVigente(idProyecto, idEtapa);
+                return detalle(plano);
+        }
 
+        @Transactional(readOnly = true)
+        public PlanoInteractivoDetalleResponse obtenerMatrizOpcional(Long idProyecto) {
+                return planoRepo.findFirstByProyecto_IdProyectoAndEtapaIsNullAndVigenteTrue(idProyecto)
+                                .map(this::detalle).orElse(null);
+        }
+
+        private PlanoInteractivoDetalleResponse detalle(PlanoInteractivo plano) {
                 List<LoteGeometriaResponse> geometrias = geometriaRepo
                                 .findByPlanoInteractivo_IdPlanoInteractivoAndActivoTrueOrderByOrdenCapaAsc(
                                                 plano.getIdPlanoInteractivo())
@@ -188,6 +197,90 @@ public class PlanoInteractivoService {
                 }
 
                 return toGeometriaResponse(geometriaRepo.save(geometria));
+        }
+
+        /**
+         * Persiste la matriz en una sola transacción. El plano general es un lienzo
+         * esquemático y puede crecer; los planos físicos por etapa conservan sus límites.
+         */
+        @Transactional
+        public PlanoInteractivoDetalleResponse guardarMatriz(Long idPlano, List<LoteGeometriaRequest> cambios) {
+                if (cambios == null || cambios.isEmpty()) {
+                        throw new ReglaNegocioException("No hay posiciones para guardar.");
+                }
+                PlanoInteractivo plano = planoRepo.findById(idPlano)
+                                .orElseThrow(() -> new RecursoNoEncontradoException("Plano no encontrado: " + idPlano));
+                if (!Boolean.TRUE.equals(plano.getVigente()) || plano.getEtapa() != null) {
+                        throw new ReglaNegocioException("La matriz requiere un plano general vigente.");
+                }
+                BigDecimal ancho = plano.getAnchoReferencia();
+                BigDecimal alto = plano.getAltoReferencia();
+                BigDecimal limite = new BigDecimal("1000000");
+                var ids = new java.util.HashSet<Long>();
+                var matriz = new java.util.HashMap<Long, List<PuntoPlanoDto>>();
+                for (LoteGeometria g : geometriaRepo
+                                .findByPlanoInteractivo_IdPlanoInteractivoAndActivoTrueOrderByOrdenCapaAsc(idPlano)) {
+                        if (Boolean.TRUE.equals(g.getLote().getActivo())) {
+                                var actual = toGeometriaResponse(g);
+                                matriz.put(actual.idLote(), actual.puntos());
+                        }
+                }
+                var lotesPorId = new java.util.HashMap<Long,Lote>();
+                for (Lote lote : loteRepo.findAllById(cambios.stream()
+                                .filter(java.util.Objects::nonNull).map(LoteGeometriaRequest::idLote)
+                                .filter(java.util.Objects::nonNull).distinct().toList())) {
+                        lotesPorId.put(lote.getIdLote(), lote);
+                }
+                for (LoteGeometriaRequest cambio : cambios) {
+                        if (cambio == null || !idPlano.equals(cambio.idPlanoInteractivo())
+                                        || !ids.add(cambio.idLote())) {
+                                throw new ReglaNegocioException("La matriz contiene lotes duplicados o de otro plano.");
+                        }
+                        Lote lote = lotesPorId.get(cambio.idLote());
+                        if (lote == null) throw new RecursoNoEncontradoException("Lote no encontrado.");
+                        validarLotePertenecePlano(lote, plano);
+                        if (!Boolean.TRUE.equals(lote.getActivo())) {
+                                throw new ReglaNegocioException("No se puede posicionar un lote inactivo.");
+                        }
+                        if (cambio.puntos() == null || cambio.puntos().size() < 3) {
+                                throw new ReglaNegocioException("La geometría debe tener al menos tres puntos.");
+                        }
+                        matriz.put(cambio.idLote(), cambio.puntos());
+                        for (PuntoPlanoDto punto : cambio.puntos()) {
+                                if (punto == null || punto.x() == null || punto.y() == null) {
+                                        throw new ReglaNegocioException("La geometría contiene puntos inválidos.");
+                                }
+                                ancho = ancho.max(punto.x());
+                                alto = alto.max(punto.y());
+                        }
+                        if (cambio.etiquetaX() != null) ancho = ancho.max(cambio.etiquetaX());
+                        if (cambio.etiquetaY() != null) alto = alto.max(cambio.etiquetaY());
+                }
+                if (ancho.compareTo(limite) > 0 || alto.compareTo(limite) > 0) {
+                        throw new ReglaNegocioException("La matriz supera el tamaño máximo permitido.");
+                }
+                // La matriz es esquemática: las cajas delimitadoras no deben superponerse.
+                var cajas = matriz.values().stream().map(PlanoInteractivoService::caja).toList();
+                for (int i = 0; i < cajas.size(); i++) {
+                        for (int j = i + 1; j < cajas.size(); j++) {
+                                if (cajas.get(i).superpone(cajas.get(j))) {
+                                        throw new ReglaNegocioException("Hay lotes superpuestos en la matriz.");
+                                }
+                        }
+                }
+                plano.setAnchoReferencia(ancho);
+                plano.setAltoReferencia(alto);
+                for (LoteGeometriaRequest cambio : cambios) {
+                        validarPuntos(cambio, plano);
+                        validarEtiqueta(cambio, plano);
+                }
+                Long proyecto = plano.getProyecto().getIdProyecto();
+                planoRepo.save(plano);
+                int guardados = geometriaRepo.guardarMatrizEnBloque(proyecto, idPlano, objectMapper.writeValueAsString(cambios));
+                if (guardados != cambios.size()) {
+                        throw new ConflictoNegocioException("No se guardaron todas las posiciones de la matriz.");
+                }
+                return obtenerDetalleVigente(proyecto, null);
         }
 
         // =========================================================
@@ -291,6 +384,24 @@ public class PlanoInteractivoService {
                         throw new ReglaNegocioException(
                                         "El lote no pertenece a la etapa del plano.");
                 }
+        }
+
+        private record Caja(BigDecimal izquierda, BigDecimal derecha, BigDecimal arriba, BigDecimal abajo) {
+                boolean superpone(Caja otra) {
+                        return izquierda.compareTo(otra.derecha) < 0 && derecha.compareTo(otra.izquierda) > 0
+                                        && arriba.compareTo(otra.abajo) < 0 && abajo.compareTo(otra.arriba) > 0;
+                }
+        }
+
+        private static Caja caja(List<PuntoPlanoDto> puntos) {
+                if (puntos == null || puntos.size() < 3 || puntos.stream().anyMatch(p -> p == null || p.x() == null || p.y() == null)) {
+                        throw new ReglaNegocioException("La matriz contiene una geometría inválida.");
+                }
+                return new Caja(
+                                puntos.stream().map(PuntoPlanoDto::x).min(BigDecimal::compareTo).orElseThrow(),
+                                puntos.stream().map(PuntoPlanoDto::x).max(BigDecimal::compareTo).orElseThrow(),
+                                puntos.stream().map(PuntoPlanoDto::y).min(BigDecimal::compareTo).orElseThrow(),
+                                puntos.stream().map(PuntoPlanoDto::y).max(BigDecimal::compareTo).orElseThrow());
         }
 
         private void validarPuntos(LoteGeometriaRequest request, PlanoInteractivo plano) {

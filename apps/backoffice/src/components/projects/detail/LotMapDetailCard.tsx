@@ -1,9 +1,10 @@
 import { BadgeCheckIcon, CalendarCheckIcon, CircleDollarSignIcon, HashIcon, LayersIcon,
-  MapPinIcon, MapIcon, RulerIcon, TagIcon, TicketIcon, Building2Icon, ShieldCheckIcon } from 'lucide-react';
+  MapPinIcon, MapIcon, RulerIcon, TicketIcon, Building2Icon, ShieldCheckIcon } from 'lucide-react';
 import type { LoteResponse } from '../../../types/core';
 import type { LucideIcon } from 'lucide-react';
 import { area } from '../../../utils/format';
 import { Button } from '../../ui/Button';
+import { mapStatus } from '../../../lib/lotMapPalette';
 
 const dinero = new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'});
 function Linea({ icono:Icono, nombre, valor }: { icono:LucideIcon; nombre:string; valor:React.ReactNode }) {
@@ -12,8 +13,8 @@ function Linea({ icono:Icono, nombre, valor }: { icono:LucideIcon; nombre:string
     <dd className="text-right text-sm font-semibold text-brand-900">{valor}</dd>
   </div>;
 }
-export function LotMapDetailCard({ lote, precio, puedeOperar, onSeparar, onVender }: {
-  lote:LoteResponse|null; precio:number|null; puedeOperar:boolean;
+export function LotMapDetailCard({ lote, precio, promocion=null, puedeOperar, onSeparar, onVender }: {
+  lote:LoteResponse|null; precio:number|null; promocion?:number|null; puedeOperar:boolean;
   onSeparar:()=>void; onVender:()=>void;
 }) {
   return <aside className="h-fit overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm xl:sticky xl:top-6">
@@ -33,16 +34,19 @@ export function LotMapDetailCard({ lote, precio, puedeOperar, onSeparar, onVende
       <dl>
         <Linea icono={HashIcon} nombre="Código" valor={lote.codigo}/>
         <Linea icono={TicketIcon} nombre="Número" valor={lote.numero||'—'}/>
-        <Linea icono={LayersIcon} nombre="Etapa" valor={lote.nombreEtapa??lote.codigoEtapa??'—'}/>
+        <Linea icono={LayersIcon} nombre="Etapa comercial" valor={lote.nombreEtapa??lote.codigoEtapa??'—'}/>
         <Linea icono={Building2Icon} nombre="Manzana" valor={lote.nombreManzana??lote.codigoManzana??'—'}/>
         <Linea icono={MapPinIcon} nombre="Zona" valor={lote.nombreZona??lote.codigoZona??'—'}/>
-        <Linea icono={TagIcon} nombre="Tipo" valor={lote.nombreTipoLote??lote.codigoTipoLote??'—'}/>
         <Linea icono={RulerIcon} nombre="Área" valor={lote.areaM2!=null?area(lote.areaM2):'—'}/>
         <Linea icono={CircleDollarSignIcon} nombre="Precio oficial" valor={precio!=null?dinero.format(precio):'Sin precio'}/>
-        <Linea icono={BadgeCheckIcon} nombre="Inventario" valor={<span className={`rounded-full px-2.5 py-1 text-xs ${lote.codigoEstadoLote==='DISPONIBLE'
-          ? 'bg-emerald-100 text-emerald-800' : lote.codigoEstadoLote==='VENDIDO'
-          ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
-          {lote.nombreEstadoLote??lote.codigoEstadoLote??'Sin estado'}</span>}/>
+        <Linea icono={TicketIcon} nombre="Promoción" valor={promocion!=null && promocion>0
+          ? <span className="flex flex-col items-end gap-1">
+              <span className="font-bold text-emerald-700">−{dinero.format(promocion)}</span>
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">Aplicada al precio oficial</span>
+            </span>
+          : promocion===0 ? 'Sin promoción' : <span className="text-xs font-medium text-brand-500">No registrada</span>}/>
+        <Linea icono={BadgeCheckIcon} nombre="Inventario" valor={<span className={`rounded-full px-2.5 py-1 text-xs ${mapStatus(lote.codigoEstadoLote).badge}`}>
+          {lote.codigoEstadoLote==='RESERVADO'?'Separado':lote.codigoEstadoLote==='BLOQUEADO_COMERCIALMENTE'?'Bloqueado':lote.nombreEstadoLote??lote.codigoEstadoLote??'Sin estado'}</span>}/>
         <Linea icono={ShieldCheckIcon} nombre="Activo" valor={lote.activo?'Sí':'No'}/>
       </dl>
       <div className="space-y-2 p-4">

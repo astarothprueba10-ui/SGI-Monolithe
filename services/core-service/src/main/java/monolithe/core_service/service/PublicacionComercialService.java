@@ -136,6 +136,19 @@ public class PublicacionComercialService {
     }
 
     @Transactional(readOnly=true)
+    public List<String> etapasHabilitadasParaMapa(Long proyecto,int version) {
+        exigirIntegridadPublicacion();
+        if (version <= 0 || repository.versionPublicada(proyecto) != version)
+            throw new ConflictoNegocioException("La configuración consultada no coincide con la publicación vigente.");
+        var evento = repository.ultimoEstado(proyecto,version);
+        if (evento.isPresent()) {
+            var estado = mapper.readValue(evento.get().json(),Estado.class);
+            return estado.etapasHabilitadas();
+        }
+        return repository.etapasHistoricas(proyecto,version);
+    }
+
+    @Transactional(readOnly=true)
     public Respuesta gestion(Long proyecto) {
         exigirIntegridadPublicacion();
         int version = repository.versionPublicada(proyecto);

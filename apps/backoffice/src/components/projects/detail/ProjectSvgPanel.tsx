@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DownloadIcon, FileArchiveIcon, FileUpIcon, Link2Icon, SaveIcon, ShieldCheckIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../ui/Button';
@@ -24,7 +24,7 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
   const [error,setError]=useState('');
   const input=useRef<HTMLInputElement>(null);
   const actual=borrador??documento;
-  const vinculados=actual?totalVinculados(actual,lotes):0;
+  const vinculados=useMemo(()=>actual?totalVinculados(actual,lotes):0,[actual,lotes]);
 
   useEffect(()=>{
     let vivo=true;
