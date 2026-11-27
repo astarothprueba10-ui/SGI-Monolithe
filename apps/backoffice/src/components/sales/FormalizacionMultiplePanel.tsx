@@ -80,7 +80,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
   observaciones:observaciones.trim()||null
  });
  const validar=async()=>{
-  if(enCurso.current||incierto||!seleccion.length)return;
+  if(enCurso.current||incierto||!seleccion.length||seleccion.length>20)return;
   enCurso.current=true;setBusy(true);onBusy(true);setError('');
   try {
    const refs=new Set<string>(),huellas=new Set<string>();
@@ -172,8 +172,8 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
    <div className="flex justify-between border-t border-brand-200 pt-2 text-base"><strong>Total a pagar</strong><strong>{seleccion.every(d=>pago(d)!==null)?formatSoles(total):'Por calcular'}</strong></div>
   </div>
   {error&&<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-  <Button variant="primary" disabled={busy||incierto||!seleccion.length||seleccion.some(d=>!habilitado(d.lote)||pago(d)===null)} onClick={()=>void validar()}>Revisar y formalizar {seleccion.length} lote(s)</Button>
-  <EditarDatosCompradorModal open={revisar!==null} idProspecto={idProspecto} lote={revisar?.map(d=>d.lote.codigoLote).join(', ')??''} proyecto={revisar?.[0]?proyecto(revisar[0]):''} idProyectoVenta={revisar?.[0]?.reserva.idProyecto??0} compradorExistente={compradorExistente} modalidad={revisar?.some(d=>d.modalidad==='FINANCIADA')?'FINANCIADA':'CONTADO'} puedeReasignar={puedeReasignar} asesorNombre={asesorNombre} onClose={()=>setRevisar(null)} onGuardar={comprador=>{if(revisar){setConfirmar({lotes:revisar,comprador});setRevisar(null);}}}/>
+  <Button variant="primary" disabled={busy||incierto||!seleccion.length||seleccion.length>20||seleccion.some(d=>!habilitado(d.lote)||pago(d)===null)} onClick={()=>void validar()}>Revisar y formalizar {seleccion.length} lote(s)</Button>
+  <EditarDatosCompradorModal open={revisar!==null} idProspecto={idProspecto} lote={revisar?.map(d=>d.lote.codigoLote).join(', ')??''} proyecto={revisar?.[0]?proyecto(revisar[0]):''} idProyectoVenta={revisar?.[0]?.lote.idProyecto??0} compradorExistente={compradorExistente} modalidad={revisar?.some(d=>d.modalidad==='FINANCIADA')?'FINANCIADA':'CONTADO'} puedeReasignar={puedeReasignar} asesorNombre={asesorNombre} onClose={()=>setRevisar(null)} onGuardar={comprador=>{if(revisar){setConfirmar({lotes:revisar,comprador});setRevisar(null);}}}/>
   <Modal open={confirmar!==null} onClose={()=>{if(!busy)setConfirmar(null);}} title="Confirmar formalización" description="Se crearán las ventas pendientes juntas, con un contrato y comprobante por lote." footer={<div className="flex justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={()=>setConfirmar(null)}>Volver</Button><Button variant="primary" disabled={busy||incierto} onClick={()=>void registrar()}>{busy?'Registrando…':'Confirmar registro'}</Button></div>}>
    {confirmar?.lotes.map(d=><div key={d.lote.idLote} className="flex justify-between border-b border-brand-100 py-3 text-sm"><span>{d.lote.codigoLote} · {d.modalidad==='FINANCIADA'?'Inicial adicional':'Contado'}</span><strong>{formatSoles(pago(d)??0)}</strong></div>)}
    <div className="mt-3 flex justify-between font-semibold"><span>Total a pagar</span><strong>{formatSoles((confirmar?.lotes??[]).reduce((s,d)=>s+Math.round((pago(d)??0)*100),0)/100)}</strong></div>
