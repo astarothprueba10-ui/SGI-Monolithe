@@ -102,3 +102,42 @@ test('un fallo del plano no desmonta la navegación y permite reintentar',()=>{
   assert.match(pagina,/No se pudieron cargar los proyectos/);
   assert.match(core,/resultado === '' \|\| resultado == null \? null/);
 });
+
+test('paleta compartida agrupa bloqueos sin alterar sus códigos comerciales',()=>{
+  const ts=require('typescript');
+  const js=ts.transpileModule(leer('lib/lotMapPalette.ts'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+  const exports={};
+  new Function('exports',js)(exports);
+  const {MAP_STATUSES,mapStatus,mapLotColors}=exports;
+  assert.equal(MAP_STATUSES.length,5);
+  assert.equal(mapStatus('BLOQUEADO_COMERCIALMENTE').code,'BLOQUEADO');
+  assert.equal(mapLotColors('BLOQUEADO').fill,mapLotColors('BLOQUEADO_COMERCIALMENTE').fill);
+  assert.equal(mapStatus('RESERVADO').label,'Separados');
+  assert.equal(mapLotColors('VENDIDO',true).fill,'#ffffff');
+  assert.equal(mapLotColors('VENDIDO',true).text,'#111111');
+  assert.match(leer('components/projects/detail/PlanSvgShapes.tsx'),/mapLotColors/);
+});
+test('la matriz tiene una sola vista y el redondeo no altera coordenadas',()=>{
+  const pagina=leer('pages/LotMap.tsx');
+  assert.doesNotMatch(pagina,/Vista general|Plano V\$\{/);
+  assert.match(pagina,/\$\{persistedCount\} de \$\{lots.length\}/);
+  assert.match(pagina,/isSelected&&!isEditingPlan\?'translateY/);
+  const ts=require('typescript');
+  const helpers=pagina.slice(pagina.indexOf('type Point ='),pagina.indexOf('const REAL_STATUSES'))
+    +pagina.slice(pagina.indexOf('function roundedLotPath'),pagina.indexOf('function naturalCompare'));
+  const js=ts.transpileModule(helpers,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
+  const {roundedLotPath,rectangle}=new Function(js+';return {roundedLotPath,rectangle};')();
+  const points=rectangle(10,20,68,55);
+  const antes=JSON.stringify(points);
+  assert.match(roundedLotPath(points),/ Q /);
+  assert.equal(JSON.stringify(points),antes);
+  assert.equal(roundedLotPath([{x:0,y:0},{x:10,y:0},{x:5,y:10}]),'M 0 0 L 10 0 L 5 10 Z');
+});
+test('la promoción procede del servidor y no se descuenta dos veces',()=>{
+  const pagina=leer('pages/LotMap.tsx');
+  const ficha=leer('components/projects/detail/LotMapDetailCard.tsx');
+  assert.match(pagina,/f\.promocionAplicada/);
+  assert.match(ficha,/Aplicada al precio oficial/);
+  assert.match(ficha,/dinero\.format\(precio\)/);
+  assert.match(ficha,/promocion===0 \? 'Sin promoción'/);
+});
