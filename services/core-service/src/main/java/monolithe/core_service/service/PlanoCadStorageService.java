@@ -120,7 +120,6 @@ public class PlanoCadStorageService {
         var archivo=jdbc.query("""
             SELECT ruta_archivo,nombre_original,formato FROM public.inm_planos_cad_archivos
             WHERE id_proyecto=? AND id_plano_archivo=?
-            FOR UPDATE
             """,(rs,n)->new ArchivoEliminar(rs.getString(1),rs.getString(2),rs.getString(3)),proyecto,idArchivo)
             .stream().findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Plano no encontrado."));
         if(!archivo.ruta().matches("proyectos/"+proyecto+"/originales/[a-f0-9-]{36}\\.(dwg|svg)"))
