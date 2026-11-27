@@ -88,16 +88,19 @@ public class LoteComercialService {
                       AND p.fecha_desde<=now() AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now()))
                 )
       ), precios AS (
-      SELECT DISTINCT ON(p.id_lote) p.id_lote,p.precio FROM public.inm_lotes_precios p
+      SELECT DISTINCT ON(p.id_lote) p.id_lote,p.id_lote_precio,p.precio FROM public.inm_lotes_precios p
            JOIN public.inm_lotes l USING(id_lote) JOIN public.cfg_monedas m USING(id_moneda)
            WHERE l.id_proyecto=? AND p.activo AND m.activo AND m.codigo='PEN' AND p.fecha_desde<=now()
              AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
            ORDER BY p.id_lote,p.fecha_desde DESC,p.id_lote_precio DESC
       ), reglas AS (
-       SELECT id_lote,codigo_etapa,situacion FROM public.inm_politicas_comerciales_lotes
+       SELECT id_lote,codigo_etapa,situacion,id_lote_precio,precio_lista,descuento,precio_final FROM public.inm_politicas_comerciales_lotes
        WHERE id_proyecto=? AND version=? AND ?
       )
       SELECT l.id_lote,r.codigo_etapa,r.situacion,p.precio,
+             CASE WHEN r.id_lote_precio=p.id_lote_precio AND r.precio_final=p.precio
+                       AND r.descuento>=0 AND r.precio_lista-r.descuento=p.precio
+                  THEN r.descuento ELSE NULL END promocion_aplicada,
              pr.id_lote IS NOT NULL protegido,d.id_lote IS NOT NULL disponible
       FROM public.inm_lotes l
       LEFT JOIN reglas r USING(id_lote)
@@ -107,13 +110,14 @@ public class LoteComercialService {
       WHERE l.id_proyecto=? AND l.activo
       """,(org.springframework.jdbc.core.RowCallbackHandler)rs->meta.put(rs.getLong("id_lote"),
           new MetaMapa(rs.getString("codigo_etapa"),rs.getString("situacion"),rs.getBigDecimal("precio"),
-              rs.getBoolean("protegido"),rs.getBoolean("disponible"))),
+              rs.getBoolean("protegido"),rs.getBoolean("disponible"),rs.getBigDecimal("promocion_aplicada"))),
       proyecto,proyecto,proyecto,proyecto,c.version(),c.publicado(),proyecto);
    long metaLista=System.nanoTime();
    var filas=lotes.listarActivosParaMapa(proyecto).stream().map(l->{
        var m=meta.get(l.idLote());
        if(m==null)throw new ConflictoNegocioException("El inventario cambió mientras se consultaba el mapa. Actualiza la vista.");
-       return filaComercial(l,c.datos(),c.publicado(),etapas,m.etapa(),m.situacion(),m.protegido(),m.disponible(),m.precio());
+       var fila=filaComercial(l,c.datos(),c.publicado(),etapas,m.etapa(),m.situacion(),m.protegido(),m.disponible(),m.precio());
+       return new Fila(fila.lote(),fila.codigoEtapa(),fila.nombreEtapa(),fila.estado(),fila.precio(),fila.protegido(),m.promocionAplicada());
    }).toList();
    long fin=System.nanoTime();
    org.slf4j.LoggerFactory.getLogger(LoteComercialService.class).info(
@@ -122,7 +126,7 @@ public class LoteComercialService {
      (metaLista-configuracionLista)/1_000_000,(fin-metaLista)/1_000_000,(fin-inicio)/1_000_000);
    return filas;
  }
- private record MetaMapa(String etapa,String situacion,BigDecimal precio,boolean protegido,boolean disponible){}
+ private record MetaMapa(String etapa,String situacion,BigDecimal precio,boolean protegido,boolean disponible,BigDecimal promocionAplicada){}
  private Fila filaComercial(LoteResponse l,ConfiguracionProyectoRequest.Datos datos,boolean publicado,
      List<ManzanaComercialDto.Etapa> etapas,String etapaRegla,String situacion,boolean protegido,boolean disponible,BigDecimal precio){
    String codigo=etapaRegla!=null?etapaRegla:etapa(datos,l);
