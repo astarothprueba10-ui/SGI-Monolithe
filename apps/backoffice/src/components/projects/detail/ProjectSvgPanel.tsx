@@ -177,7 +177,6 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
     </div>
     {originales.length>0 && <section className="space-y-2 rounded-xl border border-brand-200 p-4">
       <h4 className="flex items-center gap-2 text-sm font-semibold text-brand-900"><FileArchiveIcon className="h-4 w-4"/>Archivos técnicos del proyecto</h4>
-      <p className="text-xs text-brand-500">Versiones almacenadas en un bucket privado de Supabase Storage; sin duplicar registros del inventario.</p>
       <div className="max-h-48 space-y-2 overflow-y-auto">
         {originales.map(f=><div key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs">
           <div className="min-w-0">
@@ -260,9 +259,7 @@ export function ProjectSvgPanel({ proyecto, lotes, documento, onSave, selecciona
     </div>}
     <div className="flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-600">
       <ShieldCheckIcon className="h-4 w-4 shrink-0 text-emerald-700"/>
-      <span>Un archivo DWG no se convierte automáticamente al subirlo. El visor utiliza un SVG vectorial
-        exportado desde CAD. Sus identificadores o atributos <code>data-lote</code> se vinculan con el
-        inventario de este proyecto; los precios, etapas y estados se consultan siempre en el sistema.</span>
+      <span>Un archivo DWG no se convierte automáticamente al subirlo. El visor utiliza un SVG vectorial exportado desde CAD.</span>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
   </div>;
