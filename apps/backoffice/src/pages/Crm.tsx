@@ -285,10 +285,12 @@ export function Crm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captacionRevision,setCaptacionRevision]=useState(0);
+  const resumenRequest=useRef(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
 
-  const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('HOY');
+  const [periodoModo, setPeriodoModo] = useState<PeriodoCrmModo>('MES');
   const [fechaReferencia, setFechaReferencia] = useState(obtenerFechaHoyLima);
   const [fechaDesde, setFechaDesde] = useState(obtenerFechaHoyLima);
   const [fechaHasta, setFechaHasta] = useState(obtenerFechaHoyLima);
@@ -460,43 +462,38 @@ export function Crm() {
   const fuentesRequest = useRef(0);
 
 
-  const loadCatalogsAndAdvisors = useCallback(async () => {
-    try {
-      const [cats, advs, sum] = await Promise.all([
-        crmBackend.catalogos(),
-
-        puedeElegirAsesor
-          ? crmBackend.asesores()
-          : Promise.resolve([] as CrmAdvisor[]),
-
-        puedeVerGestionGlobal && rangoPeriodo
-          ? crmBackend.resumenPeriodo(
-            rangoPeriodo.desde,
-            rangoPeriodo.hastaExclusivo,
-            projectFilter === '' ? undefined : projectFilter
-          )
-          : Promise.resolve(null)
-      ]);
-
-      setCatalogs(cats);
-      setAdvisorsList(advs);
-      setSummary(sum);
-
-      if (
-        puedeElegirAsesor &&
-        advs.length > 0 &&
-        selectedAdvisorId === null
-      ) {
-        setSelectedAdvisorId(advs[0].id_asesor);
+  const loadSummary=useCallback(async ()=>{
+    const request=++resumenRequest.current;
+    try{
+      const sum=puedeVerGestionGlobal&&rangoPeriodo
+        ?await crmBackend.resumenPeriodo(rangoPeriodo.desde,rangoPeriodo.hastaExclusivo,projectFilter===''?undefined:projectFilter)
+        :null;
+      if(request===resumenRequest.current)setSummary(sum);
+    }catch(err:unknown){
+      if(request===resumenRequest.current){
+        setSummary(null);
+        setErrorMsg(err instanceof Error?err.message:'Error al consultar resumen CRM.');
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error
-        ? err.message
-        : 'Error al cargar catálogos CRM.';
-
-      setErrorMsg(msg);
     }
-  }, [selectedAdvisorId, rangoPeriodo, puedeVerGestionGlobal, puedeElegirAsesor, projectFilter]);
+  },[rangoPeriodo,puedeVerGestionGlobal,projectFilter]);
+
+  const loadCatalogs=useCallback(async ()=>{
+    try{
+      const [cats,advs]=await Promise.all([
+        crmBackend.catalogos(),
+        puedeElegirAsesor?crmBackend.asesores():Promise.resolve([] as CrmAdvisor[])
+      ]);
+      setCatalogs(cats);setAdvisorsList(advs);
+      if(puedeElegirAsesor&&advs.length>0)setSelectedAdvisorId(prev=>prev===null?advs[0].id_asesor:prev);
+    }catch(err:unknown){
+      setErrorMsg(err instanceof Error?err.message:'Error al cargar catálogos CRM.');
+    }
+  },[puedeElegirAsesor]);
+
+  // Los demás flujos de edición conservan su recarga explícita.
+  const loadCatalogsAndAdvisors=useCallback(async ()=>{
+    await Promise.all([loadCatalogs(),loadSummary()]);
+  },[loadCatalogs,loadSummary]);
 
   // El período global solo entra en consultas de Visitas; Leads y Potenciales
   // dependen únicamente de las fechas propias de sus tablas.
@@ -644,8 +641,9 @@ export function Crm() {
   }, [fuentesModo, rangoPeriodo, projectFilter]);
 
   useEffect(() => {
-    void loadCatalogsAndAdvisors();
-  }, [loadCatalogsAndAdvisors]);
+    void loadCatalogs();
+  }, [loadCatalogs]);
+  useEffect(()=>{void loadSummary();},[loadSummary,captacionRevision]);
 
   useEffect(() => {
     crmBackend.retrocesos.motivos()
@@ -663,15 +661,15 @@ export function Crm() {
     if (tab === 'leads' || tab === 'potenciales' || tab === 'visitas') {
       void loadLeads();
     }
-  }, [tab, loadLeads]);
+  }, [tab, loadLeads,captacionRevision]);
 
   useEffect(() => {
     if (tab === 'compradores') void loadBuyers();
-  }, [tab, loadBuyers]);
+  }, [tab, loadBuyers,captacionRevision]);
 
   useEffect(() => {
     if (tab === 'fuentes') void loadPortfolioLeads();
-  }, [tab, loadPortfolioLeads]);
+  }, [tab, loadPortfolioLeads,captacionRevision]);
 
 
   useEffect(() => {
@@ -766,7 +764,7 @@ export function Crm() {
     return () => {
       activo = false;
     };
-  }, [rangoEvolucion, puedeVerGestionGlobal, projectFilter]);
+  }, [rangoEvolucion, puedeVerGestionGlobal, projectFilter,captacionRevision]);
 
 
   useEffect(() => {
@@ -844,6 +842,7 @@ export function Crm() {
 
     setIsSubmitting(true);
 
+    const inicioCaptacion=performance.now();
     try {
       await crmBackend.crear({
         idSolicitud: solicitudId,
@@ -866,6 +865,7 @@ export function Crm() {
         direccion: form.direccion.trim() || undefined
       });
 
+      console.info('[CRM] Registro lead HTTP ms:',Math.round(performance.now()-inicioCaptacion));
       toast.success('Lead registrado correctamente', {
         description: `${form.names.trim()} ${form.paternalSurname.trim()} ingresó exitosamente al CRM.`
       });
@@ -877,10 +877,9 @@ export function Crm() {
       setLeadCamposVisitados({});
       setSolicitudId(crypto.randomUUID());
 
-      await Promise.all([
-        loadLeads(),
-        loadCatalogsAndAdvisors()
-      ]);
+      // El POST ya confirmó la transacción. Refrescar los datos visibles sin bloquear el formulario.
+      setCaptacionRevision(v=>v+1);
+      if(tab!=='leads'&&tab!=='potenciales'&&tab!=='visitas'&&tab!=='compradores')refreshTableCounts();
 
     } catch (err: unknown) {
       const msg = err instanceof Error
@@ -2398,19 +2397,25 @@ export function Crm() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-blue-50/60 p-4 shadow-sm sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="inline-flex rounded-md border border-brand-200 bg-white px-2 py-1 font-mono text-xs font-semibold text-brand-600">
-                    {leadDetail.prospecto.codigo}
-                  </span>
-                  <h3 className="mt-2 break-words text-lg font-bold text-brand-900">
-                    {leadDetail.prospecto.nombre_completo}
-                  </h3>
+            <div className="relative isolate overflow-hidden rounded-2xl border border-brand-800 bg-gradient-to-br from-[#101f32] via-[#18354a] to-[#087b67] p-5 text-white shadow-md sm:p-6">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 h-52 w-52 rounded-full bg-emerald-300/10"/>
+              <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-16 h-44 w-44 rounded-full bg-sky-300/10"/>
+              <div className="relative flex flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                  <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-lg font-bold text-white sm:h-14 sm:w-14">
+                    {leadDetail.prospecto.nombre_completo.trim().split(/\s+/).slice(0,2).map(n=>n[0]?.toUpperCase()).join('')||'—'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-white/75">Expediente comercial</p>
+                    <span className="mt-1 inline-flex rounded-md border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-xs font-semibold text-white">{leadDetail.prospecto.codigo}</span>
+                    <h3 className="mt-2 break-words text-xl font-bold leading-tight text-white sm:text-2xl">{leadDetail.prospecto.nombre_completo}</h3>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="brand">{leadDetail.prospecto.categoria}</Badge>
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-white text-brand-800">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  {leadDetail.prospecto.categoria&&<span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white">
+                    <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-300"/>{leadDetail.prospecto.categoria==='LEAD'?'Lead':leadDetail.prospecto.categoria==='POTENCIAL'?'Cliente potencial':leadDetail.prospecto.categoria==='COMPRADOR'?'Cliente comprador':leadDetail.prospecto.categoria}
+                  </span>}
+                  <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold',STAGE_TONES[leadDetail.prospecto.estado_codigo]||'bg-white text-brand-800 border-white')}>
                     {leadDetail.prospecto.estado_nombre}
                   </span>
                 </div>
