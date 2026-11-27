@@ -1389,7 +1389,7 @@ export function Sales() {
   const ventaPrincipalDisponible=lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
   const idsVentaDirectos=ventaDirectos.map(l=>l.idLote);
   const candidatosVenta=lotesDisponiblesProyecto.filter(l=>!idsVentaDirectos.includes(l.idLote)&&
-    l.idLote!==Number(formLotId)&&!reservasVigentes.some(r=>r.idLote===l.idLote));
+    (formalizacionMultiple||l.idLote!==Number(formLotId))&&!reservasVigentes.some(r=>r.idLote===l.idLote));
   const cantidadVenta=reservasVigentes.length+ventaDirectos.length+(!formalizacionMultiple&&ventaPrincipalDisponible?1:0);
   const puedeAgregarVenta=opType==='Venta'&&!asociacionAgrupadaPendiente&&
     Boolean(tieneReservasVenta||ventaDirectos.length||ventaPrincipalDisponible)&&cantidadVenta<20;
@@ -1406,7 +1406,7 @@ export function Sales() {
     ? selectedVisualLot(lotesVisorOperacion,Number(formProjectId),formLotId,false,'',editorVentaAdicional,ventaCandidato,loteEnConsulta,[...idsReservasVisor,...idsVentaDirectos])
     : selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional,loteEnConsulta,idsAdicionales);
   const opcionesVisor={
-    operation:opType,principal:Number(formLotId),adicionales:opType==='Venta'?idsVentaDirectos:idsAdicionales,
+    operation:opType,principal:opType==='Venta'&&formalizacionMultiple?0:Number(formLotId),adicionales:opType==='Venta'?idsVentaDirectos:idsAdicionales,
     ventaMultiple:opType==='Venta'&&!asociacionAgrupadaPendiente,
     editorPrincipal:editorLote,editorAdicional,
     puedeAgregar:opType==='Venta'?puedeAgregarVenta:Boolean(separacionCondicionesVerificadas&&condicionesVenta&&lotesAdicionales.length<19),
@@ -2467,7 +2467,7 @@ export function Sales() {
                 <Select
                   aria-label="Proyecto de interés registrado"
                   value={formProjectId}
-                  disabled={tieneReservasVenta || !selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
+                  disabled={tieneReservasVenta || ventaDirectos.length>0 || !selectedProspectId || loadingProjects || registrandoInteres || guardandoAsesorOperacion || editorInteres || guardandoLote || cargandoAdicional || submitting}
                   onChange={e=>{
                     setAutoseleccionPendiente(null);
                     setFormStageId('');
@@ -2488,7 +2488,7 @@ export function Sales() {
                 </div>
               )}
 
-              {!tieneReservasVenta && selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
+              {!tieneReservasVenta && ventaDirectos.length===0 && selectedProspectId && !loadingProjects && (compradorOperacion || puedeEditarInteres) &&
                 proyectosSinInteres.length > 0 && !editorInteres && (
                 <Button type="button" variant="secondary" className="mt-2 w-full sm:w-auto"
                   disabled={registrandoInteres || guardandoAsesorOperacion || submitting || guardandoLote || cargandoAdicional}
@@ -2879,6 +2879,7 @@ export function Sales() {
 
             ) : formalizacionMultiple && selectedProspectId ? (
               <FormalizacionMultiplePanel key={selectedProspectId} idProspecto={Number(selectedProspectId)} reservas={reservasVigentes} directos={ventaDirectos}
+                bloqueado={loadingProjects||loadingStages||loadingLots||editorInteres||editorAsesor||registrandoInteres||guardandoAsesorOperacion||editorVentaAdicional}
                 onConsultar={(id,proyecto)=>{
                   if(proyecto!==Number(formProjectId)){
                     setAutoseleccionPendiente({idProyecto:proyecto,idLote:id});setFormProjectId(String(proyecto));
