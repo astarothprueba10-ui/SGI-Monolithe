@@ -40,3 +40,18 @@ test('efectivo no exige adjuntar archivo y otros métodos conservan la validaci�
  assert.equal(validarPagosSeparacion([pago(1,'499',{...sinArchivo,metodo:'EFECTIVO'})],500).valido,false);
  assert.equal(validarPagosSeparacion([pago(1,'500',{metodo:'EFECTIVO',hashSha256:null})],500).valido,false);
 });
+
+test('el formulario conserva la auditoría de cambios y precarga interés sin reserva',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+ const sales=read('pages/Sales.tsx'),panel=read('components/sales/PagoSeparacionPanel.tsx');
+ assert.match(sales,/preferenciaLote\?\.id!=null&&motivoLote\.trim\(\)\.length<5/);
+ assert.match(sales,/Registro inicial de lote de interés desde Separaciones y Ventas/);
+ assert.match(sales,/setAutoseleccionPendiente\(\{idProyecto:registrado,idLote:preferido\}\)/);
+ assert.match(sales,/setFormProjectId\(String\(registrado\)\)/);
+ assert.match(sales,/p\.metodo==='EFECTIVO'&&!archivo/);
+ assert.match(panel,/p\.metodo==='EFECTIVO'\?'\(opcional\)':'\*'/);
+ assert.match(read('utils/constanciaEfectivo.tsx'),/No es un comprobante bancario, recibo de caja ni acredita la recepción del dinero/);
+ assert.doesNotMatch(sales,/Condiciones contractuales verificadas · Versión/);
+ assert.match(sales,/formalizacionMultiple=tieneReservasVenta && !asociacionAgrupadaPendiente/);
+});
