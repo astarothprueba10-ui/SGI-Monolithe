@@ -12,6 +12,23 @@ import tools.jackson.databind.json.JsonMapper;
 
 class EmailServiceRecoveryMailTest {
     @Test
+    void correoComercialContieneNombreRealYEscapaHtml() throws Exception {
+        var transport = new AppsScriptJavaMailSender(JsonMapper.builder().build(),
+            "https://script.google.com/macros/s/test/exec",
+            "abcdefghijklmnopABCDEFGHIJKLMNOP0123456789abcdefghijkl");
+        JavaMailSender sender = mock(JavaMailSender.class);
+        when(sender.createMimeMessage()).thenAnswer(inv -> transport.createMimeMessage());
+        EmailService service = new EmailService(sender);
+        ReflectionTestUtils.setField(service, "remitente", "gestion@example.test");
+        service.enviarCodigoMfaComercial("usuario@example.test","012345","MATRIZ","Los Cocos & Jardines");
+        var captor=ArgumentCaptor.forClass(MimeMessage.class);
+        verify(sender).send(captor.capture());
+        var payload=transport.payloadFor(captor.getValue());
+        assertTrue(((String)payload.get("textBody")).contains("Proyecto: Los Cocos & Jardines"));
+        assertTrue(((String)payload.get("htmlBody")).contains("Los Cocos &amp; Jardines"));
+        assertTrue(((String)payload.get("htmlBody")).contains("012345"));
+    }
+    @Test
     void recuperacionYConfirmacionSonCompatiblesConTransporteHttps() throws Exception {
         var transport = new AppsScriptJavaMailSender(JsonMapper.builder().build(),
             "https://script.google.com/macros/s/test/exec",

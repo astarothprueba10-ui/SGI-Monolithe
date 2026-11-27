@@ -38,6 +38,19 @@ class CommercialMfaServiceTest {
         when(db.query(contains("FROM public.seg_mfa_comercial WHERE id=? AND actor=? FOR UPDATE"),any(RowMapper.class),eq(id),eq(5L)))
             .thenAnswer(inv->List.of(((RowMapper)inv.getArgument(1)).mapRow(rs,0)));
     }
+    @Test void nombreRealDelProyectoSeUsaEnCorreoYRespuesta(){
+        when(db.query(contains("SELECT nombre FROM public.inm_proyectos"),any(RowMapper.class),eq(2L))).thenReturn(List.of("Residencial Campestre Los Cocos"));
+        when(db.queryForObject(contains("SELECT count(*) FROM public.seg_mfa_comercial"),eq(Integer.class),eq(5L))).thenReturn(0);
+        when(passwords.encode(anyString())).thenReturn("hash-code");
+        var resultado=mfa.iniciar(jwt,2,"MATRIZ",huella);
+        assertEquals("Residencial Campestre Los Cocos",resultado.get("proyectoNombre"));
+        verify(mail).enviarCodigoMfaComercial(eq("gerencia@example.test"),matches("[0-9]{6}"),eq("MATRIZ"),eq("Residencial Campestre Los Cocos"));
+    }
+    @Test void manzanasNoGeneranDesafio(){
+        assertThrows(ResponseStatusException.class,()->mfa.iniciar(jwt,2,"MANZANA",huella));
+        assertThrows(ResponseStatusException.class,()->mfa.iniciar(jwt,2,"ASIGNACION",huella));
+        verifyNoInteractions(mail);
+    }
     @Test void codigoIncorrectoCuentaIntentoYQuintoBloquea()throws Exception{
         when(passwords.matches("123456","hash-code")).thenReturn(false);
         var err=assertThrows(ResponseStatusException.class,()->mfa.verificar(jwt,id,"123456"));

@@ -245,7 +245,7 @@ test('zonas usa filtro desplegable de estado y centra lotes asignados',()=>{
 });
 test('operaciones sensibles pasan por confirmacion comercial y la previsualizacion no',()=>{
  const s=archivo('services/projectConfigurationService.ts');
- for(const accion of ['MATRIZ','TARIFA','DISPONIBILIDAD','PUBLICACION','ETAPAS','ASIGNACION'])assert.ok(s.includes("'"+accion+"'"));
+ for(const accion of ['MATRIZ','TARIFA','DISPONIBILIDAD','PUBLICACION','ETAPAS'])assert.ok(s.includes("'"+accion+"'"));
  assert.match(s,/coreApi.post<PublicacionComercialResponse>.*publicacion\/validar/);
  assert.match(archivo('services/projectImportService.ts'),/commercialMutation<RespuestaImportacion>\(id,'IMPORTACION'/);
  const m=archivo('services/commercialMfaService.ts');
@@ -275,4 +275,13 @@ test('filtros de manzanas: buscador, etapa con etiqueta arriba, estado',()=>{
  assert.ok(tab.indexOf('<FieldLabel htmlFor="etapa-comercial-manzanas"')<tab.indexOf('<Dropdown'));
  assert.match(tab,/flex w-full flex-col sm:w-auto/);
  assert.doesNotMatch(archivo('components/projects/CommercialBlockFormModal.tsx'),/confirmación de seguridad por correo/);
+});
+
+test('MFA comercial excluye asignaciones estructurales y protege cambios de etapas en borrador',()=>{
+ const s=archivo('services/projectConfigurationService.ts');
+ assert.match(s,/guardarAsignacion[\s\S]*?return coreApi.put<GestionComercialResponse>/);
+ assert.match(s,/if \(confirmarEtapas\) return commercialMutation<ConfiguracionProyectoResponse>/);
+ assert.match(archivo('hooks/useProjectConfiguration.ts'),/confirmarEtapas/);
+ assert.doesNotMatch(archivo('services/commercialMfaService.ts'),/'ASIGNACION'|'MANZANA'/);
+ assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/Configuración inicial finalizada, puedes administrar los precios y la disponibilidad sin volver a publicar/);
 });
