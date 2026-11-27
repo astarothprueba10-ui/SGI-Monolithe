@@ -73,6 +73,7 @@ export interface PublicacionComercialFila {
   vigenteHasta: string | null;
   habilitarInventario: boolean;
   bloquearInventario?: boolean;
+  bloquearInventario?: boolean;
 }
 export interface PublicacionComercialResponse {
   version: number;

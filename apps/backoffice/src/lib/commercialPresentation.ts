@@ -28,9 +28,21 @@ export function contarLotesPorEtapa(config: ConfiguracionProyectoResponse, codig
     (asignacionesLote.get(l.id) ?? asignacionesManzana.get(l.idManzana)) === codigo).length;
 }
 
+export function inventarioPorEtapa(config: ConfiguracionProyectoResponse, codigo: string) {
+  const lotes = new Map(config.datos.lotes.map(a => [a.id,a.codigoEtapa]));
+  const manzanas = new Map(config.datos.manzanas.map(a => [a.id,a.codigoEtapa]));
+  const asignados = config.lotes.filter(l => (lotes.get(l.id) ?? manzanas.get(l.idManzana)) === codigo);
+  return { total: asignados.length, disponibles: asignados.filter(l => l.estadoInventario === 'DISPONIBLE').length,
+    protegidos: asignados.filter(l => ['VENDIDO','RESERVADO'].includes(l.estadoInventario ?? '')).length };
+}
+
+export function seleccionInicial(config: ConfiguracionProyectoResponse): string[] {
+  return config.datos.etapas.filter(e => e.disponibilidad !== 'BLOQUEADA' && inventarioPorEtapa(config,e.codigo).disponibles > 0).map(e => e.codigo);
+}
+
 export function resumirPublicacion(filas: readonly PublicacionComercialFila[]) {
   return {
-    preciosPreparados: filas.filter(f => f.situacion === 'HABILITADA').length,
+    preciosPreparados: filas.filter(f => f.situacion === 'HABILITADA' || (f.situacion === 'BLOQUEADA' && f.precioFinal != null)).length,
     habilitarInventario: filas.filter(f => f.habilitarInventario).length,
     sinHabilitar: filas.filter(f => f.situacion === 'HABILITADA'
       && f.estadoInventario === 'NO_DISPONIBLE' && !f.habilitarInventario).length,

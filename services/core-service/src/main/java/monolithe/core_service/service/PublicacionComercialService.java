@@ -39,7 +39,7 @@ public class PublicacionComercialService {
         if (!config.monedas().contains("PEN") || config.lotes().isEmpty() || config.datos().etapas().isEmpty())
             throw new ReglaNegocioException("Se requieren lotes, etapas y moneda PEN para publicar.");
         var seleccion = SeleccionEtapasPublicacion.validar(request.etapasHabilitar(), config.datos().etapas());
-        var filas = evaluar(proyecto,config,seleccion);
+        var filas = evaluar(proyecto,configParaPrecios(config),seleccion);
         return new PublicacionComercialResponse(config.version(),publicada,
             huella(proyecto,config.version(),publicada,seleccion,filas),false,filas);
     }
@@ -68,6 +68,15 @@ public class PublicacionComercialService {
         return repository.versionPublicada(proyecto);
     }
 
+    private ConfiguracionProyectoResponse configParaPrecios(ConfiguracionProyectoResponse config) {
+        var d = config.datos();
+        var etapas = d.etapas().stream().map(e -> e.disponibilidad()==ConfiguracionProyectoRequest.Disponibilidad.BLOQUEADA
+            ? new ConfiguracionProyectoRequest.Etapa(e.codigo(),e.nombre(),ConfiguracionProyectoRequest.Disponibilidad.REGULAR,
+                ConfiguracionProyectoRequest.TipoDescuento.NINGUNO,BigDecimal.ZERO) : e).toList();
+        return new ConfiguracionProyectoResponse(config.version(),new ConfiguracionProyectoRequest.Datos(etapas,d.manzanas(),d.lotes(),d.tarifas()),
+            config.manzanas(),config.lotes(),config.zonas(),config.monedas());
+    }
+
     private List<Fila> evaluar(Long proyecto, ConfiguracionProyectoResponse config, Set<String> etapasHabilitar) {
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var candidatos = ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto);
@@ -84,9 +93,11 @@ public class PublicacionComercialService {
         if (protegido) return sinPrecio(lote,null,"PROTEGIDA","Operación existente: se conserva el precio.",actual);
         var r = simulacion.evaluar(config,lote,"PEN",ahora,candidatos);
         if (!r.resultado().equals("SIMULADO")) {
-            return sinPrecio(lote,r.codigoEtapa(),
+            var sin = sinPrecio(lote,r.codigoEtapa(),
                 ClasificadorPublicacionComercial.situacion(r.resultado()),
                 ClasificadorPublicacionComercial.detalle(r.resultado(),r.mensaje()),actual);
+            return new Fila(sin.idLote(),sin.codigo(),sin.estadoInventario(),sin.codigoEtapa(),sin.situacion(),sin.mensaje(),actual,
+                null,null,null,null,null,false,"BLOQUEADA".equals(sin.situacion()) && "DISPONIBLE".equals(sin.estadoInventario()));
         }
         if (!precioValido(r)) {
             return sinPrecio(lote,r.codigoEtapa(),"ERROR","Precio fuera de los límites permitidos.",actual);
@@ -94,10 +105,12 @@ public class PublicacionComercialService {
         var hasta = config.datos().tarifas().stream()
             .filter(t -> Objects.equals(t.codigoZona(),r.codigoZona()) && t.codigoEtapa().equals(r.codigoEtapa()) && t.moneda().equals("PEN"))
             .findFirst().orElseThrow().vigenteHasta();
-        return new Fila(lote.getIdLote(),lote.getCodigo(),r.estadoInventario(),r.codigoEtapa(),"HABILITADA",
-            "Precio comercial calculado en PEN.",actual,r.precioBase(),r.ajusteTipo(),r.descuento(),r.precioSimulado(),
+        boolean abierta = etapasHabilitar.contains(r.codigoEtapa());
+        return new Fila(lote.getIdLote(),lote.getCodigo(),r.estadoInventario(),r.codigoEtapa(),abierta ? "HABILITADA" : "BLOQUEADA",
+            abierta ? "Precio comercial calculado en PEN." : "Precio preparado; etapa cerrada para nuevas ventas.",actual,r.precioBase(),r.ajusteTipo(),r.descuento(),r.precioSimulado(),
             hasta,SeleccionEtapasPublicacion.liberarInventario(
-                r.codigoEtapa(),r.estadoInventario(),etapasHabilitar));
+                r.codigoEtapa(),r.estadoInventario(),etapasHabilitar),
+                SeleccionEtapasPublicacion.bloquearInventario(r.codigoEtapa(),r.estadoInventario(),etapasHabilitar));
     }
 
     private boolean precioValido(SimulacionComercialResponse r) {
@@ -112,8 +125,9 @@ public class PublicacionComercialService {
     }
 
     private void registrar(Long proyecto,int version,Long actor,Fila fila) {
-        Long precio = fila.situacion().equals("HABILITADA") ? repository.registrarPrecio(fila,version) : null;
-        repository.registrarFila(proyecto,version,fila,precio);
+        Long precio = fila.precioFinal()!=null ? repository.registrarPrecio(fila,version) : null;
+        repository.registrarFila(proyecto,version,fila,fila.situacion().equals("HABILITADA") ? precio : null);
+        if (fila.bloquearInventario()) repository.bloquearInventario(fila.idLote(),actor,version);
         if (fila.habilitarInventario()) repository.habilitarInventario(fila.idLote(),actor,version);
     }
 

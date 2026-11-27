@@ -3,7 +3,7 @@ import { ShieldCheckIcon } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
-import { estadoInventarioLegible, resumirPublicacion } from '../../../lib/commercialPresentation';
+import { estadoInventarioLegible, resumirPublicacion, seleccionInicial } from '../../../lib/commercialPresentation';
 import { CommercialStageReleaseSelector } from './CommercialStageReleaseSelector';
 import type { ConfiguracionProyectoResponse, PublicacionComercialResponse } from '../../../types/projectConfiguration';
 import type { ProyectoResponse } from '../../../types/core';
@@ -43,9 +43,8 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
         <p className={`text-xl font-semibold ${item.titulo === 'Errores' && item.valor ? 'text-red-700' : 'text-brand-900'}`}>{item.valor}</p>
       </div>)}
     </div>
-    {contadores.yaDisponibles > 0 && <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-700">
-      {contadores.yaDisponibles} lote(s) ya figuran como «Disponible en inventario». No se revertirán
-      por dejar una etapa sin seleccionar. Sus restricciones comerciales siguen aplicándose.
+    {r.lotes.some(l => l.bloquearInventario) && <p className="rounded-md bg-brand-50 p-3 text-sm text-brand-700">
+      {r.lotes.filter(l => l.bloquearInventario).length} lote(s) disponibles pasarán a no habilitado para ventas al cerrar su etapa.
     </p>}
     {errores.length > 0 && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
       <p className="font-semibold">Publicación detenida: {errores.length} lote(s) requieren corrección.</p>
@@ -55,7 +54,7 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
     </div>}
     {noAsignados.length > 0 && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
       <p className="font-semibold">{noAsignados.length} lote(s) sin etapa comercial quedarán bloqueados comercialmente.</p>
-      <p className="mt-1">No podrán separarse ni venderse. Su estado de inventario no se modifica.</p>
+      <p className="mt-1">No podrán separarse ni venderse. Los disponibles pasarán a no habilitado.</p>
       <p className="mt-1 font-medium">{noAsignados.map(l => l.codigo).join(', ')}</p>
     </div>}
     <div className="max-h-96 overflow-auto rounded-md border border-brand-200">
@@ -70,7 +69,7 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
           <td className="p-2">{l.codigoEtapa ?? 'Sin asignar'}</td>
           <td className={`p-2 font-medium ${l.situacion === 'ERROR' ? 'text-red-700' : ''}`}>{etiquetas[l.situacion]}</td>
           <td className={`p-2 font-semibold ${l.habilitarInventario ? 'text-emerald-700' : 'text-brand-600'}`}>
-            {l.habilitarInventario ? 'Se habilitará' : 'Sin cambios'}
+            {l.habilitarInventario ? 'Se habilitará' : l.bloquearInventario ? 'Se bloqueará' : 'Sin cambios'}
           </td>
           <td className="p-2 whitespace-nowrap">{importe(l.precioActual)}</td>
           <td className="p-2 whitespace-nowrap">{importe(l.precioFinal)}</td>
@@ -85,7 +84,7 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
 export function CommercialPublicationPanel({ project, config, dirty, onPublished }: Props) {
   const { can } = useAuth();
   const [publicada, setPublicada] = useState<number | null>(null);
-  const [etapasHabilitar, setEtapasHabilitar] = useState<string[]>([]);
+  const [etapasHabilitar, setEtapasHabilitar] = useState<string[]>(() => seleccionInicial(config));
   const [resultado, setResultado] = useState<PublicacionComercialResponse | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [aceptado, setAceptado] = useState(false);
@@ -189,7 +188,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPublished
               disabled={!puede || resultado.lotes.some(l => l.situacion === 'ERROR')}
               onChange={e => setAceptado(e.target.checked)}/>
             Confirmo los precios y restricciones revisados y la liberación exclusivamente de los lotes indicados
-            en «Se habilitarán ahora». Los demás conservarán su estado de inventario.
+            en «Se habilitarán ahora», y el cierre de los lotes indicados. Las operaciones protegidas se conservan.
           </label>
           <Button variant="primary" disabled={!puede || !aceptado
             || resultado.lotes.some(l => l.situacion === 'ERROR')}

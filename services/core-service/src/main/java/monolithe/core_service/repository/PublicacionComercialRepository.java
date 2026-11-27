@@ -116,7 +116,22 @@ public class PublicacionComercialRepository {
               situacion,id_lote_precio,precio_lista,descuento,precio_final,vigente_hasta)
             VALUES(?,?,?,?,?,?,?,?,?,?)
             """, proyecto,version,f.idLote(),f.codigoEtapa(),f.situacion(),precio,
-            f.base()==null ? null : f.base().add(f.ajuste()),f.descuento(),f.precioFinal(),f.vigenteHasta());
+            precio==null ? null : f.base().add(f.ajuste()),precio==null ? null : f.descuento(),precio==null ? null : f.precioFinal(),f.vigenteHasta());
+    }
+
+    public void bloquearInventario(Long id, Long actor, int version) {
+        int filas = jdbc.update("""
+            WITH cambio AS (
+              UPDATE public.inm_lotes l SET id_estado_lote=(SELECT id_estado_lote FROM public.cfg_estados_lote
+                WHERE codigo='NO_DISPONIBLE' AND activo), fecha_actualizacion=now()
+              WHERE l.id_lote=? AND l.id_estado_lote=(SELECT id_estado_lote FROM public.cfg_estados_lote WHERE codigo='DISPONIBLE')
+              RETURNING l.id_lote,l.id_estado_lote
+            )
+            INSERT INTO public.inm_lotes_historial_estado(id_lote,id_estado_anterior,id_estado_nuevo,motivo,fecha_cambio,id_usuario)
+            SELECT c.id_lote,e.id_estado_lote,c.id_estado_lote,?,now(),? FROM cambio c CROSS JOIN public.cfg_estados_lote e
+            WHERE e.codigo='DISPONIBLE'
+            """, id,"Cierre por etapa comercial v"+version,actor);
+        if (filas!=1) throw new IllegalStateException("El estado del lote cambió durante la publicación.");
     }
 
     public void habilitarInventario(Long id, Long actor, int version) {
