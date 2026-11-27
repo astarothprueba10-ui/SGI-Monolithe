@@ -287,6 +287,9 @@ export function Sales() {
   const [guardandoLote,setGuardandoLote]=useState(false);
   const [errorLote,setErrorLote]=useState('');
   const [lotesAdicionales,setLotesAdicionales]=useState<LoteAdicionalSeparacion[]>([]);
+  const [loteEnConsulta,setLoteEnConsulta]=useState<number|null>(null);
+  const [revisionEnfoque,setRevisionEnfoque]=useState(0);
+  const consultarUbicacion=(id:number)=>{setLoteEnConsulta(id);setRevisionEnfoque(v=>v+1);};
   const [editorAdicional,setEditorAdicional]=useState(false);
   const [candidatoAdicional,setCandidatoAdicional]=useState('');
   const [cargandoAdicional,setCargandoAdicional]=useState(false);
@@ -863,6 +866,7 @@ export function Sales() {
   useEffect(()=>{
     ++revisionLotesAdicionales.current;
     setLotesAdicionales([]);
+    setLoteEnConsulta(null);
     setCandidatoAdicional('');
     setEditorAdicional(false);
     setErrorAdicional('');
@@ -932,6 +936,7 @@ export function Sales() {
         throw new Error('No se pudieron verificar el precio y la política del lote.');
       setLotesAdicionales(prev=>[...prev,{idLote:lote.idLote,codigo:lote.codigo,precio:Number(precio.precio),
         monto:politica.montoSeparacion,dias:politica.diasVencimientoSeparacion,idPolitica:politica.idPolitica}]);
+      consultarUbicacion(lote.idLote);
       setCandidatoAdicional('');setEditorAdicional(false);
     }catch(err:unknown){
       if(revision===revisionLotesAdicionales.current)setErrorAdicional(err instanceof Error?err.message:'No se pudo añadir el lote.');
@@ -1354,7 +1359,7 @@ export function Sales() {
   const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
   const mostrarVisorSeparacion=opType==='Separacion' && can('lots.view');
-  const loteVisual=selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional);
+  const loteVisual=selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional,loteEnConsulta,lotesAdicionales.map(l=>l.idLote));
   const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
   const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
   const pagosSeparacionResueltos = resolverPagosSeparacion(pagosSeparacion,totalSeparacionSeleccion);
@@ -2523,8 +2528,10 @@ export function Sales() {
 
               {opType==='Separacion' ? <div className="space-y-2">
                 {(loadingProjects||loadingStages||loadingLots) ? <p role="status" className="py-3 text-sm text-brand-500">Consultando interés e inventario del proyecto…</p>
-                : lotePrincipal ? <div className="rounded-xl border border-brand-200 bg-white p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                : lotePrincipal ? <div className={`rounded-xl border bg-white p-3 ${mostrarVisorSeparacion&&loteVisual?.idLote===lotePrincipal.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
+                  <button type="button" disabled={!mostrarVisorSeparacion} aria-label={`Consultar ubicación de ${lotePrincipal.codigo}`}
+                    aria-pressed={mostrarVisorSeparacion&&loteVisual?.idLote===lotePrincipal.idLote} onClick={()=>consultarUbicacion(lotePrincipal.idLote)}
+                    className="flex w-full flex-wrap items-start justify-between gap-x-4 gap-y-2 text-left rounded-md enabled:cursor-pointer enabled:hover:bg-brand-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-brand-600">{preferenciaLote?.id===lotePrincipal.idLote?'Lote de interés · Principal':'Lote principal de la operación'}</p>
                       <p className="mt-1 text-base font-bold text-brand-900">{lotePrincipal.codigo}</p>
@@ -2538,7 +2545,8 @@ export function Sales() {
                         : <p className="text-xs text-brand-600">{estadoPrecio==='error'||estadoPrecio==='sin_precio'?'Precio no verificado':'Consultando precio…'}</p>}
                       {separacionCondicionesVerificadas&&condicionesVenta&&<p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(condicionesVenta.montoSeparacion)}</strong></p>}
                     </div>
-                  </div>
+                  </button>
+                  {mostrarVisorSeparacion&&<p className="mt-1 text-[11px] font-medium text-brand-600">{loteVisual?.idLote===lotePrincipal.idLote?'En consulta · Pulsa para centrar de nuevo':'Pulsa la tarjeta para ver su ubicación'}</p>}
                 </div> : <div role="status" className="py-2 text-sm text-brand-700">
                   {preferenciaLote?.id ? <>
                     <p className="font-semibold">Lote de interés en CRM: {preferenciaLote.codigo??'Lote registrado'}</p>
@@ -2550,7 +2558,7 @@ export function Sales() {
                   onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?(puedeEditarInteres?'Cambiar lote de interés':'Elegir otro lote para esta operación'):'Seleccionar lote'}</Button>}
                 {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
                   <label className="block text-xs font-medium text-brand-700">Lote disponible *</label>
-                  <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>setLoteCandidato(e.target.value)}>
+                  <Select value={loteCandidato} disabled={guardandoLote} onChange={e=>{setLoteEnConsulta(null);setLoteCandidato(e.target.value);setRevisionEnfoque(v=>v+1);}}>
                     <option value="">Seleccione un lote</option>
                     {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
                   </Select>
@@ -2567,8 +2575,10 @@ export function Sales() {
                       onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
                   </div>
                 </div>}
-                {lotesAdicionales.map(l=><div key={l.idLote} className="rounded-xl border border-brand-200 bg-white p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                {lotesAdicionales.map(l=><div key={l.idLote} className={`rounded-xl border bg-white p-3 ${mostrarVisorSeparacion&&loteVisual?.idLote===l.idLote?'border-brand-800 ring-1 ring-brand-800':'border-brand-200'}`}>
+                  <button type="button" disabled={!mostrarVisorSeparacion} aria-label={`Consultar ubicación de ${l.codigo}`}
+                    aria-pressed={mostrarVisorSeparacion&&loteVisual?.idLote===l.idLote} onClick={()=>consultarUbicacion(l.idLote)}
+                    className="flex w-full flex-wrap items-start justify-between gap-x-4 gap-y-2 text-left rounded-md enabled:cursor-pointer enabled:hover:bg-brand-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
                     <div className="min-w-0">
                       <p className="text-xs text-brand-600">Lote adicional</p>
                       <p className="mt-1 text-base font-bold text-brand-900">{l.codigo}</p>
@@ -2579,15 +2589,17 @@ export function Sales() {
                       <p className="text-base font-bold tabular-nums text-brand-900">{formatSoles(l.precio)}</p>
                       <p className="mt-1 text-xs text-brand-700">Separación: <strong>{formatSoles(l.monto)}</strong></p>
                     </div>
-                  </div>
-                  <div className="mt-2 flex justify-end"><Button type="button" size="sm" variant="secondary" disabled={submitting||guardandoLote||cargandoAdicional||editorLote} onClick={()=>setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote))}>Quitar lote</Button></div>
+                  </button>
+                  <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                    {mostrarVisorSeparacion&&<p className="mr-auto text-[11px] font-medium text-brand-600">{loteVisual?.idLote===l.idLote?'En consulta · Pulsa para centrar de nuevo':'Pulsa la tarjeta para ver su ubicación'}</p>}
+                    <Button type="button" size="sm" variant="secondary" disabled={submitting||guardandoLote||cargandoAdicional||editorLote} onClick={()=>{setLotesAdicionales(prev=>prev.filter(x=>x.idLote!==l.idLote));setLoteEnConsulta(prev=>prev===l.idLote?null:prev);}}>Quitar lote</Button></div>
                 </div>)}
                 {separacionCondicionesVerificadas&&condicionesVenta&&!editorLote&&<>
                   {!editorAdicional&&<Button type="button" variant="secondary" icon={PlusIcon} className="w-full sm:w-auto" disabled={submitting||lotesAdicionales.length>=19||!lotesDisponiblesProyecto.some(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote))}
                     onClick={()=>{setErrorAdicional('');setEditorAdicional(true)}}>Agregar otro lote</Button>}
                   {editorAdicional&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
                     <label className="block text-xs font-medium">Lote adicional
-                      <Select className="mt-1" value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>setCandidatoAdicional(e.target.value)}>
+                      <Select className="mt-1" value={candidatoAdicional} disabled={cargandoAdicional} onChange={e=>{setLoteEnConsulta(null);setCandidatoAdicional(e.target.value);setRevisionEnfoque(v=>v+1);}}>
                         <option value="">Seleccione otro lote disponible</option>
                         {lotesDisponiblesProyecto.filter(l=>l.idLote!==Number(formLotId)&&!lotesAdicionales.some(x=>x.idLote===l.idLote)).map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
                       </Select>
@@ -3088,7 +3100,7 @@ export function Sales() {
           {mostrarVisorSeparacion&&<aside className="min-w-0 lg:sticky lg:top-0">
             {selectedProspectId&&formProjectId&&proyectoConInteres
               ? <LotVisualPickerPanel key={formProjectId} project={Number(formProjectId)} selected={loteVisual}
-                  stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined}/>
+                  stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined} focusRevision={revisionEnfoque}/>
               : <section className="rounded-xl border border-brand-200 bg-brand-50 p-5 text-sm text-brand-600">
                   <h3 className="mb-2 font-semibold text-brand-900">Vista del lote</h3>
                   Selecciona el cliente y el proyecto para visualizar sus lotes.
