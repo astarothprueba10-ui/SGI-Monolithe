@@ -76,3 +76,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/gestion_comercial_171_pg_test.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/173_mfa_operaciones_comerciales.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/mfa_comercial_173_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/manzanas_comerciales_174_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/174_inm_manzanas_comerciales.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/manzanas_comerciales_174_pg_test.sql

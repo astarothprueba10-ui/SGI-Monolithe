@@ -121,7 +121,7 @@ public class ManzanaComercialService {
                 SELECT ?,?,id_estado_manzana,?,?,?,true FROM public.cfg_estados_manzana WHERE codigo='ACTIVA' AND activo RETURNING id_manzana
                 """,Long.class,proyecto,fisica,req.codigo(),req.nombre().trim(),orden);
         }else{
-            jdbc.update("UPDATE public.inm_manzanas SET codigo=?,nombre=?,activo=true WHERE id_proyecto=? AND id_manzana=?",req.codigo(),req.nombre().trim(),proyecto,id);
+            jdbc.update("UPDATE public.inm_manzanas SET codigo=?,nombre=?,activo=true,fecha_actualizacion=now() WHERE id_proyecto=? AND id_manzana=?",req.codigo(),req.nombre().trim(),proyecto,id);
         }
         jdbc.update("DELETE FROM public.inm_manzanas_zonas WHERE id_proyecto=? AND id_manzana=?",proyecto,id);
         for(Long z:zonas)jdbc.update("INSERT INTO public.inm_manzanas_zonas(id_proyecto,id_manzana,id_zona) VALUES(?,?,?)",proyecto,id,z);
@@ -135,7 +135,7 @@ public class ManzanaComercialService {
             configuracion.guardar(proyecto,actor,new ConfiguracionProyectoRequest(c.version(),new ConfiguracionProyectoRequest.Datos(d.etapas(),asignaciones,d.lotes(),d.tarifas())));
         }
         jdbc.update("""
-            UPDATE public.inm_manzanas SET activo=?,codigo_etapa_comercial_inactiva=?,id_estado_manzana=
+            UPDATE public.inm_manzanas SET activo=?,codigo_etapa_comercial_inactiva=?,fecha_actualizacion=now(),id_estado_manzana=
                 (SELECT id_estado_manzana FROM public.cfg_estados_manzana WHERE codigo=? AND activo)
             WHERE id_proyecto=? AND id_manzana=?
             """,req.activa(),req.activa()?null:req.codigoEtapa(),req.activa()?"ACTIVA":"INACTIVA",proyecto,id);

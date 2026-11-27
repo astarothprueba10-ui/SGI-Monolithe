@@ -120,6 +120,7 @@ public class ZonaService {
     }
 
     private void validarDesactivacionZona(Long idZona) {
+        if(zonaRepository.usadaPorManzanaActiva(idZona))throw new ReglaNegocioException("La zona está asociada a una manzana activa. Retira la asociación antes de desactivarla.");
         long cantidad=loteRepository.countByZona_IdZonaAndActivoTrue(idZona);
         if (cantidad>0) {
             throw new ReglaNegocioException("No se puede desactivar esta zona: tiene "+cantidad+" lote(s) activos asociados. Consulta y reasigna los lotes elegibles antes de desactivarla; conserva las operaciones existentes.");

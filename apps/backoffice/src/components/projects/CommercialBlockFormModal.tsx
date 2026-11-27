@@ -17,7 +17,6 @@ export function CommercialBlockFormModal({project,listado,block,etapaInicial,onC
  const [confirmar,setConfirmar]=useState(false);
  const seleccion=listado.etapas.find(e=>e.codigo===etapa);
  const estado=estadoManzana(activa,block?.lotes??0,block?.vendidos??0,!!seleccion?.habilitada);
- const derivado=estado==='VENDIDA'||estado==='BLOQUEADA_COMERCIALMENTE';
  const valido=!!seleccion&&/^[A-Z0-9][A-Z0-9_-]{0,29}$/.test(codigo)&&!!nombre.trim()&&zonas.length>0&&zonas.every(id=>listado.zonas.some(z=>z.id===id&&z.activa));
  const cambiaEtapa=!!block&&block.codigoEtapa!==etapa;
  const tieneLotes=(block?.lotes??0)>0;
@@ -42,7 +41,7 @@ export function CommercialBlockFormModal({project,listado,block,etapaInicial,onC
     {!confirmar?<fieldset disabled={busy} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
        <div><FieldLabel htmlFor="manzana-etapa-comercial">Etapa comercial *</FieldLabel><Select id="manzana-etapa-comercial" value={etapa} onChange={e=>setEtapa(e.target.value)}><option value="">Seleccionar etapa…</option>{listado.etapas.map(e=><option key={e.codigo} value={e.codigo}>{e.nombre} ({e.codigo})</option>)}</Select></div>
-       <div><FieldLabel htmlFor="manzana-estado-comercial">Estado</FieldLabel><Select id="manzana-estado-comercial" value={estado} onChange={e=>setActiva(e.target.value!=='INACTIVA')} disabled={estado==='VENDIDA'||tieneLotes&&derivado}><option value="ACTIVA" disabled={!seleccion?.habilitada}>Activa</option><option value="INACTIVA" disabled={tieneLotes}>Inactiva</option><option value="BLOQUEADA_COMERCIALMENTE" disabled={!!seleccion?.habilitada}>Bloqueada comercialmente</option>{estado==='VENDIDA'&&<option value="VENDIDA">Vendida</option>}</Select><p className="mt-1 text-xs text-brand-500">La disponibilidad de la etapa y las ventas determinan el estado comercial.</p></div>
+       <div><FieldLabel htmlFor="manzana-estado-comercial">Estado</FieldLabel><Select id="manzana-estado-comercial" value={estado} onChange={e=>setActiva(e.target.value!=='INACTIVA')} disabled={estado==='VENDIDA'||tieneLotes}><option value="ACTIVA" disabled={!seleccion?.habilitada}>Activa</option><option value="INACTIVA" disabled={tieneLotes}>Inactiva</option><option value="BLOQUEADA_COMERCIALMENTE" disabled={!!seleccion?.habilitada}>Bloqueada comercialmente</option>{estado==='VENDIDA'&&<option value="VENDIDA">Vendida</option>}</Select><p className="mt-1 text-xs text-brand-500">La disponibilidad de la etapa y las ventas determinan el estado comercial.</p></div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
        <div><FieldLabel htmlFor="manzana-codigo">Código *</FieldLabel><Input id="manzana-codigo" value={codigo} maxLength={30} placeholder={listado.codigoSugerido} disabled={tieneLotes} onChange={e=>cambiarCodigo(e.target.value)}/></div>

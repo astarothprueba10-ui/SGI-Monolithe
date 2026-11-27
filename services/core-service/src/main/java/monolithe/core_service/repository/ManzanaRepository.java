@@ -26,6 +26,13 @@ public interface ManzanaRepository extends JpaRepository<Manzana, Long> {
         Long idEtapa
     );
 
+    @org.springframework.data.jpa.repository.Query(value="""
+        SELECT EXISTS(SELECT 1 FROM public.inm_manzanas_zonas WHERE id_manzana=:manzana)
+          AND NOT EXISTS(SELECT 1 FROM public.inm_manzanas_zonas WHERE id_manzana=:manzana AND id_zona=CAST(:zona AS bigint))
+        """,nativeQuery=true)
+    boolean zonaNoPermitida(@org.springframework.data.repository.query.Param("manzana") Long manzana,
+                            @org.springframework.data.repository.query.Param("zona") Long zona);
+
     boolean existsByEtapa_IdEtapaAndActivoTrue(Long idEtapa);
     boolean existsByEtapa_Proyecto_IdProyectoAndActivoTrue(Long idProyecto);
 }
