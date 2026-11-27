@@ -162,3 +162,18 @@ test('venta mixta consulta reservas y permite añadir lotes disponibles sin sust
  assert.equal(action(2,{ventaMultiple:false}),'ninguna');
  assert.equal(action(2,{bloqueado:true}),'ninguna');
 });
+
+test('formalización conserva crédito y contrato por lote sin inventar reservas',()=>{
+ const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+ const panel=read('components/sales/FormalizacionMultiplePanel.tsx');
+ const sales=read('pages/Sales.tsx');
+ assert.match(panel,/reserva:CrmReservaVigenteVenta\|null/);
+ assert.match(panel,/l\.reserva\?\.montoReservaAplicable\?\?0/);
+ assert.match(panel,/idProyecto:Number\(l.idProyecto\),reserva:null/);
+ assert.match(panel,/creditoEsperado:credito\(d\),pagoEsperado:importe/);
+ assert.match(panel,/crmBackend\.registrarVentasMultiples\(ventas\)/);
+ assert.match(panel,/!habilitado\(d.lote\)/);
+ assert.match(sales,/directos=\{ventaDirectos\}/);
+ assert.match(sales,/onQuitarDirecto=/);
+ assert.match(sales,/await crmBackend\.registrarVentaPendiente/);
+});
