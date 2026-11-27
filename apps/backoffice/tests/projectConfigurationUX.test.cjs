@@ -147,11 +147,13 @@ test('gestión permanente usa operaciones independientes y muestra checks persis
   assert.doesNotMatch(gestion,/projectConfigurationService.publicar\(/);
 });
 
-test('estructura importada solo se consulta en asistente y las matrices muestran leyenda real',()=>{
+test('asistente permite corregir borrador importado sin reabrir importación y matrices muestran leyenda real',()=>{
  const ui=archivo('components/projects/detail/ProjectConfigurationTab.tsx');
- assert.match(ui,/const estructuraCerrada = !importacionPermitida/);
- assert.match(ui,/readOnly=\{bloqueado \|\| estructuraCerrada\}/);
- assert.match(ui,/readOnly=\{estructuraCerrada\}/);
+ assert.match(ui,/const importacionPermitida = lotesRegistrados < 10/);
+ assert.doesNotMatch(ui,/estructuraCerrada/);
+ assert.match(ui,/<CommercialStageEditor[^>]*readOnly=\{bloqueado\}/);
+ assert.match(ui,/<CommercialAssignmentEditor[^>]*readOnly=\{bloqueado\}/);
+ assert.match(ui,/await model.guardarYObtener\(\)/);
  assert.match(ui,/<CommercialZoneLegend/);
  assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/<CommercialZoneLegend/);
  assert.match(archivo('components/projects/detail/CommercialPublicationPanel.tsx'),/<CommercialZoneLegend/);
