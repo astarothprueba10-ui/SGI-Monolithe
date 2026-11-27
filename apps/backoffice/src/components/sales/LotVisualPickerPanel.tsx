@@ -5,7 +5,7 @@ import { PlanSvgShapes } from '../projects/detail/PlanSvgShapes';
 import { commercialLotService, estadoLote, soles, type FilaLote } from '../../services/commercialLotService';
 import { coreService } from '../../services/coreService';
 import { projectSvgService } from '../../services/projectSvgService';
-import { buildDisplayGeometries, bounds, roundedLotPath } from '../../lib/lotMatrixGeometry';
+import { buildDisplayGeometries, bounds, roundedLotPath, lotLabelSize } from '../../lib/lotMatrixGeometry';
 import { MAP_STATUSES, mapLotColors, mapStatus } from '../../lib/lotMapPalette';
 import { blockKey, focusBox, matrixFocusBox, hasSvgLot, validBox, type VisualBox } from '../../lib/lotVisualFocus';
 import type { LoteResponse, PlanoInteractivoDetalleResponse } from '../../types/core';
@@ -47,7 +47,7 @@ function MatrixPreview({lots,plan,selected,overview,selectable,onPick,resetKey}:
         onKeyDown={enabled?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onPick(lot.idLote);}}:undefined}>
         <path d={roundedLotPath(g.puntos)} fill={colors.fill} stroke={colors.stroke} strokeWidth={active?3:1.2}/>
         <text x={g.etiquetaX??box[0]+box[2]/2} y={g.etiquetaY??box[1]+box[3]/2} textAnchor="middle"
-          dominantBaseline="middle" fontSize={Math.max(5,Math.min(11,box[2]/Math.max(6,lot.codigo.length*.65)))} fontWeight="700" fill={colors.text}>{lot.codigo}</text>
+          dominantBaseline="middle" transform={g.rotacionEtiqueta?`rotate(${g.rotacionEtiqueta}, ${g.etiquetaX??box[0]+box[2]/2}, ${g.etiquetaY??box[1]+box[3]/2})`:undefined} fontSize={lotLabelSize(g.puntos,lot.codigo,g.rotacionEtiqueta??0)} fontWeight="700" fill={colors.text}>{lot.codigo}</text>
         <title>{lot.codigo} · {estadoLote(lot.codigoEstadoLote??'NO_DISPONIBLE')}</title>
       </g>;
     })}
