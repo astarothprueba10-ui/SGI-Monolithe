@@ -72,16 +72,8 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
     drag.current=null;
     if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
   }
-  return <svg viewBox={box.join(' ')} preserveAspectRatio="xMidYMid meet"
-    aria-label={`Plano vectorial de ${documento.nombreArchivo}`}
-    onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up}
-    onPointerLeave={e=>{if(!drag.current?.moving)up(e);}}
-    onClickCapture={e=>{if(suppressClick.current){e.stopPropagation();suppressClick.current=false;}}}
-    style={miniatura?undefined:{touchAction:zoom?'none':'auto',userSelect:'none'}}
-    className={miniatura ? 'h-full w-full' : `h-[min(75vh,800px)] min-h-[420px] w-full rounded-lg bg-brand-50 ${zoom?'cursor-grab active:cursor-grabbing':''}`}>
-    <rect x={documento.viewBox[0]} y={documento.viewBox[1]}
-      width={documento.viewBox[2]} height={documento.viewBox[3]} fill="#f8fafc"/>
-    {documento.elementos.map((figura,index)=>{
+  // La cámara solo cambia viewBox; las figuras CAD no se reconstruyen por cada cuadro.
+  const figuras=useMemo(()=>documento.elementos.map((figura,index)=>{
       const lote=figura.codigoLote ? referencias.get(figura.codigoLote) : undefined;
       const superficie=figuraVinculable(figura,documento.viewBox);
       const activo=!!lote&&lote.idLote===seleccionado;
@@ -108,6 +100,16 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
         {interactivo && <title>{lote ? `${lote.codigo} · ${lote.nombreEstadoLote??lote.codigoEstadoLote}`
           : 'Figura sin vínculo: selecciónala para asociar un lote'}</title>}
       </g>;
-    })}
+    }),[documento,referencias,seleccionado,alSeleccionar,alElegirFigura,miniatura,lotesSeleccionables,figuraActiva,zoom]);
+  return <svg viewBox={box.join(' ')} preserveAspectRatio="xMidYMid meet"
+    aria-label={`Plano vectorial de ${documento.nombreArchivo}`}
+    onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up}
+    onPointerLeave={e=>{if(!drag.current?.moving)up(e);}}
+    onClickCapture={e=>{if(suppressClick.current){e.stopPropagation();suppressClick.current=false;}}}
+    style={miniatura?undefined:{touchAction:zoom?'none':'auto',userSelect:'none'}}
+    className={miniatura ? 'h-full w-full' : `h-[min(75vh,800px)] min-h-[420px] w-full rounded-lg bg-brand-50 ${zoom?'cursor-grab active:cursor-grabbing':''}`}>
+    <rect x={documento.viewBox[0]} y={documento.viewBox[1]}
+      width={documento.viewBox[2]} height={documento.viewBox[3]} fill="#f8fafc"/>
+    {figuras}
   </svg>;
 });
