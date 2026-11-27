@@ -33,7 +33,7 @@ test('no consulta el detalle manual si un proyecto no tiene plano vigente; manti
  assert.match(core,/async getOptionalCurrentPlanDetail/);
  assert.match(core,/versiones\.some\(plano/);
  assert.match(core,/return vigente \? this\.getCurrentPlanDetail\(idProyecto, idEtapa\) : null/);
- assert.match(pagina,/coreService\.getOptionalCurrentPlanDetail\(projectId\)/);
+ assert.match(pagina,/coreService\.getCurrentMatrix\(projectId\)/);
  assert.match(pagina,/buildDisplayGeometries\(lots, planDetail, selectedProjectId\)/);
 });
 
@@ -71,9 +71,22 @@ test('editor protege borrador, congela escala y usa guardado transaccional',()=>
 });
 test('mapa comparte inventario, precio y etapa comercial con el CRUD',()=>{
   const pagina=leer('pages/LotMap.tsx');
-  assert.match(pagina,/commercialLotService\.listar\(projectId\)/);
+  assert.match(pagina,/commercialLotService\.listarMapa\(projectId\)/);
   assert.match(pagina,/filter\(f=>f\.lote\.activo\)/);
   assert.match(pagina,/codigoEstadoLote:f\.estado/);
   assert.match(pagina,/String\(l\.codigoEtapa\) === stageFilter/);
   assert.match(pagina,/BLOQUEADO_COMERCIALMENTE/);
+});
+
+test('carga matriz independiente del SVG y no recarga inventario después de guardar',()=>{
+  const pagina=leer('pages/LotMap.tsx');
+  const load=pagina.slice(pagina.indexOf('const loadProjectData'),pagina.indexOf('// El documento SVG'));
+  assert.match(load,/commercialLotService\.listarMapa/);
+  assert.match(load,/coreService\.getCurrentMatrix/);
+  assert.doesNotMatch(load,/projectSvgService|coreService\.getCommercializableLots/);
+  const save=pagina.slice(pagina.indexOf('const handleSavePlan'),pagina.indexOf('const svgRef'));
+  assert.match(save,/setPlanDetail\(refreshedPlan\)/);
+  assert.doesNotMatch(save,/loadProjectData\(/);
+  assert.match(pagina,/refreshInFlight\.current/);
+  assert.match(pagina,/viewMode==='matriz' && !isEditingPlan/);
 });
