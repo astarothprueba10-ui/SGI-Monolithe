@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircle2Icon, LockIcon } from 'lucide-react';
+import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -20,6 +21,7 @@ import type { ProyectoResponse } from '../../../types/core';
 export function ProjectConfigurationTab({ project }: { project: ProyectoResponse }) {
   const model = useProjectConfiguration(project.idProyecto);
   const { can } = useAuth();
+  const [confirmarRecarga,setConfirmarRecarga]=useState(false);
   const [paso, setPaso] = useState(0);
   const [procesando, setProcesando] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -135,12 +137,13 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       onChange={(codigo, marcada) => setSeleccion(marcada ? [...etapasHabilitar.filter(c => c !== codigo),codigo] : etapasHabilitar.filter(c => c !== codigo))}/>}
     {paso === 5 && <CommercialPublicationPanel project={project} config={respuesta} dirty={hayCambios || guardando}
       etapasSeleccionadas={etapasHabilitar} onPublished={model.recargar} onReviewTariffs={() => volver(3)} onBusyChange={setFinalizando}/>}
-    {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" disabled={ocupado} onClick={() => { if (!hayCambios || window.confirm('¿Descartar los cambios sin guardar y recargar?')) model.recargar(); }}>Recargar datos</Button></div>}
+    {error && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" disabled={ocupado} onClick={() => { if(hayCambios)setConfirmarRecarga(true);else model.recargar(); }}>Recargar datos</Button></div>}
     {aviso && <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{aviso}</p>}
     {incidencias.length > 0 && <div role="alert" className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
       {incidencias.map(g => <details key={g.mensaje}><summary className="cursor-pointer font-medium">{g.mensaje} ({g.lotes.length} lotes)</summary><p className="mt-1">{g.lotes.join(', ')}</p></details>)}
       <p>Si faltan zonas o existen ajustes de tipo incompatibles, corrige esos registros antes de continuar.</p>
     </div>}
+    <Modal open={confirmarRecarga} title="Descartar cambios sin guardar" onClose={()=>setConfirmarRecarga(false)} footer={<><Button onClick={()=>setConfirmarRecarga(false)}>Cancelar</Button><Button variant="danger" onClick={()=>{setConfirmarRecarga(false);model.recargar();}}>Descartar y recargar</Button></>}><p className="text-sm">Se perderán los cambios pendientes del paso actual. Los registros guardados se conservan.</p></Modal>
     <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 pt-4">
       <Button icon={ArrowLeftIcon} disabled={paso===0 || ocupado} onClick={() => volver(paso-1)}>Anterior</Button>
       <span className="text-xs text-brand-500">{hayCambios ? 'Cambios pendientes de guardar' : 'Los cambios se conservan al avanzar'}</span>

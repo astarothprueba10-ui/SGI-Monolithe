@@ -133,6 +133,27 @@ class GestionComercialServiceTest {
         verify(repo,never()).evento(anyLong(),anyInt(),anyLong(),anyString(),anyString(),anyString());
     }
 
+    @Test void reasignaLoteLibreAEtapaCerradaSinRepublicar() {
+        var lote=mock(Lote.class);
+        when(lotes.findById(1L)).thenReturn(Optional.of(lote));
+        when(simulacion.evaluar(any(),eq(lote),eq("PEN"),any(),any())).thenReturn(
+            new SimulacionComercialResponse(1,1L,"L1","DISPONIBLE","Z-A","E2","REGULAR","PEN",LocalDate.now(),
+                "SIMULADO","",BigDecimal.valueOf(27000),BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.valueOf(27000)));
+        when(repo.registrarPrecio(any(),eq(1))).thenReturn(21L);
+        var r=service.guardarAsignacion(proyecto,actor,new GestionComercialDto.CambioAsignacion(10L,"lotes",1L,"E2"));
+        assertEquals(List.of(new Asignacion(1L,"E2")),r.estado().lotes());
+        assertEquals(List.of("E1"),r.estado().etapasHabilitadas());
+        verify(repo).reasignarRegla(eq(proyecto),eq(1),argThat(f->"E2".equals(f.codigoEtapa())&&"BLOQUEADA".equals(f.situacion())),eq(21L),eq("E1"));
+        verify(repo).bloquearInventario(1L,actor,1);
+        verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
+    }
+
+    @Test void noReasignaReservaNiCambiaPrecios() {
+        assertThrows(ReglaNegocioException.class,()->service.guardarAsignacion(proyecto,actor,new GestionComercialDto.CambioAsignacion(10L,"lotes",2L,"E2")));
+        verify(repo,never()).registrarPrecio(any(),anyInt());
+        verify(repo,never()).evento(anyLong(),anyInt(),anyLong(),anyString(),anyString(),anyString());
+    }
+
     @Test void tarifaAnteriorNoConvierteSeleccionInferidaEnConfirmada() {
         when(repo.seleccionRegistrada(proyecto,1)).thenReturn(false);
         assertTrue(service.gestion(proyecto).inferida());

@@ -142,7 +142,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
       <p className="text-xs text-brand-500">Últimos 50 eventos registrados. Las publicaciones anteriores a esta función no cuentan con el nuevo detalle de auditoría.</p>
       {!historial?<p>Cargando historial…</p>:historial.length===0?<p>No hay eventos registrados.</p>:historial.map(e=><CommercialHistoryEntry key={e.id} evento={e} config={inventario}/>)}
     </section>}
-    <Modal open={tarifa!==null} title="Actualizar tarifa" onClose={()=>{if(!ocupado){setTarifa(null);setError('');}}}
+    <Modal open={tarifa!==null && confirmar!=='tarifa'} title="Actualizar tarifa" onClose={()=>{if(!ocupado){setTarifa(null);setError('');}}}
       description="El cambio se aplica al precio comercial, no a la disponibilidad."
       footer={<><Button disabled={ocupado} onClick={()=>{setTarifa(null);setError('');}}>Cancelar</Button><Button variant="primary" disabled={!editable||ocupado} onClick={()=>void guardarTarifa()}>{ocupado?'Guardando…':'Guardar tarifa'}</Button></>}>
       {tarifa&&<fieldset disabled={ocupado} className="space-y-3">

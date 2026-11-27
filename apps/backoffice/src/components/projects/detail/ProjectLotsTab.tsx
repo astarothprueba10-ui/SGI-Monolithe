@@ -255,7 +255,7 @@ export function ProjectLotsTab({ project }: Props) {
 
   return (
     <div className="space-y-4">
-      {asignando && <CommercialAssignmentModal projectId={project.idProyecto} tipo="lotes" id={asignando.idLote} codigo={asignando.codigo} onClose={()=>setAsignando(null)}/>}
+      {asignando && <CommercialAssignmentModal projectId={project.idProyecto} tipo="lotes" id={asignando.idLote} codigo={asignando.codigo} onSuccess={handleFormSuccess} onClose={()=>setAsignando(null)}/>}
       <LotFormModal
         open={formOpen}
         onClose={handleCloseForm}

@@ -186,3 +186,10 @@ test('las zonas utilizadas respetan excepciones individuales y los formularios c
  assert.doesNotMatch(zona,/id="zona-numero-orden"/);
  assert.match(zona,/disabled=\{isEditing\}/);
 });
+
+test('las asignaciones posteriores utilizan gestión sin crear otro borrador',()=>{
+ const ui=archivo('components/projects/detail/CommercialAssignmentModal.tsx');
+ assert.match(ui,/projectConfigurationService.guardarAsignacion/);
+ assert.match(ui,/Las operaciones protegidas conservan su asignación y precio/);
+ assert.doesNotMatch(archivo('components/projects/detail/ProjectConfigurationTab.tsx'),/window.confirm/);
+});

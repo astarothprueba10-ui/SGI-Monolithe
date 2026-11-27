@@ -6,8 +6,8 @@ import { useProjectConfiguration } from '../../../hooks/useProjectConfiguration'
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
 import { asignacion, asignar } from '../../../lib/projectConfiguration';
 
-type Props = { projectId: number; tipo: 'manzanas' | 'lotes'; id: number; codigo: string; onClose: () => void };
-export function CommercialAssignmentModal({ projectId, tipo, id, codigo, onClose }: Props) {
+type Props = { projectId: number; tipo: 'manzanas' | 'lotes'; id: number; codigo: string; onClose: () => void; onSuccess?: () => void | Promise<void> };
+export function CommercialAssignmentModal({ projectId, tipo, id, codigo, onClose, onSuccess }: Props) {
   const model=useProjectConfiguration(projectId);
   const [valor,setValor]=useState<string|null>(null);
   const [error,setError]=useState('');
@@ -27,10 +27,10 @@ export function CommercialAssignmentModal({ projectId, tipo, id, codigo, onClose
     setBusy(true);setError('');
     try {
       if(publicada&&publicada>0&&revision!==null) {
-        await projectConfigurationService.guardarAsignacion(projectId,revision,tipo,id,seleccion);onClose();return;
+        await projectConfigurationService.guardarAsignacion(projectId,revision,tipo,id,seleccion);await onSuccess?.();onClose();return;
       }
       const ok=await model.guardar({...datos,[tipo]:asignar(datos[tipo],id,seleccion)},true);
-      if(ok)onClose();else setError('No se pudo guardar la asignación.');
+      if(ok){await onSuccess?.();onClose();}else setError('No se pudo guardar la asignación.');
     } catch(e) {setError(e instanceof Error?e.message:'No se pudo guardar la asignación.');}
     finally {setBusy(false);}
   }
