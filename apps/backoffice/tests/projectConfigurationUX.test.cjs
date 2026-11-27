@@ -5,12 +5,11 @@ const { resolve } = require('node:path');
 const root = resolve(__dirname, '../src');
 function archivo(path) { return readFileSync(resolve(root,path), 'utf8'); }
 
-test('el panel monta una única sección de simulación y no apila todos los bloques', () => {
+test('el panel elimina el simulador y conserva la navegación por secciones', () => {
   const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
-  assert.equal((ui.match(/<CommercialSimulationPanel\b/g) || []).length,1);
-  assert.match(ui,/seccion === 'simulador' && <CommercialSimulationPanel/);
-  assert.match(ui,/seccion === 'tarifas' && <fieldset/);
-  assert.match(ui,/seccion === 'excel' && <ProjectImportPreparation/);
+  assert.doesNotMatch(ui,/CommercialSimulationPanel|CalculatorIcon|Ir al simulador/);
+  assert.match(ui,/seccionVisible === 'tarifas' && <fieldset/);
+  assert.match(ui,/seccionVisible === 'excel' && <ProjectImportPreparation/);
 });
 
 test('tras confirmar importación el formulario recarga catálogos automáticamente', () => {
@@ -48,8 +47,19 @@ test('la publicación utiliza liberación por etapa y muestra el cambio de inven
   assert.match(ui,/<CommercialStageReleaseSelector/);
   assert.match(ui,/etapasHabilitar/);
   assert.match(ui,/Se habilitarán ahora/);
-  assert.match(ui,/Preparar nueva versión de publicación/);
+  assert.doesNotMatch(ui,/Preparar nueva versión de publicación/);
+  assert.match(ui,/publicada === 0 && config.version > 0/);
   assert.match(selector,/Ninguna etapa se libera automáticamente/);
   assert.match(service,/\{ version, etapasHabilitar \}/);
   assert.doesNotMatch(service,/habilitarNoDisponibles/);
+});
+
+test('la configuración publicada oculta importación y no permite guardar otro borrador', () => {
+  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
+  const hook = archivo('hooks/useProjectConfiguration.ts');
+  assert.match(ui, /const esPublicado = publicada > 0/);
+  assert.match(ui, /SECCIONES\.filter\(s => !esPublicado \|\| s\.id !== 'excel'\)/);
+  assert.match(ui, /const bloqueado = guardando \|\| !project\.activo \|\| esPublicado/);
+  assert.match(hook, /projectConfigurationService\.versionPublicada\(idProyecto\)/);
+  assert.match(hook, /guardando \|\| publicada !== 0/);
 });
