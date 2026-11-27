@@ -23,6 +23,33 @@ public class ConfiguracionProyectoService {
     private final ProyectoRepository proyectos;
     private final JsonMapper mapper;
 
+    // El mapa solo requiere las etapas y asignaciones vigentes, no los catálogos ni tarifas.
+    public record ConfiguracionMapa(int version, boolean publicado, Datos datos) {}
+
+    @Transactional(readOnly = true)
+    public ConfiguracionMapa obtenerParaMapa(Long proyecto) {
+        obtenerProyecto(proyecto);
+        int publicada = repository.versionPublicada(proyecto);
+        var version = publicada > 0 ? repository.porVersion(proyecto,publicada) : repository.vigente(proyecto);
+        if (publicada > 0 && version.isEmpty())
+            throw new ConflictoNegocioException("No se encontró la configuración de la publicación vigente.");
+        var datos = version.map(v -> leer(v.json()))
+                .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
+        if (publicada > 0) {
+            var asignaciones = repository.asignacionesVigentes(proyecto,publicada);
+            if (asignaciones.isPresent()) {
+                var estado = mapper.readValue(asignaciones.get(),monolithe.core_service.dto.GestionComercialDto.Estado.class);
+                datos = new Datos(datos.etapas(),estado.manzanas(),estado.lotes());
+            }
+            var vigentes = repository.etapasVigentes(proyecto,publicada);
+            if (vigentes.isPresent()) {
+                var etapas = mapper.readValue(vigentes.get(),ConfiguracionProyectoRequest.Etapa[].class);
+                datos = new Datos(List.of(etapas),datos.manzanas(),datos.lotes());
+            }
+        }
+        return new ConfiguracionMapa(version.map(v -> v.numero()).orElse(0),publicada > 0,datos);
+    }
+
     @Transactional(readOnly = true)
     public ConfiguracionProyectoResponse obtener(Long proyecto) {
         obtenerProyecto(proyecto);
