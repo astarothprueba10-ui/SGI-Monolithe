@@ -556,6 +556,9 @@ export const coreService = {
   createPlanVersion(data: PlanoInteractivoRequest): Promise<PlanoInteractivoResponse> {
     return coreApi.post<PlanoInteractivoResponse>('/planos', data);
   },
+  saveLotMatrix(idPlano: number, cambios: LoteGeometriaRequest[]): Promise<PlanoInteractivoDetalleResponse> {
+    return coreApi.put<PlanoInteractivoDetalleResponse>(`/planos/${idPlano}/matriz`, cambios);
+  },
   saveLotGeometry(data: LoteGeometriaRequest): Promise<LoteGeometriaResponse> {
     return coreApi.put<LoteGeometriaResponse>('/planos/geometrias', data);
   },
