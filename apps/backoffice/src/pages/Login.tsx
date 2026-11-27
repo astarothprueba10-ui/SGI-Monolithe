@@ -10,7 +10,7 @@ import {
 
 import { ApiError, authApi } from '../lib/apiClient';
 import { MfaLoginForm } from '../components/auth/MfaLoginForm';
-import { requireMfaChallenge, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
+import { startLogin, isLoginSession, type MfaChallenge, type MfaLoginSession } from '../lib/mfaLogin';
 import { beginSessionActivity } from '../lib/inactivitySession';
 import { getSessionRoles } from '../lib/authSession';
 import { Alert } from '../components/ui/Feedback';
@@ -136,11 +136,12 @@ export function Login() {
     async function solicitarReto() {
         setLoading(true);
         try {
-            const data = await authApi.post<MfaChallenge>('/login', {
+            const data = await startLogin({
                 usuario: usuario.trim(), tipoDocumento, contrasena: password, portal: 'BACKOFFICE'
             });
-            setChallenge(requireMfaChallenge(data));
             setPassword('');
+            if (isLoginSession(data)) await finalizarSesion(data);
+            else setChallenge(data);
         } catch (problem) {
             setError(problem instanceof ApiError ? resolverMensajeErrorLogin(problem)
                 : 'No pudimos conectar con el servicio de autenticación. Inténtalo nuevamente.');
@@ -204,7 +205,7 @@ export function Login() {
 
                     {searchParams.get('motivo') === 'inactividad' && (
                         <Alert tone="info" title="Sesión cerrada por inactividad" className="mb-5">
-                            Pasaron 10 minutos sin actividad. Inicia sesión nuevamente.
+                            Pasaron 30 minutos sin actividad. Inicia sesión nuevamente.
                         </Alert>
                     )}
 
@@ -326,7 +327,7 @@ export function Login() {
                                     disabled={loading}
                                 />
 
-                                Recordarme en este equipo
+                                Mantener mi sesión en este equipo
                             </label>
 
 

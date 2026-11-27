@@ -1,6 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { assertPageWidth } from './assertions';
 import { assertNoSession, enrollment, openLogin, portals, submitPassword } from './mfaLogin.fixtures';
+
+async function clearSessionAndOpenLogin(page: Page, port: number) {
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.goto(`http://127.0.0.1:${port}/login`);
+}
 
 for (const portal of portals) {
   test.describe(portal.name, () => {
@@ -80,6 +88,47 @@ for (const portal of portals) {
       await expect(page.locator('#password')).toHaveValue('');
       await expect(page.getByRole('alert')).toContainText('La verificación expiró.');
       await assertNoSession(page);
+    });
+
+    test('recuerda el navegador para el día solo después de aceptar y verificar', async ({ page }) => {
+      const requests = await openLogin(page, portal, { device: true });
+      await submitPassword(page);
+      const remember = page.getByRole('checkbox', { name: /Recordar en este equipo por todo el día/ });
+      await expect(remember).not.toBeChecked();
+      await remember.check();
+      await page.getByLabel('Código del autenticador', { exact: true }).fill('654321');
+      await page.getByRole('button', { name: 'Verificar e ingresar' }).click();
+      await page.waitForURL(url => url.pathname === portal.next);
+      const cookies = await page.context().cookies();
+      expect(cookies.some(cookie => cookie.name === '__Host-monolithe-device' && cookie.httpOnly && cookie.secure)).toBe(true);
+
+      await clearSessionAndOpenLogin(page, portal.port);
+      await submitPassword(page);
+      await page.waitForURL(url => url.pathname === portal.next);
+      expect(requests.filter(request => request.path.endsWith('/verificar')).map(request => request.body.recordarDispositivo)).toEqual([true]);
+
+      await page.context().clearCookies();
+      await clearSessionAndOpenLogin(page, portal.port);
+      await submitPassword(page);
+      await expect(page.getByLabel('Código del autenticador', { exact: true })).toBeVisible();
+    });
+
+    test('sin aceptar, exige MFA nuevamente y el acceso caduca tras treinta minutos sin interacción', async ({ page }) => {
+      await page.clock.install();
+      const requests = await openLogin(page, portal, { device: true });
+      await submitPassword(page);
+      await page.getByLabel('Código del autenticador', { exact: true }).fill('654321');
+      await page.getByRole('button', { name: 'Verificar e ingresar' }).click();
+      await page.waitForURL(url => url.pathname === portal.next);
+      await page.clock.fastForward(29 * 60_000);
+      await expect(page).toHaveURL(url => url.pathname === portal.next);
+      await page.clock.fastForward(60_000);
+      await expect(page).toHaveURL(/motivo=inactividad/);
+      await assertNoSession(page);
+      expect(requests.some(request => request.path.endsWith('/logout'))).toBe(true);
+      expect(requests.find(request => request.path.endsWith('/verificar'))?.body.recordarDispositivo).toBe(false);
+      await submitPassword(page);
+      await expect(page.getByLabel('Código del autenticador', { exact: true })).toBeVisible();
     });
 
     test('un servidor antiguo no permite continuar solo con contraseña', async ({ page }) => {

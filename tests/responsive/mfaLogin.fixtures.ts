@@ -16,7 +16,7 @@ export const enrollment = {
 
 type Portal = typeof portals[number];
 type AuthStep = 'ACTIVACION' | 'CODIGO';
-type Overrides = { phase?: AuthStep; old?: boolean; expired?: boolean; temporary?: boolean; invitationFailure?: boolean };
+type Overrides = { phase?: AuthStep; old?: boolean; expired?: boolean; temporary?: boolean; invitationFailure?: boolean; device?: boolean };
 
 function session(portal: Portal, temporary: boolean) {
   return { idUsuario: 14, usuario: 'persona', nombreMostrar: 'Persona de prueba', iniciales: 'PP',
@@ -33,6 +33,8 @@ async function verify(route: Route, portal: Portal, options: Overrides) {
 /** Simula las respuestas del servidor y abre el login sin una sesión previa. */
 export async function openLogin(page: Page, portal: Portal, options: Overrides = {}) {
   const requests: { path: string; body: Record<string, unknown> }[] = [];
+  const deviceName = '__Host-monolithe-device';
+  let remembered = false;
   await page.context().route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== '127.0.0.1') return route.abort();
@@ -41,13 +43,27 @@ export async function openLogin(page: Page, portal: Portal, options: Overrides =
     }
     if (!url.pathname.startsWith('/api/auth/')) return route.continue();
     requests.push({ path: url.pathname, body: route.request().postDataJSON() });
-    if (url.pathname.endsWith('/login')) return options.old ? route.fulfill({ json: session(portal, false) })
-      : route.fulfill({ status: 202, json: { reto: 'A'.repeat(43), paso: options.phase ?? 'CODIGO', venceEn: 300 } });
+    if (url.pathname.endsWith('/login')) {
+      if (options.old) return route.fulfill({ json: session(portal, false) });
+      const cookie = await route.request().headerValue('cookie');
+      if (remembered && cookie?.includes(deviceName + '=')) {
+        return route.fulfill({ json: { sesionRecordada: session(portal, false) } });
+      }
+      return route.fulfill({ status: 202, json: { reto: 'A'.repeat(43), paso: options.phase ?? 'CODIGO', venceEn: 300 } });
+    }
     if (url.pathname.endsWith('/mfa/activacion/enviar')) return options.invitationFailure
       ? route.fulfill({ status: 503, json: { message: 'Correo no disponible temporalmente.' } })
       : route.fulfill({ json: { mensaje: 'Invitación enviada al correo principal verificado.', segundosEspera: 60 } });
     if (url.pathname.endsWith('/preparar')) return route.fulfill({ json: enrollment });
-    if (url.pathname.endsWith('/verificar')) return verify(route, portal, options);
+
+    if (url.pathname.endsWith('/verificar')) {
+      const body = route.request().postDataJSON();
+      if (!options.device || options.expired || body.codigo !== '654321') return verify(route, portal, options);
+      remembered = body.recordarDispositivo === true;
+      return route.fulfill({ headers: {
+        'set-cookie': deviceName + '=' + 'D'.repeat(43) + '; Path=/; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=1000'
+      }, json: session(portal, false) });
+    }
     return route.fulfill({ status: 204 });
   });
   await page.goto(`http://127.0.0.1:${portal.port}/login`);

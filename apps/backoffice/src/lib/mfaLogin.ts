@@ -16,7 +16,7 @@ export interface MfaEnrollment {
     codigoRecuperacion: string;
 }
 
-/** Sesión completa devuelta después de verificar el autenticador. */
+/** Sesión completa devuelta tras MFA o al usar un equipo recordado. */
 export interface MfaLoginSession {
     idUsuario: number;
     usuario: string;
@@ -26,6 +26,28 @@ export interface MfaLoginSession {
     requiereCambioPassword: boolean;
     accessToken: string;
     refreshToken: string;
+}
+
+/** Resuelve el login. Solo el servidor decide si una sesión se puede emitir. */
+export async function startLogin(body: {
+    usuario: string; tipoDocumento: string; contrasena: string; portal: 'BACKOFFICE' | 'CLIENTE';
+}): Promise<MfaChallenge | MfaLoginSession> {
+    const response = await authApi.post<MfaChallenge | { sesionRecordada: MfaLoginSession }>(
+        '/login', body, { credentials: 'include' });
+    if (response && 'sesionRecordada' in response && isLoginSession(response.sesionRecordada)) {
+        return response.sesionRecordada;
+    }
+    return requireMfaChallenge(response as MfaChallenge);
+}
+
+/** Reconoce una respuesta con los tokens y la identidad de la sesión. */
+export function isLoginSession(value: unknown): value is MfaLoginSession {
+    if (!value || typeof value !== 'object') return false;
+    const session = value as Partial<MfaLoginSession>;
+    return typeof session.idUsuario === 'number' && typeof session.usuario === 'string'
+        && typeof session.requiereCambioPassword === 'boolean' && Array.isArray(session.autoridades)
+        && typeof session.accessToken === 'string' && !!session.accessToken
+        && typeof session.refreshToken === 'string' && !!session.refreshToken;
 }
 
 /** Valida que el servidor responda con un reto de autenticación utilizable. */
@@ -50,9 +72,10 @@ export async function prepareMfa(reto: string, codigo: string): Promise<MfaEnrol
 }
 
 /** Intercambia un código TOTP válido por la sesión. */
-export async function verifyMfa(reto: string, codigo: string): Promise<MfaLoginSession> {
-    const session = await authApi.post<MfaLoginSession>('/mfa/verificar', { reto, codigo });
-    if (!session?.accessToken || !session.refreshToken || !Array.isArray(session.autoridades)) {
+export async function verifyMfa(reto: string, codigo: string, recordarDispositivo: boolean): Promise<MfaLoginSession> {
+    const session = await authApi.post<MfaLoginSession>('/mfa/verificar',
+        { reto, codigo, recordarDispositivo }, { credentials: 'include' });
+    if (!isLoginSession(session)) {
         throw new ApiError(503, 'El servicio no entregó una sesión verificada.');
     }
     return session;

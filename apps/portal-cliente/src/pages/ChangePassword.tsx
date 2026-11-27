@@ -8,7 +8,8 @@ import { BrandPanel } from '../components/BrandPanel';
 import { Logo } from '../components/Logo';
 import { TextField } from '../components/TextField';
 import { ApiError, authApi } from '../lib/apiClient';
-import { clearPortalSession, getPortalAccessToken } from '../lib/portalSession';
+import { clearPortalSession } from '../lib/portalSession';
+import { withPortalCredentials } from '../lib/portalCredentials';
 
 /** Primer ingreso: solo CLIENTE con requiereCambioPassword puede visitar esta ruta. */
 export function ChangePassword() {
@@ -54,17 +55,11 @@ export function ChangePassword() {
       return;
     }
 
-    const accessToken = getPortalAccessToken();
-    if (!accessToken) {
-      salir();
-      return;
-    }
-
     setLoading(true);
     try {
-      await authApi.post<void>('/change-password', {
+      await withPortalCredentials(accessToken => authApi.post<void>('/change-password', {
         contrasenaActual, nuevaContrasena, confirmarContrasena
-      }, { headers: { Authorization: `Bearer ${accessToken}` } });
+      }, { headers: { Authorization: `Bearer ${accessToken}` } }));
 
       // Auth Service revoca todas las sesiones tras el cambio de contraseña.
       clearPortalSession();

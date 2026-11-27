@@ -5,6 +5,7 @@ import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
 import monolithe.auth_service.dto.MfaChallenge;
 import monolithe.auth_service.dto.MfaCodeRequest;
+import monolithe.auth_service.dto.MfaPortal;
 import monolithe.auth_service.dto.RefreshTokenRequest;
 import monolithe.auth_service.exception.MfaException;
 import monolithe.auth_service.exception.InvalidTokenException;
@@ -29,6 +30,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -56,6 +60,8 @@ class AuthenticationServiceTest {
 
         private AuthenticationService authenticationService;
         private MfaLoginService mfaLoginService;
+
+        private LoginDeviceService loginDevices;
         private final MfaChallenge reto = new MfaChallenge("A".repeat(43), MfaChallenge.Paso.CODIGO, 300);
 
         @BeforeEach
@@ -80,6 +86,9 @@ class AuthenticationServiceTest {
                                                                 "JP"));
 
                 mfaLoginService = mock(MfaLoginService.class);
+                loginDevices = mock(LoginDeviceService.class);
+                var transactionManager = mock(PlatformTransactionManager.class);
+                when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
                 when(mfaLoginService.start(any(), any())).thenReturn(reto);
                 authenticationService = new AuthenticationService(
                                 authenticationManager,
@@ -93,7 +102,8 @@ class AuthenticationServiceTest {
                                 passwordEncoder,
                                 passwordPolicyService,
                                 auditService,
-                                userVisualIdentityRepository, mfaLoginService);
+                                userVisualIdentityRepository, mfaLoginService, loginDevices,
+                                new TransactionTemplate(transactionManager));
         }
 
         @Test
@@ -450,14 +460,34 @@ class AuthenticationServiceTest {
         }
 
         @Test
+        void unEquipoRecordadoSoloCreaSesionDespuesDeComprobarLaContrasena() {
+                var request = crearSolicitudConDocumento("12345678", "claveValida", "DNI");
+                request.setPortal(MfaPortal.BACKOFFICE);
+                when(documentLoginProcedureRepository.resolverLogin("DNI", "12345678"))
+                                .thenReturn(Optional.of("usuarioOk"));
+                var principal = crearPrincipal(3L, "usuarioOk");
+                var authentication = autenticacionExitosa(principal);
+                when(authenticationManager.authenticate(any())).thenReturn(authentication);
+                String token = "D".repeat(43);
+                when(mfaLoginService.trustedDevice(principal, MfaPortal.BACKOFFICE, token)).thenReturn(true);
+                var login = authenticationService.autenticar(request, "127.0.0.1", "JUnit", token);
+                assertNotNull(login.session());
+                assertNull(login.challenge());
+                var order = inOrder(authenticationManager, mfaLoginService, refreshTokenService);
+                order.verify(authenticationManager).authenticate(any());
+                order.verify(mfaLoginService).trustedDevice(principal, MfaPortal.BACKOFFICE, token);
+                order.verify(refreshTokenService).crearSesion(3L, "127.0.0.1", "JUnit");
+        }
+
+        @Test
         void emiteUnaSesionSoloDespuesDeValidarElSegundoFactor() {
                 var code = new MfaCodeRequest(reto.reto(), "123456");
                 var principal = crearPrincipal(3L, "usuarioOk");
-                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(principal, false));
+                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(principal, false, null));
                 when(jwtService.generarAccessToken(principal)).thenReturn("mockJwt");
                 when(refreshTokenService.crearSesion(3L, "127.0.0.1", "JUnit")).thenReturn("mockRefresh");
 
-                LoginResponse resp = authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit");
+                LoginResponse resp = authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit", null).session();
                 assertEquals("mockJwt", resp.getAccessToken());
                 assertEquals("mockRefresh", resp.getRefreshToken());
                 verify(loginSecurityService).registrarAccesoExitoso(3L);
@@ -467,7 +497,7 @@ class AuthenticationServiceTest {
         void unSegundoFactorRechazadoNoCreaSesion() {
                 var code = new MfaCodeRequest(reto.reto(), "000000");
                 when(mfaLoginService.verify(code)).thenThrow(MfaException.invalidCode());
-                assertThrows(MfaException.class, () -> authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit"));
+                assertThrows(MfaException.class, () -> authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit", null));
                 verifyNoInteractions(jwtService, refreshTokenService, loginSecurityService);
         }
 
@@ -476,9 +506,9 @@ class AuthenticationServiceTest {
                 var code = new MfaCodeRequest(reto.reto(), "123456");
                 var old = crearPrincipal(3L, "usuarioOk");
                 var updated = new UserPrincipal(3L, "usuarioOk", "hash", old.getAuthorities(), true, true, false, 1L);
-                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(old, true));
+                when(mfaLoginService.verify(code)).thenReturn(new MfaLoginService.Verified(old, true, null));
                 when(customUserDetailsService.loadUserByUsername("usuarioOk")).thenReturn(updated);
-                authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit");
+                authenticationService.confirmarMfa(code, "127.0.0.1", "JUnit", null);
                 var ordered = inOrder(refreshTokenService, jwtService);
                 ordered.verify(refreshTokenService).revocarTodasLasSesiones(3L, "VINCULACION_MFA");
                 ordered.verify(jwtService).generarAccessToken(updated);

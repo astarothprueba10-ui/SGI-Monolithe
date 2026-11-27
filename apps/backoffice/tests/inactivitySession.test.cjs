@@ -71,35 +71,35 @@ function browserFixture(context, remember = true) {
   return { time, local, temporary, auth, window, document, redirects };
 }
 
-test('el límite es exactamente diez minutos y respeta su frontera', () => {
-  assert.equal(INACTIVITY_TIMEOUT_MS, 600_000);
-  assert.equal(remainingInactivity(1000, 600_999), 1);
-  assert.equal(remainingInactivity(1000, 601_000), 0);
+test('el límite es exactamente treinta minutos y respeta su frontera', () => {
+  assert.equal(INACTIVITY_TIMEOUT_MS, 1_800_000);
+  assert.equal(remainingInactivity(1000, 1_800_999), 1);
+  assert.equal(remainingInactivity(1000, 1_801_000), 0);
   for (const value of [0, -1, NaN, Infinity, 2000]) assert.equal(remainingInactivity(value, 1000), 0);
 });
 
-test('cierra al cumplirse diez minutos sin actividad y lo hace una sola vez', () => {
+test('cierra al cumplirse treinta minutos sin actividad y lo hace una sola vez', () => {
   const f = timerFixture(); f.timer.start();
-  f.time.advance(599_999); f.time.flush(); assert.equal(f.expired(), 0);
+  f.time.advance(1_799_999); f.time.flush(); assert.equal(f.expired(), 0);
   f.time.advance(1); f.time.flush(); assert.equal(f.expired(), 1);
   f.timer.check(); f.timer.activity(); assert.equal(f.expired(), 1);
 });
 
 test('una interacción anterior al límite reinicia el plazo completo', () => {
   const f = timerFixture(); f.timer.start();
-  f.time.advance(599_999); assert.equal(f.timer.activity(), true);
-  f.time.advance(599_999); f.time.flush(); assert.equal(f.expired(), 0);
+  f.time.advance(1_799_999); assert.equal(f.timer.activity(), true);
+  f.time.advance(1_799_999); f.time.flush(); assert.equal(f.expired(), 0);
   f.time.advance(1); f.time.flush(); assert.equal(f.expired(), 1);
 });
 
 test('una interacción posterior al límite no revive la sesión', () => {
-  const f = timerFixture(); f.timer.start(); f.time.advance(600_001);
+  const f = timerFixture(); f.timer.start(); f.time.advance(1_800_001);
   assert.equal(f.timer.activity(), false); assert.equal(f.expired(), 1);
   assert.equal(f.shared.activity.closed, true);
 });
 
 test('recargar conserva el plazo de actividad que ya estaba guardado', () => {
-  const f = timerFixture(); f.timer.start(); f.time.advance(540_000); f.timer.stop();
+  const f = timerFixture(); f.timer.start(); f.time.advance(1_740_000); f.timer.stop();
   const reloaded = timerFixture(f.shared, f.time); reloaded.timer.start();
   f.time.advance(60_000); f.time.flush(); assert.equal(reloaded.expired(), 1);
 });
@@ -107,21 +107,21 @@ test('recargar conserva el plazo de actividad que ya estaba guardado', () => {
 test('la actividad de otra pestaña de la misma sesión mantiene el plazo compartido', () => {
   const first = timerFixture(); first.timer.start();
   const second = timerFixture(first.shared, first.time); second.timer.start();
-  first.time.advance(540_000); second.timer.activity();
+  first.time.advance(1_740_000); second.timer.activity();
   first.time.advance(60_000); first.time.flush(); assert.equal(first.expired(), 0);
-  first.time.advance(540_000); first.time.flush(); assert.equal(first.expired(), 1); assert.equal(second.expired(), 1);
+  first.time.advance(1_740_000); first.time.flush(); assert.equal(first.expired(), 1); assert.equal(second.expired(), 1);
 });
 
 test('la actividad de una sesión independiente no mantiene abierta otra sesión', () => {
   const first = timerFixture(); first.timer.start();
   const second = timerFixture({ activity: null }, first.time); second.timer.start();
-  first.time.advance(540_000); second.timer.activity();
+  first.time.advance(1_740_000); second.timer.activity();
   first.time.advance(60_000); first.time.flush(); assert.equal(first.expired(), 1); assert.equal(second.expired(), 0);
 });
 
 test('desmontar el observador cancela el temporizador sin cerrar la sesión', () => {
   const f = timerFixture(); f.timer.start(); f.timer.stop();
-  f.time.advance(700_000); f.time.flush(); assert.equal(f.expired(), 0); assert.equal(f.time.pending(), 0);
+  f.time.advance(1_900_000); f.time.flush(); assert.equal(f.expired(), 0); assert.equal(f.time.pending(), 0);
 });
 
 for (const remember of [true, false]) {
@@ -129,7 +129,7 @@ for (const remember of [true, false]) {
     const f = browserFixture(context, remember); const revoked = [];
     session.beginSessionActivity(f.auth);
     session.watchSessionInactivity(token => { revoked.push(token); return new Promise(() => {}); });
-    f.time.advance(600_000); f.time.flush();
+    f.time.advance(1_800_000); f.time.flush();
     assert.equal(getAccessToken(), null); assert.equal(session.getInactivitySessionId(), null);
     assert.deepEqual(revoked, ['refresh-test']); assert.deepEqual(f.redirects, ['/login?motivo=inactividad']);
   });
@@ -139,7 +139,7 @@ test('el cierre local y la redirección funcionan aunque falle la revocación re
   const f = browserFixture(context); context.mock.method(console, 'warn', () => {});
   session.beginSessionActivity(f.auth);
   session.watchSessionInactivity(() => Promise.reject(new Error('sin conexión')));
-  f.time.advance(600_000); f.time.flush(); await Promise.resolve();
+  f.time.advance(1_800_000); f.time.flush(); await Promise.resolve();
   assert.equal(getAccessToken(), null); assert.deepEqual(f.redirects, ['/login?motivo=inactividad']);
 });
 
@@ -147,7 +147,7 @@ for (const type of ['pointerdown', 'pointermove', 'keydown', 'click', 'wheel', '
   test(`la interacción real ${type} renueva el plazo`, context => {
     const f = browserFixture(context); const id = session.beginSessionActivity(f.auth);
     const stop = session.watchSessionInactivity(async () => {});
-    f.time.advance(540_000); f.window.emit(type);
+    f.time.advance(1_740_000); f.window.emit(type);
     assert.equal(session.readSessionActivity(id).lastActivity, f.time.now());
     f.time.advance(60_000); f.time.flush(); assert.deepEqual(f.redirects, []); stop();
   });
@@ -156,7 +156,7 @@ for (const type of ['pointerdown', 'pointermove', 'keydown', 'click', 'wheel', '
 test('los eventos sintéticos y los de una pestaña oculta no renuevan el plazo', context => {
   const f = browserFixture(context); const id = session.beginSessionActivity(f.auth);
   session.watchSessionInactivity(async () => {}); const original = session.readSessionActivity(id).lastActivity;
-  f.time.advance(540_000); f.window.emit('pointermove', { isTrusted: false });
+  f.time.advance(1_740_000); f.window.emit('pointermove', { isTrusted: false });
   f.document.hidden = true; f.window.emit('input');
   assert.equal(session.readSessionActivity(id).lastActivity, original);
   f.time.advance(60_000); f.time.flush(); assert.equal(f.redirects.length, 1);
@@ -165,7 +165,7 @@ test('los eventos sintéticos y los de una pestaña oculta no renuevan el plazo'
 test('un desplazamiento automático del documento no renueva el plazo', context => {
   const f = browserFixture(context); const id = session.beginSessionActivity(f.auth);
   session.watchSessionInactivity(async () => {}); const original = session.readSessionActivity(id).lastActivity;
-  f.time.advance(540_000); f.window.emit('scroll');
+  f.time.advance(1_740_000); f.window.emit('scroll');
   assert.equal(session.readSessionActivity(id).lastActivity, original);
   f.time.advance(60_000); f.time.flush(); assert.equal(f.redirects.length, 1);
 });
@@ -173,14 +173,14 @@ test('un desplazamiento automático del documento no renueva el plazo', context 
 for (const event of ['focus', 'pageshow', 'visibilitychange']) {
   test(`al volver mediante ${event} comprueba un vencimiento con el temporizador suspendido`, context => {
     const f = browserFixture(context); session.beginSessionActivity(f.auth);
-    session.watchSessionInactivity(async () => {}); f.time.advance(600_001);
+    session.watchSessionInactivity(async () => {}); f.time.advance(1_800_001);
     (event === 'visibilitychange' ? f.document : f.window).emit(event);
     assert.equal(getAccessToken(), null); assert.deepEqual(f.redirects, ['/login?motivo=inactividad']);
   });
 }
 
 test('las peticiones autenticadas vencidas pueden bloquearse antes de enviarse', context => {
-  const f = browserFixture(context); session.beginSessionActivity(f.auth); f.time.advance(600_000);
+  const f = browserFixture(context); session.beginSessionActivity(f.auth); f.time.advance(1_800_000);
   assert.equal(session.expireSessionIfInactive(async () => {}), true); assert.equal(getAccessToken(), null);
 });
 
@@ -245,7 +245,7 @@ test('una sesión anterior a la actualización recibe el control sin exigir otro
   const f = browserFixture(context); assert.equal(session.getInactivitySessionId(), null);
   const stop = session.watchSessionInactivity(async () => {});
   assert.ok(session.getInactivitySessionId()); assert.equal(getAccessToken(), 'access-test');
-  f.time.advance(600_000); f.time.flush(); assert.equal(getAccessToken(), null); stop();
+  f.time.advance(1_800_000); f.time.flush(); assert.equal(getAccessToken(), null); stop();
 });
 
 test('el temporizador mantiene el cierre local cuando se bloquea el almacenamiento de actividad', context => {
@@ -259,7 +259,7 @@ test('el temporizador mantiene el cierre local cuando se bloquea el almacenamien
     return originalSet(key, value);
   });
   session.beginSessionActivity(f.auth); session.watchSessionInactivity(async () => {});
-  f.time.advance(600_000); f.time.flush(); assert.deepEqual(f.redirects, ['/login?motivo=inactividad']);
+  f.time.advance(1_800_000); f.time.flush(); assert.deepEqual(f.redirects, ['/login?motivo=inactividad']);
 });
 
 test('una notificación de cierre de la misma sesión cierra la pestaña receptora', context => {

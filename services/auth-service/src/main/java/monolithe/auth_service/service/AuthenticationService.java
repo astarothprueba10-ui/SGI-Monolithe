@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import monolithe.auth_service.dto.AuthenticationContext;
 import monolithe.auth_service.dto.LoginRequest;
 import monolithe.auth_service.dto.LoginResponse;
+import monolithe.auth_service.dto.LoginFlow;
 import monolithe.auth_service.dto.MfaChallenge;
 import monolithe.auth_service.dto.MfaCodeRequest;
 import monolithe.auth_service.dto.MfaEnrollment;
@@ -27,6 +28,7 @@ import monolithe.auth_service.repository.DocumentLoginProcedureRepository;
 import monolithe.auth_service.repository.UserVisualIdentityRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,6 +39,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -60,15 +63,33 @@ public class AuthenticationService {
         private final AuditService auditService;
         private final UserVisualIdentityRepository userVisualIdentityRepository;
         private final MfaLoginService mfaLoginService;
+        private final LoginDeviceService loginDevices;
+        private final TransactionTemplate transactions;
 
         @Value("${security.jwt.access-token-expiration}")
         private long accessTokenExpiration;
 
         /** Comprueba el primer factor sin emitir una sesión. */
         public MfaChallenge autenticar(LoginRequest solicitud, String ipOrigen, String userAgent) {
-                String login = resolverLoginEfectivo(solicitud, ipOrigen, userAgent);
-                var principal = autenticarContrasena(login, solicitud.getContrasena(), ipOrigen, userAgent);
+                var principal = validarPrimerFactor(solicitud, ipOrigen, userAgent);
                 return mfaLoginService.start(principal, solicitud.getPortal());
+        }
+
+        /** Reutiliza un permiso MFA vigente únicamente después de comprobar la contraseña. */
+        public LoginFlow autenticar(LoginRequest solicitud, String ip, String agent, String token) {
+                var portal = solicitud.getPortal();
+                if (token == null || portal == null) {
+                        return LoginFlow.pending(autenticar(solicitud, ip, agent));
+                }
+                var principal = validarPrimerFactor(solicitud, ip, agent);
+                return transactions.execute(status -> mfaLoginService.trustedDevice(principal, portal, token)
+                                ? LoginFlow.completed(crearSesionVerificada(principal, ip, agent), null)
+                                : LoginFlow.pending(mfaLoginService.start(principal, portal)));
+        }
+
+        private UserPrincipal validarPrimerFactor(LoginRequest solicitud, String ip, String agent) {
+                String login = resolverLoginEfectivo(solicitud, ip, agent);
+                return autenticarContrasena(login, solicitud.getContrasena(), ip, agent);
         }
 
         /** Prepara la vinculación con una prueba de activación o recuperación válida. */
@@ -78,14 +99,17 @@ public class AuthenticationService {
 
         /** Consume el reto y emite tokens en la misma transacción. */
         @Transactional(noRollbackFor = MfaException.class)
-        public LoginResponse confirmarMfa(MfaCodeRequest solicitud, String ip, String agent) {
+        public LoginFlow confirmarMfa(MfaCodeRequest solicitud, String ip, String agent, String token) {
                 var verified = mfaLoginService.verify(solicitud);
                 UserPrincipal principal = verified.principal();
                 if (verified.factorChanged()) {
                         refreshTokenService.revocarTodasLasSesiones(principal.getIdUsuario(), "VINCULACION_MFA");
                         principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(principal.getUsername());
                 }
-                return crearSesionVerificada(principal, ip, agent);
+                LoginResponse login = crearSesionVerificada(principal, ip, agent);
+                String device = loginDevices.register(principal, verified.portal(), token,
+                                solicitud.recordarDispositivo(), OffsetDateTime.now(ZoneOffset.UTC));
+                return LoginFlow.completed(login, device);
         }
 
         private UserPrincipal autenticarContrasena(String login, String password, String ip, String agent) {

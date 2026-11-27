@@ -1,18 +1,14 @@
 import { ApiError } from './apiClient';
+import { withPortalCredentials } from './portalCredentials';
 
 /** El cliente nunca consulta funciones financieras con la clave pública de Supabase. */
 const coreBaseUrl =
   import.meta.env.VITE_CORE_API_URL ?? '/api/core';
 
-async function portalCoreRequest<T>(
-  path: string, method: 'GET' | 'POST',
+async function sendToCore<T>(
+  path: string, method: 'GET' | 'POST', token: string,
   body?: Record<string, unknown>, signal?: AbortSignal
 ): Promise<T> {
-  const token = localStorage.getItem('monolithe_access_token')
-    ?? sessionStorage.getItem('monolithe_access_token');
-
-  if (!token) throw new ApiError(401, 'Inicie sesión como cliente.');
-
   const response = await fetch(`${coreBaseUrl}${path}`, {
     method,
     headers: {
@@ -27,6 +23,10 @@ async function portalCoreRequest<T>(
     cache: 'no-store',
     credentials: 'omit'
   });
+  return readCoreResponse<T>(response);
+}
+
+async function readCoreResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') ?? '';
   const data: unknown = contentType.includes('application/json')
     ? await response.json()
@@ -53,11 +53,11 @@ async function portalCoreRequest<T>(
 export async function portalCoreGet<T>(
   path: string, signal?: AbortSignal
 ): Promise<T> {
-  return portalCoreRequest<T>(path, 'GET', undefined, signal);
+  return withPortalCredentials(token => sendToCore<T>(path, 'GET', token, undefined, signal));
 }
 
 export async function portalCorePost<T>(
   path: string, body: Record<string, unknown>
 ): Promise<T> {
-  return portalCoreRequest<T>(path, 'POST', body);
+  return withPortalCredentials(token => sendToCore<T>(path, 'POST', token, body));
 }

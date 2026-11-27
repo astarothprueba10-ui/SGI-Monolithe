@@ -13,6 +13,7 @@ import { Documentos } from './pages/portal/Documentos';
 import { NotFound } from './pages/NotFound';
 import { ChangePassword } from './pages/ChangePassword';
 import { getPortalAuthState } from './lib/portalSession';
+import { SessionInactivity } from './components/auth/SessionInactivity';
 
 function rutaInicialPortal() {
   const estado = getPortalAuthState();
@@ -40,6 +41,7 @@ function RequirePasswordChange({ children }: { children: React.ReactElement }) {
 export function App() {
   return (
     <BrowserRouter>
+      <SessionInactivity />
       <Routes>
         <Route path="/" element={<Navigate to={rutaInicialPortal()} replace />} />
         <Route path="/login" element={<Login />} />
