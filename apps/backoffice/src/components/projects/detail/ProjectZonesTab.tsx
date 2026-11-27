@@ -42,14 +42,18 @@ export function ProjectZonesTab({ project }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await coreService.getZonesByProject(project.idProyecto);
-      setZones(data);
+      const [zonesResult,detalleResult]=await Promise.allSettled([
+        coreService.getZonesByProject(project.idProyecto),projectConfigurationService.detalle(project.idProyecto)
+      ]);
+      if(zonesResult.status==='rejected')throw zonesResult.reason;
+      setZones(zonesResult.value);
       setTarifasError(false);
-      try { const [c,p]=await Promise.all([projectConfigurationService.obtener(project.idProyecto),projectConfigurationService.versionPublicada(project.idProyecto)]);setConfig(c);setPublicado(p.version>0);
-        const g=p.version>0?await projectConfigurationService.gestion(project.idProyecto):null;
+      if(detalleResult.status==='fulfilled'){
+        const {configuracion:c,versionPublicada:v,gestion:g}=detalleResult.value;
+        setConfig(c);setPublicado(v>0);
         setTarifas(g?.estado.tarifas??c.datos.tarifas??[]);setTarifario(g?.estado.tarifario??null);
-        setContexto(old=>old==='general'&&p.version>0||c.datos.etapas.some(e=>e.codigo===old)?old:c.datos.etapas[0]?.codigo??'general'); }
-      catch {setConfig(null);setTarifario(null);setTarifas([]);setPublicado(false);setContexto('general');setTarifasError(true);}
+        setContexto(old=>old==='general'&&v>0||c.datos.etapas.some(e=>e.codigo===old)?old:c.datos.etapas[0]?.codigo??'general');
+      }else{setConfig(null);setTarifario(null);setTarifas([]);setPublicado(false);setContexto('general');setTarifasError(true);}
     } catch (err: any) {
       setError(err.message || 'Error al cargar las zonas del proyecto');
     } finally {
