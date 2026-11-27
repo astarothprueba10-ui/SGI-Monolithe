@@ -313,3 +313,17 @@ test('historial de lotes muestra el nombre del responsable sin ID y la etapa com
  assert.doesNotMatch(modal,/lot\.nombreEtapa|lot\.codigoEtapa/);
  assert.match(modal,/estadoLote\(comercial.estado\)/);
 });
+
+test('supervisor consulta etapas sin habilitar configuración ni acciones de edición',()=>{
+ const detalle=archivo('pages/ProjectDetail.tsx');
+ const etapas=archivo('components/projects/detail/ProjectStagesTab.tsx');
+ const zonas=archivo('components/projects/detail/ProjectZonesTab.tsx');
+ assert.match(detalle,/canViewCommercial = canConfigure \|\| .*user\.roles\.includes\('Supervisor comercial'\)/);
+ assert.match(detalle,/canViewCommercial \? \[\{ id: 'etapas'/);
+ assert.match(detalle,/activeTab === 'etapas' && canViewCommercial/);
+ assert.match(detalle,/activeTab === 'configuracion' && canConfigure/);
+ assert.match(etapas,/puedeEditar=project\.activo && user\.roles\.includes\('Gerencia'\)/);
+ assert.match(etapas,/readOnly=\{!puedeEditar/);
+ assert.match(etapas,/if\(!puedeEditar\)return false/);
+ assert.match(zonas,/tarifasError\?'No consultado'/);
+});
