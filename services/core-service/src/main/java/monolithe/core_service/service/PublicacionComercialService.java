@@ -31,6 +31,7 @@ public class PublicacionComercialService {
 
     @Transactional(readOnly=true)
     public PublicacionComercialResponse previsualizar(Long proyecto, PublicacionComercialRequest request) {
+        long inicio=System.nanoTime();
         exigirIntegridadPublicacion();
         if (!repository.proyectoHabilitado(proyecto)) throw new ReglaNegocioException("Proyecto no habilitado.");
         int publicada = repository.versionPublicada(proyecto);
@@ -42,6 +43,7 @@ public class PublicacionComercialService {
             throw new ReglaNegocioException("Se requieren lotes, etapas y moneda PEN para publicar.");
         var seleccion = SeleccionEtapasPublicacion.validar(request.etapasHabilitar(), config.datos().etapas());
         var filas = evaluar(proyecto,configParaPrecios(config),seleccion);
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Publicacion proyecto={} lotes={} revisionMs={}",proyecto,filas.size(),(System.nanoTime()-inicio)/1_000_000);
         return new PublicacionComercialResponse(config.version(),publicada,
             huella(proyecto,config.version(),publicada,seleccion,filas),false,filas);
     }
@@ -54,10 +56,12 @@ public class PublicacionComercialService {
         if (!previo.huella().equals(request.huella())) throw new ConflictoNegocioException("La revisión cambió. Valida de nuevo.");
         if (previo.lotes().stream().anyMatch(f -> f.situacion().equals("ERROR")))
             throw new ReglaNegocioException("Corrige todos los lotes con errores antes de publicar.");
+        long inicioEscritura=System.nanoTime();
         repository.publicar(proyecto,previo.version(),actor);
         previo.lotes().forEach(f -> registrar(proyecto,previo.version(),actor,f));
         var inicial = configuracion.obtener(proyecto);
         registrarEvento(proyecto,previo.version(),actor,"INICIAL",null,null,new Estado(List.copyOf(new TreeSet<>(request.etapasHabilitar())),inicial.datos().tarifas()));
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Publicacion proyecto={} lotes={} escrituraMs={}",proyecto,previo.lotes().size(),(System.nanoTime()-inicioEscritura)/1_000_000);
         return new PublicacionComercialResponse(previo.version(),previo.version(),previo.huella(),true,previo.lotes());
     }
 
@@ -87,13 +91,13 @@ public class PublicacionComercialService {
         var ahora = ZonedDateTime.now(ZoneId.of("America/Lima"));
         var parcelas = lotes.findAllById(config.lotes().stream().map(ConfiguracionProyectoResponse.Lote::id).toList());
         if (parcelas.size()!=config.lotes().size()) throw new ConflictoNegocioException("El inventario cambió.");
+        var precios=repository.preciosActuales(proyecto);
         return parcelas.stream().sorted(Comparator.comparing(Lote::getIdLote))
-            .map(l -> evaluarFila(config,l,protegidos.contains(l.getIdLote()),etapasHabilitar,ahora,candidatos)).toList();
+            .map(l -> evaluarFila(config,l,protegidos.contains(l.getIdLote()),etapasHabilitar,ahora,candidatos,precios.get(l.getIdLote()))).toList();
     }
 
     private Fila evaluarFila(ConfiguracionProyectoResponse config,Lote lote,boolean protegido,
-            Set<String> etapasHabilitar,ZonedDateTime ahora,List<AjusteTipoLote> candidatos) {
-        BigDecimal actual = repository.precioActual(lote.getIdLote());
+            Set<String> etapasHabilitar,ZonedDateTime ahora,List<AjusteTipoLote> candidatos,BigDecimal actual) {
         if (protegido) return sinPrecio(lote,null,"PROTEGIDA","Operación existente: se conserva el precio.",actual);
         var r = simulacion.evaluar(config,lote,"PEN",ahora,candidatos);
         if (!r.resultado().equals("SIMULADO")) {
