@@ -75,8 +75,11 @@ public class ConfiguracionProyectoController {
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
     public PublicacionComercialResponse publicar(@PathVariable Long idProyecto,
             @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        long inicio=System.nanoTime();
         mfa.exigir(jwt,idProyecto,"PUBLICACION",request,approval);
-        return publicacion.publicar(idProyecto,obtenerActor(jwt),request);
+        long autorizado=System.nanoTime();
+        try{return publicacion.publicar(idProyecto,obtenerActor(jwt),request);}
+        finally{org.slf4j.LoggerFactory.getLogger(getClass()).info("Publicacion proyecto={} autorizacionMs={} transaccionMs={} totalHttpServicioMs={}",idProyecto,(autorizado-inicio)/1_000_000,(System.nanoTime()-autorizado)/1_000_000,(System.nanoTime()-inicio)/1_000_000);}
     }
 
     @GetMapping("/gestion")
