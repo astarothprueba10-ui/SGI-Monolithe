@@ -50,7 +50,7 @@ public class ConfiguracionProyectoService {
         return new ConfiguracionMapa(version.map(v -> v.numero()).orElse(0),publicada > 0,datos);
     }
 
-    public record LecturaMapa(int version, boolean publicado, Datos datos, List<String> abiertas) {}
+    public record LecturaMapa(int version, boolean publicado, Datos datos, List<String> abiertas, long revision) {}
 
     @Transactional(readOnly = true)
     public LecturaMapa obtenerLecturaMapa(Long proyecto) {
@@ -81,7 +81,7 @@ public class ConfiguracionProyectoService {
                 throw new ConflictoNegocioException("La disponibilidad de la publicación vigente es inválida.");
             abiertas = List.of(valores);
         }
-        return new LecturaMapa(lectura.versionBorrador()==null?0:lectura.versionBorrador(),publicada,datos,abiertas);
+        return new LecturaMapa(lectura.versionBorrador()==null?0:lectura.versionBorrador(),publicada,datos,abiertas,lectura.revision());
     }
 
     @Transactional(readOnly = true)
