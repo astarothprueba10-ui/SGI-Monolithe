@@ -23,12 +23,18 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit')")
 public class ConfiguracionProyectoController {
+    // Solo las tres consultas del detalle comercial se comparten con Supervisión.
+    // La seguridad a nivel de método sustituye la de clase exclusivamente en esos GET.
+    private static final String CONSULTAR =
+        "hasAuthority('projects.view') and ((hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.edit')) "
+        + "or (hasAuthority('ROLE_SUPERVISOR_COMERCIAL') and hasAuthority('lots.view')))";
     private final ConfiguracionProyectoService service;
     private final SimulacionComercialService simulacion;
     private final PublicacionComercialService publicacion;
     private final monolithe.core_service.service.CommercialMfaClient mfa;
 
     @GetMapping
+    @PreAuthorize(CONSULTAR)
     public ConfiguracionProyectoResponse obtener(@PathVariable Long idProyecto) {
         return service.obtener(idProyecto);
     }
@@ -52,6 +58,7 @@ public class ConfiguracionProyectoController {
     }
 
     @GetMapping("/publicacion")
+    @PreAuthorize(CONSULTAR)
     public java.util.Map<String,Integer> estadoPublicacion(@PathVariable Long idProyecto) {
         return java.util.Map.of("version",service.versionPublicada(idProyecto),
             "lotesRegistrados",service.contarLotesRegistrados(idProyecto),"importacionRealizada",service.importacionRealizada(idProyecto)?1:0);
@@ -73,6 +80,7 @@ public class ConfiguracionProyectoController {
     }
 
     @GetMapping("/gestion")
+    @PreAuthorize(CONSULTAR)
     public Respuesta gestion(@PathVariable Long idProyecto) { return publicacion.gestion(idProyecto); }
 
     @GetMapping("/gestion/historial")
