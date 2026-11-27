@@ -156,7 +156,7 @@ test('estructura importada solo se consulta en asistente y las matrices muestran
  assert.match(archivo('components/projects/detail/CommercialPublicationPanel.tsx'),/<CommercialZoneLegend/);
  assert.match(archivo('components/projects/detail/CommercialZoneLegend.tsx'),/coreService.getZonesByProject/);
  assert.match(archivo('components/projects/detail/ProjectBlocksTab.tsx'),/<CommercialBlockFormModal/);
- assert.match(archivo('components/projects/detail/ProjectLotsTab.tsx'),/<CommercialAssignmentModal/);
+ assert.match(archivo('components/projects/detail/ProjectLotsTab.tsx'),/<CommercialLotFormModal/);
 });
 test('historial presenta cambios y nombre, no JSON técnico',()=>{
  const ui=archivo('components/projects/detail/CommercialManagementPanel.tsx');
@@ -284,4 +284,17 @@ test('MFA comercial excluye asignaciones estructurales y protege cambios de etap
  assert.match(archivo('hooks/useProjectConfiguration.ts'),/confirmarEtapas/);
  assert.doesNotMatch(archivo('services/commercialMfaService.ts'),/'ASIGNACION'|'MANZANA'/);
  assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/Configuración inicial finalizada, puedes administrar los precios y la disponibilidad sin volver a publicar/);
+});
+
+test('lotes usa etapas comerciales, zonas por manzana y precio calculado sin tipo de lote',()=>{
+ const tab=archivo('components/projects/detail/ProjectLotsTab.tsx');
+ assert.match(tab,/commercialLotService.listar/);
+ assert.match(tab,/Historial/);
+ assert.doesNotMatch(tab,/CommercialAssignmentModal|getStagesByProject|getBlocksByStage/);
+ const form=archivo('components/projects/CommercialLotFormModal.tsx');
+ assert.match(form,/m.codigoEtapa===etapa/);
+ assert.match(form,/Precio base/);
+ assert.match(form,/Precio final simulado/);
+ assert.match(form,/commercialLotService.revisar/);
+ assert.doesNotMatch(form,/Tipo de lote|precioManual/);
 });

@@ -35,7 +35,7 @@ public class LoteComercialService {
  }
  static String siguienteNumero(List<String> numeros){
    BigInteger max=BigInteger.ZERO;int ancho=2;
-   for(String n:numeros)if(n!=null&&n.matches("[0-9]{1,19}")){
+   for(String n:numeros)if(n!=null&&n.matches("[0-9]{1,20}")){
      var valor=new BigInteger(n);if(valor.compareTo(max)>0)max=valor;ancho=Math.max(ancho,n.length());
    }
    String n=max.add(BigInteger.ONE).toString();
@@ -66,7 +66,17 @@ public class LoteComercialService {
       boolean protegido=protegidos.contains(l.idLote())||regla!=null&&"PROTEGIDA".equals(regla.situacion());
       return new Fila(l,codigo,e==null?null:e.nombre(),estado(l.codigoEstadoLote(),catalogo.publicado(),e!=null&&e.habilitada(),disponibles.contains(l.idLote())),precios.get(l.idLote()),protegido);
    }).toList();
-   return new Listado(catalogo,filas);
+   var sugerencias=new HashMap<Long,Identidad>();
+   for(var m:catalogo.manzanas())if(m.activa())sugerencias.put(m.id(),identidad(m));
+   return new Listado(catalogo,filas,sugerencias);
+ }
+ private Identidad identidad(ManzanaComercialDto.Fila m){
+   var numeros=new ArrayList<>(repo.findByManzana_IdManzanaOrderByNumeroAsc(m.id()).stream().map(Lote::getNumero).toList());
+   String numero,codigo;
+   do{numero=siguienteNumero(numeros);codigo=m.codigo()+"-L"+numero;numeros.add(numero);
+     if(codigo.length()>40||numero.length()>20)throw new ReglaNegocioException("Se agotó la numeración de la manzana.");
+   }while(repo.existsByCodigo(codigo));
+   return new Identidad(codigo,numero);
  }
  private record Contexto(ManzanaComercialDto.Listado catalogo,ConfiguracionProyectoResponse config,
     ManzanaComercialDto.Fila manzana,ManzanaComercialDto.Zona zona,ManzanaComercialDto.Etapa etapa,LoteResponse anterior,boolean protegido){}
@@ -88,12 +98,7 @@ public class LoteComercialService {
  private Vista revisar(Long proyecto,Consulta q,Contexto x){
    String numero,codigo;
    if(x.anterior()!=null){numero=x.anterior().numero();codigo=x.anterior().codigo();}
-   else {
-     var numeros=new ArrayList<>(repo.findByManzana_IdManzanaOrderByNumeroAsc(q.idManzana()).stream().map(Lote::getNumero).toList());
-     do{numero=siguienteNumero(numeros);codigo=x.manzana().codigo()+"-L"+numero;numeros.add(numero);
-       if(codigo.length()>40||numero.length()>20)throw new ReglaNegocioException("Se agotó la numeración de la manzana.");
-     }while(repo.existsByCodigo(codigo));
-   }
+   else {var id=identidad(x.manzana());numero=id.numero();codigo=id.codigo();}
    var d=x.config().datos();
    var etapas=d.etapas().stream().map(e->e.disponibilidad()==ConfiguracionProyectoRequest.Disponibilidad.BLOQUEADA?
      new ConfiguracionProyectoRequest.Etapa(e.codigo(),e.nombre(),ConfiguracionProyectoRequest.Disponibilidad.REGULAR,ConfiguracionProyectoRequest.TipoDescuento.NINGUNO,BigDecimal.ZERO):e).toList();
