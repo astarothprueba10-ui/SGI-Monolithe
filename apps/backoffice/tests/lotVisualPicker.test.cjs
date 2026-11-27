@@ -1,7 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
-const {selectedVisualLot,focusBox,hasSvgLot,fitVisualBox,clampVisualBox,zoomVisualBox,matrixFocusBox}=require('../src/lib/lotVisualFocus.ts');
+const {selectedVisualLot,focusBox,hasSvgLot,fitVisualBox,clampVisualBox,zoomVisualBox,matrixFocusBox,visualLotAction}=require('../src/lib/lotVisualFocus.ts');
 const lot=(id,project=2,activo=true)=>({idLote:id,idProyecto:project,idManzana:1,codigo:'L'+id,activo});
 const lots=[lot(1),lot(2),lot(3,3),lot(4,2,false)];
 test('previsualiza candidatos antes de confirmar y limita al inventario autorizado del proyecto',()=>{
@@ -27,11 +27,11 @@ test('SVG incompleto o con asociaciones de texto no suplanta a matriz',()=>{
   assert.equal(hasSvgLot(doc,lots[1]),true);
   assert.equal(hasSvgLot(null,lots[1]),false);
 });
-test('el visor es de solo lectura y permanece fuera del formulario de registro',()=>{
+test('el visor no escribe datos por sí mismo y permanece fuera del formulario de registro',()=>{
   const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
   const sales=read('pages/Sales.tsx'),panel=read('components/sales/LotVisualPickerPanel.tsx');
   assert.match(sales,/mostrarVisorSeparacion=opType==='Separacion' && can\('lots.view'\)/);
-  assert.match(sales,/<\/fieldset><\/form>\s*\{mostrarVisorSeparacion&&<aside/);
+  assert.match(sales,/<\/fieldset><\/form>\s*\{mostrarVisorOperacion&&<aside/);
   assert.match(panel,/commercialLotService\.listarMapa\(project\)/);
   assert.match(panel,/coreService\.getCurrentMatrix\(project\)/);
   assert.match(panel,/projectSvgService\.obtener\(project\)/);
@@ -69,4 +69,43 @@ test('la cámara conserva proporciones, acota el desplazamiento y permite amplia
   assert.equal((read('LotVisualPickerPanel.tsx').match(/<LotVisualViewport /g)||[]).length,2);
   assert.match(read('LotVisualViewport.tsx'),/setPointerCapture/);
   assert.match(read('LotVisualViewport.tsx'),/getScreenCTM/);
+});
+
+test('seleccionar desde el plano respeta el flujo de confirmación y el límite de adicionales',()=>{
+  const base={operation:'Separacion',principal:0,adicionales:[],editorPrincipal:false,editorAdicional:false,
+    puedeAgregar:false,bloqueado:false,reservasBloqueadas:false,reservas:[]};
+  const action=(id,options={})=>visualLotAction(id,2,lots,{...base,...options});
+  assert.equal(action(1),'principal');
+  assert.equal(action(2,{principal:1,editorPrincipal:true}),'principal');
+  assert.equal(action(2,{principal:1,puedeAgregar:true}),'adicional');
+  assert.equal(action(2,{principal:1,editorAdicional:true}),'ninguna');
+  assert.equal(action(2,{principal:1,adicionales:[2]}),'consultar');
+  assert.equal(action(3),'ninguna');
+  assert.equal(action(4),'ninguna');
+  assert.equal(action(1,{bloqueado:true}),'ninguna');
+});
+test('ventas solo selecciona lotes del listado autorizado y nunca sustituye una reserva vigente',()=>{
+  const base={operation:'Venta',principal:1,adicionales:[],editorPrincipal:false,editorAdicional:false,
+    puedeAgregar:false,bloqueado:false,reservasBloqueadas:false,reservas:[]};
+  const action=(id,options={})=>visualLotAction(id,2,lots,{...base,...options});
+  assert.equal(action(2),'venta');
+  assert.equal(action(1),'consultar');
+  assert.equal(action(2,{reservasBloqueadas:true,reservas:[1]}),'ninguna');
+  assert.equal(action(1,{reservasBloqueadas:true,reservas:[1]}),'consultar');
+  assert.equal(visualLotAction(2,2,[lots[0]],base),'ninguna');
+  assert.equal(action(3),'ninguna');
+});
+test('la interacción compartida conserva permisos, selección por teclado y separación de arrastre',()=>{
+  const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+  const sales=read('pages/Sales.tsx'),panel=read('components/sales/LotVisualPickerPanel.tsx');
+  const viewport=read('components/sales/LotVisualViewport.tsx'),svg=read('components/projects/detail/PlanSvgShapes.tsx');
+  assert.match(sales,/mostrarVisorOperacion=can\('lots.view'\)/);
+  assert.match(sales,/lotesVisorOperacion=opType==='Venta'\?availableLots:lotesDisponiblesProyecto/);
+  assert.match(sales,/reservasBloqueadas:tieneReservasVenta\|\|!!asociacionAgrupadaPendiente/);
+  assert.match(sales,/onPick=\{seleccionarDesdePlano\}/);
+  assert.match(panel,/selectable.has\(lot.idLote\)/);
+  assert.match(panel,/lotesSeleccionables=\{selectable\}/);
+  assert.match(svg,/lotesSeleccionables\?\.has\(lote.idLote\)/);
+  assert.match(viewport,/Math.hypot\(e.clientX-d.x,e.clientY-d.y\)<5/);
+  assert.match(viewport,/onClickCapture/);
 });
