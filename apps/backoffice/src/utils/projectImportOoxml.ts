@@ -6,6 +6,19 @@ const REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const MAX_XML_BYTES = 24 * 1024 * 1024;
 const MAX_ENTRIES = 500;
 
+// JSZip 3.x expone este método documentado en runtime, pero JSZipObject no lo declara.
+// Conservar la lectura incremental para limitar la expansión antes de procesar el XLSX.
+interface FlujoZip {
+  on(event: 'data', callback: (chunk: Uint8Array) => void): FlujoZip;
+  on(event: 'error', callback: (error: Error) => void): FlujoZip;
+  on(event: 'end', callback: () => void): FlujoZip;
+  pause(): FlujoZip;
+  resume(): FlujoZip;
+}
+interface EntradaZipIncremental {
+  internalStream(type: 'uint8array'): FlujoZip;
+}
+
 const escapeText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escapeAttr = (s: string) => escapeText(s).replace(/"/g, '&quot;').replace(/\t/g, '&#9;').replace(/\n/g, '&#10;').replace(/\r/g, '&#13;');
 
@@ -63,7 +76,12 @@ export async function normalizarXlsxProyecto(bytes: ArrayBuffer): Promise<ArrayB
     const data = await new Promise<Uint8Array>((resolve, reject) => {
       const chunks: Uint8Array[] = [];
       let size = 0;
-      const stream = entry.internalStream('uint8array');
+      const incremental = entry as unknown as Partial<EntradaZipIncremental>;
+      if (typeof incremental.internalStream !== 'function') {
+        reject(new Error('No se puede validar el tamaño descomprimido de este XLSX.'));
+        return;
+      }
+      const stream = incremental.internalStream('uint8array');
       stream.on('data', (chunk: Uint8Array) => {
         total += chunk.length;
         size += chunk.length;
