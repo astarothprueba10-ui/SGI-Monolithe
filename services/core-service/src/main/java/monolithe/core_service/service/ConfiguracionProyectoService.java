@@ -66,11 +66,11 @@ public class ConfiguracionProyectoService {
             ? new Datos(repository.etapas(proyecto),List.of(),List.of()) : leer(lectura.borrador());
         if (publicada && lectura.asignaciones() != null) {
             var estado = mapper.readValue(lectura.asignaciones(),monolithe.core_service.dto.GestionComercialDto.Estado.class);
-            datos = new Datos(datos.etapas(),estado.manzanas(),estado.lotes());
+            datos = new Datos(datos.etapas(),estado.manzanas(),estado.lotes(),datos.tarifas());
         }
         if (publicada && lectura.etapas() != null) {
             var etapas = mapper.readValue(lectura.etapas(),ConfiguracionProyectoRequest.Etapa[].class);
-            datos = new Datos(List.of(etapas),datos.manzanas(),datos.lotes());
+            datos = new Datos(List.of(etapas),datos.manzanas(),datos.lotes(),datos.tarifas());
         }
         List<String> abiertas = List.of();
         if (publicada) {
@@ -82,6 +82,24 @@ public class ConfiguracionProyectoService {
             abiertas = List.of(valores);
         }
         return new LecturaMapa(lectura.versionBorrador()==null?0:lectura.versionBorrador(),publicada,datos,abiertas,lectura.revision());
+    }
+
+    public record DetalleConsulta(ConfiguracionProyectoResponse configuracion,int publicada,long revision) {}
+    @Transactional(readOnly=true)
+    public DetalleConsulta obtenerDetalleConsulta(Long proyecto){
+        var lectura=obtenerLecturaMapa(proyecto);
+        var datos=lectura.datos();
+        if(lectura.publicado()){
+            var tarifas=repository.tarifasVigentes(proyecto,lectura.version());
+            if(tarifas.isPresent())datos=new Datos(datos.etapas(),datos.manzanas(),datos.lotes(),
+                List.of(mapper.readValue(tarifas.get(),ConfiguracionProyectoRequest.Tarifa[].class)));
+        }
+        var c=repository.catalogosDetalle(proyecto);
+        var respuesta=new ConfiguracionProyectoResponse(lectura.version(),datos,
+            List.of(mapper.readValue(c.manzanas(),ConfiguracionProyectoResponse.Manzana[].class)),
+            List.of(mapper.readValue(c.lotes(),ConfiguracionProyectoResponse.Lote[].class)),
+            List.of(mapper.readValue(c.zonas(),String[].class)),List.of(mapper.readValue(c.monedas(),String[].class)));
+        return new DetalleConsulta(respuesta,lectura.publicado()?lectura.version():0,lectura.revision());
     }
 
     @Transactional(readOnly = true)
