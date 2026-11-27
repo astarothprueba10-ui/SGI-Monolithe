@@ -22,7 +22,7 @@ type Draft = {
 };
 type Props = {
  idProspecto:number; reservas:CrmReservaVigenteVenta[]; directos:readonly LoteResponse[];
- onConsultar:(idLote:number,idProyecto:number)=>void; onQuitarDirecto:(idLote:number)=>void;
+ onConsultar:(idLote:number,idProyecto:number)=>void; onQuitarDirecto:(idLote:number)=>void; bloqueado:boolean;
  proyectos:Array<{idProyecto:number;nombre:string}>;
  compradorExistente:boolean; puedeReasignar:boolean; asesorNombre:string;
  observaciones:string; onBusy:(busy:boolean)=>void; onCompleted:()=>void;
@@ -37,7 +37,7 @@ const resumen=(d:Draft)=>{
 const pago=(d:Draft)=>{const r=resumen(d);return r?d.modalidad==='FINANCIADA'?r.inicialAdicional:r.saldoContado:null;};
 const mensaje=(e:unknown)=>e instanceof Error?e.message:'No se pudo completar la operación.';
 
-export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyectos,compradorExistente,puedeReasignar,asesorNombre,observaciones,onBusy,onCompleted,onConsultar,onQuitarDirecto}:Props){
+export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyectos,compradorExistente,puedeReasignar,asesorNombre,observaciones,onBusy,onCompleted,onConsultar,onQuitarDirecto,bloqueado}:Props){
  const [drafts,setDrafts]=useState<Draft[]>([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
@@ -51,7 +51,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
   let activo=true;setLoading(true);setError('');setRevisar(null);setConfirmar(null);
   const entradas:LoteVenta[]=[
    ...reservas.map(r=>({idLote:r.idLote,codigoLote:r.codigoLote,idProyecto:r.idProyecto,reserva:r})),
-   ...directos.filter(l=>!reservas.some(r=>r.idLote===l.idLote)).map(l=>({idLote:l.idLote,codigoLote:l.codigo,idProyecto:l.idProyecto,reserva:null}))
+   ...directos.filter(l=>!reservas.some(r=>r.idLote===l.idLote)).map(l=>({idLote:l.idLote,codigoLote:l.codigo,idProyecto:Number(l.idProyecto),reserva:null}))
   ];
   void Promise.all(entradas.map(async lote=>{
    const [p,politica]=await Promise.all([coreService.getCurrentLotPrice(lote.idLote,'PEN'),crmBackend.obtenerCondicionesVenta(idProspecto,lote.idLote)]);
@@ -80,7 +80,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
   observaciones:observaciones.trim()||null
  });
  const validar=async()=>{
-  if(enCurso.current||incierto||!seleccion.length||seleccion.length>20)return;
+  if(bloqueado||loading||enCurso.current||incierto||!seleccion.length||seleccion.length>20)return;
   enCurso.current=true;setBusy(true);onBusy(true);setError('');
   try {
    const refs=new Set<string>(),huellas=new Set<string>();
@@ -135,7 +135,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
  if(loading)return <p className="py-4 text-sm text-brand-500">Consultando precios y políticas individuales…</p>;
  if(!drafts.length)return <div className="rounded-xl border border-rose-200 p-3"><p className="text-sm text-rose-700">{error||'No hay lotes para formalizar.'}</p><Button onClick={()=>setRevision(n=>n+1)}>Reintentar</Button></div>;
  return <section className="space-y-4">
-  <header className="flex items-start gap-3 border-t border-brand-100 pt-5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">3</span><div><h3 className="text-sm font-semibold text-brand-900">Condiciones y pago por lote</h3><p className="text-xs text-brand-500">Selecciona los lotes a formalizar. Cada inicial descuenta únicamente su propia separación confirmada.</p></div></header>
+  <header className="flex items-start gap-3 border-t border-brand-100 pt-5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">3</span><div><h3 className="text-sm font-semibold text-brand-900">Condiciones y pago por lote</h3><p className="text-xs text-brand-500">Selecciona los lotes a formalizar. Cada lote tiene sus condiciones; solo se descuenta su propia separación confirmada.</p></div></header>
   {drafts.map(d=>{const r=resumen(d),debe=pago(d),id=d.lote.idLote;return <article key={id} className="space-y-3 rounded-xl border border-brand-200 bg-white p-4">
    <div className="flex flex-wrap items-center justify-between gap-2"><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={d.incluir} onChange={e=>actualizar(id,{incluir:e.target.checked})}/>{d.lote.codigoLote}</label><span className="text-xs text-brand-600">{proyecto(d)}</span></div>
    <div className="flex flex-wrap items-center justify-between gap-2">
@@ -172,7 +172,7 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
    <div className="flex justify-between border-t border-brand-200 pt-2 text-base"><strong>Total a pagar</strong><strong>{seleccion.every(d=>pago(d)!==null)?formatSoles(total):'Por calcular'}</strong></div>
   </div>
   {error&&<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-  <Button variant="primary" disabled={busy||incierto||!seleccion.length||seleccion.length>20||seleccion.some(d=>!habilitado(d.lote)||pago(d)===null)} onClick={()=>void validar()}>Revisar y formalizar {seleccion.length} lote(s)</Button>
+  <Button variant="primary" disabled={bloqueado||busy||incierto||!seleccion.length||seleccion.length>20||seleccion.some(d=>!habilitado(d.lote)||pago(d)===null)} onClick={()=>void validar()}>Revisar y formalizar {seleccion.length} lote(s)</Button>
   <EditarDatosCompradorModal open={revisar!==null} idProspecto={idProspecto} lote={revisar?.map(d=>d.lote.codigoLote).join(', ')??''} proyecto={revisar?.[0]?proyecto(revisar[0]):''} idProyectoVenta={revisar?.[0]?.lote.idProyecto??0} compradorExistente={compradorExistente} modalidad={revisar?.some(d=>d.modalidad==='FINANCIADA')?'FINANCIADA':'CONTADO'} puedeReasignar={puedeReasignar} asesorNombre={asesorNombre} onClose={()=>setRevisar(null)} onGuardar={comprador=>{if(revisar){setConfirmar({lotes:revisar,comprador});setRevisar(null);}}}/>
   <Modal open={confirmar!==null} onClose={()=>{if(!busy)setConfirmar(null);}} title="Confirmar formalización" description="Se crearán las ventas pendientes juntas, con un contrato y comprobante por lote." footer={<div className="flex justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={()=>setConfirmar(null)}>Volver</Button><Button variant="primary" disabled={busy||incierto} onClick={()=>void registrar()}>{busy?'Registrando…':'Confirmar registro'}</Button></div>}>
    {confirmar?.lotes.map(d=><div key={d.lote.idLote} className="flex justify-between border-b border-brand-100 py-3 text-sm"><span>{d.lote.codigoLote} · {d.modalidad==='FINANCIADA'?'Inicial adicional':'Contado'}</span><strong>{formatSoles(pago(d)??0)}</strong></div>)}
