@@ -132,3 +132,16 @@ test('la promoción procede del servidor y no se descuenta dos veces',()=>{
   assert.match(ficha,/dinero\.format\(precio\)/);
   assert.match(ficha,/promocion===0 \? 'Sin promoción'/);
 });
+
+test('códigos largos amplían geometrías nuevas y se ajustan a las guardadas',()=>{
+ const {buildDisplayGeometries,lotLabelSize,rectangle,bounds,overlaps}=require('../src/lib/lotMatrixGeometry.ts');
+ const lote=(id)=>({idLote:id,idProyecto:5,idManzana:1,codigo:'OAS-MZ-A-L0'+id,numero:String(id),activo:true});
+ const filas=buildDisplayGeometries([lote(1),lote(2)],null,5);
+ const b=bounds(filas[0].puntos);
+ assert.ok(b.right-b.left>68);
+ assert.ok(!overlaps(filas[0].puntos,filas[1].puntos));
+ const fijo=rectangle(20,20,68,55);
+ const font=lotLabelSize(fijo,lote(1).codigo);
+ assert.ok(font>0&&font*0.78*lote(1).codigo.length<=60);
+ assert.ok(lotLabelSize(fijo,lote(1).codigo,90)<font);
+});
