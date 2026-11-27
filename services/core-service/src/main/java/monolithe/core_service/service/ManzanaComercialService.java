@@ -53,11 +53,13 @@ public class ManzanaComercialService {
     static String nombreSugerido(String codigo){return "Manzana "+codigo.replaceFirst("^.*[-_]","");}
     @Transactional(readOnly=true)
     public Listado listar(Long proyecto){
-        return listar(proyecto,configuracion.obtenerLecturaMapa(proyecto));
+        long inicio=System.nanoTime();
+        var resultado=listar(proyecto,configuracion.obtenerLecturaMapa(proyecto));
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle manzanas proyecto={} filas={} totalMs={}",proyecto,resultado.manzanas().size(),(System.nanoTime()-inicio)/1_000_000);
+        return resultado;
     }
 
     Listado listar(Long proyecto,ConfiguracionProyectoService.LecturaMapa config){
-        long inicio=System.nanoTime();
         boolean publicado=config.publicado();
         var abiertas=config.abiertas();
         var etapas=config.datos().etapas().stream().map(e->new Etapa(e.codigo(),e.nombre(),abiertas.contains(e.codigo()))).toList();
@@ -85,7 +87,6 @@ public class ManzanaComercialService {
                 vinculadas.stream().filter(x->x.manzana().equals(m.id())).map(Vinculo::zona).toList());
         }).toList();
         String sugerido=siguienteCodigo(bases.stream().map(Base::codigo).toList());
-        org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle manzanas proyecto={} filas={} totalMs={}",proyecto,filas.size(),(System.nanoTime()-inicio)/1_000_000);
         return new Listado(publicado?config.revision():config.version(),publicado,etapas,catalogo,filas,sugerido,nombreSugerido(sugerido));
     }
     @Transactional
