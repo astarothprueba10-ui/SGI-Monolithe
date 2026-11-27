@@ -30,6 +30,9 @@ export const projectConfigurationService = {
   guardarDisponibilidad(idProyecto: number, revision: number, etapasHabilitadas: string[]) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/disponibilidad`, { revision, etapasHabilitadas });
   },
+  guardarAsignacion(idProyecto: number, revision: number, tipo: 'manzanas'|'lotes', id: number, codigoEtapa: string) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/asignacion`, { revision, tipo, id, codigoEtapa });
+  },
   guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/etapas`, { revision, etapas });
   },

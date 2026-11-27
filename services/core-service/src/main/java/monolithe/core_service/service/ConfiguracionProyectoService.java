@@ -35,6 +35,11 @@ public class ConfiguracionProyectoService {
             var tarifas=repository.tarifasVigentes(proyecto,publicada);
             if(tarifas.isPresent())datos=new Datos(datos.etapas(),datos.manzanas(),datos.lotes(),
                 List.of(mapper.readValue(tarifas.get(),ConfiguracionProyectoRequest.Tarifa[].class)));
+            var asignaciones=repository.asignacionesVigentes(proyecto,publicada);
+            if(asignaciones.isPresent()) {
+                var estado=mapper.readValue(asignaciones.get(),monolithe.core_service.dto.GestionComercialDto.Estado.class);
+                datos=new Datos(datos.etapas(),estado.manzanas(),estado.lotes(),datos.tarifas());
+            }
             var vigentes=repository.etapasVigentes(proyecto,publicada);
             if (vigentes.isPresent()) {
                 var etapas=mapper.readValue(vigentes.get(),ConfiguracionProyectoRequest.Etapa[].class);

@@ -89,7 +89,7 @@ public class PublicacionComercialRepository {
         return jdbc.query("""
             SELECT id_evento, (nuevo->'estado')::text AS estado
             FROM public.inm_gestion_comercial_eventos
-            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION')
+            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION','ASIGNACIONES')
             ORDER BY id_evento DESC LIMIT 1
             """,(r,n)->new EventoEstado(r.getLong("id_evento"),r.getString("estado")),proyecto,version).stream().findFirst();
     }
@@ -168,6 +168,15 @@ public class PublicacionComercialRepository {
             """,precio,f.base().add(f.ajuste()),f.descuento(),f.precioFinal(),f.vigenteHasta(),situacion,
             proyecto,version,f.idLote(),f.codigoEtapa())!=1)
             throw new monolithe.core_service.exception.ConflictoNegocioException("La regla comercial del lote cambió.");
+    }
+
+    public void reasignarRegla(Long proyecto,int version,Fila f,Long precio,String anterior) {
+        if(jdbc.update("""
+            UPDATE public.inm_politicas_comerciales_lotes SET codigo_etapa=?,situacion=?,id_lote_precio=?,precio_lista=?,descuento=?,precio_final=?,vigente_hasta=?
+            WHERE id_proyecto=? AND version=? AND id_lote=? AND codigo_etapa IS NOT DISTINCT FROM CAST(? AS text)
+              AND situacion IN ('HABILITADA','BLOQUEADA')
+            """,f.codigoEtapa(),f.situacion(),precio,f.base().add(f.ajuste()),f.descuento(),f.precioFinal(),f.vigenteHasta(),
+            proyecto,version,f.idLote(),anterior)!=1)throw new monolithe.core_service.exception.ConflictoNegocioException("La regla comercial cambió durante la asignación.");
     }
 
     public void publicar(Long proyecto, int version, Long actor) {

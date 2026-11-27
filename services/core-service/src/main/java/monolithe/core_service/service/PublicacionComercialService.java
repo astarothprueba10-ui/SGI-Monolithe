@@ -222,6 +222,79 @@ public class PublicacionComercialService {
         return gestion(proyecto);
     }
 
+    private static List<ConfiguracionProyectoRequest.Asignacion> asignar(List<ConfiguracionProyectoRequest.Asignacion> lista,Long id,String etapa) {
+        var nueva=new ArrayList<>(lista.stream().filter(a->!a.id().equals(id)).toList());
+        if(etapa!=null&&!etapa.isBlank())nueva.add(new ConfiguracionProyectoRequest.Asignacion(id,etapa));
+        return List.copyOf(nueva);
+    }
+
+    @Transactional
+    public Respuesta guardarAsignacion(Long proyecto,Long actor,CambioAsignacion request) {
+        var anterior=bloquearGestion(proyecto,request.revision());
+        var config=configuracion.obtener(proyecto);
+        var d=config.datos();
+        boolean manzana="manzanas".equals(request.tipo());
+        if(!manzana&&!"lotes".equals(request.tipo()))throw new ReglaNegocioException("Tipo de asignación inválido.");
+        if(manzana&&config.manzanas().stream().noneMatch(m->m.id().equals(request.id()))||
+            !manzana&&config.lotes().stream().noneMatch(l->l.id().equals(request.id())))
+            throw new ReglaNegocioException("El registro no está activo o pertenece a otro proyecto.");
+        String codigo=request.codigoEtapa();
+        if(!codigo.isBlank()&&d.etapas().stream().noneMatch(e->e.codigo().equals(codigo)))
+            throw new ReglaNegocioException("La etapa comercial no existe en este proyecto.");
+        if(manzana&&codigo.isBlank())throw new ReglaNegocioException("Selecciona una etapa para la manzana publicada.");
+        var nuevasManzanas=manzana?asignar(d.manzanas(),request.id(),codigo):d.manzanas();
+        var nuevosLotes=manzana?d.lotes():asignar(d.lotes(),request.id(),codigo);
+        var protegidos=new HashSet<>(repository.protegidos(proyecto));
+        var reglas=reglasPorLote(proyecto,anterior.version());
+        var grupo=config.lotes().stream().filter(l->manzana?l.idManzana().equals(request.id()):l.id().equals(request.id())).toList();
+        for(var l:grupo) {
+            var regla=reglas.get(l.id());
+            if(!protegidos.contains(l.id())&&(regla==null||!"PROTEGIDA".equals(regla.situacion())))continue;
+            if(!manzana)throw new ReglaNegocioException("El lote "+l.codigo()+" tiene una operación protegida y no puede reasignarse.");
+            // Una excepción individual conserva la etapa histórica del lote comprometido.
+            String antigua=etapaDe(config,l);
+            if(antigua==null)throw new ReglaNegocioException("El lote protegido "+l.codigo()+" no tiene etapa histórica verificable; no se puede mover su manzana.");
+            nuevosLotes=asignar(nuevosLotes,l.id(),antigua);
+        }
+        var datos=new ConfiguracionProyectoRequest.Datos(d.etapas(),nuevasManzanas,nuevosLotes,anterior.estado().tarifas());
+        var destino=configParaPrecios(new ConfiguracionProyectoResponse(config.version(),datos,config.manzanas(),config.lotes(),config.zonas(),config.monedas()));
+        var ahora=ZonedDateTime.now(ZoneId.of("America/Lima"));
+        var candidatos=ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto);
+        var filas=new ArrayList<Fila>();
+        for(var l:grupo) {
+            var regla=reglas.get(l.id());
+            if(protegidos.contains(l.id())||regla!=null&&"PROTEGIDA".equals(regla.situacion()))continue;
+            String vieja=etapaDe(config,l),nueva=etapaDe(destino,l);
+            if(nueva==null)throw new ReglaNegocioException("El lote "+l.codigo()+" quedaría sin etapa comercial.");
+            if(regla!=null&&!Objects.equals(vieja,regla.etapa()))throw new ReglaNegocioException("El lote "+l.codigo()+" no tiene una regla coherente con su asignación actual.");
+            if(regla!=null&&Objects.equals(vieja,nueva))continue;
+            var parcela=lotes.findById(l.id()).orElseThrow(()->new ConflictoNegocioException("El inventario cambió."));
+            var r=simulacion.evaluar(destino,parcela,"PEN",ahora,candidatos);
+            if(!"SIMULADO".equals(r.resultado())||!precioValido(r)||!nueva.equals(r.codigoEtapa()))
+                throw new ReglaNegocioException("Lote "+l.codigo()+": "+r.mensaje()+". Revisa la tarifa de la etapa de destino.");
+            var vigencia=datos.tarifas().stream().filter(t->t.codigoEtapa().equals(nueva)&&Objects.equals(t.codigoZona(),r.codigoZona())&&"PEN".equals(t.moneda())
+                &&!t.vigenteDesde().isAfter(ahora.toLocalDate())&&(t.vigenteHasta()==null||!t.vigenteHasta().isBefore(ahora.toLocalDate()))).toList();
+            if(vigencia.size()!=1)throw new ReglaNegocioException("Falta una tarifa vigente única para "+l.codigo()+".");
+            boolean abrir=anterior.estado().etapasHabilitadas().contains(nueva);
+            filas.add(new Fila(l.id(),l.codigo(),l.estadoInventario(),nueva,abrir?"HABILITADA":"BLOQUEADA","Reasignación comercial",
+                repository.precioActual(l.id()),r.precioBase(),r.ajusteTipo(),r.descuento(),r.precioSimulado(),vigencia.getFirst().vigenteHasta(),
+                abrir&&"NO_DISPONIBLE".equals(l.estadoInventario()),!abrir&&"DISPONIBLE".equals(l.estadoInventario())));
+        }
+        var foto=repository.foto(proyecto,anterior.version());
+        for(var f:filas) {
+            var precio=repository.registrarPrecio(f,anterior.version());
+            var regla=reglas.get(f.idLote());
+            if(regla==null)repository.registrarFila(proyecto,anterior.version(),f,precio);
+            else repository.reasignarRegla(proyecto,anterior.version(),f,precio,regla.etapa());
+            if(f.bloquearInventario())repository.bloquearInventario(f.idLote(),actor,anterior.version());
+            if(f.habilitarInventario())repository.habilitarInventario(f.idLote(),actor,anterior.version());
+        }
+        registrarEvento(proyecto,anterior.version(),actor,"ASIGNACIONES",
+            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),null,d.manzanas(),d.lotes()),foto,
+            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),null,nuevasManzanas,nuevosLotes));
+        return gestion(proyecto);
+    }
+
     @Transactional
     public Respuesta guardarEtapas(Long proyecto,Long actor,CambioEtapas request) {
         var anterior=bloquearGestion(proyecto,request.revision());

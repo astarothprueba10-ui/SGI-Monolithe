@@ -36,7 +36,15 @@ public class ConfiguracionProyectoRepository {
     public Optional<String> tarifasVigentes(Long proyecto,int version) {
         return jdbc.query("""
             SELECT (nuevo->'estado'->'tarifas')::text FROM public.inm_gestion_comercial_eventos
-            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION')
+            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION','ASIGNACIONES')
+            ORDER BY id_evento DESC LIMIT 1
+            """,(r,n)->r.getString(1),proyecto,version).stream().findFirst();
+    }
+
+    public Optional<String> asignacionesVigentes(Long proyecto,int version) {
+        return jdbc.query("""
+            SELECT (nuevo->'estado')::text FROM public.inm_gestion_comercial_eventos
+            WHERE id_proyecto=? AND version_publicada=? AND tipo='ASIGNACIONES'
             ORDER BY id_evento DESC LIMIT 1
             """,(r,n)->r.getString(1),proyecto,version).stream().findFirst();
     }
