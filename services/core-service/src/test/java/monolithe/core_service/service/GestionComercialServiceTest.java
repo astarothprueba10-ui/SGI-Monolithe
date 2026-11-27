@@ -154,6 +154,20 @@ class GestionComercialServiceTest {
         verify(repo,never()).evento(anyLong(),anyInt(),anyLong(),anyString(),anyString(),anyString());
     }
 
+    @Test void matrizGeneraTotalesSinDuplicarComponentes() {
+        var catalogo=new ConfiguracionProyectoResponse(1,datos,config.manzanas(),config.lotes(),
+            List.of("D","A","B","C","E","AB","ABC","AE"),List.of("PEN"));
+        var req=new GestionComercialDto.CambioMatriz(10L,BigDecimal.valueOf(26000),
+            Map.of("A",BigDecimal.valueOf(3000),"B",BigDecimal.valueOf(2000),"C",BigDecimal.valueOf(1000),"E",BigDecimal.valueOf(4000)),
+            LocalDate.now(),null);
+        var tarifas=MatrizRecargosComercial.generar(catalogo,req);
+        assertEquals(16,tarifas.size());
+        assertEquals(BigDecimal.valueOf(33000),tarifas.stream().filter(t->t.codigoZona().equals("AE")).findFirst().orElseThrow().valor());
+        assertEquals(BigDecimal.valueOf(32000),tarifas.stream().filter(t->t.codigoZona().equals("ABC")).findFirst().orElseThrow().valor());
+        assertThrows(ReglaNegocioException.class,()->MatrizRecargosComercial.generar(catalogo,
+            new GestionComercialDto.CambioMatriz(10L,BigDecimal.valueOf(26000),Map.of("A",BigDecimal.ZERO),LocalDate.now(),null)));
+    }
+
     @Test void tarifaAnteriorNoConvierteSeleccionInferidaEnConfirmada() {
         when(repo.seleccionRegistrada(proyecto,1)).thenReturn(false);
         assertTrue(service.gestion(proyecto).inferida());

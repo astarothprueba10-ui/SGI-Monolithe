@@ -371,7 +371,7 @@ public class PublicacionComercialService {
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var reglas = reglasPorLote(proyecto,anterior.version());
         var candidatos = ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto);
-        if(matriz&&!candidatos.isEmpty())throw new ReglaNegocioException("Existen ajustes de tipo de lote activos. Revisa esos ajustes antes de guardar una matriz de recargos para evitar duplicidades.");
+        if(matriz&&candidatos.stream().anyMatch(a->!a.getFechaDesde().isAfter(ahora.toOffsetDateTime())&&(a.getFechaHasta()==null||a.getFechaHasta().isAfter(ahora.toOffsetDateTime()))))throw new ReglaNegocioException("Existen ajustes de tipo de lote activos. Revisa esos ajustes antes de guardar una matriz de recargos para evitar duplicidades.");
         var etapasAfectadas=nuevas.stream().map(Tarifa::codigoEtapa).collect(java.util.stream.Collectors.toSet());
         var afectados = config.lotes().stream().filter(l->etapasAfectadas.contains(etapaDe(config,l))).toList();
         var etapasPorLote=new HashMap<Long,String>();

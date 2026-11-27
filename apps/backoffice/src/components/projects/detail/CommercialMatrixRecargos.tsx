@@ -19,7 +19,7 @@ export function CommercialMatrixRecargos({zonas,tarifas,etapas,disabled,onSave}:
  const r=Object.fromEntries(partes.map(k=>[k,Number(recargos[k])]));
  const valido=base.trim()!==''&&Number.isFinite(Number(base))&&Number(base)>0&&partes.every(k=>!!recargos[k]?.trim()&&Number.isFinite(r[k])&&r[k]>=0)&&!!desde&&desde<=hoy()&&(!hasta||hasta>=hoy()&&hasta>=desde);
  function abrir(){
-  const bs=tarifas.filter(t=>t.codigoZona==='D'&&t.moneda==='PEN'&&t.tipoTarifa==='MONTO_FIJO');
+  const bs=tarifas.filter(t=>t.codigoZona==='D'&&t.moneda==='PEN'&&t.tipoTarifa==='MONTO_FIJO'&&t.vigenteDesde<=hoy()&&(!t.vigenteHasta||t.vigenteHasta>=hoy()));
   const unica=bs.length&&bs.every(t=>t.valor===bs[0].valor)?bs[0].valor:null;
   setBase(unica===null?'':String(unica));setRecargos({});setDesde(hoy());setHasta('');setError('');setConfirmar(false);setOpen(true);
  }

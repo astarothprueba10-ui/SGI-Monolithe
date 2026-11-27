@@ -193,3 +193,25 @@ test('las asignaciones posteriores utilizan gestión sin crear otro borrador',()
  assert.match(ui,/Las operaciones protegidas conservan su asignación y precio/);
  assert.doesNotMatch(archivo('components/projects/detail/ProjectConfigurationTab.tsx'),/window.confirm/);
 });
+
+test('sugiere siguiente código sin precargar el campo y conserva nomenclatura',()=>{
+ const {nuevaEtapa,sugerirCodigoEtapa}=require('../src/lib/projectConfiguration.ts');
+ const etapas=[{codigo:'COC-C01'},{codigo:'COC-C02'},{codigo:'COC-C05'}];
+ assert.equal(nuevaEtapa(etapas).codigo,'');
+ assert.equal(nuevaEtapa(etapas).nombre,'');
+ assert.equal(sugerirCodigoEtapa(etapas),'COC-C06');
+ assert.equal(sugerirCodigoEtapa([]),'COM-01');
+ assert.equal(sugerirCodigoEtapa([{codigo:'ALM-C09'}]),'ALM-C10');
+ const editor=archivo('components/projects/detail/CommercialStageEditor.tsx');
+ assert.match(editor,/placeholder=\{sugerirCodigoEtapa\(datos.etapas\)\}/);
+});
+test('matriz de ubicación admite E y AE y rechaza componentes ausentes',()=>{
+ const {componentesMatriz,totalZona}=require('../src/lib/commercialRecargos.ts');
+ assert.deepEqual(componentesMatriz(['A','B','C','D','E','AB','ABC','AE']),['A','B','C','E']);
+ assert.equal(componentesMatriz(['D','AE','A']),null);
+ assert.equal(totalZona('AE',26000,{A:3000,E:2000}),31000);
+ assert.equal(totalZona('ABC',26000,{A:3000,B:1000,C:2000}),32000);
+ assert.equal(totalZona('D',26000,{}),26000);
+ assert.match(archivo('components/projects/detail/ProjectZonesTab.tsx'),/Tarifa adicional por lote/);
+ assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/guardarMatriz/);
+});
