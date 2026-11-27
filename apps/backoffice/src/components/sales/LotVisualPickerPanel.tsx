@@ -16,7 +16,7 @@ const pending=<T,>(value:T):Result<T>=>({status:'loading',value});
 const ready=<T,>(value:T):Result<T>=>({status:'ready',value});
 
 type SelectionProps={selectable:ReadonlySet<number>;onPick:(id:number)=>void};
-function MatrixPreview({lots,plan,selected,overview,selectable,onPick}:{lots:LoteResponse[];plan:PlanoInteractivoDetalleResponse|null;selected:LoteResponse|null;overview:boolean}&SelectionProps){
+function MatrixPreview({lots,plan,selected,overview,selectable,onPick,resetKey}:{lots:LoteResponse[];plan:PlanoInteractivoDetalleResponse|null;selected:LoteResponse|null;overview:boolean;resetKey:string}&SelectionProps){
   const geometries=useMemo(()=>buildDisplayGeometries(lots,plan,lots[0]?.idProyecto??null),[lots,plan]);
   const byId=useMemo(()=>new Map(lots.map(l=>[l.idLote,l])),[lots]);
   const items=useMemo(()=>geometries.map(g=>{
@@ -34,7 +34,8 @@ function MatrixPreview({lots,plan,selected,overview,selectable,onPick}:{lots:Lot
     Math.max(...items.map(i=>i.box[1]+i.box[3]))-minY+28];
   const target=items.find(i=>i.g.idLote===selected?.idLote);
   const focus=!overview&&target?matrixFocusBox(full,target.box):null;
-  return <LotVisualViewport full={full} focus={focus}>{view=><svg viewBox={view.join(' ')} className="h-full w-full" role="group" aria-label="Matriz de lotes por manzanas">
+  const shapes=<>
+
     {labels.map(l=><text key={l.key} x={l.x} y={l.y} fontSize="11" fontWeight="600" fill="#334155">{l.label}</text>)}
     {items.map(({g,box,lot})=>{
       const active=lot.idLote===selected?.idLote,colors=mapLotColors(lot.codigoEstadoLote,active);
@@ -50,28 +51,35 @@ function MatrixPreview({lots,plan,selected,overview,selectable,onPick}:{lots:Lot
         <title>{lot.codigo} · {estadoLote(lot.codigoEstadoLote??'NO_DISPONIBLE')}</title>
       </g>;
     })}
-  </svg>}</LotVisualViewport>;
+  </>;
+  return <LotVisualViewport full={full} focus={focus} resetKey={resetKey}>{view=><svg viewBox={view.join(' ')} className="h-full w-full" role="group" aria-label="Matriz de lotes por manzanas">{shapes}</svg>}</LotVisualViewport>;
 }
 
-function SvgPreview({document,lots,selected,overview,onUnavailable,selectable,onPick}:{document:PlanoSvgDocumento;lots:LoteResponse[];selected:LoteResponse|null;overview:boolean;onUnavailable:()=>void}&SelectionProps){
+function SvgPreview({document,lots,selected,overview,onUnavailable,selectable,onPick,resetKey}:{document:PlanoSvgDocumento;lots:LoteResponse[];selected:LoteResponse|null;overview:boolean;onUnavailable:()=>void;resetKey:string}&SelectionProps){
   const host=useRef<HTMLDivElement>(null);
   const [view,setView]=useState<VisualBox|null>(null);
   const block=selected?blockKey(selected):null;
+  const measurements=useRef<{document:PlanoSvgDocumento;lots:LoteResponse[];boxes:Map<number,VisualBox>}|null>(null);
   useLayoutEffect(()=>{
     if(overview||!selected||!validBox(document.viewBox)){setView(null);return;}
+    if(measurements.current?.document!==document||measurements.current?.lots!==lots){
     const elements=Array.from(host.current?.querySelectorAll<SVGGElement>('[data-lot-id]')??[]);
     const measure=(el:SVGGElement|undefined):VisualBox|null=>{
       if(!el)return null;
       try{const b=el.getBBox();const box:VisualBox=[b.x,b.y,b.width,b.height];return validBox(box)?box:null;}catch{return null;}
     };
-    const target=measure(elements.find(el=>Number(el.dataset.lotId)===selected.idLote));
+    const boxes=new Map<number,VisualBox>();
+    for(const el of elements){const box=measure(el);if(box)boxes.set(Number(el.dataset.lotId),box);}
+    measurements.current={document,lots,boxes};
+    }
+    const boxes=measurements.current.boxes;
+    const target=boxes.get(selected.idLote);
     if(!target){onUnavailable();return;}
-    const ids=new Set(lots.filter(l=>blockKey(l)===block).map(l=>l.idLote));
-    const neighbors=elements.filter(el=>ids.has(Number(el.dataset.lotId))).map(measure).filter((v):v is VisualBox=>v!==null);
+    const neighbors=lots.filter(l=>blockKey(l)===block).map(l=>boxes.get(l.idLote)).filter((v):v is VisualBox=>v!==undefined);
     setView(focusBox(document.viewBox,target,neighbors));
   },[document,lots,selected,block,overview,onUnavailable]);
   return <div ref={host} className="h-full w-full">
-    {validBox(document.viewBox)&&<LotVisualViewport full={document.viewBox} focus={overview?null:view}>{camera=>
+    {validBox(document.viewBox)&&<LotVisualViewport full={document.viewBox} focus={overview?null:view} resetKey={resetKey}>{camera=>
       <PlanSvgShapes documento={document} lotes={lots} seleccionado={selected?.idLote??null} miniatura vista={camera} lotesSeleccionables={selectable} alSeleccionar={onPick}/>}</LotVisualViewport>}
   </div>;
 }
@@ -89,7 +97,9 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
   const [svg,setSvg]=useState<Result<PlanoSvgDocumento|null>>(pending(null));
   const [mode,setMode]=useState<'auto'|'matriz'|'svg'>('auto');
   const [retry,setRetry]=useState(0);
-  const [overview,setOverview]=useState(false);
+  const selectionKey=`${selected?.idLote??'none'}-${focusRevision}`;
+  const [overviewKey,setOverviewKey]=useState<string|null>(null);
+  const overview=overviewKey===selectionKey;
   const [unavailableId,setUnavailableId]=useState<number|null>(null);
   useEffect(()=>{
     let active=true;
@@ -110,7 +120,7 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
     }).catch(()=>{if(active)setSvg({status:'error',value:null});});
     return ()=>{active=false;};
   },[project,retry]);
-  useEffect(()=>{setOverview(false);setUnavailableId(null);},[selected?.idLote,focusRevision]);
+  const resetKey=`${selectionKey}-${overview}`;
   const lots=useMemo(()=>rows.value.map(f=>({...f.lote,codigoEstadoLote:f.estado,nombreEstadoLote:estadoLote(f.estado),
     nombreEtapa:f.nombreEtapa??undefined,codigoEtapa:f.codigoEtapa??undefined})),[rows.value]);
   const row=rows.value.find(f=>f.lote.idLote===selected?.idLote);
@@ -123,23 +133,23 @@ function LotVisualPicker({project,selected,stageName,focusRevision=0,selectable,
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="flex items-center gap-2 text-sm font-semibold text-brand-900"><MapIcon className="h-4 w-4"/> Vista del lote</h3>
       <p className="mt-1 text-xs text-brand-500">Ubicación y entorno comercial</p></div>
-      <button type="button" disabled={!selected} onClick={()=>setOverview(v=>!v)} className="inline-flex items-center gap-1 rounded-md border border-brand-200 px-2 py-1.5 text-xs text-brand-700 disabled:opacity-50"><RotateCcwIcon className="h-3 w-3"/>{overview?'Centrar lote':'Ver proyecto'}</button>
+      <button type="button" disabled={!selected} onClick={()=>setOverviewKey(v=>v===selectionKey?null:selectionKey)} className="inline-flex items-center gap-1 rounded-md border border-brand-200 px-2 py-1.5 text-xs text-brand-700 disabled:opacity-50"><RotateCcwIcon className="h-3 w-3"/>{overview?'Centrar lote':'Ver proyecto'}</button>
     </div>
     <div className="flex flex-wrap gap-1 rounded-lg bg-brand-50 p-1" role="group" aria-label="Tipo de vista">
       {(['auto','svg','matriz'] as const).map(m=><button key={m} type="button" aria-pressed={mode===m} disabled={m==='svg'&&!svgUsable} onClick={()=>setMode(m)}
-        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium disabled:opacity-40 ${mode===m?'bg-brand-900 text-white':'text-brand-600 hover:bg-white'}`}>{m==='auto'?'Automática':m==='svg'?'Plano SVG':'Matriz'}</button>)}
+        className={`flex-1 rounded-md px-2 py-2 text-xs font-medium motion-safe:transition-colors disabled:opacity-40 ${mode===m?'bg-brand-900 text-white':'text-brand-600 hover:bg-white'}`}>{m==='auto'?'Automática':m==='svg'?'Plano SVG':'Matriz'}</button>)}
     </div>
     <div className="min-w-0">
-      {waiting?<p className="flex h-[300px] items-center justify-center rounded-lg bg-brand-50 text-sm text-brand-500">Cargando vista del proyecto…</p>:rows.status==='error'||(!showSvg&&matrix.status==='error')?
+      {waiting?<div role="status" className="flex h-[240px] items-center justify-center gap-2 rounded-lg bg-brand-50 text-sm text-brand-500"><span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-brand-200 border-t-brand-600 motion-safe:animate-spin"/>Cargando vista del proyecto…</div>:rows.status==='error'||(!showSvg&&matrix.status==='error')?
         <div className="space-y-2 p-4 text-center"><p className="text-sm text-brand-600">No se pudo consultar el plano.</p><button type="button" className="text-xs font-semibold underline" onClick={()=>setRetry(v=>v+1)}>Reintentar</button></div>:
-        showSvg&&svg.value?<SvgPreview key={`svg-${selected?.idLote}-${focusRevision}-${overview}`} document={svg.value} lots={lots} selected={lot} overview={overview} onUnavailable={markUnavailable} selectable={selectable} onPick={onPick}/>:
-          <MatrixPreview key={`matriz-${selected?.idLote}-${focusRevision}-${overview}`} lots={lots} plan={matrix.value} selected={lot} overview={overview} selectable={selectable} onPick={onPick}/>}
+        showSvg&&svg.value?<SvgPreview resetKey={resetKey} document={svg.value} lots={lots} selected={lot} overview={overview} onUnavailable={markUnavailable} selectable={selectable} onPick={onPick}/>:
+          <MatrixPreview resetKey={resetKey} lots={lots} plan={matrix.value} selected={lot} overview={overview} selectable={selectable} onPick={onPick}/>}
     </div>
     {selectionHint&&<p className="rounded-lg bg-brand-50 p-2 text-xs text-brand-600">{selectionHint}</p>}
     {mode!=='matriz'&&!showSvg&&svg.status!=='loading'&&<p className="flex items-center gap-1.5 text-xs text-brand-500"><Grid2X2Icon className="h-3.5 w-3.5 shrink-0"/>{svg.status==='error'?'SVG no disponible para consulta.':svg.value&&selected?'Lote sin figura SVG vinculada; se muestra la matriz.':'Se muestra la matriz del proyecto.'}</p>}
     {!showSvg&&matrix.status==='ready'&&!matrix.value&&<p className="text-xs text-brand-500">Distribución referencial por manzanas, sin posiciones guardadas.</p>}
     <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-brand-600">{MAP_STATUSES.map(s=><span key={s.code} className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm" style={{background:s.fill}}/>{s.label}</span>)}</div>
-    {selected?<div className="space-y-2 rounded-lg border border-brand-200 p-3">
+    {selected?<div aria-live="polite" className="space-y-2 rounded-lg border border-brand-200 p-3">
       <p className="text-xs font-medium text-brand-500">Lote en consulta</p><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-base text-brand-900">{selected.codigo}</strong>{row&&<span className={`rounded-full px-2 py-1 text-xs ${mapStatus(row.estado).badge}`}>{estadoLote(row.estado)}</span>}</div>
       <p className="text-xs text-brand-600">{selected.nombreManzana??'Manzana'} · {selected.areaM2??'—'} m² · {row?.nombreEtapa??stageName??'Etapa sin identificar'}</p>
       <dl className="space-y-1 border-t border-brand-100 pt-2 text-xs">
