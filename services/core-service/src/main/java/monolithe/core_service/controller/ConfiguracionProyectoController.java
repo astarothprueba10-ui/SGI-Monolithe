@@ -76,6 +76,12 @@ public class ConfiguracionProyectoController {
         return publicacion.guardarDisponibilidad(idProyecto,obtenerActor(jwt),request);
     }
 
+    @PutMapping("/gestion/etapas")
+    @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
+    public Respuesta etapas(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioEtapas request) {
+        return publicacion.guardarEtapas(idProyecto,obtenerActor(jwt),request);
+    }
+
     @PutMapping("/gestion/tarifa")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
     public Respuesta tarifa(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioTarifa request) {

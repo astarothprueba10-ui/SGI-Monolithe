@@ -65,21 +65,6 @@ function initForm(
   };
 }
 
-function parseOptionalNumber(
-  value: string
-): number | null {
-  const trimmed = value.trim();
-
-  if (trimmed === '') {
-    return null;
-  }
-
-  const numberValue = Number(trimmed);
-
-  return Number.isNaN(numberValue)
-    ? null
-    : numberValue;
-}
 
 function parseOptionalString(
   value: string

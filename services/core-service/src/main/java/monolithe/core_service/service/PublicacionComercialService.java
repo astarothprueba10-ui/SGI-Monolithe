@@ -223,6 +223,46 @@ public class PublicacionComercialService {
     }
 
     @Transactional
+    public Respuesta guardarEtapas(Long proyecto,Long actor,CambioEtapas request) {
+        var anterior=bloquearGestion(proyecto,request.revision());
+        var config=configuracion.obtener(proyecto);
+        var antiguas=config.datos().etapas();
+        var nuevas=request.etapas().stream().map(e -> e.disponibilidad()==ConfiguracionProyectoRequest.Disponibilidad.BLOQUEADA
+            || e.disponibilidad()==ConfiguracionProyectoRequest.Disponibilidad.ANTICIPADA
+            ? new ConfiguracionProyectoRequest.Etapa(e.codigo(),e.nombre(),ConfiguracionProyectoRequest.Disponibilidad.REGULAR,
+                ConfiguracionProyectoRequest.TipoDescuento.NINGUNO,BigDecimal.ZERO) : e).toList();
+        var codigos=ConfiguracionProyectoValidator.validarEtapas(nuevas);
+        if (antiguas.stream().anyMatch(e->!codigos.contains(e.codigo())))
+            throw new ReglaNegocioException("No se puede retirar o cambiar el código de una etapa publicada.");
+        var recalcular=new HashSet<String>();
+        for (var e: antiguas) {
+            var n=nuevas.stream().filter(x->x.codigo().equals(e.codigo())).findFirst().orElseThrow();
+            if (e.tipoDescuento()!=n.tipoDescuento() || e.descuento().compareTo(n.descuento())!=0)
+                recalcular.add(e.codigo());
+        }
+        var hoy=LocalDate.now(ZoneId.of("America/Lima"));
+        var protegidos=new HashSet<>(repository.protegidos(proyecto));
+        var reglas=reglasPorLote(proyecto,anterior.version());
+        var tarifas=new ArrayList<Tarifa>();
+        for(var l:config.lotes()) {
+            String etapa=etapaDe(config,l);
+            if(!recalcular.contains(etapa)||protegidos.contains(l.id())||reglas.containsKey(l.id())&&"PROTEGIDA".equals(reglas.get(l.id()).situacion()))continue;
+            var zona=l.codigoZona();
+            var ts=anterior.estado().tarifas().stream().filter(t->Objects.equals(t.codigoZona(),zona)&&t.codigoEtapa().equals(etapa)&&"PEN".equals(t.moneda())
+                &&!t.vigenteDesde().isAfter(hoy)&&(t.vigenteHasta()==null||!t.vigenteHasta().isBefore(hoy))).toList();
+            if(ts.size()!=1)throw new ReglaNegocioException("El lote "+l.codigo()+" requiere una tarifa vigente de su zona antes de modificar el descuento.");
+            if(!tarifas.contains(ts.getFirst()))tarifas.add(ts.getFirst());
+        }
+        var estadoAnterior=new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),antiguas);
+        registrarEvento(proyecto,anterior.version(),actor,"ETAPAS",estadoAnterior,repository.foto(proyecto,anterior.version()),
+            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),nuevas));
+        // El cambio de descuento y los precios derivados se guardan en la misma transacción.
+        var actual=gestion(proyecto);
+        for(var t:tarifas)actual=guardarTarifa(proyecto,actor,new CambioTarifa(actual.revision(),t));
+        return actual;
+    }
+
+    @Transactional
     public Respuesta guardarTarifa(Long proyecto,Long actor,CambioTarifa request) {
         var anterior = bloquearGestion(proyecto,request.revision());
         var config = configuracion.obtener(proyecto);

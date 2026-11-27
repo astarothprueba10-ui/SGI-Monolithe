@@ -31,6 +31,13 @@ public class ConfiguracionProyectoService {
         if (publicada > 0 && version.isEmpty()) throw new ConflictoNegocioException("No se encontró la configuración de la publicación vigente.");
         var datos = version.map(v -> leer(v.json()))
                 .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
+        if (publicada>0) {
+            var vigentes=repository.etapasVigentes(proyecto,publicada);
+            if (vigentes.isPresent()) {
+                var etapas=mapper.readValue(vigentes.get(),ConfiguracionProyectoRequest.Etapa[].class);
+                datos=new Datos(List.of(etapas),datos.manzanas(),datos.lotes(),datos.tarifas());
+            }
+        }
         return new ConfiguracionProyectoResponse(version.map(v -> v.numero()).orElse(0), datos,
                 repository.manzanas(proyecto), repository.lotes(proyecto), repository.zonas(proyecto), repository.monedas());
     }

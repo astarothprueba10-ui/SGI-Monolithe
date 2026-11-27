@@ -1,5 +1,5 @@
 import { coreApi } from '../lib/apiClient';
-import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial } from '../types/projectConfiguration';
+import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial, ReglaEtapaComercial } from '../types/projectConfiguration';
 
 function ruta(idProyecto: number) {
   return `/proyectos/${idProyecto}/configuracion-comercial`;
@@ -29,6 +29,9 @@ export const projectConfigurationService = {
   },
   guardarDisponibilidad(idProyecto: number, revision: number, etapasHabilitadas: string[]) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/disponibilidad`, { revision, etapasHabilitadas });
+  },
+  guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/etapas`, { revision, etapas });
   },
   guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/tarifa`, { revision, tarifa });

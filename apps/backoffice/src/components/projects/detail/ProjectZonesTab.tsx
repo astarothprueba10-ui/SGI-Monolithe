@@ -123,10 +123,10 @@ export function ProjectZonesTab({ project }: Props) {
               </>
             }
           >
-            {zones.map((zn) => (
+            {zones.map((zn,index) => (
               <TR key={zn.idZona} className="hover:bg-brand-50/40">
                 <TD className="font-semibold text-brand-900 w-16">
-                  {zn.numeroOrden ?? '—'}
+                  {index+1}
                 </TD>
                 <TD>
                   <span className="inline-flex items-center rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">

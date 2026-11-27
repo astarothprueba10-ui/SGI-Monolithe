@@ -7,10 +7,13 @@ import monolithe.core_service.dto.ConfiguracionProyectoRequest.Tarifa;
 
 public final class GestionComercialDto {
     private GestionComercialDto() {}
-    public record Estado(List<String> etapasHabilitadas, List<Tarifa> tarifas) {}
+    public record Estado(List<String> etapasHabilitadas, List<Tarifa> tarifas, List<ConfiguracionProyectoRequest.Etapa> etapas) {
+        public Estado(List<String> etapasHabilitadas,List<Tarifa> tarifas) { this(etapasHabilitadas,tarifas,null); }
+    }
     public record Respuesta(int version, long revision, boolean inferida, Estado estado) {}
     public record Disponibilidad(@NotNull @Min(0) Long revision,
         @NotNull @Size(max=100) List<@NotBlank String> etapasHabilitadas) {}
+    public record CambioEtapas(@NotNull @Min(0) Long revision, @NotNull @Size(min=1,max=100) List<@NotNull @Valid ConfiguracionProyectoRequest.Etapa> etapas) {}
     public record CambioTarifa(@NotNull @Min(0) Long revision, @NotNull @Valid Tarifa tarifa) {}
     public record Evento(long id, String tipo, Long actor, String fecha, String anterior, String nuevo, String actorNombre) {}
 }

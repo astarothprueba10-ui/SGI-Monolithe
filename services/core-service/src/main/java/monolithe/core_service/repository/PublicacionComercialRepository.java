@@ -89,7 +89,7 @@ public class PublicacionComercialRepository {
         return jdbc.query("""
             SELECT id_evento, (nuevo->'estado')::text AS estado
             FROM public.inm_gestion_comercial_eventos
-            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS')
+            WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD','TARIFAS','ETAPAS','REPARACION')
             ORDER BY id_evento DESC LIMIT 1
             """,(r,n)->new EventoEstado(r.getLong("id_evento"),r.getString("estado")),proyecto,version).stream().findFirst();
     }
@@ -111,7 +111,7 @@ public class PublicacionComercialRepository {
             LEFT JOIN public.seg_usuarios u ON u.id_usuario=e.id_usuario
             LEFT JOIN public.core_personas p ON p.id_persona=u.id_persona
             WHERE e.id_proyecto=? ORDER BY e.id_evento DESC LIMIT 50
-            """,(r,n)->new Evento(r.getLong(1),r.getString(2),r.getLong(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),proyecto);
+            """,(r,n)->new Evento(r.getLong(1),r.getString(2),r.getObject(3,Long.class),r.getString(4),r.getString(5),r.getString(6),r.getString(7)),proyecto);
     }
 
     public void evento(Long proyecto,int version,Long actor,String tipo,String anterior,String nuevo) {

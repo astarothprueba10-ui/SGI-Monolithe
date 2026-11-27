@@ -33,6 +33,14 @@ public class ConfiguracionProyectoRepository {
             """,(r,n)->new Version(r.getInt(1),r.getString(2)),proyecto,version).stream().findFirst();
     }
 
+    public Optional<String> etapasVigentes(Long proyecto,int version) {
+        return jdbc.query("""
+            SELECT (nuevo->'estado'->'etapas')::text FROM public.inm_gestion_comercial_eventos
+            WHERE id_proyecto=? AND version_publicada=? AND tipo='ETAPAS'
+            ORDER BY id_evento DESC LIMIT 1
+            """,(r,n)->r.getString(1),proyecto,version).stream().findFirst();
+    }
+
     public void bloquearConfiguracion(Long proyecto) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended('inm_publicacion:' || CAST(? AS text),0))",
                 (rs,n) -> true, proyecto);
