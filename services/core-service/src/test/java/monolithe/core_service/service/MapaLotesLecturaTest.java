@@ -65,4 +65,46 @@ class MapaLotesLecturaTest {
         var servicio = new PublicacionComercialService(null,repo,null,null,null,JsonMapper.builder().build());
         assertEquals(List.of("E1"),servicio.etapasHabilitadasParaMapa(2L,3));
     }
+    @Test void lecturaConjuntaConservaAsignacionesYDisponibilidad() {
+        var repo = mock(ConfiguracionProyectoRepository.class);
+        var proyectos = mock(ProyectoRepository.class);
+        when(repo.lecturaMapa(2L)).thenReturn(new ConfiguracionProyectoRepository.LecturaMapa(
+            true,true,true,3,3,
+            "{\"etapas\":[],\"manzanas\":[],\"lotes\":[]}",
+            "{\"manzanas\":[{\"id\":10,\"codigoEtapa\":\"E2\"}],\"lotes\":[{\"id\":71,\"codigoEtapa\":\"E2\"}]}",
+            "[{\"codigo\":\"E2\",\"nombre\":\"Segunda etapa\",\"disponibilidad\":\"REGULAR\",\"tipoDescuento\":\"NINGUNO\",\"descuento\":0}]",
+            "[\"E2\"]"));
+        var servicio = new ConfiguracionProyectoService(repo,proyectos,JsonMapper.builder().build());
+        var resultado = servicio.obtenerLecturaMapa(2L);
+        assertTrue(resultado.publicado());
+        assertEquals(3,resultado.version());
+        assertEquals(List.of("E2"),resultado.abiertas());
+        assertEquals("E2",resultado.datos().etapas().get(0).codigo());
+        assertEquals("E2",resultado.datos().manzanas().get(0).codigoEtapa());
+        assertEquals("E2",resultado.datos().lotes().get(0).codigoEtapa());
+        verify(repo).lecturaMapa(2L);
+        verifyNoMoreInteractions(repo);
+        verifyNoInteractions(proyectos);
+    }
+
+    @Test void lecturaConjuntaNoPermitePublicacionConVisibilidadIncompleta() {
+        var repo = mock(ConfiguracionProyectoRepository.class);
+        when(repo.lecturaMapa(2L)).thenReturn(new ConfiguracionProyectoRepository.LecturaMapa(
+            true,true,false,3,3,null,null,null,null));
+        var servicio = new ConfiguracionProyectoService(repo,null,JsonMapper.builder().build());
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->servicio.obtenerLecturaMapa(2L));
+    }
+
+    @Test void lecturaConjuntaSinPublicacionMantieneEtapasBloqueadas() {
+        var repo = mock(ConfiguracionProyectoRepository.class);
+        when(repo.lecturaMapa(2L)).thenReturn(new ConfiguracionProyectoRepository.LecturaMapa(
+            true,true,true,0,null,null,null,null,"[]"));
+        when(repo.etapas(2L)).thenReturn(List.of());
+        var servicio = new ConfiguracionProyectoService(repo,null,JsonMapper.builder().build());
+        var resultado = servicio.obtenerLecturaMapa(2L);
+        assertFalse(resultado.publicado());
+        assertEquals(0,resultado.version());
+        assertTrue(resultado.abiertas().isEmpty());
+        assertTrue(resultado.datos().etapas().isEmpty());
+    }
 }
