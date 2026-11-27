@@ -4,7 +4,7 @@ import { Button } from '../../ui/Button';
 import { Input, Select, FieldLabel } from '../../ui/Field';
 import { Modal } from '../../ui/Modal';
 import type { ConfiguracionComercial, ReglaEtapaComercial, ConfiguracionProyectoResponse } from '../../../types/projectConfiguration';
-import { actualizarEtapa, etapaEnUso, nuevaEtapa, validarConfiguracion, condicionPrecio } from '../../../lib/projectConfiguration';
+import { actualizarEtapa, etapaEnUso, nuevaEtapa, sugerirCodigoEtapa, validarConfiguracion, condicionPrecio } from '../../../lib/projectConfiguration';
 import { contarLotesPorEtapa } from '../../../lib/commercialPresentation';
 
 type Props = {
@@ -55,6 +55,7 @@ export function CommercialStageEditor({ datos, catalogos, onChange, readOnly = f
     if (!edicion) return;
     const { index, etapa: original } = edicion;
     const etapa = { ...original, nombre: original.nombre.trim(), codigo: original.codigo.trim() };
+    if (!/^[A-Z0-9][A-Z0-9_-]{0,29}$/.test(etapa.codigo)) { setError('Ingresa un código comercial válido, por ejemplo '+sugerirCodigoEtapa(datos.etapas)+'.'); return; }
     if (datos.etapas.some((e, i) => i !== index && e.codigo === etapa.codigo)) {
       setError('Ya existe una etapa comercial con ese código.'); return;
     }
@@ -94,8 +95,8 @@ export function CommercialStageEditor({ datos, catalogos, onChange, readOnly = f
       {etapa && <fieldset disabled={guardando} className="space-y-4">
         <div className="rounded-md border border-brand-200 bg-brand-50 p-3 text-sm"><strong>Proyecto:</strong><div>{projectName}</div></div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div><FieldLabel htmlFor="comercial-codigo">Código *</FieldLabel><Input id="comercial-codigo" disabled={published && edicion?.index !== -1} maxLength={30} value={etapa.codigo} onChange={e => cambiar({codigo:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,'')})}/></div>
-          <div><FieldLabel htmlFor="comercial-nombre">Nombre *</FieldLabel><Input id="comercial-nombre" maxLength={100} value={etapa.nombre} onChange={e => cambiar({nombre:e.target.value})}/></div>
+          <div><FieldLabel htmlFor="comercial-codigo">Código *</FieldLabel><Input id="comercial-codigo" placeholder={sugerirCodigoEtapa(datos.etapas)} disabled={published && edicion?.index !== -1} maxLength={30} value={etapa.codigo} onChange={e => cambiar({codigo:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,'')})}/>{edicion?.index===-1&&<p className="text-xs text-brand-500">Sugerencia: {sugerirCodigoEtapa(datos.etapas)}. Escribe el código para continuar.</p>}</div>
+          <div><FieldLabel htmlFor="comercial-nombre">Nombre *</FieldLabel><Input id="comercial-nombre" placeholder={`Etapa comercial ${datos.etapas.length+1}`} maxLength={100} value={etapa.nombre} onChange={e => cambiar({nombre:e.target.value})}/></div>
           <div><FieldLabel htmlFor="comercial-condicion">Condición del precio *</FieldLabel><Select id="comercial-condicion" disabled={!published && etapa.disponibilidad === 'BLOQUEADA'} value={condicionPrecio(etapa.disponibilidad)} onChange={e => cambiar({disponibilidad:e.target.value as ReglaEtapaComercial['disponibilidad']})}>
             {MODOS.map(([id,label]) => <option key={id} value={id}>{label}</option>)}</Select></div>
           <div><FieldLabel htmlFor="comercial-descuento">Tipo de descuento</FieldLabel><Select id="comercial-descuento" disabled={etapa.disponibilidad !== 'PROMOCION'} value={etapa.tipoDescuento} onChange={e => cambiar({tipoDescuento:e.target.value as ReglaEtapaComercial['tipoDescuento'],descuento:0})}>

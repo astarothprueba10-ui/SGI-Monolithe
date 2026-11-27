@@ -36,6 +36,9 @@ export const projectConfigurationService = {
   guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/etapas`, { revision, etapas });
   },
+  guardarMatriz(idProyecto:number, revision:number, precioBase:number, recargos:Record<string,number>, vigenteDesde:string, vigenteHasta:string|null) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/matriz`, {revision,precioBase,recargos,vigenteDesde,vigenteHasta});
+  },
   guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/tarifa`, { revision, tarifa });
   },

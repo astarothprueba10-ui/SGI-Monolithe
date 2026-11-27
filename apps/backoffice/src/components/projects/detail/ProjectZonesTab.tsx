@@ -6,6 +6,9 @@ import { Table, TD, TH, TR } from '../../ui/Table';
 import { Badge } from '../../ui/Badge';
 import { EmptyState } from '../../ui/Feedback';
 import { useAuth } from '../../../contexts/AuthContext';
+import { projectConfigurationService } from '../../../services/projectConfigurationService';
+import { adicionalPorZona } from '../../../lib/commercialRecargos';
+import type { TarifaComercial } from '../../../types/projectConfiguration';
 import { coreService } from '../../../services/coreService';
 import { ZoneFormModal } from '../ZoneFormModal';
 import type { ProyectoResponse, ZonaResponse } from '../../../types/core';
@@ -18,6 +21,8 @@ export function ProjectZonesTab({ project }: Props) {
   const { can } = useAuth();
   const canEdit = can('projects.edit');
 
+  const [tarifas,setTarifas]=useState<TarifaComercial[]>([]);
+  const [tarifasError,setTarifasError]=useState(false);
   const [zones, setZones] = useState<ZonaResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +36,9 @@ export function ProjectZonesTab({ project }: Props) {
     try {
       const data = await coreService.getZonesByProject(project.idProyecto);
       setZones(data);
+      setTarifasError(false);
+      try { const config=await projectConfigurationService.obtener(project.idProyecto);setTarifas(config.datos.tarifas??[]); }
+      catch {setTarifas([]);setTarifasError(true);}
     } catch (err: any) {
       setError(err.message || 'Error al cargar las zonas del proyecto');
     } finally {
@@ -93,6 +101,8 @@ export function ProjectZonesTab({ project }: Props) {
         )}
       </div>
 
+      <p className="text-xs text-brand-600">La tarifa adicional es el precio de lista por lote menos el precio base de la zona regular D, antes del descuento. Se configura en la matriz comercial.</p>
+      {tarifasError&&<p className="text-xs text-amber-700">No se pudieron consultar las tarifas; no se mostrarán importes estimados.</p>}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <p className="font-semibold">Error al cargar zonas:</p>
@@ -118,6 +128,7 @@ export function ProjectZonesTab({ project }: Props) {
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Código</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Nombre</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Descripción</TH>
+                <TH className="text-brand-900 font-bold bg-brand-50/80">Tarifa adicional por lote</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Lotes activos</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Estado</TH>
                 {canEdit && <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Acciones</TH>}
@@ -138,6 +149,7 @@ export function ProjectZonesTab({ project }: Props) {
                 <TD className="text-brand-600 max-w-xs truncate">
                   {zn.descripcion ?? '—'}
                 </TD>
+                <TD>{adicionalPorZona(tarifas,zn.codigo)}</TD>
                 <TD>{zn.lotesActivos??'—'}</TD>
                 <TD>
                   {zn.activo ? (

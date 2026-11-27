@@ -338,30 +338,50 @@ public class PublicacionComercialService {
     @Transactional
     public Respuesta guardarTarifa(Long proyecto,Long actor,CambioTarifa request) {
         var anterior = bloquearGestion(proyecto,request.revision());
-        var config = configuracion.obtener(proyecto);
-        Tarifa tarifa = request.tarifa();
+        return guardarTarifas(proyecto,actor,anterior,List.of(request.tarifa()),false);
+    }
+
+    @Transactional
+    public Respuesta guardarMatriz(Long proyecto,Long actor,CambioMatriz request) {
+        var anterior=bloquearGestion(proyecto,request.revision());
+        var config=configuracion.obtener(proyecto);
+        var nuevas=MatrizRecargosComercial.generar(config,request);
+        return guardarTarifas(proyecto,actor,anterior,nuevas,true);
+    }
+
+    private Respuesta guardarTarifas(Long proyecto,Long actor,Respuesta anterior,List<Tarifa> nuevas,boolean matriz) {
+        var config=configuracion.obtener(proyecto);
+        var ahora=ZonedDateTime.now(ZoneId.of("America/Lima"));
+        var d=config.datos();
+        var tarifas=new ArrayList<>(anterior.estado().tarifas());
+        for(var tarifa:nuevas) {
         if (!"PEN".equals(tarifa.moneda())) throw new ReglaNegocioException("La gestión de precios de venta actualmente utiliza PEN.");
-        var ahora = ZonedDateTime.now(ZoneId.of("America/Lima"));
         if (tarifa.vigenteDesde().isAfter(ahora.toLocalDate()) || tarifa.vigenteHasta()!=null && tarifa.vigenteHasta().isBefore(ahora.toLocalDate()))
             throw new ReglaNegocioException("La tarifa debe estar vigente hoy. No se admite programar cambios futuros en esta operación.");
-        var tarifas = new ArrayList<>(anterior.estado().tarifas());
         tarifas.removeIf(t->ConfiguracionProyectoValidator.claveTarifa(t).equals(ConfiguracionProyectoValidator.claveTarifa(tarifa)));
         tarifas.add(tarifa);
-        var d = config.datos();
-        var datos = new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),d.lotes(),List.copyOf(tarifas));
         // Validar la combinación solicitada; las tarifas históricas de zonas retiradas
         // se conservan en auditoría y no impiden editar otra combinación válida.
         ConfiguracionProyectoValidator.validarTarifas(new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),d.lotes(),List.of(tarifa)),config.zonas(),config.monedas());
+        }
+        if(tarifas.size()>2000)throw new ReglaNegocioException("La matriz supera el máximo de tarifas.");
+        var datos = new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),d.lotes(),List.copyOf(tarifas));
         var paraPrecios = configParaPrecios(new ConfiguracionProyectoResponse(config.version(),datos,config.manzanas(),config.lotes(),config.zonas(),config.monedas()));
         var foto = repository.foto(proyecto,anterior.version());
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var reglas = reglasPorLote(proyecto,anterior.version());
         var candidatos = ajustes.findByProyecto_IdProyectoAndActivoTrueOrderByFechaDesdeDesc(proyecto);
-        var afectados = config.lotes().stream().filter(l->tarifa.codigoEtapa().equals(etapaDe(config,l))).toList();
+        if(matriz&&!candidatos.isEmpty())throw new ReglaNegocioException("Existen ajustes de tipo de lote activos. Revisa esos ajustes antes de guardar una matriz de recargos para evitar duplicidades.");
+        var etapasAfectadas=nuevas.stream().map(Tarifa::codigoEtapa).collect(java.util.stream.Collectors.toSet());
+        var afectados = config.lotes().stream().filter(l->etapasAfectadas.contains(etapaDe(config,l))).toList();
+        var etapasPorLote=new HashMap<Long,String>();
+        for(var l:afectados)etapasPorLote.put(l.id(),etapaDe(config,l));
         var parcelas = lotes.findAllById(afectados.stream().map(ConfiguracionProyectoResponse.Lote::id).toList());
         if (parcelas.size()!=afectados.size()) throw new ConflictoNegocioException("El inventario cambió.");
         for (var lote: parcelas) {
-            if (lote.getZona()==null || !tarifa.codigoZona().equals(lote.getZona().getCodigo())) continue;
+            if (lote.getZona()==null) continue;
+            var tarifa=nuevas.stream().filter(t->t.codigoZona().equals(lote.getZona().getCodigo())&&t.codigoEtapa().equals(etapasPorLote.get(lote.getIdLote()))).findFirst().orElse(null);
+            if(tarifa==null)continue;
             var regla = reglas.get(lote.getIdLote());
             if (protegidos.contains(lote.getIdLote()) || regla!=null && "PROTEGIDA".equals(regla.situacion())) continue;
             if (regla==null || !tarifa.codigoEtapa().equals(regla.etapa()))

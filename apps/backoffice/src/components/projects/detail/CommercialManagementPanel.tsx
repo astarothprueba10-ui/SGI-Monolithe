@@ -6,6 +6,8 @@ import { Input, Select, FieldLabel } from '../../ui/Field';
 import { Modal } from '../../ui/Modal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
+import { CommercialMatrixRecargos } from './CommercialMatrixRecargos';
+import { componentesMatriz } from '../../../lib/commercialRecargos';
 import { CommercialZoneLegend } from './CommercialZoneLegend';
 import { CommercialHistoryEntry } from './CommercialHistoryEntry';
 import { contarZonaEtapa } from '../../../lib/commercialZoneUsage';
@@ -90,6 +92,9 @@ export function CommercialManagementPanel({ config, version, project }: { config
   if (config.version !== version || actual && actual.version!==version) return <Card className="p-5"><h2 className="font-semibold text-brand-900">Gestión comercial</h2><p role="alert" className="mt-2 text-sm text-brand-700">La versión consultada no coincide con la configuración publicada. Recarga el proyecto.</p></Card>;
   if (!actual) return <Card className="p-5"><p role={error?'alert':'status'} className="text-sm text-brand-700">{error||'Cargando gestión comercial…'}</p>{error&&<Button onClick={()=>setIntento(n=>n+1)}>Reintentar</Button>}</Card>;
   const tarifas = actual.estado.tarifas;
+  const componentes=componentesMatriz(inventario.zonas);
+  const base=tarifas.find(t=>t.codigoEtapa===etapa&&t.codigoZona==='D'&&t.moneda==='PEN'&&t.tipoTarifa==='MONTO_FIJO');
+  const reglaEtapa=inventario.datos.etapas.find(e=>e.codigo===etapa);
   const uso = contarZonaEtapa(inventario,etapa);
   const zonasVisibles = inventario.zonas.filter(z=>!soloUsadas || (uso.get(z)??0)>0);
   return <Card className="p-5 space-y-5">
@@ -124,17 +129,22 @@ export function CommercialManagementPanel({ config, version, project }: { config
     {seccion === 'tarifas' && <section className="space-y-4">
       <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
       <CommercialZoneLegend projectId={id} codigos={config.zonas}/>
-      <p className="text-sm text-brand-600">Edita una combinación de etapa y zona. El sistema aplica el cambio a los lotes correspondientes, sin reabrir etapas ni modificar ventas y reservas. Moneda PEN.</p>
+      <p className="text-sm text-brand-600">Precio base + adicional de zona − descuento de etapa. Se conservan las ventas y reservas. Moneda PEN.</p>
+      {componentes&&<CommercialMatrixRecargos key={id} zonas={inventario.zonas} tarifas={tarifas} etapas={inventario.datos.etapas} disabled={!editable||ocupado} onSave={async (b,r,d,h)=>{setOcupado(true);setError('');setAviso('');try {const g=await projectConfigurationService.guardarMatriz(id,actual.revision,b,r,d,h);setActual(g);setAviso('Matriz guardada. Los precios elegibles se actualizaron sin cambiar la disponibilidad.');setInventario(await projectConfigurationService.obtener(id));} finally {setOcupado(false);}}}/>}
+      {base&&<p className="text-sm font-medium text-brand-900">Precio base de esta etapa: {soles(base.valor)} por lote</p>}
       <div className="max-w-sm"><FieldLabel htmlFor="gestion-etapa">Etapa comercial</FieldLabel><Select id="gestion-etapa" disabled={ocupado} value={etapa} onChange={e=>setEtapa(e.target.value)}>{config.datos.etapas.map(e=><option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
       <label className="flex items-center gap-2 text-sm text-brand-700"><input type="checkbox" checked={soloUsadas} onChange={e=>setSoloUsadas(e.target.checked)}/> Mostrar solo zonas utilizadas ({inventario.zonas.filter(z=>(uso.get(z)??0)>0).length})</label>
       {zonasVisibles.length===0&&<p className="text-sm text-brand-600">No hay zonas utilizadas en esta etapa. Desmarca el filtro para preparar tarifas opcionales.</p>}
+      <p className="text-xs text-brand-500">El precio final mostrado es teórico y no incluye ajustes de tipo de lote ni condiciones históricas de una operación.</p>
       <div className="overflow-auto rounded-lg border border-brand-200"><table className="w-full text-left text-sm">
-        <thead className="bg-brand-50"><tr>{['Zona','Lotes asociados','Tarifa PEN','Modalidad','Vigencia','Acción'].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
+        <thead className="bg-brand-50"><tr>{['Zona','Lotes asociados','Adicional por lote','Precio de lista','Descuento de etapa','Precio final teórico','Vigencia',...(!componentes?['Acción']:[])].map(h=><th key={h} className="p-3">{h}</th>)}</tr></thead>
         <tbody>{zonasVisibles.map(z=>{
           const t=tarifas.find(x=>x.codigoEtapa===etapa&&x.codigoZona===z&&x.moneda==='PEN');
-          return <tr key={z} className="border-t border-brand-100"><td className="p-3 font-medium">{z}</td><td className="p-3">{uso.get(z)??0}</td><td className="p-3">{t?soles(t.valor):(uso.get(z)??0)>0?'Sin tarifa configurada':'Opcional · sin lotes'}</td><td className="p-3">{t?.tipoTarifa==='POR_M2'?'Por m²':t?'Por lote':'—'}</td>
+          const total=t&&t.tipoTarifa==='MONTO_FIJO'?t.valor:null;
+          const descuento=total!==null&&reglaEtapa?.disponibilidad==='PROMOCION'?(reglaEtapa.tipoDescuento==='PORCENTAJE'?total*reglaEtapa.descuento/100:reglaEtapa.tipoDescuento==='MONTO_FIJO'?reglaEtapa.descuento:0):0;
+          return <tr key={z} className="border-t border-brand-100"><td className="p-3 font-medium">{z}</td><td className="p-3">{uso.get(z)??0}</td><td className="p-3">{base&&total!==null?soles(total-base.valor):'—'}</td><td className="p-3">{t?soles(t.valor)+(t.tipoTarifa==='POR_M2'?' / m²':''):(uso.get(z)??0)>0?'Sin tarifa configurada':'Opcional · sin lotes'}</td><td className="p-3">{total!==null?soles(descuento):'—'}</td><td className="p-3">{total!==null?soles(total-descuento):'—'}</td>
             <td className="p-3">{t?`${t.vigenteDesde} — ${t.vigenteHasta??'Sin fin'}`:'—'}</td>
-            <td className="p-3"><Button size="sm" icon={PencilIcon} disabled={!editable||ocupado||!etapa} onClick={()=>{setError('');setTarifa(t?{...t}:{codigoZona:z,codigoEtapa:etapa,moneda:'PEN',tipoTarifa:'MONTO_FIJO',valor:0,vigenteDesde:hoy(),vigenteHasta:null});}}>{t?'Editar':'Crear'}</Button></td></tr>;
+            {!componentes&&<td className="p-3"><Button size="sm" icon={PencilIcon} disabled={!editable||ocupado||!etapa} onClick={()=>{setError('');setTarifa(t?{...t}:{codigoZona:z,codigoEtapa:etapa,moneda:'PEN',tipoTarifa:'MONTO_FIJO',valor:0,vigenteDesde:hoy(),vigenteHasta:null});}}>{t?'Editar':'Crear'}</Button></td>}</tr>;
         })}</tbody></table></div>
     </section>}
     {seccion === 'historial' && <section className="space-y-3">

@@ -5,11 +5,19 @@ export function condicionPrecio(codigo: ReglaEtapaComercial['disponibilidad']): 
   return codigo === 'PROMOCION' ? 'PROMOCION' : 'REGULAR';
 }
 
-export function nuevaEtapa(etapas: ReglaEtapaComercial[]): ReglaEtapaComercial {
-  let numero = 1;
-  while (etapas.some(e => e.codigo === `COM-${String(numero).padStart(2, '0')}`)) numero++;
-  return { codigo: `COM-${String(numero).padStart(2, '0')}`, nombre: `Etapa comercial ${numero}`,
-    disponibilidad: 'REGULAR', tipoDescuento: 'NINGUNO', descuento: 0 };
+export function sugerirCodigoEtapa(etapas: ReglaEtapaComercial[]): string {
+  const primera = etapas.map(e => e.codigo.match(/^(.+?)(\d+)$/)).find(m => m !== null);
+  const prefijo = primera?.[1] ?? 'COM-';
+  const ancho = primera?.[2].length ?? 2;
+  const numeros = etapas.map(e => e.codigo.startsWith(prefijo) ? e.codigo.slice(prefijo.length) : '').filter(n => /^\d+$/.test(n)).map(Number).filter(Number.isSafeInteger);
+  let siguiente = Math.max(0, ...numeros) + 1;
+  if (!Number.isSafeInteger(siguiente)) return 'COM-01';
+  let codigo = prefijo + String(siguiente).padStart(ancho, '0');
+  while (etapas.some(e => e.codigo === codigo)) codigo = prefijo + String(++siguiente).padStart(ancho, '0');
+  return codigo.length <= 30 ? codigo : 'COM-01';
+}
+export function nuevaEtapa(_etapas: ReglaEtapaComercial[]): ReglaEtapaComercial {
+  return { codigo: '', nombre: '', disponibilidad: 'REGULAR', tipoDescuento: 'NINGUNO', descuento: 0 };
 }
 
 export function asignar(filas: AsignacionComercial[], id: number, codigoEtapa: string): AsignacionComercial[] {
