@@ -15,7 +15,7 @@ import java.util.*;
 
 @Service
 public class CommercialMfaService {
-    private static final Set<String> ACCIONES=Set.of("MATRIZ","TARIFA","DISPONIBILIDAD","IMPORTACION","PUBLICACION","ETAPAS","ASIGNACION");
+    private static final Set<String> ACCIONES=Set.of("MATRIZ","TARIFA","DISPONIBILIDAD","IMPORTACION","PUBLICACION","ETAPAS","ASIGNACION","MANZANA");
     private final JdbcTemplate db;
     private final PasswordEncoder passwords;
     private final EmailService correo;

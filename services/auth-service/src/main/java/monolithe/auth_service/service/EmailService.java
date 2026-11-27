@@ -95,10 +95,38 @@ public class EmailService {
   public void enviarCodigoMfaComercial(String destinatario,String codigo,String accion,long proyecto) {
     try {
       MimeMessage mensaje=mailSender.createMimeMessage();
-      MimeMessageHelper helper=new MimeMessageHelper(mensaje,false,"UTF-8");
+      MimeMessageHelper helper=new MimeMessageHelper(mensaje,true,"UTF-8");
       helper.setFrom(remitente);helper.setTo(destinatario);
-      helper.setSubject("Confirmación de seguridad comercial - MONOLITHE");
-      helper.setText("Código de confirmación: "+codigo+". Operación: "+accion+"; proyecto #"+proyecto+". Válido por 5 minutos. No compartas este código. Si no solicitaste la operación, contacta a Seguridad.",false);
+      helper.setSubject("Código de confirmación comercial | SIGI MONOLITHE");
+      String operacion=switch(accion){
+        case "MATRIZ","TARIFA" -> "Actualizar tarifas comerciales";
+        case "DISPONIBILIDAD" -> "Actualizar disponibilidad comercial";
+        case "IMPORTACION" -> "Confirmar importación inicial";
+        case "PUBLICACION" -> "Publicar configuración inicial";
+        case "ETAPAS" -> "Modificar etapas comerciales";
+        case "ASIGNACION" -> "Modificar asignaciones comerciales";
+        case "MANZANA" -> "Guardar manzana comercial";
+        default -> "Confirmación comercial";
+      };
+      if(!codigo.matches("[0-9]{6}"))throw new IllegalArgumentException("Código inválido");
+      String texto="SIGI MONOLITHE. "+operacion+". Proyecto #"+proyecto+". Código: "+codigo+". Válido por 5 minutos. No compartas este código. Si no solicitaste la operación, contacta a Seguridad.";
+      String html="""
+        <!doctype html><html lang="es"><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#152c45">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:28px 12px">
+        <table role="presentation" width="100%%" style="max-width:520px;background:#ffffff;border:1px solid #dbe4ee;border-radius:14px;overflow:hidden" cellspacing="0" cellpadding="0">
+        <tr><td style="background:#142b43;padding:24px;color:white;border-bottom:4px solid #4cbb17"><strong style="font-size:19px">SIGI MONOLITHE</strong><br><span style="font-size:12px;color:#c3d3e5">Gestión inmobiliaria · Seguridad</span></td></tr>
+        <tr><td style="padding:28px"><h1 style="font-size:22px;margin:0 0 12px">Confirmación de seguridad comercial</h1>
+        <p style="font-size:14px;line-height:1.6">Utiliza este código para autorizar la operación que acabas de solicitar.</p>
+        <div style="text-align:center;background:#f1f5f9;border:1px solid #dbe4ee;border-radius:10px;padding:22px;margin:22px 0">
+        <div style="font-size:12px;color:#466580">CÓDIGO DE CONFIRMACIÓN</div>
+        <div style="font-family:monospace;font-size:34px;font-weight:bold;letter-spacing:7px;padding:14px 0">%s</div>
+        <div style="font-size:13px;color:#31602d">Válido durante 5 minutos</div></div>
+        <p style="font-size:14px;line-height:1.8"><strong>Operación:</strong> %s<br><strong>Proyecto:</strong> #%d</p>
+        <p style="font-size:13px;line-height:1.6;color:#475569;border-top:1px solid #dbe4ee;padding-top:16px">Nunca compartas este código. Si no solicitaste esta operación, contacta a Seguridad.</p>
+        </td></tr><tr><td style="padding:18px;background:#f8fafc;color:#64748b;text-align:center;font-size:11px">Mensaje automático de SIGI MONOLITHE</td></tr>
+        </table></td></tr></table></body></html>
+        """.formatted(codigo,operacion,proyecto);
+      helper.setText(texto,html);
       mailSender.send(mensaje);
     }catch(MessagingException e){throw new MailException("No se pudo preparar el correo comercial.",e){};}
   }
