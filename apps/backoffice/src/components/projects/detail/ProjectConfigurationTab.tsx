@@ -45,7 +45,6 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   const editable = project.activo && can('lots.edit');
   const bloqueado = ocupado || !editable;
   const importacionPermitida = lotesRegistrados < 10 && !importadoSesion && importacionRealizada === 0;
-  const estructuraCerrada = !importacionPermitida;
   const etapasHabilitar = filtrarSeleccion(seleccion ?? seleccionInicial(config), config);
 
   function importado() {
@@ -121,12 +120,12 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
         : <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-100 p-4 text-gray-500"><LockIcon className="h-5 w-5"/><div><p className="font-medium">Importar Excel</p><p className="text-xs">Carga masiva cerrada. Se conserva el inventario registrado.</p></div></div>}
     </section>}
     {paso === 1 && <section className="space-y-3">
-      {estructuraCerrada && <p className="flex items-center gap-2 rounded-md bg-gray-100 p-3 text-sm text-gray-600"><LockIcon className="h-4 w-4"/> Solo consulta. Edita los datos desde la pestaña principal Etapas comerciales del proyecto.</p>}
-      <fieldset disabled={bloqueado || estructuraCerrada}><CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado || estructuraCerrada} onChange={model.setDatos}/></fieldset>
+      <p className="text-sm text-brand-600">Revisa y corrige las etapas antes de publicar. Los cambios se guardan al continuar.</p>
+      <fieldset disabled={bloqueado}><CommercialStageEditor datos={datos} catalogos={respuesta} projectName={project.nombre} readOnly={bloqueado} onChange={model.setDatos}/></fieldset>
     </section>}
     {paso === 2 && <fieldset disabled={bloqueado}>
-      {estructuraCerrada ? <p className="mb-3 flex items-center gap-2 rounded-md bg-gray-100 p-3 text-sm text-gray-600"><LockIcon className="h-4 w-4"/> Solo consulta. Realiza las asignaciones desde las pestañas principales Manzanas y Lotes.</p> : <p className="mb-3 text-sm text-brand-600">Asigna cada manzana a una etapa de venta. Solo crea excepciones si un lote necesita otra etapa.</p>}
-      <CommercialAssignmentEditor datos={datos} catalogos={respuesta} readOnly={estructuraCerrada} onChange={model.setDatos}/>
+      <p className="mb-3 text-sm text-brand-600">Asigna cada manzana a una etapa de venta. Solo crea excepciones si un lote necesita otra etapa.</p>
+      <CommercialAssignmentEditor datos={datos} catalogos={respuesta} readOnly={bloqueado} onChange={model.setDatos}/>
     </fieldset>}
     {paso === 3 && <fieldset disabled={bloqueado}>
       <CommercialZoneLegend projectId={project.idProyecto} codigos={respuesta.zonas}/>
@@ -148,7 +147,7 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
       <Button icon={ArrowLeftIcon} disabled={paso===0 || ocupado} onClick={() => volver(paso-1)}>Anterior</Button>
       <span className="text-xs text-brand-500">{hayCambios ? 'Cambios pendientes de guardar' : 'Los cambios se conservan al avanzar'}</span>
       {paso < 5 && <Button variant="primary" iconRight={ArrowRightIcon} disabled={bloqueado} onClick={() => void continuar()}>
-        {procesando || guardando ? 'Validando…' : paso === 0 ? 'Continuar con inventario' : paso === 3 ? 'Validar precios y continuar' : estructuraCerrada && (paso===1 || paso===2) ? 'Continuar' : 'Guardar y continuar'}
+        {procesando || guardando ? 'Validando…' : paso === 0 ? 'Continuar con inventario' : paso === 3 ? 'Validar precios y continuar' : 'Guardar y continuar'}
       </Button>}
     </footer>
   </Card>;
