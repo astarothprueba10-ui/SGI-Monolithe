@@ -16,6 +16,13 @@ export function codigoLoteVinculado(texto: string | null | undefined, lotes: rea
   return lotes.find(l => l.codigo.trim().toUpperCase() === clave)?.codigo ?? null;
 }
 
+export function figuraVinculable(figura: SvgFigura): boolean {
+  return ['rect','polygon','path','circle','ellipse'].includes(figura.tipo);
+}
+export function asociacionesLote(documento:PlanoSvgDocumento,codigo:string):number[] {
+  return documento.elementos.flatMap((e,i)=>e.codigoLote===codigo?[i]:[]);
+}
+
 export function totalVinculados(documento: PlanoSvgDocumento, lotes: readonly Pick<LoteResponse,'codigo'>[]): number {
   const codigos = new Set(lotes.map(l => l.codigo));
   return new Set(documento.elementos.map(e => e.codigoLote).filter(c => c && codigos.has(c))).size;
@@ -68,7 +75,8 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
       if(transformTotal) atributos.transform=transformTotal;
       const opciones=[node.getAttribute('data-lote'),node.getAttribute('id'),node.getAttribute('data-code')];
       const codigoPropio=opciones.map(x=>codigoLoteVinculado(x,lotes)).find(Boolean) ?? null;
-      const codigo=codigoPropio ?? (codigoGrupo && !usados.has(codigoGrupo) ? codigoGrupo : null);
+      const codigo=['rect','polygon','path','circle','ellipse'].includes(etiqueta)
+        ? codigoPropio ?? (codigoGrupo && !usados.has(codigoGrupo) ? codigoGrupo : null) : null;
       if(codigo && usados.has(codigo)) throw new Error('Un mismo lote figura más de una vez en el SVG: '+codigo);
       if(codigo) usados.add(codigo);
       const texto=etiqueta==='text' ? (node.textContent??'').trim().slice(0,150) : null;
@@ -89,11 +97,13 @@ export function leerSvgVectorial(contenido: string, nombreArchivo: string,
 }
 
 export function vincularFigura(documento: PlanoSvgDocumento, indice: number, codigo: string | null,
-  lotes: readonly Pick<LoteResponse,'codigo'>[]): PlanoSvgDocumento {
+  lotes: readonly Pick<LoteResponse,'codigo'>[], reemplazar=false): PlanoSvgDocumento {
   if(indice<0 || indice>=documento.elementos.length) throw new Error('Figura fuera del plano.');
   const codigoValido=codigo===null ? null : codigoLoteVinculado(codigo,lotes);
   if(codigo!==null && !codigoValido) throw new Error('El lote no pertenece a este proyecto.');
-  if(codigoValido && documento.elementos.some((e,i)=>i!==indice && e.codigoLote===codigoValido))
+  if(codigoValido && !figuraVinculable(documento.elementos[indice]))
+    throw new Error('Selecciona la superficie del lote, no un texto o línea.');
+  if(codigoValido && !reemplazar && documento.elementos.some((e,i)=>i!==indice && e.codigoLote===codigoValido))
     throw new Error('Este lote ya tiene otra figura asociada.');
-  return {...documento,elementos:documento.elementos.map((e,i)=>i===indice ? {...e,codigoLote:codigoValido}:e)};
+  return {...documento,elementos:documento.elementos.map((e,i)=>i===indice ? {...e,codigoLote:codigoValido}:reemplazar && codigoValido && e.codigoLote===codigoValido?{...e,codigoLote:null}:e)};
 }
