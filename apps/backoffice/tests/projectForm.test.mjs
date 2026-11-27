@@ -220,7 +220,7 @@ test('asignaciones comerciales se actualizan y se eliminan sin duplicar registro
 });
 
 test('el cambio de código conserva las referencias y el bloqueo elimina promoción', () => {
-  const e = { ...nuevaEtapa([]), disponibilidad: 'PROMOCION', tipoDescuento: 'PORCENTAJE', descuento: 10 };
+  const e = { ...nuevaEtapa([]), codigo:'COM-01', nombre:'Etapa comercial 1', disponibilidad: 'PROMOCION', tipoDescuento: 'PORCENTAJE', descuento: 10 };
   const datos = { etapas: [e], manzanas: [{ id: 1, codigoEtapa: e.codigo }], lotes: [] };
   const modificado = actualizarEtapa(datos, 0, { codigo: 'E-01', disponibilidad: 'BLOQUEADA' });
   assert.equal(modificado.manzanas[0].codigoEtapa, 'E-01');
@@ -238,7 +238,7 @@ test('la plantilla usa claves estables para manzanas y lotes', () => {
 });
 
 test('renombrar una etapa conserva las tarifas y evita quitar etapas con tarifas asociadas', () => {
-  const e = nuevaEtapa([]);
+  const e = { ...nuevaEtapa([]), codigo:'COM-01', nombre:'Etapa comercial 1' };
   const tarifa = { codigoZona: 'Z-A', codigoEtapa: e.codigo, moneda: 'PEN', tipoTarifa: 'POR_M2', valor: 60, vigenteDesde: '2026-11-01', vigenteHasta: null };
   const datos = { etapas: [e], manzanas: [], lotes: [], tarifas: [tarifa] };
   const modificado = actualizarEtapa(datos, 0, { codigo: 'E-01' });
