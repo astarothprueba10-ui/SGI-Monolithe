@@ -47,3 +47,21 @@ export function matrixFocusBox(full:VisualBox,target:VisualBox):VisualBox {
   const w=Math.min(full[2],target[2]*6),h=Math.min(full[3],target[3]*4.5);
   return clampVisualBox(full,[target[0]+(target[2]-w)/2,target[1]+(target[3]-h)/2,w,h]);
 }
+
+export type VisualLotAction = 'consultar'|'principal'|'adicional'|'venta'|'ninguna';
+export function visualLotAction(id:number,project:number,lots:readonly LoteResponse[],options:{
+  operation:'Separacion'|'Venta';principal:number;adicionales:readonly number[];
+  editorPrincipal:boolean;editorAdicional:boolean;puedeAgregar:boolean;
+  bloqueado:boolean;reservasBloqueadas:boolean;reservas:readonly number[];
+}):VisualLotAction {
+  if(options.bloqueado||!lots.some(l=>l.idLote===id&&l.idProyecto===project&&l.activo))return 'ninguna';
+  if(options.operation==='Venta'){
+    if(options.reservasBloqueadas)return options.reservas.includes(id)?'consultar':'ninguna';
+    return id===options.principal?'consultar':'venta';
+  }
+  if(id===options.principal||options.adicionales.includes(id))return 'consultar';
+  if(options.editorPrincipal)return 'principal';
+  if(options.editorAdicional)return options.puedeAgregar?'adicional':'ninguna';
+  if(!options.principal)return 'principal';
+  return options.puedeAgregar?'adicional':'ninguna';
+}
