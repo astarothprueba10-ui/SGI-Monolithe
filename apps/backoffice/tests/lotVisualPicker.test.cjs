@@ -100,7 +100,7 @@ test('la interacción compartida conserva permisos, selección por teclado y sep
   const sales=read('pages/Sales.tsx'),panel=read('components/sales/LotVisualPickerPanel.tsx');
   const viewport=read('components/sales/LotVisualViewport.tsx'),svg=read('components/projects/detail/PlanSvgShapes.tsx');
   assert.match(sales,/mostrarVisorOperacion=can\('lots.view'\)/);
-  assert.match(sales,/lotesVisorOperacion=opType==='Venta'\?availableLots:lotesDisponiblesProyecto/);
+  assert.match(sales,/lotesVisorOperacion=opType==='Venta'\?\(asociacionAgrupadaPendiente\?availableLots:lotesVentaProyecto\):lotesDisponiblesProyecto/);
   assert.match(sales,/reservasBloqueadas:tieneReservasVenta\|\|!!asociacionAgrupadaPendiente/);
   assert.match(sales,/onPick=\{seleccionarDesdePlano\}/);
   assert.match(panel,/selectable.has\(lot.idLote\)/);
@@ -146,4 +146,19 @@ test('el visor conserva las figuras durante el zoom y respeta movimiento reducid
   assert.match(sales,/operacion-lotes-visor/);
   assert.match(sales,/lg:overflow-y-auto/);
   assert.match(sales,/Volver a lotes seleccionados/);
+});
+
+test('venta mixta consulta reservas y permite añadir lotes disponibles sin sustituirlas',()=>{
+ const base={operation:'Venta',principal:1,adicionales:[],editorPrincipal:false,editorAdicional:false,
+   puedeAgregar:true,bloqueado:false,reservasBloqueadas:true,reservas:[1],ventaMultiple:true};
+ const action=(id,opts={})=>visualLotAction(id,2,lots,{...base,...opts});
+ assert.equal(action(1),'consultar');
+ assert.equal(action(2),'adicional');
+ assert.equal(action(2,{adicionales:[2]}),'consultar');
+ assert.equal(action(2,{puedeAgregar:false}),'ninguna');
+ assert.equal(action(3),'ninguna');
+ assert.equal(action(4),'ninguna');
+ assert.equal(action(2,{principal:0,reservas:[],reservasBloqueadas:false}),'venta');
+ assert.equal(action(2,{ventaMultiple:false}),'ninguna');
+ assert.equal(action(2,{bloqueado:true}),'ninguna');
 });
