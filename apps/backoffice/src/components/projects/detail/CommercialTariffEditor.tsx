@@ -61,6 +61,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
   }
 
   function quitar(zona: string) {
+    if (!window.confirm(`¿Quitar la tarifa de ${zona} en ${etapaActual?.nombre ?? etapa}? Si existen lotes asociados, la publicación quedará pendiente hasta que se configure otra tarifa vigente.`)) return;
     onChange({ ...datos, tarifas: tarifas.filter(t => !(
       t.codigoEtapa === etapa && t.moneda === moneda && t.codigoZona === zona)) });
     setAviso('Tarifa retirada del borrador. No modifica precios vigentes hasta la publicación.');
