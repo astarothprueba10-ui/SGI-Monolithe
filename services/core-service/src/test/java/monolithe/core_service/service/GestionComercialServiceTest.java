@@ -181,6 +181,63 @@ class GestionComercialServiceTest {
         verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
     }
 
+    private ConfiguracionProyectoResponse catalogoSinLotes(){
+        return new ConfiguracionProyectoResponse(1,datos,List.of(),List.of(),List.of("D","A","B","AB"),List.of("PEN"));
+    }
+    private GestionComercialDto.CambioMatriz matriz(long revision,long base,String alcance,String etapa){
+        return new GestionComercialDto.CambioMatriz(revision,BigDecimal.valueOf(base),Map.of("A",BigDecimal.valueOf(2000),"B",BigDecimal.valueOf(1500)),LocalDate.now(),null,alcance,etapa);
+    }
+    private void iniciarMatrizComun(){
+        var c=catalogoSinLotes();
+        when(configuracion.obtener(proyecto)).thenReturn(c);
+        var t=MatrizRecargosComercial.generar(c,matriz(10L,26000,"GENERAL",null));
+        when(repo.ultimoEstado(proyecto,1)).thenReturn(Optional.of(new PublicacionComercialRepository.EventoEstado(10L,
+            mapper.writeValueAsString(new GestionComercialDto.Estado(List.of("E1"),t)))));
+    }
+    private BigDecimal importe(GestionComercialDto.Respuesta r,String etapa,String zona){
+        return r.estado().tarifas().stream().filter(t->t.codigoEtapa().equals(etapa)&&t.codigoZona().equals(zona)).findFirst().orElseThrow().valor();
+    }
+
+    @Test void matrizPersonalizadaNoCambiaOtrasEtapasYGeneralRespetaExcepciones(){
+        iniciarMatrizComun();
+        var propia=service.guardarMatriz(proyecto,actor,matriz(10L,30000,"ETAPA","E2"));
+        assertEquals(BigDecimal.valueOf(26000),importe(propia,"E1","D"));
+        assertEquals(BigDecimal.valueOf(33500),importe(propia,"E2","AB"));
+        assertEquals(List.of("E2"),propia.estado().tarifario().personalizadas());
+        var general=service.guardarMatriz(proyecto,actor,matriz(11L,28000,"GENERAL",null));
+        assertEquals(BigDecimal.valueOf(28000),importe(general,"E1","D"));
+        assertEquals(BigDecimal.valueOf(33500),importe(general,"E2","AB"));
+        var heredada=service.guardarMatriz(proyecto,actor,matriz(11L,99999,"HEREDAR","E2"));
+        assertEquals(BigDecimal.valueOf(31500),importe(heredada,"E2","AB"));
+        assertTrue(heredada.estado().tarifario().personalizadas().isEmpty());
+        assertEquals(List.of("E1"),heredada.estado().etapasHabilitadas());
+        verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
+    }
+
+    @Test void tarifasHistoricasDistintasNoSeSobrescribenAlCrearGeneral(){
+        var c=catalogoSinLotes();
+        when(configuracion.obtener(proyecto)).thenReturn(c);
+        var tarifas=new ArrayList<>(MatrizRecargosComercial.generar(c,matriz(10L,26000,"GENERAL",null),List.of("E1")));
+        tarifas.addAll(MatrizRecargosComercial.generar(c,matriz(10L,30000,"GENERAL",null),List.of("E2")));
+        when(repo.ultimoEstado(proyecto,1)).thenReturn(Optional.of(new PublicacionComercialRepository.EventoEstado(10L,
+            mapper.writeValueAsString(new GestionComercialDto.Estado(List.of("E1"),tarifas)))));
+        var r=service.guardarMatriz(proyecto,actor,matriz(10L,29000,"GENERAL",null));
+        assertEquals(List.of("E1","E2"),r.estado().tarifario().personalizadas());
+        assertEquals(BigDecimal.valueOf(26000),importe(r,"E1","D"));
+        assertEquals(BigDecimal.valueOf(30000),importe(r,"E2","D"));
+    }
+
+    @Test void nuevaEtapaHeredaMatrizSinAbrirse(){
+        iniciarMatrizComun();
+        var nuevas=new ArrayList<>(datos.etapas());
+        nuevas.add(new Etapa("E3","Nueva",Disponibilidad.REGULAR,TipoDescuento.NINGUNO,BigDecimal.ZERO));
+        var r=service.guardarEtapas(proyecto,actor,new GestionComercialDto.CambioEtapas(10L,nuevas));
+        assertEquals(BigDecimal.valueOf(29500),importe(r,"E3","AB"));
+        assertEquals(List.of("E1"),r.estado().etapasHabilitadas());
+        assertFalse(r.estado().tarifario().personalizadas().contains("E3"));
+        verify(repo,never()).registrarPrecio(any(),anyInt());
+    }
+
     @Test void tarifaAnteriorNoConvierteSeleccionInferidaEnConfirmada() {
         when(repo.seleccionRegistrada(proyecto,1)).thenReturn(false);
         assertTrue(service.gestion(proyecto).inferida());

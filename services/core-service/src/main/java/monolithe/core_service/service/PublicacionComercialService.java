@@ -374,7 +374,7 @@ public class PublicacionComercialService {
             general=new MatrizBase(request.precioBase(),Map.copyOf(request.recargos()),request.vigenteDesde(),request.vigenteHasta());
             destino=codigos.stream().filter(e->!propias.contains(e)).toList();
         }else if("ETAPA".equals(alcance)||"HEREDAR".equals(alcance)){
-            if(!codigos.contains(request.codigoEtapa()))throw new ReglaNegocioException("Selecciona una etapa comercial válida del proyecto.");
+            if(request.codigoEtapa()==null||!codigos.contains(request.codigoEtapa()))throw new ReglaNegocioException("Selecciona una etapa comercial válida del proyecto.");
             destino=List.of(request.codigoEtapa());
             if("HEREDAR".equals(alcance)){
                 if(general==null)throw new ReglaNegocioException("Configura primero el tarifario general.");

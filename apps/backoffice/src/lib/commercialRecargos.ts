@@ -30,7 +30,7 @@ export function adicionalGeneral(m:MatrizBase|null|undefined,zona:string):string
  if(!m)return 'Sin matriz general';
  const hoy=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  if(m.vigenteDesde>hoy||m.vigenteHasta&&m.vigenteHasta<hoy)return 'Sin tarifa vigente';
- if(zona!=='D'&&(!/^[A-CE-Z]+$/.test(zona)||new Set(zona).size!==zona.length||[...zona].some(k=>!Object.hasOwn(m.recargos,k))))return 'Sin tarifa vigente';
+ if(zona!=='D'&&(!/^[A-CE-Z]+$/.test(zona)||new Set(zona).size!==zona.length||[...zona].some(k=>!Object.prototype.hasOwnProperty.call(m.recargos,k))))return 'Sin tarifa vigente';
  return solesRecargo(Math.round((totalZona(zona,m.precioBase,m.recargos)-m.precioBase)*100)/100);
 }
 export function origenTarifario(general:MatrizBase|null|undefined,personalizadas:readonly string[],etapa:string):string {

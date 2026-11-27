@@ -215,3 +215,21 @@ test('matriz de ubicación admite E y AE y rechaza componentes ausentes',()=>{
  assert.match(archivo('components/projects/detail/ProjectZonesTab.tsx'),/Tarifa adicional por lote/);
  assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/guardarMatriz/);
 });
+
+test('zonas consulta recargos por etapa y oculta importes de zonas inactivas',()=>{
+ const {adicionalPorZona,adicionalGeneral,origenTarifario,solesRecargo}=require('../src/lib/commercialRecargos.ts');
+ const ts=[{codigoEtapa:'E1',codigoZona:'D',valor:26000},{codigoEtapa:'E1',codigoZona:'A',valor:28000},{codigoEtapa:'E2',codigoZona:'D',valor:30000},{codigoEtapa:'E2',codigoZona:'A',valor:34000}].map(t=>({...t,moneda:'PEN',tipoTarifa:'MONTO_FIJO',vigenteDesde:'2020-01-01',vigenteHasta:null}));
+ assert.equal(adicionalPorZona(ts,'A','E1'),solesRecargo(2000));
+ assert.equal(adicionalPorZona(ts,'A','E2'),solesRecargo(4000));
+ const g={precioBase:26000,recargos:{A:2000,B:1500},vigenteDesde:'2020-01-01',vigenteHasta:null};
+ assert.equal(adicionalGeneral(g,'AB'),solesRecargo(3500));
+ assert.equal(origenTarifario(g,['E2'],'E2'),'Personalizado');
+ assert.equal(origenTarifario(g,['E2'],'E1'),'Heredado del general');
+ const zonas=archivo('components/projects/detail/ProjectZonesTab.tsx');
+ assert.match(zonas,/Consultar tarifario/);
+ assert.match(zonas,/!zn.activo\?'No aplica'/);
+ assert.match(zonas,/adicionalPorZona\(tarifas,zn.codigo,contexto\)/);
+ const matriz=archivo('components/projects/detail/CommercialMatrixRecargos.tsx');
+ assert.match(matriz,/Restablecer matriz general/);
+ assert.match(matriz,/!propias.includes\(e.codigo\)/);
+});
