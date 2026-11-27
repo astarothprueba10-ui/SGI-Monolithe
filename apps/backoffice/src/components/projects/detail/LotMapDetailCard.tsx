@@ -1,5 +1,5 @@
 import { BadgeCheckIcon, CalendarCheckIcon, CircleDollarSignIcon, HashIcon, LayersIcon,
-  MapPinIcon, MapIcon, RulerIcon, TagIcon, TicketIcon, Building2Icon, ShieldCheckIcon } from 'lucide-react';
+  MapPinIcon, MapIcon, RulerIcon, TicketIcon, Building2Icon, ShieldCheckIcon } from 'lucide-react';
 import type { LoteResponse } from '../../../types/core';
 import type { LucideIcon } from 'lucide-react';
 import { area } from '../../../utils/format';
@@ -33,15 +33,15 @@ export function LotMapDetailCard({ lote, precio, puedeOperar, onSeparar, onVende
       <dl>
         <Linea icono={HashIcon} nombre="Código" valor={lote.codigo}/>
         <Linea icono={TicketIcon} nombre="Número" valor={lote.numero||'—'}/>
-        <Linea icono={LayersIcon} nombre="Etapa" valor={lote.nombreEtapa??lote.codigoEtapa??'—'}/>
+        <Linea icono={LayersIcon} nombre="Etapa comercial" valor={lote.nombreEtapa??lote.codigoEtapa??'—'}/>
         <Linea icono={Building2Icon} nombre="Manzana" valor={lote.nombreManzana??lote.codigoManzana??'—'}/>
         <Linea icono={MapPinIcon} nombre="Zona" valor={lote.nombreZona??lote.codigoZona??'—'}/>
-        <Linea icono={TagIcon} nombre="Tipo" valor={lote.nombreTipoLote??lote.codigoTipoLote??'—'}/>
         <Linea icono={RulerIcon} nombre="Área" valor={lote.areaM2!=null?area(lote.areaM2):'—'}/>
         <Linea icono={CircleDollarSignIcon} nombre="Precio oficial" valor={precio!=null?dinero.format(precio):'Sin precio'}/>
         <Linea icono={BadgeCheckIcon} nombre="Inventario" valor={<span className={`rounded-full px-2.5 py-1 text-xs ${lote.codigoEstadoLote==='DISPONIBLE'
           ? 'bg-emerald-100 text-emerald-800' : lote.codigoEstadoLote==='VENDIDO'
-          ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
+          ? 'bg-red-100 text-red-800' : lote.codigoEstadoLote==='NO_DISPONIBLE'
+          ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-900'}`}>
           {lote.nombreEstadoLote??lote.codigoEstadoLote??'Sin estado'}</span>}/>
         <Linea icono={ShieldCheckIcon} nombre="Activo" valor={lote.activo?'Sí':'No'}/>
       </dl>
