@@ -29,8 +29,11 @@ public class ImportacionProyectoController {
     @PostMapping("/confirmar")
     public ImportacionProyectoResponse confirmar(@PathVariable Long idProyecto,
             @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ImportacionProyectoRequest request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        long inicio=System.nanoTime();
         mfa.exigir(jwt,idProyecto,"IMPORTACION",request,approval);
-        return service.confirmar(idProyecto, request, actor(jwt));
+        long autorizado=System.nanoTime();
+        try{return service.confirmar(idProyecto, request, actor(jwt));}
+        finally{org.slf4j.LoggerFactory.getLogger(getClass()).info("Importacion proyecto={} autorizacionMs={} transaccionMs={} totalHttpServicioMs={}",idProyecto,(autorizado-inicio)/1_000_000,(System.nanoTime()-autorizado)/1_000_000,(System.nanoTime()-inicio)/1_000_000);}
     }
 
     private Long actor(Jwt jwt) {
