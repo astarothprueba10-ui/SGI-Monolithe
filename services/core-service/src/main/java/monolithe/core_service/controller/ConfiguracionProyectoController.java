@@ -26,6 +26,7 @@ public class ConfiguracionProyectoController {
     private final ConfiguracionProyectoService service;
     private final SimulacionComercialService simulacion;
     private final PublicacionComercialService publicacion;
+    private final monolithe.core_service.service.CommercialMfaClient mfa;
 
     @GetMapping
     public ConfiguracionProyectoResponse obtener(@PathVariable Long idProyecto) {
@@ -60,7 +61,8 @@ public class ConfiguracionProyectoController {
     @PostMapping("/publicacion")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
     public PublicacionComercialResponse publicar(@PathVariable Long idProyecto,
-            @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request) {
+            @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PublicacionComercialRequest request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"PUBLICACION",request,approval);
         return publicacion.publicar(idProyecto,obtenerActor(jwt),request);
     }
 
@@ -72,31 +74,36 @@ public class ConfiguracionProyectoController {
 
     @PutMapping("/gestion/disponibilidad")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta disponibilidad(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Disponibilidad request) {
+    public Respuesta disponibilidad(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody Disponibilidad request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"DISPONIBILIDAD",request,approval);
         return publicacion.guardarDisponibilidad(idProyecto,obtenerActor(jwt),request);
     }
 
     @PutMapping("/gestion/asignacion")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta asignacion(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioAsignacion request) {
+    public Respuesta asignacion(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioAsignacion request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"ASIGNACION",request,approval);
         return publicacion.guardarAsignacion(idProyecto,obtenerActor(jwt),request);
     }
 
     @PutMapping("/gestion/etapas")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta etapas(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioEtapas request) {
+    public Respuesta etapas(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioEtapas request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"ETAPAS",request,approval);
         return publicacion.guardarEtapas(idProyecto,obtenerActor(jwt),request);
     }
 
     @PutMapping("/gestion/matriz")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta matriz(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioMatriz request) {
+    public Respuesta matriz(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioMatriz request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"MATRIZ",request,approval);
         return publicacion.guardarMatriz(idProyecto,obtenerActor(jwt),request);
     }
 
     @PutMapping("/gestion/tarifa")
     @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
-    public Respuesta tarifa(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioTarifa request) {
+    public Respuesta tarifa(@PathVariable Long idProyecto,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CambioTarifa request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"TARIFA",request,approval);
         return publicacion.guardarTarifa(idProyecto,obtenerActor(jwt),request);
     }
 

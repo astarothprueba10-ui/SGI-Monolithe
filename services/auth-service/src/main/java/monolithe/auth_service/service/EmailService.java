@@ -92,6 +92,17 @@ public class EmailService {
   }
 
   /** Desafío separado de la contraseña; solo a correo corporativo ya verificado. */
+  public void enviarCodigoMfaComercial(String destinatario,String codigo,String accion,long proyecto) {
+    try {
+      MimeMessage mensaje=mailSender.createMimeMessage();
+      MimeMessageHelper helper=new MimeMessageHelper(mensaje,false,"UTF-8");
+      helper.setFrom(remitente);helper.setTo(destinatario);
+      helper.setSubject("Confirmación de seguridad comercial - MONOLITHE");
+      helper.setText("Código de confirmación: "+codigo+". Operación: "+accion+"; proyecto #"+proyecto+". Válido por 5 minutos. No compartas este código. Si no solicitaste la operación, contacta a Seguridad.",false);
+      mailSender.send(mensaje);
+    }catch(MessagingException e){throw new MailException("No se pudo preparar el correo comercial.",e){};}
+  }
+
   public void enviarCodigoMfaFinanciero(String destinatario, String codigo) {
     try {
       MimeMessage mensaje = mailSender.createMimeMessage();

@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.view') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
 public class ImportacionProyectoController {
     private final ImportacionProyectoService service;
+    private final monolithe.core_service.service.CommercialMfaClient mfa;
 
     @PostMapping("/validar")
     public ImportacionProyectoResponse validar(@PathVariable Long idProyecto,
@@ -27,7 +28,8 @@ public class ImportacionProyectoController {
 
     @PostMapping("/confirmar")
     public ImportacionProyectoResponse confirmar(@PathVariable Long idProyecto,
-            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ImportacionProyectoRequest request) {
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ImportacionProyectoRequest request,@RequestHeader(value="X-Commercial-Approval",required=false) String approval) {
+        mfa.exigir(jwt,idProyecto,"IMPORTACION",request,approval);
         return service.confirmar(idProyecto, request, actor(jwt));
     }
 
