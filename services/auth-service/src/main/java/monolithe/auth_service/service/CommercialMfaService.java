@@ -23,7 +23,7 @@ public class CommercialMfaService {
     public CommercialMfaService(JdbcTemplate db,PasswordEncoder passwords,EmailService correo){
         this.db=db;this.passwords=passwords;this.correo=correo;
     }
-    private ResponseStatusException fallo(HttpStatus status,String mensaje){return new ResponseStatusException(status,mensaje);}
+    private ResponseStatusException fallo(HttpStatus status,String mensaje){return new monolithe.auth_service.exception.MfaFlowException(status,mensaje);}
     private long actor(Jwt jwt){
         if(jwt==null||jwt.getId()==null||jwt.getId().length()>128||!(jwt.getClaim("session_version") instanceof Number version)||Boolean.TRUE.equals(jwt.getClaim("password_change_required")))
             throw fallo(HttpStatus.FORBIDDEN,"Sesión no válida para la confirmación comercial.");

@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
@@ -23,7 +22,7 @@ public class CommercialMfaInternalController {
     public CommercialMfaInternalController(CommercialMfaService service,@Value("${security.internal.mail-key:}") String key){this.service=service;this.key=key;}
     private void autorizar(String provided){
         if(key.isBlank()||provided==null||!MessageDigest.isEqual(key.getBytes(StandardCharsets.UTF_8),provided.getBytes(StandardCharsets.UTF_8)))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Servicio interno no autorizado.");
+            throw new monolithe.auth_service.exception.MfaFlowException(HttpStatus.FORBIDDEN,"Servicio interno no autorizado.");
     }
     public record Inicio(@Positive long proyecto,@NotBlank String accion,@Pattern(regexp="[a-f0-9]{64}") @NotNull String huella){}
     public record Verificar(@NotNull UUID challengeId,@NotBlank @Size(max=6) String codigo){}

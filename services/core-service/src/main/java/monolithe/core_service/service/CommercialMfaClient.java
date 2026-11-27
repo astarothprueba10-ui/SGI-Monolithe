@@ -1,8 +1,7 @@
 package monolithe.core_service.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 import monolithe.core_service.dto.*;
 import monolithe.core_service.dto.GestionComercialDto.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,12 +16,12 @@ import java.util.*;
 @Service
 public class CommercialMfaClient {
     private final RestClient http;
-    private final ObjectMapper mapper;
+    private final JsonMapper mapper;
     private final String key;
-    public CommercialMfaClient(ObjectMapper mapper,@Value("${services.auth.url:http://localhost:8081}") String url,@Value("${security.internal.mail-key:}") String key){
-        this.mapper=mapper.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);this.http=RestClient.builder().baseUrl(url).build();this.key=key;
+    public CommercialMfaClient(JsonMapper mapper,@Value("${services.auth.url:http://localhost:8081}") String url,@Value("${security.internal.mail-key:}") String key){
+        this.mapper=mapper.rebuild().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();this.http=RestClient.builder().baseUrl(url).build();this.key=key;
     }
-    public Object normalizar(String accion,com.fasterxml.jackson.databind.JsonNode datos){
+    public Object normalizar(String accion,tools.jackson.databind.JsonNode datos){
         Class<?> tipo=switch(accion){
             case "MATRIZ" -> CambioMatriz.class;
             case "TARIFA" -> CambioTarifa.class;
@@ -37,8 +36,8 @@ public class CommercialMfaClient {
     }
     String huella(Object datos){
         try{
-            Object canon=mapper.convertValue(datos,Object.class);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(canon)));
+            if(datos==null)throw new IllegalArgumentException("Datos ausentes");
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsBytes(datos)));
         }catch(Exception e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No se pudo preparar la confirmación.");}
     }
     private RestClient.ResponseSpec enviar(Jwt jwt,String ruta,Object body){
