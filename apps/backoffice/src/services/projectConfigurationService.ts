@@ -1,5 +1,5 @@
 import { coreApi } from '../lib/apiClient';
-import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse } from '../types/projectConfiguration';
+import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial } from '../types/projectConfiguration';
 
 function ruta(idProyecto: number) {
   return `/proyectos/${idProyecto}/configuracion-comercial`;
@@ -13,13 +13,25 @@ export const projectConfigurationService = {
     return coreApi.get<SimulacionComercialResponse>(`${ruta(idProyecto)}/simulacion?idLote=${idLote}&version=${version}&moneda=${encodeURIComponent(moneda)}`);
   },
   versionPublicada(idProyecto: number) {
-    return coreApi.get<{ version: number; lotesRegistrados: number }>(`${ruta(idProyecto)}/publicacion`);
+    return coreApi.get<{ version: number; lotesRegistrados: number; importacionRealizada: number }>(`${ruta(idProyecto)}/publicacion`);
   },
   revisarPublicacion(idProyecto: number, version: number, etapasHabilitar: string[]) {
     return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion/validar`, { version, etapasHabilitar });
   },
   publicar(idProyecto: number, version: number, etapasHabilitar: string[], huella: string) {
     return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion`, { version, etapasHabilitar, huella });
+  },
+  gestion(idProyecto: number) {
+    return coreApi.get<GestionComercialResponse>(`${ruta(idProyecto)}/gestion`);
+  },
+  historial(idProyecto: number) {
+    return coreApi.get<EventoComercial[]>(`${ruta(idProyecto)}/gestion/historial`);
+  },
+  guardarDisponibilidad(idProyecto: number, revision: number, etapasHabilitadas: string[]) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/disponibilidad`, { revision, etapasHabilitadas });
+  },
+  guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/tarifa`, { revision, tarifa });
   },
   guardar(idProyecto: number, version: number, datos: ConfiguracionComercial) {
     return coreApi.put<ConfiguracionProyectoResponse>(ruta(idProyecto), { version, datos });

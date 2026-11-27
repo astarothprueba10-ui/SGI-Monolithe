@@ -27,21 +27,21 @@ export function ProjectConfigurationTab({ project }: { project: ProyectoResponse
   const [seleccion, setSeleccion] = useState<string[] | null>(null);
   const [aviso, setAviso] = useState('');
   const [incidencias, setIncidencias] = useState<ReturnType<typeof agruparIncidencias>>([]);
-  const { datos, respuesta, publicada, lotesRegistrados, error, guardando } = model;
+  const { datos, respuesta, publicada, lotesRegistrados, importacionRealizada, error, guardando } = model;
 
   if (!datos || !respuesta || publicada === null || lotesRegistrados === null) return <Card className="p-5">
     <p className="text-sm text-brand-700">{error || 'Cargando configuración comercial…'}</p>
     {error && <Button onClick={model.recargar}>Reintentar</Button>}
   </Card>;
 
-  if (publicada > 0) return <CommercialManagementPanel config={respuesta} version={publicada}/>;
+  if (publicada > 0) return <CommercialManagementPanel config={respuesta} version={publicada} project={project}/>;
 
   const config = { ...respuesta, datos };
   const hayCambios = JSON.stringify(datos) !== JSON.stringify(respuesta.datos);
   const ocupado = guardando || procesando || importando || finalizando;
   const editable = project.activo && can('lots.edit');
   const bloqueado = ocupado || !editable;
-  const importacionPermitida = lotesRegistrados < 10 && !importadoSesion;
+  const importacionPermitida = lotesRegistrados < 10 && !importadoSesion && importacionRealizada === 0;
   const etapasHabilitar = filtrarSeleccion(seleccion ?? seleccionInicial(config), config);
 
   function importado() {

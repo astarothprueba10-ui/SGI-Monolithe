@@ -98,7 +98,7 @@ test('el alta comercial separa precio de liberación y conserva bloqueos histór
 
 test('la carga masiva se bloquea desde diez lotes registrados', () => {
  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
- assert.match(ui,/lotesRegistrados < 10 && !importadoSesion/);
+ assert.match(ui,/lotesRegistrados < 10 && !importadoSesion && importacionRealizada === 0/);
 });
 
 test('mantiene la configuración inicial cerrada y permite consultar matriz publicada', () => {
@@ -106,7 +106,7 @@ test('mantiene la configuración inicial cerrada y permite consultar matriz publ
  const matriz = archivo('components/projects/detail/CommercialTariffEditor.tsx');
  const pub = archivo('components/projects/detail/CommercialPublicationPanel.tsx');
  assert.match(ui,/publicada > 0\) return <CommercialManagementPanel/);
- assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/<CommercialTariffEditor[^>]*readOnly/);
+ assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/guardarTarifa/);
  assert.match(matriz,/if \(readOnly\) return/);
  assert.match(pub,/Ver detalle por lote \(opcional\)/);
  assert.match(pub,/Revisar matriz de tarifas/);
@@ -131,4 +131,16 @@ test('los pasos detectan lotes sin asignación y agrupan incidencias sin duplica
   assert.equal(validarPasoInicial(2,config),null);
   assert.deepEqual(filtrarSeleccion(['E1','E1','NO'],config),['E1']);
   assert.deepEqual(agruparIncidencias([{situacion:'ERROR',mensaje:'Falta tarifa',codigo:'L1'},{situacion:'ERROR',mensaje:'Falta tarifa',codigo:'L2'},{situacion:'PROTEGIDA',mensaje:'Venta',codigo:'L3'}]),[{mensaje:'Falta tarifa',lotes:['L1','L2']}]);
+});
+
+test('gestión permanente usa operaciones independientes y muestra checks persistidos e historial', () => {
+  const gestion=archivo('components/projects/detail/CommercialManagementPanel.tsx');
+  const api=archivo('services/projectConfigurationService.ts');
+  assert.match(gestion,/setSeleccion\(g.estado.etapasHabilitadas\)/);
+  assert.match(gestion,/projectConfigurationService.guardarDisponibilidad\(id,actual.revision,seleccion\)/);
+  assert.match(gestion,/projectConfigurationService.guardarTarifa\(id,actual.revision,t\)/);
+  assert.match(gestion,/projectConfigurationService.historial\(id\)/);
+  assert.match(api,/gestion\/disponibilidad/);
+  assert.match(api,/gestion\/tarifa/);
+  assert.doesNotMatch(gestion,/projectConfigurationService.publicar\(/);
 });

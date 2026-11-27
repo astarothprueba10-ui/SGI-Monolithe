@@ -81,3 +81,13 @@ export interface PublicacionComercialResponse {
   publicado: boolean;
   lotes: PublicacionComercialFila[];
 }
+
+export interface GestionComercialResponse {
+  version: number;
+  revision: number;
+  inferida: boolean;
+  estado: { etapasHabilitadas: string[]; tarifas: TarifaComercial[] };
+}
+export interface EventoComercial {
+  id: number; tipo: string; actor: number; fecha: string; anterior: string; nuevo: string;
+}
