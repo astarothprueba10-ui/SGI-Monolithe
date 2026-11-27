@@ -31,6 +31,11 @@ public interface LoteRepository extends
         """,nativeQuery=true)
     List<Long> listarComercializables(@org.springframework.data.repository.query.Param("proyecto") Long proyecto);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+        "manzana", "manzana.etapa", "manzana.etapa.proyecto", "zona", "tipoLote", "estadoLote"
+    })
+    List<Lote> findByIdProyectoAndActivoTrueOrderByCodigoAsc(Long idProyecto);
+
     boolean existsByCodigo(String codigo);
 
     boolean existsByCodigoAndIdLoteNot(
