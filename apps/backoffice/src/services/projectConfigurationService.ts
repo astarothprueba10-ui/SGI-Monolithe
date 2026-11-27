@@ -1,3 +1,4 @@
+import { commercialMutation } from './commercialMfaService';
 import { coreApi } from '../lib/apiClient';
 import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial, ReglaEtapaComercial, AlcanceMatriz } from '../types/projectConfiguration';
 
@@ -19,7 +20,7 @@ export const projectConfigurationService = {
     return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion/validar`, { version, etapasHabilitar });
   },
   publicar(idProyecto: number, version: number, etapasHabilitar: string[], huella: string) {
-    return coreApi.post<PublicacionComercialResponse>(`${ruta(idProyecto)}/publicacion`, { version, etapasHabilitar, huella });
+    return commercialMutation<PublicacionComercialResponse>(idProyecto,'PUBLICACION',`${ruta(idProyecto)}/publicacion`,'POST', { version, etapasHabilitar, huella });
   },
   gestion(idProyecto: number) {
     return coreApi.get<GestionComercialResponse>(`${ruta(idProyecto)}/gestion`);
@@ -28,19 +29,19 @@ export const projectConfigurationService = {
     return coreApi.get<EventoComercial[]>(`${ruta(idProyecto)}/gestion/historial`);
   },
   guardarDisponibilidad(idProyecto: number, revision: number, etapasHabilitadas: string[]) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/disponibilidad`, { revision, etapasHabilitadas });
+    return commercialMutation<GestionComercialResponse>(idProyecto,'DISPONIBILIDAD',`${ruta(idProyecto)}/gestion/disponibilidad`,'PUT', { revision, etapasHabilitadas });
   },
   guardarAsignacion(idProyecto: number, revision: number, tipo: 'manzanas'|'lotes', id: number, codigoEtapa: string) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/asignacion`, { revision, tipo, id, codigoEtapa });
+    return commercialMutation<GestionComercialResponse>(idProyecto,'ASIGNACION',`${ruta(idProyecto)}/gestion/asignacion`,'PUT', { revision, tipo, id, codigoEtapa });
   },
   guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/etapas`, { revision, etapas });
+    return commercialMutation<GestionComercialResponse>(idProyecto,'ETAPAS',`${ruta(idProyecto)}/gestion/etapas`,'PUT', { revision, etapas });
   },
   guardarMatriz(idProyecto:number, revision:number, precioBase:number, recargos:Record<string,number>, vigenteDesde:string, vigenteHasta:string|null, alcance:AlcanceMatriz='GENERAL', codigoEtapa:string|null=null) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/matriz`, {revision,precioBase,recargos,vigenteDesde,vigenteHasta,alcance,codigoEtapa});
+    return commercialMutation<GestionComercialResponse>(idProyecto,'MATRIZ',`${ruta(idProyecto)}/gestion/matriz`,'PUT', {revision,precioBase,recargos,vigenteDesde,vigenteHasta,alcance,codigoEtapa});
   },
   guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/tarifa`, { revision, tarifa });
+    return commercialMutation<GestionComercialResponse>(idProyecto,'TARIFA',`${ruta(idProyecto)}/gestion/tarifa`,'PUT', { revision, tarifa });
   },
   guardar(idProyecto: number, version: number, datos: ConfiguracionComercial) {
     return coreApi.put<ConfiguracionProyectoResponse>(ruta(idProyecto), { version, datos });

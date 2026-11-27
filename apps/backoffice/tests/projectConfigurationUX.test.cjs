@@ -212,7 +212,7 @@ test('matriz de ubicación admite E y AE y rechaza componentes ausentes',()=>{
  assert.equal(totalZona('AE',26000,{A:3000,E:2000}),31000);
  assert.equal(totalZona('ABC',26000,{A:3000,B:1000,C:2000}),32000);
  assert.equal(totalZona('D',26000,{}),26000);
- assert.match(archivo('components/projects/detail/ProjectZonesTab.tsx'),/Tarifa adicional por lote/);
+ assert.match(archivo('components/projects/detail/ProjectZonesTab.tsx'),/Tarifa adicional<\/TH>/);
  assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/guardarMatriz/);
 });
 
@@ -232,4 +232,24 @@ test('zonas consulta recargos por etapa y oculta importes de zonas inactivas',()
  const matriz=archivo('components/projects/detail/CommercialMatrixRecargos.tsx');
  assert.match(matriz,/Restablecer matriz general/);
  assert.match(matriz,/!propias.includes\(e.codigo\)/);
+});
+
+test('zonas usa filtro desplegable de estado y centra lotes asignados',()=>{
+ const ui=archivo('components/projects/detail/ProjectZonesTab.tsx');
+ assert.match(ui,/Dropdown/);
+ assert.match(ui,/Todos.*Activos.*Inactivos/);
+ assert.doesNotMatch(ui,/Solo activas/);
+ assert.match(ui,/TH align="center"[^>]*>Lotes asignados/);
+ assert.match(ui,/TD align="center">\{uso/);
+ assert.match(ui,/Tarifas de solo lectura antes del descuento, los importes se administran en Configuración comercial/);
+});
+test('operaciones sensibles pasan por confirmacion comercial y la previsualizacion no',()=>{
+ const s=archivo('services/projectConfigurationService.ts');
+ for(const accion of ['MATRIZ','TARIFA','DISPONIBILIDAD','PUBLICACION','ETAPAS','ASIGNACION'])assert.ok(s.includes("'"+accion+"'"));
+ assert.match(s,/coreApi.post<PublicacionComercialResponse>.*publicacion\/validar/);
+ assert.match(archivo('services/projectImportService.ts'),/commercialMutation<RespuestaImportacion>\(id,'IMPORTACION'/);
+ const m=archivo('services/commercialMfaService.ts');
+ assert.match(m,/X-Commercial-Approval/);
+ assert.doesNotMatch(m,/localStorage|sessionStorage/);
+ assert.match(archivo('components/projects/CommercialMfaModal.tsx'),/commercialMfaService.verificar/);
 });
