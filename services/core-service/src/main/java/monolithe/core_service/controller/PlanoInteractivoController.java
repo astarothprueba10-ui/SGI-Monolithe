@@ -66,6 +66,12 @@ public class PlanoInteractivoController {
                                                 idEtapa));
         }
 
+        @GetMapping("/proyecto/{idProyecto}/matriz")
+        @PreAuthorize("hasAuthority('lots.view')")
+        public ResponseEntity<PlanoInteractivoDetalleResponse> obtenerMatrizOpcional(@PathVariable @Positive Long idProyecto) {
+                return ResponseEntity.ok(planoInteractivoService.obtenerMatrizOpcional(idProyecto));
+        }
+
         @PutMapping("/geometrias")
         @PreAuthorize("hasAuthority('lots.configure')")
         public ResponseEntity<LoteGeometriaResponse> guardarGeometria(
