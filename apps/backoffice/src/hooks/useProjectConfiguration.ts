@@ -4,7 +4,8 @@ import { projectConfigurationService } from '../services/projectConfigurationSer
 import { validarConfiguracion } from '../lib/projectConfiguration';
 import type { ConfiguracionComercial, ConfiguracionProyectoResponse } from '../types/projectConfiguration';
 
-export function useProjectConfiguration(idProyecto: number) {
+export function useProjectConfiguration(idProyecto: number, soloDetalle = false) {
+  const [revision,setRevision]=useState<number|null>(null);
   const [respuesta, setRespuesta] = useState<ConfiguracionProyectoResponse | null>(null);
   const [lotesRegistrados, setLotesRegistrados] = useState<number | null>(null);
   const [importacionRealizada, setImportacionRealizada] = useState<number | null>(null);
@@ -17,13 +18,20 @@ export function useProjectConfiguration(idProyecto: number) {
   useEffect(() => {
     let vigente = true;
     setRespuesta(null); setDatos(null); setPublicada(null); setLotesRegistrados(null); setImportacionRealizada(null); setError('');
+    setRevision(null);
+    if(soloDetalle){
+      projectConfigurationService.detalle(idProyecto).then(d=>{
+        if(vigente){setRespuesta(d.configuracion);setDatos(d.configuracion.datos);setPublicada(d.versionPublicada);setRevision(d.gestion?.revision??null);}
+      }).catch((e:unknown)=>{if(vigente)setError(e instanceof Error?e.message:'No se pudo cargar la configuración.');});
+      return ()=>{vigente=false;};
+    }
     Promise.all([projectConfigurationService.obtener(idProyecto), projectConfigurationService.versionPublicada(idProyecto)]).then(([r, p]) => {
       if (vigente) { setRespuesta(r); setDatos(r.datos); setPublicada(p.version); setLotesRegistrados(p.lotesRegistrados); setImportacionRealizada(p.importacionRealizada ?? null); }
     }).catch((e: unknown) => {
       if (vigente) setError(e instanceof Error ? e.message : 'No se pudo cargar la configuración.');
     });
     return () => { vigente = false; };
-  }, [idProyecto, intento]);
+  }, [idProyecto, intento, soloDetalle]);
 
   async function guardarYObtener(nuevosDatos: ConfiguracionComercial | null = datos, propagarError = false): Promise<ConfiguracionProyectoResponse | null> {
     if (!datos || !respuesta || guardando || publicada !== 0 || !nuevosDatos) return null;
@@ -47,5 +55,5 @@ export function useProjectConfiguration(idProyecto: number) {
     return (await guardarYObtener(nuevosDatos, propagarError)) !== null;
   }
 
-  return { respuesta, publicada, lotesRegistrados, importacionRealizada, datos, setDatos, error, guardando, guardar, guardarYObtener, recargar: () => setIntento(n => n + 1) };
+  return { revision, respuesta, publicada, lotesRegistrados, importacionRealizada, datos, setDatos, error, guardando, guardar, guardarYObtener, recargar: () => setIntento(n => n + 1) };
 }
