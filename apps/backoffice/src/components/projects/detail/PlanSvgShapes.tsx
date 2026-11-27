@@ -40,9 +40,10 @@ function Figura({ figura }: { figura: SvgFigura }) {
 }
 
 export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, seleccionado, alSeleccionar, alElegirFigura,
-  miniatura=false, vista, alMoverVista, figuraActiva=null }: {
+  miniatura=false, vista, alMoverVista, figuraActiva=null, lotesSeleccionables }: {
   documento: PlanoSvgDocumento; lotes: readonly LoteResponse[]; seleccionado: number | null;
   alSeleccionar?: (id: number) => void; alElegirFigura?: (index: number) => void; miniatura?: boolean;
+  lotesSeleccionables?: ReadonlySet<number>;
   vista?: number[]; alMoverVista?: (v:number[])=>void; figuraActiva?: number|null;
 }) {
   const referencias = useMemo(()=>new Map(lotes.map(l => [l.codigo,l])),[lotes]);
@@ -85,7 +86,9 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
       const superficie=figuraVinculable(figura,documento.viewBox);
       const activo=!!lote&&lote.idLote===seleccionado;
       const editing=!!alElegirFigura;
-      const interactivo=!miniatura && superficie && (editing||!!lote);
+      const interactivo=superficie && (miniatura
+        ? !!alSeleccionar && !!lote && !!lotesSeleccionables?.has(lote.idLote)
+        : editing||!!lote);
       const colors=mapLotColors(lote?.codigoEstadoLote,activo);
       const elegido=figuraActiva===index;
       const seleccionar=()=>{if(editing)alElegirFigura?.(index);if(lote)alSeleccionar?.(lote.idLote);};
