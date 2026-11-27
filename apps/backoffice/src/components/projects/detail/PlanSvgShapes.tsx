@@ -82,7 +82,7 @@ export const PlanSvgShapes = memo(function PlanSvgShapes({ documento, lotes, sel
       width={documento.viewBox[2]} height={documento.viewBox[3]} fill="#f8fafc"/>
     {documento.elementos.map((figura,index)=>{
       const lote=figura.codigoLote ? referencias.get(figura.codigoLote) : undefined;
-      const superficie=figuraVinculable(figura);
+      const superficie=figuraVinculable(figura,documento.viewBox);
       const activo=!!lote&&lote.idLote===seleccionado;
       const editing=!!alElegirFigura;
       const interactivo=!miniatura && superficie && (editing||!!lote);
