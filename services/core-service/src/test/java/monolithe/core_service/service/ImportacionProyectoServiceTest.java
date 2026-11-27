@@ -66,6 +66,32 @@ class ImportacionProyectoServiceTest {
         verifyNoInteractions(etapas, zonas, manzanas, lotes);
     }
 
+    private Fila loteCocos(int fila, String manzana, String numero) {
+        return new Fila("Lotes", fila, Map.ofEntries(
+            Map.entry("codigo_etapa_fisica","ET-01"), Map.entry("codigo_manzana",manzana),
+            Map.entry("codigo",manzana+"-L"+numero), Map.entry("numero",numero),
+            Map.entry("codigo_zona","Z-A"), Map.entry("codigo_tipo_lote","REGULAR"),
+            Map.entry("area_m2","450"), Map.entry("frente_m",""), Map.entry("fondo_m",""),
+            Map.entry("lateral_derecho_m",""), Map.entry("lateral_izquierdo_m",""), Map.entry("observaciones","")));
+    }
+
+    @Test
+    void losCocosDetectaNumeroOcupadoYRepetidoEntreManzanasAntesDeConfirmar() {
+        when(repo.manzanas(2L)).thenReturn(List.of(
+            new Referencia(12L,"ET-01"+(char)31+"M-A",true),
+            new Referencia(13L,"ET-01"+(char)31+"M-B",true)));
+        when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L,"Z-A",true)));
+        when(repo.numeroActivoEnProyecto(2L,"01")).thenReturn(true);
+        var filas = List.of(loteCocos(2,"M-A","01"), loteCocos(3,"M-B","01"), loteCocos(4,"M-B","76"));
+        var previo = service.previsualizar(2L, solicitud(filas,null));
+        assertTrue(previo.filas().stream().allMatch(f -> f.estado().equals("ERROR")));
+        assertTrue(previo.filas().get(0).mensaje().contains("ya pertenece"));
+        assertTrue(previo.filas().get(1).mensaje().contains("repetido"));
+        assertTrue(previo.filas().get(2).mensaje().contains("01 al 75"));
+        assertThrows(ReglaNegocioException.class, () -> service.confirmar(2L,solicitud(filas,previo.huella()),1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
     @Test
     void vistaPreviaNoRegistraYDetectaExistentes() {
         when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L, "Z-A", true)));
