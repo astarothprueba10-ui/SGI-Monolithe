@@ -145,7 +145,7 @@ public class PublicacionComercialService {
         var evento = repository.ultimoEstado(proyecto,version);
         if (evento.isPresent()) {
             var e = evento.get();
-            return new Respuesta(version,e.id(),false,mapper.readValue(e.json(),Estado.class));
+            return new Respuesta(version,e.id(),!repository.seleccionRegistrada(proyecto,version),mapper.readValue(e.json(),Estado.class));
         }
         // Las publicaciones anteriores no registraban la selección explícita. Nunca deducirla del inventario.
         return new Respuesta(version,0,true,new Estado(repository.etapasHistoricas(proyecto,version),config.datos().tarifas()));
@@ -187,18 +187,30 @@ public class PublicacionComercialService {
         var foto = repository.foto(proyecto,anterior.version());
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var reglas = reglasPorLote(proyecto,anterior.version());
+        var cambios = new ArrayList<ConfiguracionProyectoResponse.Lote>();
         for (var lote: config.lotes()) {
             var regla = reglas.get(lote.id());
             if (protegidos.contains(lote.id()) || regla!=null && "PROTEGIDA".equals(regla.situacion())) continue;
             String etapa = etapaDe(config,lote);
-            if (etapa==null || regla==null || !Objects.equals(etapa,regla.etapa()))
-                throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene una regla publicada coherente. Revisa su asignación.");
+            if (etapa==null) {
+                if (regla!=null && "HABILITADA".equals(regla.situacion()))
+                    throw new ReglaNegocioException("El lote "+lote.codigo()+" está habilitado sin etapa comercial coherente.");
+                continue;
+            }
             boolean abrir = seleccion.contains(etapa);
             boolean estabaAbierta = anterior.estado().etapasHabilitadas().contains(etapa);
             if (!anterior.inferida() && abrir==estabaAbierta) continue;
+            if (regla==null || !Objects.equals(etapa,regla.etapa()))
+                throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene una regla publicada coherente. Revisa su asignación.");
+            if (abrir && !regla.precioValido())
+                throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene un precio preparado vigente. Guarda su tarifa en la matriz antes de abrir la etapa "+etapa+".");
+            cambios.add(lote);
+        }
+        for (var lote: cambios) {
+            var regla = reglas.get(lote.id());
+            boolean abrir = seleccion.contains(regla.etapa());
             if (abrir) {
-                // No registrar ni recalcular precios al abrir. El precio preparado debe seguir vigente.
-                if (!regla.precioValido()) throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene un precio preparado vigente. Guarda su tarifa en la matriz antes de abrir la etapa "+etapa+".");
+                // No registrar ni recalcular precios al abrir.
                 if (!"HABILITADA".equals(regla.situacion())) repository.cambiarSituacion(proyecto,anterior.version(),lote.id(),"HABILITADA");
                 if ("NO_DISPONIBLE".equals(lote.estadoInventario())) repository.habilitarInventario(lote.id(),actor,anterior.version());
             } else {

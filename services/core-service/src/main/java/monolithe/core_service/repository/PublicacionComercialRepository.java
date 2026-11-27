@@ -17,6 +17,8 @@ public class PublicacionComercialRepository {
     // Una vista previa incompleta puede clasificar como libre un lote comprometido.
     // Protección transitoria mientras se valida la lectura autorizada bajo RLS.
     public boolean puedeVerificarIntegridadPublicacion() {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT to_regclass('public.inm_gestion_comercial_eventos') IS NOT NULL",Boolean.class)))
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Falta aplicar la migración de gestión comercial (170).");
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             SELECT NOT (
                 pg_catalog.row_security_active('public.inm_proyectos'::regclass)
@@ -92,6 +94,13 @@ public class PublicacionComercialRepository {
             """,(r,n)->new EventoEstado(r.getLong("id_evento"),r.getString("estado")),proyecto,version).stream().findFirst();
     }
 
+    public boolean seleccionRegistrada(Long proyecto,int version) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM public.inm_gestion_comercial_eventos
+              WHERE id_proyecto=? AND version_publicada=? AND tipo IN ('INICIAL','DISPONIBILIDAD'))
+            """,Boolean.class,proyecto,version));
+    }
+
     public List<Evento> historial(Long proyecto) {
         return jdbc.query("""
             SELECT id_evento,tipo,id_usuario,fecha::text,anterior::text,nuevo::text
@@ -119,7 +128,10 @@ public class PublicacionComercialRepository {
               coalesce(p.activo AND m.activo AND m.codigo='PEN' AND p.id_lote=pl.id_lote
                 AND p.precio=pl.precio_final AND p.precio>0 AND p.fecha_desde<=now()
                 AND (p.fecha_hasta IS NULL OR p.fecha_hasta>now())
-                AND (pl.vigente_hasta IS NULL OR pl.vigente_hasta >= (now() AT TIME ZONE 'America/Lima')::date),false) precio_valido
+                AND (pl.vigente_hasta IS NULL OR pl.vigente_hasta >= (now() AT TIME ZONE 'America/Lima')::date)
+                AND 1=(SELECT count(*) FROM public.inm_lotes_precios pp JOIN public.cfg_monedas mm USING(id_moneda)
+                  WHERE pp.id_lote=pl.id_lote AND mm.codigo='PEN' AND mm.activo AND pp.activo AND pp.precio>0
+                    AND pp.fecha_desde<=now() AND (pp.fecha_hasta IS NULL OR pp.fecha_hasta>now())),false) precio_valido
             FROM public.inm_politicas_comerciales_lotes pl
             LEFT JOIN public.inm_lotes_precios p ON p.id_lote_precio=pl.id_lote_precio
             LEFT JOIN public.cfg_monedas m ON m.id_moneda=p.id_moneda

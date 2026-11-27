@@ -26,7 +26,9 @@ public class ConfiguracionProyectoService {
     @Transactional(readOnly = true)
     public ConfiguracionProyectoResponse obtener(Long proyecto) {
         obtenerProyecto(proyecto);
-        var version = repository.vigente(proyecto);
+        int publicada = repository.versionPublicada(proyecto);
+        var version = publicada > 0 ? repository.porVersion(proyecto,publicada) : repository.vigente(proyecto);
+        if (publicada > 0 && version.isEmpty()) throw new ConflictoNegocioException("No se encontró la configuración de la publicación vigente.");
         var datos = version.map(v -> leer(v.json()))
                 .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
         return new ConfiguracionProyectoResponse(version.map(v -> v.numero()).orElse(0), datos,

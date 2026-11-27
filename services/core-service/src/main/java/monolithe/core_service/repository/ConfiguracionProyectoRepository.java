@@ -26,6 +26,13 @@ public class ConfiguracionProyectoRepository {
                 .stream().findFirst();
     }
 
+    public Optional<Version> porVersion(Long proyecto,int version) {
+        return jdbc.query("""
+            SELECT version,configuracion::text AS json FROM public.inm_configuracion_comercial_borradores
+            WHERE id_proyecto=? AND version=?
+            """,(r,n)->new Version(r.getInt(1),r.getString(2)),proyecto,version).stream().findFirst();
+    }
+
     public void bloquearConfiguracion(Long proyecto) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended('inm_publicacion:' || CAST(? AS text),0))",
                 (rs,n) -> true, proyecto);
@@ -44,6 +51,8 @@ public class ConfiguracionProyectoRepository {
     }
 
     public boolean importacionRealizada(Long proyecto) {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT to_regclass('public.inm_gestion_comercial_eventos') IS NOT NULL",Boolean.class)))
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Falta aplicar la migración de gestión comercial (170).");
         if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_catalog.row_security_active('public.inm_gestion_comercial_eventos'::regclass)",Boolean.class)))
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
                 "No se puede verificar la importación inicial.");

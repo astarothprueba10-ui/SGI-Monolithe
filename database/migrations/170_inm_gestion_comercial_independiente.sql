@@ -15,8 +15,8 @@ CREATE TABLE public.inm_gestion_comercial_eventos (
 CREATE UNIQUE INDEX ux_inm_importacion_unica ON public.inm_gestion_comercial_eventos(id_proyecto) WHERE tipo='IMPORTACION';
 CREATE INDEX ix_inm_gestion_eventos_proyecto ON public.inm_gestion_comercial_eventos(id_proyecto,id_evento DESC);
 ALTER TABLE public.inm_gestion_comercial_eventos ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.inm_gestion_comercial_eventos FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON SEQUENCE public.inm_gestion_comercial_eventos_id_evento_seq FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON public.inm_gestion_comercial_eventos FROM PUBLIC, anon, authenticated, service_role, sgi_backend_user, sigi_app_user;
+REVOKE ALL ON SEQUENCE public.inm_gestion_comercial_eventos_id_evento_seq FROM PUBLIC, anon, authenticated, service_role, sgi_backend_user, sigi_app_user;
 GRANT SELECT,INSERT ON public.inm_gestion_comercial_eventos TO sigi_app_user;
 GRANT USAGE ON SEQUENCE public.inm_gestion_comercial_eventos_id_evento_seq TO sigi_app_user;
 -- Los lotes cerrados pueden conservar un precio preparado, sin autorizar operaciones.
