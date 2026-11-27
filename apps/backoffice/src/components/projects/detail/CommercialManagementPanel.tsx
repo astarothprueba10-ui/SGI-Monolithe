@@ -7,7 +7,7 @@ import { Modal } from '../../ui/Modal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { projectConfigurationService } from '../../../services/projectConfigurationService';
 import { CommercialMatrixRecargos } from './CommercialMatrixRecargos';
-import { componentesMatriz } from '../../../lib/commercialRecargos';
+import { componentesMatriz, origenTarifario } from '../../../lib/commercialRecargos';
 import { CommercialZoneLegend } from './CommercialZoneLegend';
 import { CommercialHistoryEntry } from './CommercialHistoryEntry';
 import { contarZonaEtapa } from '../../../lib/commercialZoneUsage';
@@ -54,7 +54,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
   },[id,seccion,actual?.revision,intento]);
 
   const originales = actual?.estado.etapasHabilitadas ?? [];
-  const cambios = config.datos.etapas.filter(e=>seleccion.includes(e.codigo)!==originales.includes(e.codigo));
+  const cambios = inventario.datos.etapas.filter(e=>seleccion.includes(e.codigo)!==originales.includes(e.codigo));
   const cambiar = (codigo:string, marcada:boolean) => setSeleccion(prev=>marcada?[...prev.filter(c=>c!==codigo),codigo]:prev.filter(c=>c!==codigo));
 
   async function guardarDisponibilidad(confirmada=false) {
@@ -92,6 +92,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
   if (config.version !== version || actual && actual.version!==version) return <Card className="p-5"><h2 className="font-semibold text-brand-900">Gestión comercial</h2><p role="alert" className="mt-2 text-sm text-brand-700">La versión consultada no coincide con la configuración publicada. Recarga el proyecto.</p></Card>;
   if (!actual) return <Card className="p-5"><p role={error?'alert':'status'} className="text-sm text-brand-700">{error||'Cargando gestión comercial…'}</p>{error&&<Button onClick={()=>setIntento(n=>n+1)}>Reintentar</Button>}</Card>;
   const tarifas = actual.estado.tarifas;
+  const tarifario=actual.estado.tarifario;
   const componentes=componentesMatriz(inventario.zonas);
   const base=tarifas.find(t=>t.codigoEtapa===etapa&&t.codigoZona==='D'&&t.moneda==='PEN'&&t.tipoTarifa==='MONTO_FIJO');
   const reglaEtapa=inventario.datos.etapas.find(e=>e.codigo===etapa);
@@ -114,7 +115,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
       <h3 className="font-semibold text-brand-900">Disponibilidad de etapas comerciales</h3>
       <p className="text-sm text-brand-600">Marca las etapas que deseas mantener abiertas. Desmarca las que deseas cerrar. Si hay lotes pendientes de habilitar, configura sus tarifas y sincroniza la disponibilidad. No se recalculan precios.</p>
       {actual.inferida && <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Publicación anterior: la selección se propone a partir de sus reglas comerciales, no del inventario. Confirma el estado deseado para registrarlo. Si faltan precios preparados, revisa la matriz.</p>}
-      <div className="grid gap-2 md:grid-cols-2">{config.datos.etapas.map(e => {
+      <div className="grid gap-2 md:grid-cols-2">{inventario.datos.etapas.map(e => {
         const i=inventarioPorEtapa(inventario,e.codigo);const abierta=seleccion.includes(e.codigo);
         return <label key={e.codigo} className={`flex gap-3 rounded-lg border p-3 ${abierta?'border-[#4cbb17] bg-[#4cbb17]/10':'border-gray-200 bg-gray-50'}`}>
           <input aria-label={e.nombre} type="checkbox" className="mt-1 h-4 w-4 accent-[#4cbb17]" checked={abierta} disabled={!editable||ocupado} onChange={event=>cambiar(e.codigo,event.target.checked)}/>
@@ -130,9 +131,9 @@ export function CommercialManagementPanel({ config, version, project }: { config
       <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
       <CommercialZoneLegend projectId={id} codigos={config.zonas}/>
       <p className="text-sm text-brand-600">Precio base + adicional de zona − descuento de etapa. Se conservan las ventas y reservas. Moneda PEN.</p>
-      {componentes&&<CommercialMatrixRecargos key={id} zonas={inventario.zonas} tarifas={tarifas} etapas={inventario.datos.etapas} disabled={!editable||ocupado} onSave={async (b,r,d,h)=>{setOcupado(true);setError('');setAviso('');try {const g=await projectConfigurationService.guardarMatriz(id,actual.revision,b,r,d,h);setActual(g);setAviso('Matriz guardada. Los precios elegibles se actualizaron sin cambiar la disponibilidad.');setInventario(await projectConfigurationService.obtener(id));} finally {setOcupado(false);}}}/>}
-      {base&&<p className="text-sm font-medium text-brand-900">Precio base de esta etapa: {soles(base.valor)} por lote</p>}
-      <div className="max-w-sm"><FieldLabel htmlFor="gestion-etapa">Etapa comercial</FieldLabel><Select id="gestion-etapa" disabled={ocupado} value={etapa} onChange={e=>setEtapa(e.target.value)}>{config.datos.etapas.map(e=><option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
+      {componentes&&<CommercialMatrixRecargos key={id} zonas={inventario.zonas} tarifas={tarifas} tarifario={tarifario} etapaSeleccionada={etapa} etapas={inventario.datos.etapas} disabled={!editable||ocupado} onSave={async (b,r,d,h,alcance,codigo)=>{setOcupado(true);setError('');setAviso('');try {const g=await projectConfigurationService.guardarMatriz(id,actual.revision,b,r,d,h,alcance,codigo);setActual(g);setAviso('Matriz guardada. Los precios elegibles se actualizaron sin cambiar la disponibilidad.');try{setInventario(await projectConfigurationService.obtener(id));}catch{setError('Matriz guardada; recarga el proyecto para actualizar la vista.');}} finally {setOcupado(false);}}}/>}
+      <p className="text-sm font-medium text-brand-900">Origen: {origenTarifario(tarifario?.general,tarifario?.personalizadas??[],etapa)}{base?` · Precio base: ${soles(base.valor)} por lote`:''}</p>
+      <div className="max-w-sm"><FieldLabel htmlFor="gestion-etapa">Etapa comercial</FieldLabel><Select id="gestion-etapa" disabled={ocupado} value={etapa} onChange={e=>setEtapa(e.target.value)}>{inventario.datos.etapas.map(e=><option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
       <label className="flex items-center gap-2 text-sm text-brand-700"><input type="checkbox" checked={soloUsadas} onChange={e=>setSoloUsadas(e.target.checked)}/> Mostrar solo zonas utilizadas ({inventario.zonas.filter(z=>(uso.get(z)??0)>0).length})</label>
       {zonasVisibles.length===0&&<p className="text-sm text-brand-600">No hay zonas utilizadas en esta etapa. Desmarca el filtro para preparar tarifas opcionales.</p>}
       <p className="text-xs text-brand-500">El precio final mostrado es teórico y no incluye ajustes de tipo de lote ni condiciones históricas de una operación.</p>

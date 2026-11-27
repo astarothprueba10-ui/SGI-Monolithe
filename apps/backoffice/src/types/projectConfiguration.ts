@@ -82,11 +82,14 @@ export interface PublicacionComercialResponse {
   lotes: PublicacionComercialFila[];
 }
 
+export interface MatrizBase { precioBase:number; recargos:Record<string,number>; vigenteDesde:string; vigenteHasta:string|null }
+export interface TarifarioComercial { general:MatrizBase|null; personalizadas:string[] }
+export type AlcanceMatriz = 'GENERAL'|'ETAPA'|'HEREDAR';
 export interface GestionComercialResponse {
   version: number;
   revision: number;
   inferida: boolean;
-  estado: { etapasHabilitadas: string[]; tarifas: TarifaComercial[] };
+  estado: { etapasHabilitadas: string[]; tarifas: TarifaComercial[]; tarifario?:TarifarioComercial|null };
 }
 export interface EventoComercial {
   id: number; tipo: string; actor: number | null; actorNombre?: string | null; fecha: string; anterior: string; nuevo: string;

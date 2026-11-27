@@ -1,5 +1,5 @@
 import { coreApi } from '../lib/apiClient';
-import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial, ReglaEtapaComercial } from '../types/projectConfiguration';
+import type { ConfiguracionComercial, ConfiguracionProyectoResponse, SimulacionComercialResponse, PublicacionComercialResponse, GestionComercialResponse, EventoComercial, TarifaComercial, ReglaEtapaComercial, AlcanceMatriz } from '../types/projectConfiguration';
 
 function ruta(idProyecto: number) {
   return `/proyectos/${idProyecto}/configuracion-comercial`;
@@ -36,8 +36,8 @@ export const projectConfigurationService = {
   guardarEtapas(idProyecto: number, revision: number, etapas: ReglaEtapaComercial[]) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/etapas`, { revision, etapas });
   },
-  guardarMatriz(idProyecto:number, revision:number, precioBase:number, recargos:Record<string,number>, vigenteDesde:string, vigenteHasta:string|null) {
-    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/matriz`, {revision,precioBase,recargos,vigenteDesde,vigenteHasta});
+  guardarMatriz(idProyecto:number, revision:number, precioBase:number, recargos:Record<string,number>, vigenteDesde:string, vigenteHasta:string|null, alcance:AlcanceMatriz='GENERAL', codigoEtapa:string|null=null) {
+    return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/matriz`, {revision,precioBase,recargos,vigenteDesde,vigenteHasta,alcance,codigoEtapa});
   },
   guardarTarifa(idProyecto: number, revision: number, tarifa: TarifaComercial) {
     return coreApi.put<GestionComercialResponse>(`${ruta(idProyecto)}/gestion/tarifa`, { revision, tarifa });
