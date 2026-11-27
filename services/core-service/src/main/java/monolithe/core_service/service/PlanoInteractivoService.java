@@ -190,6 +190,58 @@ public class PlanoInteractivoService {
                 return toGeometriaResponse(geometriaRepo.save(geometria));
         }
 
+        /**
+         * Persiste la matriz en una sola transacción. El plano general es un lienzo
+         * esquemático y puede crecer; los planos físicos por etapa conservan sus límites.
+         */
+        @Transactional
+        public PlanoInteractivoDetalleResponse guardarMatriz(Long idPlano, List<LoteGeometriaRequest> cambios) {
+                if (cambios == null || cambios.isEmpty()) {
+                        throw new ReglaNegocioException("No hay posiciones para guardar.");
+                }
+                PlanoInteractivo plano = planoRepo.findById(idPlano)
+                                .orElseThrow(() -> new RecursoNoEncontradoException("Plano no encontrado: " + idPlano));
+                if (!Boolean.TRUE.equals(plano.getVigente()) || plano.getEtapa() != null) {
+                        throw new ReglaNegocioException("La matriz requiere un plano general vigente.");
+                }
+                BigDecimal ancho = plano.getAnchoReferencia();
+                BigDecimal alto = plano.getAltoReferencia();
+                BigDecimal limite = new BigDecimal("1000000");
+                var ids = new java.util.HashSet<Long>();
+                for (LoteGeometriaRequest cambio : cambios) {
+                        if (cambio == null || !idPlano.equals(cambio.idPlanoInteractivo())
+                                        || !ids.add(cambio.idLote())) {
+                                throw new ReglaNegocioException("La matriz contiene lotes duplicados o de otro plano.");
+                        }
+                        Lote lote = loteRepo.findById(cambio.idLote())
+                                        .orElseThrow(() -> new RecursoNoEncontradoException("Lote no encontrado."));
+                        validarLotePertenecePlano(lote, plano);
+                        if (!Boolean.TRUE.equals(lote.getActivo())) {
+                                throw new ReglaNegocioException("No se puede posicionar un lote inactivo.");
+                        }
+                        for (PuntoPlanoDto punto : cambio.puntos()) {
+                                if (punto == null || punto.x() == null || punto.y() == null) {
+                                        throw new ReglaNegocioException("La geometría contiene puntos inválidos.");
+                                }
+                                ancho = ancho.max(punto.x());
+                                alto = alto.max(punto.y());
+                        }
+                        if (cambio.etiquetaX() != null) ancho = ancho.max(cambio.etiquetaX());
+                        if (cambio.etiquetaY() != null) alto = alto.max(cambio.etiquetaY());
+                }
+                if (ancho.compareTo(limite) > 0 || alto.compareTo(limite) > 0) {
+                        throw new ReglaNegocioException("La matriz supera el tamaño máximo permitido.");
+                }
+                plano.setAnchoReferencia(ancho);
+                plano.setAltoReferencia(alto);
+                planoRepo.save(plano);
+                for (LoteGeometriaRequest cambio : cambios) {
+                        guardarGeometria(cambio);
+                }
+                geometriaRepo.flush();
+                return obtenerDetalleVigente(plano.getProyecto().getIdProyecto(), null);
+        }
+
         // =========================================================
         // 6. DESACTIVAR GEOMETRIA
         // =========================================================
