@@ -12,7 +12,10 @@ import monolithe.core_service.dto.ConfiguracionProyectoRequest.Asignacion;
 
 public final class GestionComercialDto {
     private GestionComercialDto() {}
-    public record Estado(List<String> etapasHabilitadas, List<Tarifa> tarifas, List<Etapa> etapas, List<Asignacion> manzanas, List<Asignacion> lotes) {
+    public record MatrizBase(BigDecimal precioBase, Map<String,BigDecimal> recargos, LocalDate vigenteDesde, LocalDate vigenteHasta) {}
+    public record Tarifario(MatrizBase general, List<String> personalizadas) {}
+    public record Estado(List<String> etapasHabilitadas, List<Tarifa> tarifas, List<Etapa> etapas, List<Asignacion> manzanas, List<Asignacion> lotes, Tarifario tarifario) {
+        public Estado(List<String> abiertas,List<Tarifa> tarifas,List<Etapa> etapas,List<Asignacion> manzanas,List<Asignacion> lotes) { this(abiertas,tarifas,etapas,manzanas,lotes,null); }
         public Estado(List<String> etapasHabilitadas,List<Tarifa> tarifas) { this(etapasHabilitadas,tarifas,null,null,null); }
         public Estado(List<String> etapasHabilitadas,List<Tarifa> tarifas,List<Etapa> etapas) { this(etapasHabilitadas,tarifas,etapas,null,null); }
     }
@@ -25,7 +28,9 @@ public final class GestionComercialDto {
     public record CambioMatriz(@NotNull @Min(0) Long revision,
         @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=10,fraction=2) BigDecimal precioBase,
         @NotNull @Size(max=25) Map<@Pattern(regexp="[A-Z]") String,@NotNull @DecimalMin("0") @Digits(integer=10,fraction=2) BigDecimal> recargos,
-        @NotNull LocalDate vigenteDesde, LocalDate vigenteHasta) {}
+        @NotNull LocalDate vigenteDesde, LocalDate vigenteHasta, @Pattern(regexp="GENERAL|ETAPA|HEREDAR") String alcance, @Size(max=30) String codigoEtapa) {
+        public CambioMatriz(Long revision,BigDecimal base,Map<String,BigDecimal> recargos,LocalDate desde,LocalDate hasta) { this(revision,base,recargos,desde,hasta,"GENERAL",null); }
+    }
     public record CambioTarifa(@NotNull @Min(0) Long revision, @NotNull @Valid Tarifa tarifa) {}
     public record Evento(long id, String tipo, Long actor, String fecha, String anterior, String nuevo, String actorNombre) {}
 }

@@ -145,16 +145,22 @@ public class PublicacionComercialService {
         var evento = repository.ultimoEstado(proyecto,version);
         if (evento.isPresent()) {
             var e = evento.get();
-            return new Respuesta(version,e.id(),!repository.seleccionRegistrada(proyecto,version),mapper.readValue(e.json(),Estado.class));
+            var estado=mapper.readValue(e.json(),Estado.class);
+            return new Respuesta(version,e.id(),!repository.seleccionRegistrada(proyecto,version),conTarifario(estado,config));
         }
         // Las publicaciones anteriores no registraban la selección explícita. Nunca deducirla del inventario.
-        return new Respuesta(version,0,true,new Estado(repository.etapasHistoricas(proyecto,version),config.datos().tarifas()));
+        return new Respuesta(version,0,true,conTarifario(new Estado(repository.etapasHistoricas(proyecto,version),config.datos().tarifas()),config));
     }
 
     @Transactional(readOnly=true)
     public List<Evento> historial(Long proyecto) {
         exigirIntegridadPublicacion();
         return repository.historial(proyecto);
+    }
+
+    private Estado conTarifario(Estado e,ConfiguracionProyectoResponse config){
+        return new Estado(e.etapasHabilitadas(),e.tarifas(),e.etapas(),e.manzanas(),e.lotes(),
+            e.tarifario()==null?MatrizRecargosComercial.inferir(config,e.tarifas()):e.tarifario());
     }
 
     private Respuesta bloquearGestion(Long proyecto,long revision) {
@@ -291,7 +297,7 @@ public class PublicacionComercialService {
             if(f.habilitarInventario())repository.habilitarInventario(f.idLote(),actor,anterior.version());
         }
         registrarEvento(proyecto,anterior.version(),actor,"ASIGNACIONES",
-            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),null,d.manzanas(),d.lotes()),foto,
+            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),null,d.manzanas(),d.lotes(),anterior.estado().tarifario()),foto,
             new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),null,nuevasManzanas,nuevosLotes));
         return gestion(proyecto);
     }
@@ -327,30 +333,62 @@ public class PublicacionComercialService {
             if(ts.size()!=1)throw new ReglaNegocioException("El lote "+l.codigo()+" requiere una tarifa vigente de su zona antes de modificar el descuento.");
             if(!tarifas.contains(ts.getFirst()))tarifas.add(ts.getFirst());
         }
-        var estadoAnterior=new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),antiguas);
+        var tarifario=anterior.estado().tarifario();
+        var nuevasTarifas=new ArrayList<>(anterior.estado().tarifas());
+        var nuevosCodigos=nuevas.stream().map(ConfiguracionProyectoRequest.Etapa::codigo).filter(e->antiguas.stream().noneMatch(a->a.codigo().equals(e))).toList();
+        if(tarifario!=null&&tarifario.general()!=null&&!nuevosCodigos.isEmpty()){
+            nuevasTarifas.addAll(MatrizRecargosComercial.generar(config,MatrizRecargosComercial.solicitud(anterior.revision(),tarifario.general()),nuevosCodigos));
+            if(nuevasTarifas.size()>2000)throw new ReglaNegocioException("La matriz supera el máximo de tarifas.");
+        }
+        var estadoAnterior=new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),antiguas,null,null,tarifario);
         registrarEvento(proyecto,anterior.version(),actor,"ETAPAS",estadoAnterior,repository.foto(proyecto,anterior.version()),
-            new Estado(anterior.estado().etapasHabilitadas(),anterior.estado().tarifas(),nuevas));
+            new Estado(anterior.estado().etapasHabilitadas(),List.copyOf(nuevasTarifas),nuevas,null,null,tarifario));
         // El cambio de descuento y los precios derivados se guardan en la misma transacción.
         var actual=gestion(proyecto);
-        for(var t:tarifas)actual=guardarTarifa(proyecto,actor,new CambioTarifa(actual.revision(),t));
+        if(!tarifas.isEmpty())actual=guardarTarifas(proyecto,actor,actual,tarifas,false,actual.estado().tarifario());
         return actual;
     }
 
     @Transactional
     public Respuesta guardarTarifa(Long proyecto,Long actor,CambioTarifa request) {
         var anterior = bloquearGestion(proyecto,request.revision());
-        return guardarTarifas(proyecto,actor,anterior,List.of(request.tarifa()),false);
+        var origen=anterior.estado().tarifario();
+        var personalizadas=new TreeSet<>(origen.personalizadas());
+        personalizadas.add(request.tarifa().codigoEtapa());
+        return guardarTarifas(proyecto,actor,anterior,List.of(request.tarifa()),false,new Tarifario(origen.general(),List.copyOf(personalizadas)));
     }
 
     @Transactional
     public Respuesta guardarMatriz(Long proyecto,Long actor,CambioMatriz request) {
         var anterior=bloquearGestion(proyecto,request.revision());
         var config=configuracion.obtener(proyecto);
-        var nuevas=MatrizRecargosComercial.generar(config,request);
-        return guardarTarifas(proyecto,actor,anterior,nuevas,true);
+        var origen=anterior.estado().tarifario();
+        var propias=new TreeSet<>(origen.personalizadas());
+        var codigos=config.datos().etapas().stream().map(ConfiguracionProyectoRequest.Etapa::codigo).toList();
+        var alcance=request.alcance()==null?"GENERAL":request.alcance();
+        var general=origen.general();
+        Collection<String> destino;
+        CambioMatriz valores=request;
+        if("GENERAL".equals(alcance)){
+            if(request.codigoEtapa()!=null&&!request.codigoEtapa().isBlank())throw new ReglaNegocioException("La matriz general no recibe una etapa específica.");
+            general=new MatrizBase(request.precioBase(),Map.copyOf(request.recargos()),request.vigenteDesde(),request.vigenteHasta());
+            destino=codigos.stream().filter(e->!propias.contains(e)).toList();
+        }else if("ETAPA".equals(alcance)||"HEREDAR".equals(alcance)){
+            if(!codigos.contains(request.codigoEtapa()))throw new ReglaNegocioException("Selecciona una etapa comercial válida del proyecto.");
+            destino=List.of(request.codigoEtapa());
+            if("HEREDAR".equals(alcance)){
+                if(general==null)throw new ReglaNegocioException("Configura primero el tarifario general.");
+                valores=MatrizRecargosComercial.solicitud(anterior.revision(),general);
+                propias.remove(request.codigoEtapa());
+            }else propias.add(request.codigoEtapa());
+        }else throw new ReglaNegocioException("Alcance de matriz inválido.");
+        var hoy=LocalDate.now(ZoneId.of("America/Lima"));
+        if(valores.vigenteDesde().isAfter(hoy)||valores.vigenteHasta()!=null&&(valores.vigenteHasta().isBefore(hoy)||valores.vigenteHasta().isBefore(valores.vigenteDesde())))throw new ReglaNegocioException("La matriz debe estar vigente hoy.");
+        var nuevas=MatrizRecargosComercial.generar(config,valores,destino);
+        return guardarTarifas(proyecto,actor,anterior,nuevas,true,new Tarifario(general,List.copyOf(propias)));
     }
 
-    private Respuesta guardarTarifas(Long proyecto,Long actor,Respuesta anterior,List<Tarifa> nuevas,boolean matriz) {
+    private Respuesta guardarTarifas(Long proyecto,Long actor,Respuesta anterior,List<Tarifa> nuevas,boolean matriz,Tarifario tarifario) {
         var config=configuracion.obtener(proyecto);
         var ahora=ZonedDateTime.now(ZoneId.of("America/Lima"));
         var d=config.datos();
@@ -397,7 +435,7 @@ public class PublicacionComercialService {
             Long precio = repository.registrarPrecio(fila,anterior.version());
             repository.actualizarPrecioRegla(proyecto,anterior.version(),fila,precio,regla.situacion());
         }
-        registrarEvento(proyecto,anterior.version(),actor,"TARIFAS",anterior.estado(),foto,new Estado(anterior.estado().etapasHabilitadas(),List.copyOf(tarifas)));
+        registrarEvento(proyecto,anterior.version(),actor,"TARIFAS",anterior.estado(),foto,new Estado(anterior.estado().etapasHabilitadas(),List.copyOf(tarifas),null,null,null,tarifario));
         return gestion(proyecto);
     }
 
@@ -405,6 +443,8 @@ public class PublicacionComercialService {
         var antes = new LinkedHashMap<String,Object>();
         if (anterior!=null) antes.put("estado",anterior);
         if (foto!=null) antes.put("lotes",mapper.readTree(foto));
+        if(nuevo.tarifario()==null && anterior!=null && anterior.tarifario()!=null)
+            nuevo=new Estado(nuevo.etapasHabilitadas(),nuevo.tarifas(),nuevo.etapas(),nuevo.manzanas(),nuevo.lotes(),anterior.tarifario());
         var despues = Map.of("estado",nuevo,"lotes",mapper.readTree(repository.foto(proyecto,version)));
         repository.evento(proyecto,version,actor,tipo,mapper.writeValueAsString(antes),mapper.writeValueAsString(despues));
     }
