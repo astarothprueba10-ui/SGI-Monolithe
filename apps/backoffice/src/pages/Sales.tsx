@@ -55,6 +55,8 @@ import {
   type FiltrosVentas
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
+import { LotVisualPickerPanel } from '../components/sales/LotVisualPickerPanel';
+import { selectedVisualLot } from '../lib/lotVisualFocus';
 import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
 import { centavosImporte, crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
@@ -1351,6 +1353,8 @@ export function Sales() {
     && precioLote?.idLote === Number(formLotId));
   const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
+  const mostrarVisorSeparacion=opType==='Separacion' && can('lots.view');
+  const loteVisual=selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional);
   const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
   const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
   const pagosSeparacionResueltos = resolverPagosSeparacion(pagosSeparacion,totalSeparacionSeleccion);
@@ -2256,7 +2260,7 @@ export function Sales() {
       <Modal
         open={isModalOpen}
         onClose={cerrarModalOperacion}
-        width="max-w-3xl"
+        width={mostrarVisorSeparacion ? "max-w-7xl" : "max-w-3xl"}
         title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
           ? 'Selecciona los lotes y revisa sus importes antes de registrar el pago.'
@@ -2304,7 +2308,8 @@ export function Sales() {
             Cargando prospectos y lotes disponibles…
           </div>
         ) : (
-          <form onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
+          <div className={mostrarVisorSeparacion?'grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]':'min-w-0'}>
+          <form className="min-w-0" onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
             {<header className="flex items-start gap-3 pb-1">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
               <div><h3 className="text-sm font-semibold text-brand-900">Cliente y proyecto</h3>
@@ -3080,6 +3085,16 @@ export function Sales() {
               />
             </div>
           </fieldset></form>
+          {mostrarVisorSeparacion&&<aside className="min-w-0 lg:sticky lg:top-0">
+            {selectedProspectId&&formProjectId&&proyectoConInteres
+              ? <LotVisualPickerPanel key={formProjectId} project={Number(formProjectId)} selected={loteVisual}
+                  stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined}/>
+              : <section className="rounded-xl border border-brand-200 bg-brand-50 p-5 text-sm text-brand-600">
+                  <h3 className="mb-2 font-semibold text-brand-900">Vista del lote</h3>
+                  Selecciona el cliente y el proyecto para visualizar sus lotes.
+                </section>}
+          </aside>}
+          </div>
         )}
       </Modal>
 
