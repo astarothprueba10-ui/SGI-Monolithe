@@ -65,7 +65,8 @@ public class ZonaService {
         z.setCodigo(codigo);
         z.setNombre(nombre);
         z.setDescripcion(descripcion);
-        z.setNumeroOrden(request.numeroOrden() != null ? request.numeroOrden() : 1);
+        z.setNumeroOrden(zonaRepository.findByProyecto_IdProyectoOrderByNumeroOrdenAsc(proyecto.getIdProyecto()).stream()
+                .map(Zona::getNumeroOrden).filter(java.util.Objects::nonNull).max(Integer::compareTo).orElse(0) + 1);
         z.setActivo(request.activo() != null ? request.activo() : true);
 
         Zona guardada = zonaRepository.save(z);
@@ -91,13 +92,11 @@ public class ZonaService {
             );
         }
 
-        z.setProyecto(proyecto);
-        z.setCodigo(codigo);
+        if (!java.util.Objects.equals(z.getCodigo(), codigo)) {
+            throw new ReglaNegocioException("El código de una zona registrada es permanente. Puedes editar su nombre y descripción; para otra categoría crea una zona nueva.");
+        }
         z.setNombre(nombre);
         z.setDescripcion(descripcion);
-        if (request.numeroOrden() != null) {
-            z.setNumeroOrden(request.numeroOrden());
-        }
         if (Boolean.TRUE.equals(z.getActivo()) && Boolean.FALSE.equals(request.activo())) {
             validarDesactivacionZona(idZona);
         }
@@ -122,7 +121,7 @@ public class ZonaService {
 
     private void validarDesactivacionZona(Long idZona) {
         if (loteRepository.existsByZona_IdZonaAndActivoTrue(idZona)) {
-            throw new ReglaNegocioException("La zona no puede desactivarse porque tiene lotes activos asociados");
+            throw new ReglaNegocioException("No se puede desactivar esta zona porque tiene lotes activos asociados. Consulta y reasigna los lotes elegibles antes de desactivarla; conserva las operaciones existentes.");
         }
     }
 

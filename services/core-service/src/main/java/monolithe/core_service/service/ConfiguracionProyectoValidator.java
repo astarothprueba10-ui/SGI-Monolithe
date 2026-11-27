@@ -57,8 +57,10 @@ public final class ConfiguracionProyectoValidator {
         Set<String> etapas = datos.etapas().stream().map(Etapa::codigo).collect(Collectors.toSet());
         Set<String> claves = new HashSet<>();
         for (Tarifa tarifa : datos.tarifas()) {
-            if (!zonas.contains(tarifa.codigoZona()) || !monedas.contains(tarifa.moneda()) || !etapas.contains(tarifa.codigoEtapa()))
-                error("La tarifa tiene una zona, moneda o etapa inválida.");
+            String contexto = "Tarifa de etapa " + tarifa.codigoEtapa() + ", zona " + tarifa.codigoZona() + ", moneda " + tarifa.moneda() + ": ";
+            if (!zonas.contains(tarifa.codigoZona())) error(contexto + "la zona no existe o está inactiva. Revisa el catálogo de zonas.");
+            if (!monedas.contains(tarifa.moneda())) error(contexto + "la moneda no está habilitada.");
+            if (!etapas.contains(tarifa.codigoEtapa())) error(contexto + "la etapa comercial no existe.");
             if (tarifa.vigenteHasta() != null && tarifa.vigenteHasta().isBefore(tarifa.vigenteDesde()))
                 error("La vigencia final de la tarifa precede al inicio.");
             if (!claves.add(claveTarifa(tarifa))) error("Solo se admite una tarifa por zona, etapa y moneda en el borrador.");

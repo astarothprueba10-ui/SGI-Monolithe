@@ -236,7 +236,9 @@ public class PublicacionComercialService {
         tarifas.add(tarifa);
         var d = config.datos();
         var datos = new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),d.lotes(),List.copyOf(tarifas));
-        ConfiguracionProyectoValidator.validarTarifas(datos,config.zonas(),config.monedas());
+        // Validar la combinación solicitada; las tarifas históricas de zonas retiradas
+        // se conservan en auditoría y no impiden editar otra combinación válida.
+        ConfiguracionProyectoValidator.validarTarifas(new ConfiguracionProyectoRequest.Datos(d.etapas(),d.manzanas(),d.lotes(),List.of(tarifa)),config.zonas(),config.monedas());
         var paraPrecios = configParaPrecios(new ConfiguracionProyectoResponse(config.version(),datos,config.manzanas(),config.lotes(),config.zonas(),config.monedas()));
         var foto = repository.foto(proyecto,anterior.version());
         var protegidos = new HashSet<>(repository.protegidos(proyecto));

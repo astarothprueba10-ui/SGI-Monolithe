@@ -115,11 +115,12 @@ public class ConfiguracionProyectoRepository {
 
     public List<Lote> lotes(Long proyecto) {
         return jdbc.query("""
-            SELECT l.id_lote, l.id_manzana, l.codigo, el.codigo AS estado FROM public.inm_lotes l
+            SELECT l.id_lote, l.id_manzana, l.codigo, el.codigo AS estado, z.codigo AS zona FROM public.inm_lotes l
             JOIN public.cfg_estados_lote el ON el.id_estado_lote=l.id_estado_lote
+            LEFT JOIN public.inm_zonas z ON z.id_zona=l.id_zona AND z.id_proyecto=l.id_proyecto
             JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
             WHERE l.id_proyecto = ? AND l.activo AND m.activo AND e.activo ORDER BY l.codigo, l.id_lote
             """, (rs, n) -> new Lote(rs.getLong("id_lote"), rs.getLong("id_manzana"),
-                rs.getString("codigo"), rs.getString("estado")), proyecto);
+                rs.getString("codigo"), rs.getString("estado"), rs.getString("zona")), proyecto);
     }
 }

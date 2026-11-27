@@ -102,9 +102,7 @@ function buildRequest(
     descripcion: parseOptionalString(
       form.descripcion
     ),
-    numeroOrden: parseOptionalNumber(
-      form.numeroOrden
-    ),
+    numeroOrden: null,
     activo: form.activo
   };
 }
@@ -433,11 +431,12 @@ export function ZoneFormModal({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <FieldLabel htmlFor="zona-codigo">
-              Código *
+              Código comercial *
             </FieldLabel>
 
             <Input
               id="zona-codigo"
+              disabled={isEditing}
               value={
                 form.codigo
               }
@@ -505,44 +504,7 @@ export function ZoneFormModal({
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="zona-numero-orden">
-              Número de orden
-            </FieldLabel>
-
-            <Input
-              id="zona-numero-orden"
-              type="number"
-              min={1}
-              step={1}
-              value={
-                form.numeroOrden
-              }
-              onChange={(event) =>
-                handleChange(
-                  'numeroOrden',
-                  event.target
-                    .value
-                )
-              }
-              placeholder="1"
-              className={
-                errors.numeroOrden
-                  ? 'border-red-400 focus:border-red-500'
-                  : ''
-              }
-            />
-
-            {errors.numeroOrden && (
-              <p className="mt-1 text-xs text-red-600">
-                {
-                  errors.numeroOrden
-                }
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center pt-6">
+          <div className="flex items-center pt-2">
             <label
               htmlFor="zona-activa"
               className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-brand-800"

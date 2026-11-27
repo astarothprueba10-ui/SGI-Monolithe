@@ -37,7 +37,7 @@ export interface ConfiguracionProyectoResponse {
   monedas: string[];
   datos: ConfiguracionComercial;
   manzanas: { id: number; codigo: string; nombre: string }[];
-  lotes: { id: number; idManzana: number; codigo: string; estadoInventario?: string | null }[];
+  lotes: { id: number; idManzana: number; codigo: string; estadoInventario?: string | null; codigoZona?: string | null }[];
 }
 
 export interface SimulacionComercialResponse {

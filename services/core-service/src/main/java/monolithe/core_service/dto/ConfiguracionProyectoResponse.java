@@ -8,7 +8,8 @@ public record ConfiguracionProyectoResponse(
         List<Manzana> manzanas,
         List<Lote> lotes, List<String> zonas, List<String> monedas) {
     public record Manzana(Long id, String codigo, String nombre) {}
-    public record Lote(Long id, Long idManzana, String codigo, String estadoInventario) {
-        public Lote(Long id, Long idManzana, String codigo) { this(id,idManzana,codigo,null); }
+    public record Lote(Long id, Long idManzana, String codigo, String estadoInventario, String codigoZona) {
+        public Lote(Long id, Long idManzana, String codigo, String estadoInventario) { this(id,idManzana,codigo,estadoInventario,null); }
+        public Lote(Long id, Long idManzana, String codigo) { this(id,idManzana,codigo,null,null); }
     }
 }
