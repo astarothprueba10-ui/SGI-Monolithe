@@ -10,7 +10,11 @@ export function registerCommercialPrompt(fn:(prompt:CommercialPrompt)=>void) {
  return ()=>{if(listener===fn)listener=null;};
 }
 export const commercialMfaService={
- iniciar:(p:CommercialPrompt)=>coreApi.post<CommercialChallenge>(`/proyectos/${p.project}/mfa-comercial/iniciar`,{accion:p.action,datos:p.body}),
+ iniciar:async(p:CommercialPrompt)=>{
+  const inicio=performance.now();
+  try{return await coreApi.post<CommercialChallenge>(`/proyectos/${p.project}/mfa-comercial/iniciar`,{accion:p.action,datos:p.body});}
+  finally{console.info('[MFA comercial]',p.action,'solicitudMs:',Math.round(performance.now()-inicio));}
+ },
  verificar:(project:number,challengeId:string,codigo:string)=>coreApi.post<{approvalToken:string}>(`/proyectos/${project}/mfa-comercial/verificar`,{challengeId,codigo})
 };
 export async function commercialMutation<T>(project:number,action:CommercialAction,path:string,method:'POST'|'PUT',body:Record<string,unknown>):Promise<T>{
@@ -20,6 +24,8 @@ export async function commercialMutation<T>(project:number,action:CommercialActi
  try{
   const token=await new Promise<string>((resolve,reject)=>listener!({project,action,body:snapshot,resolve,reject}));
   const options={headers:{'X-Commercial-Approval':token}};
-  return await (method==='POST'?coreApi.post<T>(path,snapshot,options):coreApi.put<T>(path,snapshot,options));
+  const inicio=performance.now();
+  try{return await (method==='POST'?coreApi.post<T>(path,snapshot,options):coreApi.put<T>(path,snapshot,options));}
+  finally{console.info('[Operacion comercial]',action,'registroHttpMs:',Math.round(performance.now()-inicio));}
  }finally{pending=false;}
 }
