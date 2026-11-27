@@ -35,6 +35,13 @@ public class PlanoCadStorageController {
         return service.cargar(idProyecto,actor,archivo);
     }
 
+    @DeleteMapping("/{idArchivo}")
+    @PreAuthorize("hasAuthority('lots.configure')")
+    public PlanoCadStorageService.Eliminacion eliminar(@PathVariable Long idProyecto,
+        @PathVariable Long idArchivo) {
+        return service.eliminar(idProyecto,idArchivo);
+    }
+
     @GetMapping("/{idArchivo}/enlace")
     @PreAuthorize("hasAuthority('lots.view')")
     public PlanoCadStorageService.Descarga descargar(@PathVariable Long idProyecto,
