@@ -51,8 +51,10 @@ public class CommercialMfaClient {
     }
     @SuppressWarnings("unchecked")
     public Map<String,Object> iniciar(Jwt jwt,long proyecto,String accion,Object datos){
+        long inicio=System.nanoTime();
         try{return enviar(jwt,"start",Map.of("proyecto",proyecto,"accion",accion,"huella",huella(datos))).body(Map.class);}
         catch(ResourceAccessException e){throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Auth Service no está disponible para enviar el código.");}
+        finally{org.slf4j.LoggerFactory.getLogger(getClass()).info("MFA comercial accion={} authMs={}",accion,(System.nanoTime()-inicio)/1_000_000);}
     }
     @SuppressWarnings("unchecked")
     public Map<String,Object> verificar(Jwt jwt,UUID id,String codigo){
