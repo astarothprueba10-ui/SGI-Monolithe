@@ -73,7 +73,8 @@ test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un moda
   assert.match(detalle,/label: 'Etapas comerciales'/);
   assert.doesNotMatch(tab,/StageFormModal|getStagesByProject/);
   assert.match(tab,/useProjectConfiguration\(project.idProyecto\)/);
-  assert.match(tab,/onChange=\{next => model.guardar\(next, true\)\}/);
+  assert.match(tab,/model.guardar\(next,true\)/);
+  assert.match(tab,/projectConfigurationService.guardarEtapas/);
   assert.doesNotMatch(tab,/readOnly=\{[^}]*guardando/);
   assert.match(config,/<CommercialStageEditor/);
   assert.match(editor,/<Modal/);
@@ -92,7 +93,7 @@ test('el alta comercial separa precio de liberación y conserva bloqueos histór
   assert.equal(condicionPrecio('PROMOCION'),'PROMOCION');
   assert.doesNotMatch(editor,/Venta anticipada|\['BLOQUEADA', 'Bloqueada'\]/);
   assert.match(editor,/Bloqueo histórico conservado/);
-  assert.match(editor,/disabled=\{etapa.disponibilidad === 'BLOQUEADA'\}/);
+  assert.match(editor,/disabled=\{!published && etapa.disponibilidad === 'BLOQUEADA'\}/);
   assert.match(plantilla,/\['PROMOCION', 'REGULAR'\]/);
 });
 
@@ -166,4 +167,22 @@ test('historial presenta cambios y nombre, no JSON técnico',()=>{
  const r=resumirEvento({anterior:JSON.stringify({estado:{etapasHabilitadas:['E1']},lotes:[{id_lote:1,estadoInventario:'DISPONIBLE',precio_final:26000}]}),nuevo:JSON.stringify({estado:{etapasHabilitadas:['E2']},lotes:[{id_lote:1,estadoInventario:'NO_DISPONIBLE',precio_final:26000}]})});
  assert.deepEqual(r.abrieron,['E2']);assert.deepEqual(r.cerraron,['E1']);assert.equal(r.lotes.length,1);
  assert.equal(resumirEvento({anterior:'?',nuevo:'{}'}),null);
+});
+
+test('las zonas utilizadas respetan excepciones individuales y los formularios confirman internamente',()=>{
+ const {contarZonaEtapa}=require('../src/lib/commercialZoneUsage.ts');
+ const config={datos:{manzanas:[{id:10,codigoEtapa:'E1'}],lotes:[{id:2,codigoEtapa:'E2'}]},lotes:[
+ {id:1,idManzana:10,codigoZona:'AE'},{id:2,idManzana:10,codigoZona:'AE'},{id:3,idManzana:10,codigoZona:'E'},{id:4,idManzana:10,codigoZona:null}]};
+ assert.deepEqual([...contarZonaEtapa(config,'E1')],[['AE',1],['E',1]]);
+ assert.deepEqual([...contarZonaEtapa(config,'E2')],[['AE',1]]);
+ for(const p of ['CommercialManagementPanel.tsx','CommercialTariffEditor.tsx']){
+   const ui=archivo('components/projects/detail/'+p);
+   assert.match(ui,/Lotes asociados/);
+   assert.match(ui,/<Modal/);
+   assert.doesNotMatch(ui,/window.confirm/);
+ }
+ const zona=archivo('components/projects/ZoneFormModal.tsx');
+ assert.match(zona,/numeroOrden: null/);
+ assert.doesNotMatch(zona,/id="zona-numero-orden"/);
+ assert.match(zona,/disabled=\{isEditing\}/);
 });

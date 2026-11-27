@@ -120,8 +120,9 @@ public class ZonaService {
     }
 
     private void validarDesactivacionZona(Long idZona) {
-        if (loteRepository.existsByZona_IdZonaAndActivoTrue(idZona)) {
-            throw new ReglaNegocioException("No se puede desactivar esta zona porque tiene lotes activos asociados. Consulta y reasigna los lotes elegibles antes de desactivarla; conserva las operaciones existentes.");
+        long cantidad=loteRepository.countByZona_IdZonaAndActivoTrue(idZona);
+        if (cantidad>0) {
+            throw new ReglaNegocioException("No se puede desactivar esta zona: tiene "+cantidad+" lote(s) activos asociados. Consulta y reasigna los lotes elegibles antes de desactivarla; conserva las operaciones existentes.");
         }
     }
 
@@ -164,7 +165,8 @@ public class ZonaService {
                 zona.getNombre(),
                 zona.getDescripcion(),
                 zona.getNumeroOrden(),
-                zona.getActivo()
+                zona.getActivo(),
+                loteRepository.countByZona_IdZonaAndActivoTrue(zona.getIdZona())
         );
     }
 }

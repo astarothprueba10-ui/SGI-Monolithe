@@ -65,6 +65,7 @@ export type EtapaRequest = {
 };
 
 export interface ZonaResponse {
+  lotesActivos?: number;
   idZona: number;
   idProyecto: number;
   codigoProyecto?: string;

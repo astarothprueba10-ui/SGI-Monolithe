@@ -32,6 +32,9 @@ public class ConfiguracionProyectoService {
         var datos = version.map(v -> leer(v.json()))
                 .orElseGet(() -> new Datos(repository.etapas(proyecto), List.of(), List.of()));
         if (publicada>0) {
+            var tarifas=repository.tarifasVigentes(proyecto,publicada);
+            if(tarifas.isPresent())datos=new Datos(datos.etapas(),datos.manzanas(),datos.lotes(),
+                List.of(mapper.readValue(tarifas.get(),ConfiguracionProyectoRequest.Tarifa[].class)));
             var vigentes=repository.etapasVigentes(proyecto,publicada);
             if (vigentes.isPresent()) {
                 var etapas=mapper.readValue(vigentes.get(),ConfiguracionProyectoRequest.Etapa[].class);

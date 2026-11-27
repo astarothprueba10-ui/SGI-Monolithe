@@ -26,7 +26,6 @@ interface FormState {
   codigo: string;
   nombre: string;
   descripcion: string;
-  numeroOrden: string;
   activo: boolean;
 }
 
@@ -48,7 +47,6 @@ function initForm(
       codigo: '',
       nombre: '',
       descripcion: '',
-      numeroOrden: '1',
       activo: true
     };
   }
@@ -57,10 +55,6 @@ function initForm(
     codigo: zone.codigo ?? '',
     nombre: zone.nombre ?? '',
     descripcion: zone.descripcion ?? '',
-    numeroOrden:
-      zone.numeroOrden != null
-        ? String(zone.numeroOrden)
-        : '1',
     activo: zone.activo ?? true
   };
 }
@@ -124,22 +118,6 @@ function validate(
       'La descripción no debe superar 255 caracteres.';
   }
 
-  if (
-    form.numeroOrden.trim() !== ''
-  ) {
-    const orden = Number(
-      form.numeroOrden
-    );
-
-    if (
-      Number.isNaN(orden) ||
-      !Number.isInteger(orden) ||
-      orden < 1
-    ) {
-      errors.numeroOrden =
-        'Debe ser un número entero mayor o igual a 1.';
-    }
-  }
 
   return errors;
 }
@@ -168,7 +146,6 @@ function mapBackendFieldErrors(
     'codigo',
     'nombre',
     'descripcion',
-    'numeroOrden',
     'activo'
   ];
 
@@ -500,6 +477,7 @@ export function ZoneFormModal({
                 checked={
                   form.activo
                 }
+                disabled={!!zone?.activo && (zone.lotesActivos??0)>0}
                 onChange={(
                   event
                 ) =>
@@ -517,6 +495,7 @@ export function ZoneFormModal({
               </span>
             </label>
           </div>
+          {!!zone?.activo && (zone.lotesActivos??0)>0 && <p className="text-xs text-brand-600">No se puede desactivar: {zone.lotesActivos} lotes activos asociados.</p>}
         </div>
 
         <div>

@@ -116,6 +116,23 @@ class GestionComercialServiceTest {
         verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
     }
 
+    @Test void crearEtapaNoAbreInventarioNiRepublica() {
+        var nuevas=new ArrayList<>(datos.etapas());
+        nuevas.add(new Etapa("E3","Nueva",Disponibilidad.REGULAR,TipoDescuento.NINGUNO,BigDecimal.ZERO));
+        var r=service.guardarEtapas(proyecto,actor,new GestionComercialDto.CambioEtapas(10L,nuevas));
+        assertEquals(List.of("E1"),r.estado().etapasHabilitadas());
+        assertEquals(3,r.estado().etapas().size());
+        verify(repo).evento(eq(proyecto),eq(1),eq(actor),eq("ETAPAS"),anyString(),anyString());
+        verify(repo,never()).registrarPrecio(any(),anyInt());
+        verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
+        verify(repo,never()).habilitarInventario(anyLong(),anyLong(),anyInt());
+    }
+
+    @Test void noPuedeRetirarEtapaPublicada() {
+        assertThrows(ReglaNegocioException.class,()->service.guardarEtapas(proyecto,actor,new GestionComercialDto.CambioEtapas(10L,List.of(datos.etapas().getFirst()))));
+        verify(repo,never()).evento(anyLong(),anyInt(),anyLong(),anyString(),anyString(),anyString());
+    }
+
     @Test void tarifaAnteriorNoConvierteSeleccionInferidaEnConfirmada() {
         when(repo.seleccionRegistrada(proyecto,1)).thenReturn(false);
         assertTrue(service.gestion(proyecto).inferida());

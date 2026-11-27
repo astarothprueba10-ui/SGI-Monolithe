@@ -62,3 +62,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/tests/fixtures/gestion_comercial_170_fixture.sql
           psql -v ON_ERROR_STOP=1 -f database/migrations/170_inm_gestion_comercial_independiente.sql
           psql -v ON_ERROR_STOP=1 -f database/tests/gestion_comercial_170_pg_test.sql
+          psql -v ON_ERROR_STOP=1 -f database/migrations/171_inm_gestion_etapas.sql
+          psql -v ON_ERROR_STOP=1 -f database/tests/gestion_comercial_171_pg_test.sql

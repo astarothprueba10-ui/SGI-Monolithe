@@ -118,6 +118,7 @@ export function ProjectZonesTab({ project }: Props) {
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Código</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Nombre</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Descripción</TH>
+                <TH className="text-brand-900 font-bold bg-brand-50/80">Lotes activos</TH>
                 <TH className="text-brand-900 font-bold bg-brand-50/80">Estado</TH>
                 {canEdit && <TH align="right" className="text-brand-900 font-bold bg-brand-50/80">Acciones</TH>}
               </>
@@ -137,6 +138,7 @@ export function ProjectZonesTab({ project }: Props) {
                 <TD className="text-brand-600 max-w-xs truncate">
                   {zn.descripcion ?? '—'}
                 </TD>
+                <TD>{zn.lotesActivos??'—'}</TD>
                 <TD>
                   {zn.activo ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4cbb17]/40 bg-[#4cbb17]/10 px-2.5 py-0.5 text-xs font-semibold text-[#2d7a0c]">
