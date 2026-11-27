@@ -56,7 +56,7 @@ import {
 } from '../utils/ventasComercial';
 import { validarPagoVenta } from '../utils/crmPagoVenta';
 import { LotVisualPickerPanel } from '../components/sales/LotVisualPickerPanel';
-import { selectedVisualLot } from '../lib/lotVisualFocus';
+import { selectedVisualLot, visualLotAction } from '../lib/lotVisualFocus';
 import { PagoSeparacionPanel } from '../components/sales/PagoSeparacionPanel';
 import { centavosImporte, crearPagoSeparacion, resolverPagosSeparacion, validarPagosSeparacion, type PagoSeparacionBorrador } from '../utils/pagosSeparacion';
 import { calcularVenta, validarInicialTotal, type ResumenVentaCalculado, type CondicionesFrancesas } from '../utils/financiamientoFrances';
@@ -1359,7 +1359,42 @@ export function Sales() {
   const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
   const mostrarVisorSeparacion=opType==='Separacion' && can('lots.view');
-  const loteVisual=selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional,loteEnConsulta,lotesAdicionales.map(l=>l.idLote));
+  const mostrarVisorOperacion=can('lots.view');
+  // En venta se usa exactamente el listado autorizado por cliente y etapa, no el inventario del mapa.
+  const lotesVisorOperacion=opType==='Venta'?availableLots:lotesDisponiblesProyecto;
+  const idsAdicionales=lotesAdicionales.map(l=>l.idLote);
+  const idsReservasVisor=reservasVigentes.filter(r=>r.idProyecto===Number(formProjectId)).map(r=>r.idLote);
+  const loteVisual=opType==='Venta'
+    ? selectedVisualLot(availableLots,Number(formProjectId),formLotId,false,'',false,'',loteEnConsulta,idsReservasVisor)
+    : selectedVisualLot(lotesDisponiblesProyecto,Number(formProjectId),formLotId,editorLote,loteCandidato,editorAdicional,candidatoAdicional,loteEnConsulta,idsAdicionales);
+  const opcionesVisor={
+    operation:opType,principal:Number(formLotId),adicionales:idsAdicionales,
+    editorPrincipal:editorLote,editorAdicional,
+    puedeAgregar:Boolean(separacionCondicionesVerificadas&&condicionesVenta&&lotesAdicionales.length<19),
+    bloqueado:!mostrarVisorOperacion||!selectedProspectId||!formProjectId||!proyectoConInteres||loadingFormData||loadingProjects||loadingStages||loadingLots||submitting||registrandoInteres||guardandoAsesorOperacion||editorAsesor||editorInteres||guardandoLote||cargandoAdicional,
+    reservasBloqueadas:tieneReservasVenta||!!asociacionAgrupadaPendiente,
+    reservas:asociacionAgrupadaPendiente?idsReservasVisor.filter(id=>id===asociacionAgrupadaPendiente.idLote):idsReservasVisor
+  };
+  const accionVisor=(id:number)=>visualLotAction(id,Number(formProjectId),lotesVisorOperacion,opcionesVisor);
+  const lotesSeleccionablesVisor=new Set(lotesVisorOperacion.filter(l=>accionVisor(l.idLote)!=='ninguna').map(l=>l.idLote));
+  function seleccionarDesdePlano(id:number){
+    const accion=accionVisor(id);
+    if(accion==='ninguna')return;
+    if(accion==='consultar'){consultarUbicacion(id);return;}
+    setLoteEnConsulta(null);setRevisionEnfoque(v=>v+1);
+    if(accion==='venta'){handleSelectLot(String(id));return;}
+    if(accion==='principal'){
+      if(!editorLote)abrirEditorLote();
+      setLoteCandidato(String(id));setErrorLote('');
+    }else if(accion==='adicional'){
+      setEditorAdicional(true);setCandidatoAdicional(String(id));setErrorAdicional('');
+    }
+  }
+  const ayudaVisor=opType==='Venta'
+    ? opcionesVisor.reservasBloqueadas?'Las reservas vigentes se consultan en el plano. Para formalizar, utiliza el panel de reservas.':'Selecciona un lote autorizado de la etapa comercial actual desde el plano o la lista.'
+    : editorLote?'Selecciona el lote principal en el plano y confirma el cambio en el formulario.'
+    : editorAdicional?'Selecciona el lote adicional en el plano y pulsa Añadir lote.'
+    : formLotId?'Pulsa un lote agregado para consultarlo, o uno disponible para preparar su incorporación.':'Selecciona un lote disponible en el plano y confírmalo en el formulario.';
   const totalSeparacionSeleccion = (condicionesVenta?.montoSeparacion ?? 0)+lotesAdicionales.reduce((sum,l)=>sum+l.monto,0);
   const totalPrecioSeleccion = (precioLote?.idLote===Number(formLotId)?Number(precioLote.precio):0)+lotesAdicionales.reduce((sum,l)=>sum+l.precio,0);
   const pagosSeparacionResueltos = resolverPagosSeparacion(pagosSeparacion,totalSeparacionSeleccion);
@@ -2265,7 +2300,7 @@ export function Sales() {
       <Modal
         open={isModalOpen}
         onClose={cerrarModalOperacion}
-        width={mostrarVisorSeparacion ? "max-w-7xl" : "max-w-3xl"}
+        width={mostrarVisorOperacion ? "max-w-7xl" : "max-w-3xl"}
         title={opType === 'Separacion' ? 'Registrar separación' : 'Formalización de Venta'}
         description={opType === 'Separacion'
           ? 'Selecciona los lotes y revisa sus importes antes de registrar el pago.'
@@ -2313,7 +2348,7 @@ export function Sales() {
             Cargando prospectos y lotes disponibles…
           </div>
         ) : (
-          <div className={mostrarVisorSeparacion?'grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]':'min-w-0'}>
+          <div className={mostrarVisorOperacion?'grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]':'min-w-0'}>
           <form className="min-w-0" onSubmit={handleProcessOperation}><fieldset disabled={submitting} className="space-y-4 min-w-0">
             {<header className="flex items-start gap-3 pb-1">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-bold text-white">1</span>
@@ -2472,6 +2507,7 @@ export function Sales() {
               idProspecto={Number(selectedProspectId)} reservas={reservasVigentes}
               idLoteSeleccionado={Number(formLotId)} disabled={submitting || loadingLots || loadingStages}
               onSeleccionar={r=>{
+                setLoteEnConsulta(null);setRevisionEnfoque(v=>v+1);
                 setAutoseleccionPendiente({idProyecto:r.idProyecto,idLote:r.idLote});
                 if(r.idProyecto!==Number(formProjectId)){
                   setFormProjectId(String(r.idProyecto));setFormStageId('');setFormLotId('');
@@ -2618,7 +2654,7 @@ export function Sales() {
               </div> : <Select
                 value={formLotId}
                 disabled={tieneReservasVenta || !formProjectId || !formStageId || loadingLots}
-                onChange={(e) => handleSelectLot(e.target.value)}
+                onChange={(e) => {setLoteEnConsulta(null);setRevisionEnfoque(v=>v+1);handleSelectLot(e.target.value);}}
               >
                 <option value="">
                   {loadingLots
@@ -3097,10 +3133,10 @@ export function Sales() {
               />
             </div>
           </fieldset></form>
-          {mostrarVisorSeparacion&&<aside className="min-w-0 lg:sticky lg:top-0">
+          {mostrarVisorOperacion&&<aside className="min-w-0 lg:sticky lg:top-0">
             {selectedProspectId&&formProjectId&&proyectoConInteres
               ? <LotVisualPickerPanel key={formProjectId} project={Number(formProjectId)} selected={loteVisual}
-                  stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined} focusRevision={revisionEnfoque}/>
+                  stageName={loteVisual?nombreEtapaLote(loteVisual.idLote):undefined} focusRevision={revisionEnfoque} selectable={lotesSeleccionablesVisor} onPick={seleccionarDesdePlano} selectionHint={ayudaVisor}/>
               : <section className="rounded-xl border border-brand-200 bg-brand-50 p-5 text-sm text-brand-600">
                   <h3 className="mb-2 font-semibold text-brand-900">Vista del lote</h3>
                   Selecciona el cliente y el proyecto para visualizar sus lotes.
