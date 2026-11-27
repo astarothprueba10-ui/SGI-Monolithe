@@ -556,8 +556,9 @@ export const coreService = {
   createPlanVersion(data: PlanoInteractivoRequest): Promise<PlanoInteractivoResponse> {
     return coreApi.post<PlanoInteractivoResponse>('/planos', data);
   },
-  getCurrentMatrix(idProyecto: number): Promise<PlanoInteractivoDetalleResponse | null> {
-    return coreApi.get<PlanoInteractivoDetalleResponse | null>(`/planos/proyecto/${idProyecto}/matriz`);
+  async getCurrentMatrix(idProyecto: number): Promise<PlanoInteractivoDetalleResponse | null> {
+    const resultado = await coreApi.get<PlanoInteractivoDetalleResponse | null | ''>(`/planos/proyecto/${idProyecto}/matriz`);
+    return resultado === '' || resultado == null ? null : resultado;
   },
   saveLotMatrix(idPlano: number, cambios: LoteGeometriaRequest[]): Promise<PlanoInteractivoDetalleResponse> {
     return coreApi.put<PlanoInteractivoDetalleResponse>(`/planos/${idPlano}/matriz`, cambios);
