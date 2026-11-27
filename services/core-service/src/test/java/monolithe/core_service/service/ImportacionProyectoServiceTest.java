@@ -117,6 +117,7 @@ class ImportacionProyectoServiceTest {
         var previo = service.previsualizar(2L, solicitud(filas,null));
         assertTrue(service.confirmar(2L, solicitud(filas,previo.huella()), 1L).confirmado());
         verify(zonas, times(1)).crear(argThat(z -> z.codigo().equals("Z-B")));
+        verify(configuracion).registrarImportacion(2L,1L,previo.huella(),2);
         verifyNoInteractions(etapas, manzanas, lotes);
     }
 
@@ -180,6 +181,7 @@ class ImportacionProyectoServiceTest {
         service.confirmar(2L, solicitud(filas,previo.huella()), 3L);
         var captor = ArgumentCaptor.forClass(ConfiguracionProyectoRequest.class);
         verify(configuracion).guardar(eq(2L), eq(3L), captor.capture());
+        verify(configuracion).registrarImportacion(2L,3L,previo.huella(),4);
         assertEquals(4, captor.getValue().version());
         assertEquals(12L, captor.getValue().datos().manzanas().getFirst().id());
         assertEquals(14L, captor.getValue().datos().lotes().getFirst().id());
