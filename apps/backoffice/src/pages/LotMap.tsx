@@ -204,6 +204,12 @@ export function LotMap() {
   const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
   const [pricesMap, setPricesMap] = useState<Map<number, number>>(new Map());
   const [svgDocument, setSvgDocument] = useState<PlanoSvgDocumento | null>(null);
+  const [svgLoading,setSvgLoading]=useState(false);
+  const [svgError,setSvgError]=useState(false);
+  const [svgRetry,setSvgRetry]=useState(0);
+  const [refreshingPlan,setRefreshingPlan]=useState(false);
+  const refreshInFlight=useRef(false);
+  const lastRefresh=useRef(0);
   const [commercializable, setCommercializable] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<'matriz' | 'svg'>('matriz');
   const [layoutMode, setLayoutMode] = useState<'manzanas' | 'general'>('manzanas');
@@ -243,35 +249,49 @@ export function LotMap() {
   }, []);
 
   const loadProjectData = useCallback((projectId: number, preserveSelection = false) => {
+    if(preserveSelection&&refreshInFlight.current)return ()=>{};
     const version=++requestVersion.current;
     let isMounted=true;
-    setLoadingPlan(true);
+    refreshInFlight.current=true;
+    setRefreshingPlan(preserveSelection);
+    setLoadingPlan(!preserveSelection);
     setLoadError(false);
     if(!preserveSelection){
       setSelectedLotId(null);setLots([]);setPlanDetail(null);setPricesMap(new Map());setCommercializable(new Set());
     }
     Promise.allSettled([
-      commercialLotService.listar(projectId),
-      coreService.getOptionalCurrentPlanDetail(projectId),
-      projectSvgService.obtener(projectId),
-      coreService.getCommercializableLots(projectId)
-    ]).then(([lotsResult,planResult,svgResult,commercialResult])=>{
+      commercialLotService.listarMapa(projectId),
+      coreService.getCurrentMatrix(projectId)
+    ]).then(([lotsResult,planResult])=>{
       if(!isMounted||version!==requestVersion.current||editingRef.current)return;
+      refreshInFlight.current=false;setRefreshingPlan(false);setLoadingPlan(false);lastRefresh.current=Date.now();
       if(lotsResult.status!=='fulfilled'||planResult.status!=='fulfilled'){
-        setLoadError(true);setCommercializable(new Set());setLoadingPlan(false);
+        setLoadError(true);setCommercializable(new Set());
         toast.error('No se pudo consultar el inventario comercial o las posiciones del plano.');return;
       }
-      const rows=lotsResult.value.lotes.filter(f=>f.lote.activo);
+      const rows=lotsResult.value.filter(f=>f.lote.activo);
       setLots(rows.map(f=>({...f.lote,codigoEtapa:f.codigoEtapa??undefined,nombreEtapa:f.nombreEtapa??'Sin asignar',
         codigoEstadoLote:f.estado,nombreEstadoLote:estadoLote(f.estado)})));
       setPricesMap(new Map(rows.flatMap(f=>f.precio==null?[]:[[f.lote.idLote,f.precio] as const])));
       setPlanDetail(planResult.value);
-      setSvgDocument(svgResult.status==='fulfilled'&&svgResult.value?.documento?svgResult.value.documento:null);
-      setCommercializable(commercialResult.status==='fulfilled'?new Set(commercialResult.value):new Set());
-      setLoadingPlan(false);
+      // DISPONIBLE se calcula en el servidor con listarComercializables y protección de operaciones.
+      setCommercializable(new Set(rows.filter(f=>f.estado==='DISPONIBLE'&&!f.protegido).map(f=>f.lote.idLote)));
     });
-    return ()=>{isMounted=false;};
+    return ()=>{isMounted=false;if(version===requestVersion.current)refreshInFlight.current=false;};
   }, []);
+
+  // El documento SVG se descarga una sola vez por proyecto, sin bloquear la matriz.
+  useEffect(()=>{
+    let active=true;
+    setSvgDocument(null);setSvgError(false);
+    if(!selectedProjectId){setSvgLoading(false);return;}
+    setSvgLoading(true);
+    projectSvgService.obtener(selectedProjectId).then(res=>{
+      if(active)setSvgDocument(res?.documento??null);
+    }).catch(()=>{if(active)setSvgError(true);})
+      .finally(()=>{if(active)setSvgLoading(false);});
+    return ()=>{active=false;};
+  },[selectedProjectId,svgRetry]);
 
   // Al cambiar de proyecto, cargar datos completos
   useEffect(() => {
@@ -293,7 +313,7 @@ export function LotMap() {
   // Refrescar al enfocar la ventana preservando la seleccion del lote
   useEffect(() => {
     const handleFocus = () => {
-      if (selectedProjectId && !editingRef.current) {
+      if (selectedProjectId && !editingRef.current && !refreshInFlight.current && Date.now()-lastRefresh.current>15000) {
         loadProjectData(selectedProjectId, true);
       }
     };
@@ -328,7 +348,7 @@ export function LotMap() {
   },[isEditingPlan,draftKey,draftSignature,draftGeometries]);
 
   const handleStartPlanEditing=()=>{
-    if(loadingPlan||loadError||!planDetail?.plano||!lots.length||!canConfigurePlan){
+    if(loadingPlan||refreshingPlan||loadError||!planDetail?.plano||!lots.length||!canConfigurePlan){
       toast.error('Se requiere un plano general vigente y el inventario cargado.');return;
     }
     let copy=displayGeometries.map(g=>({...g,puntos:g.puntos.map(p=>({...p}))}));
@@ -399,7 +419,7 @@ export function LotMap() {
       })));
       clearStoredDraft();setPlanDetail(refreshedPlan);editingRef.current=false;setIsEditingPlan(false);setDraftGeometries([]);
       toast.success(`${changedGeometries.length} lote(s) actualizados correctamente.`);
-      if(selectedProjectId)loadProjectData(selectedProjectId,true);
+      // La respuesta ya contiene las geometrías persistidas; no repetir las consultas del proyecto.
     }catch(err:unknown){
       toast.error(err instanceof ApiError?err.message:'No se pudo guardar la configuración. El borrador se conserva.');
     }finally{setSavingPlan(false);}
@@ -619,7 +639,7 @@ export function LotMap() {
     if (selectedLotId === null) return null;
     return lots.find((l) => l.idLote === selectedLotId) ?? null;
   }, [lots, selectedLotId]);
-  const canOperate = Boolean(!isEditingPlan && !loadingPlan && !loadError && selectedLot && can('sales.create') && selectedLot.activo
+  const canOperate = Boolean(!isEditingPlan && !loadingPlan && !refreshingPlan && !loadError && selectedLot && can('sales.create') && selectedLot.activo
     && selectedLot.codigoEstadoLote === 'DISPONIBLE' && pricesMap.has(selectedLot.idLote)
     && commercializable.has(selectedLot.idLote));
   const openCommercialFlow = (operacion: 'Separacion' | 'Venta') => {
@@ -707,7 +727,7 @@ export function LotMap() {
               <Button icon={SaveIcon} variant="primary" onClick={()=>void handleSavePlan()}
                 disabled={savingPlan}>{savingPlan?'Guardando…':'Guardar posiciones'}</Button>
             </div>
-          : <Button icon={Settings2Icon} onClick={handleStartPlanEditing} disabled={loadingPlan || loadError || !planDetail?.plano || !lots.length}>
+          : <Button icon={Settings2Icon} onClick={handleStartPlanEditing} disabled={loadingPlan || refreshingPlan || loadError || !planDetail?.plano || !lots.length}>
               Configurar posiciones
             </Button>) : undefined}/>
       {currentProject && <section className="overflow-hidden rounded-2xl border border-brand-200 bg-white p-4 shadow-sm lg:p-5">
@@ -735,7 +755,7 @@ export function LotMap() {
             </div>
           </div>
           <div className="h-44 overflow-hidden rounded-xl border border-brand-100 bg-brand-50/70">
-            {svgDocument ? <PlanSvgShapes documento={svgDocument} lotes={lots} seleccionado={selectedLotId} miniatura/>
+            {svgDocument && viewMode==='matriz' && !isEditingPlan ? <PlanSvgShapes documento={svgDocument} lotes={lots} seleccionado={null} miniatura/>
               : <svg viewBox={`0 0 ${canvasDimensions.width} ${canvasDimensions.height}`} preserveAspectRatio="xMidYMid meet"
                   className="h-full w-full" role="img" aria-label="Vista previa automática del inventario del proyecto">
                   <rect width={canvasDimensions.width} height={canvasDimensions.height} rx="18" fill="#eef5f8"/>
@@ -752,7 +772,7 @@ export function LotMap() {
             <div><p className="text-sm font-bold text-brand-900">Plano del proyecto</p>
               <p className="mt-1 text-xs text-brand-500">{svgDocument ? svgDocument.nombreArchivo : 'DWG original o SVG interactivo'}</p></div>
             <Button size="sm" disabled={isEditingPlan || savingPlan} onClick={()=>setViewMode('svg')}>
-              {svgDocument?'Ver plano SVG':'Importar DWG / SVG'}
+              {svgLoading?'Ver plano SVG':svgDocument?'Ver plano SVG':svgError?'Consultar plano SVG':'Importar DWG / SVG'}
             </Button>
           </div>
         </div>
@@ -966,7 +986,7 @@ export function LotMap() {
                 </div>}
             </div>
           </> : <div className="p-4 sm:p-5">
-            {selectedProjectId && <ProjectSvgPanel key={selectedProjectId} proyecto={selectedProjectId}
+            {svgLoading || loadingPlan ? <div className="p-16 text-center text-sm text-brand-500">Cargando plano SVG…</div> : svgError ? <div className="p-8 text-center"><p className="mb-3 text-sm text-brand-600">No se pudo consultar el plano SVG.</p><Button onClick={()=>setSvgRetry(v=>v+1)}>Reintentar</Button></div> : selectedProjectId && <ProjectSvgPanel key={selectedProjectId} proyecto={selectedProjectId}
               lotes={lots} documento={svgDocument} onSave={setSvgDocument}
               seleccionado={selectedLotId} onSelect={setSelectedLotId} puedeConfigurar={canConfigurePlan}/>}
           </div>}
