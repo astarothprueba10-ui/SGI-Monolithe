@@ -90,3 +90,15 @@ test('carga matriz independiente del SVG y no recarga inventario después de gua
   assert.match(pagina,/refreshInFlight\.current/);
   assert.match(pagina,/viewMode==='matriz' && !isEditingPlan/);
 });
+
+test('un fallo del plano no desmonta la navegación y permite reintentar',()=>{
+  const app=leer('App.tsx');
+  const pagina=leer('pages/LotMap.tsx');
+  const core=leer('services/coreService.ts');
+  assert.match(app,/<LotMapErrorBoundary><LotMap \/><\/LotMapErrorBoundary>/);
+  assert.match(app,/getDerivedStateFromError/);
+  assert.match(pagina,/!Array\.isArray\(inventory\)/);
+  assert.match(pagina,/!Array\.isArray\(plan\.lotes\)/);
+  assert.match(pagina,/No se pudieron cargar los proyectos/);
+  assert.match(core,/resultado === '' \|\| resultado == null \? null/);
+});
