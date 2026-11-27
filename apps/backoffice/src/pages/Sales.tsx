@@ -619,7 +619,7 @@ export function Sales() {
           : Promise.resolve({ reservas: [] as CrmReservaVigenteVenta[], idLotes: [] as number[] })
       ]);
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
-      const intereses = new Set((detalle.intereses ?? []).map((i) => i.idProyecto));
+      const intereses = new Set((detalle.intereses ?? []).map(i=>Number(i.idProyecto)).filter(i=>Number.isSafeInteger(i)&&i>0));
       setInteresesOperacion([...intereses]);
       const preferencias:typeof preferenciasLote={};
       for(const i of detalle.intereses??[]) {
@@ -653,7 +653,11 @@ export function Sales() {
         setFormProjectId(String(reserva.idProyecto));
       } else {
         const registrado = [...intereses].find(idProyecto => elegibles.some(p => p.idProyecto === idProyecto));
-        if (registrado !== undefined) setFormProjectId(String(registrado));
+        if (registrado !== undefined) {
+          setFormProjectId(String(registrado));
+          const preferido=preferencias[registrado]?.id;
+          if(opType==='Venta'&&preferido!=null&&!destino)setAutoseleccionPendiente({idProyecto:registrado,idLote:preferido});
+        }
         if (destino && (compradorExistente || puedeEditarInteres)) {
           setProyectoInteresNuevo(String(destino.idProyecto));
           setProyectoInteresAnterior(registrado === undefined ? '' : String(registrado));
@@ -896,8 +900,9 @@ export function Sales() {
     setErrorLote('');
     try {
       if(puedeEditarInteres && candidato.idLote!==preferenciaLote?.id) {
-        if(motivoLote.trim().length<5) return;
-        const res=await crmBackend.cambiarLoteInteres(selectedProspectId,proyecto,candidato.idLote,preferenciaLote?.id??null,motivoLote.trim());
+        if(preferenciaLote?.id!=null&&motivoLote.trim().length<5) return;
+        const motivo=preferenciaLote?.id!=null?motivoLote.trim():'Registro inicial de lote de interés desde Separaciones y Ventas';
+        const res=await crmBackend.cambiarLoteInteres(selectedProspectId,proyecto,candidato.idLote,preferenciaLote?.id??null,motivo);
         if(solicitud!==seleccionProspectoPeticionRef.current) return;
         setPreferenciasLote(prev=>({...prev,[proyecto]:{
           id:res.idLoteInteres,codigo:res.codigoLoteInteres,comentario:prev[proyecto]?.comentario??null
@@ -1018,7 +1023,7 @@ export function Sales() {
       return false;
     }
     if (!validacionPagosSeparacion.valido) {
-      toast.error('Completa los comprobantes y verifica que los abonos coincidan con el total de separación.');
+      toast.error('Completa los datos de los abonos y verifica que coincidan con el total de separación.');
       return false;
     }
     return true;
@@ -1160,11 +1165,18 @@ export function Sales() {
       ];
       const abonos:CrmSeparacionAcumuladaInput['abonos']=[];
       for(const p of pagosSeparacionResueltos){
-        if(!p.archivo||!p.hashSha256)throw new Error('Falta verificar un comprobante.');
         const centavos=centavosImporte(p.monto);
         if(centavos===null)throw new Error('Importe de abono inválido.');
-        const carga=await crmBackend.subirComprobanteSeparacion(idProspecto,idPrincipal,p.archivo);
-        abonos.push({...carga,hashSha256:p.hashSha256,metodoPago:p.metodo,
+        let archivo=p.archivo,hashSha256=p.hashSha256;
+        if(p.metodo==='EFECTIVO'&&!archivo){
+          const {crearConstanciaEfectivo}=await import('../utils/constanciaEfectivo');
+          archivo=await crearConstanciaEfectivo(idProspecto,idPrincipal,centavos,lotes.map(l=>l.idLote));
+          const digest=await crypto.subtle.digest('SHA-256',await archivo.arrayBuffer());
+          hashSha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+        }
+        if(!archivo||!hashSha256)throw new Error('Falta verificar el documento del abono.');
+        const carga=await crmBackend.subirComprobanteSeparacion(idProspecto,idPrincipal,archivo);
+        abonos.push({...carga,hashSha256,metodoPago:p.metodo,
           numeroOperacion:p.metodo==='EFECTIVO'?null:p.referencia.trim()||null,monto:centavos/100});
       }
       enviado=true;
@@ -1460,7 +1472,7 @@ export function Sales() {
       .then(etapas => {
         if (!vigente) return;
         setAvailableStages(etapas ?? []);
-        if (opType==='Venta' && etapas.length === 1) setFormStageId(etapas[0].codigo);
+        if (opType==='Venta' && etapas?.length === 1) setFormStageId(etapas[0].codigo);
       })
       .catch((err: unknown) => {
         if (vigente) toast.error('No se pudieron cargar las etapas comerciales', {
@@ -2594,7 +2606,7 @@ export function Sales() {
                     <p className="mt-1 text-xs text-amber-700">No está disponible para una nueva separación. Puedes elegir otro lote.</p>
                   </> : <p>{selectedProspectId&&formProjectId?'El cliente aún no tiene un lote de interés identificado en CRM. Selecciona el lote principal.':'Selecciona un cliente y su proyecto para consultar el lote de interés.'}</p>}
                 </div>}
-                {!editorLote&&<Button type="button" variant="secondary" className="w-full sm:w-auto"
+                {!editorLote&&<Button type="button" variant="secondary" className="mr-0 sm:mr-3 w-full sm:w-auto"
                   disabled={!formProjectId||loadingProjects||loadingStages||loadingLots||!lotesDisponiblesProyecto.length||submitting||guardandoLote||cargandoAdicional||editorAdicional||editorInteres}
                   onClick={abrirEditorLote}>{formLotId||preferenciaLote?.id?(puedeEditarInteres?'Cambiar lote de interés':'Elegir otro lote para esta operación'):'Seleccionar lote'}</Button>}
                 {editorLote&&<div className="space-y-2 rounded-xl border border-brand-200 p-3">
@@ -2603,7 +2615,7 @@ export function Sales() {
                     <option value="">Seleccione un lote</option>
                     {lotesDisponiblesProyecto.map(l=><option key={l.idLote} value={l.idLote}>{l.codigo} · {l.nombreManzana??''} · {l.areaM2??0} m² · {nombreEtapaLote(l.idLote)??''}</option>)}
                   </Select>
-                  {puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&<label className="block text-xs font-medium text-brand-700">Motivo del registro o cambio *
+                  {puedeEditarInteres&&preferenciaLote?.id!=null&&!!loteCandidato&&Number(loteCandidato)!==preferenciaLote.id&&<label className="block text-xs font-medium text-brand-700">Motivo del cambio de interés *
                     <textarea rows={2} maxLength={500} className="mt-1 w-full rounded-lg border border-brand-200 p-2" value={motivoLote} disabled={guardandoLote}
                       onChange={e=>setMotivoLote(e.target.value)} placeholder="Preferencia expresada por el cliente"/>
                     <span className="block font-normal text-brand-500">Se guardará en CRM y en el expediente.</span>
@@ -2612,7 +2624,7 @@ export function Sales() {
                   {errorLote&&<Alert tone="danger" title="No se pudo actualizar el lote">{errorLote}</Alert>}
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={guardandoLote} onClick={()=>setEditorLote(false)}>Cancelar</Button>
-                    <Button type="button" disabled={!loteCandidato||guardandoLote||(puedeEditarInteres&&Number(loteCandidato)!==preferenciaLote?.id&&motivoLote.trim().length<5)}
+                    <Button type="button" disabled={!loteCandidato||guardandoLote||(puedeEditarInteres&&preferenciaLote?.id!=null&&Number(loteCandidato)!==preferenciaLote.id&&motivoLote.trim().length<5)}
                       onClick={()=>void confirmarLoteInteres()}>{guardandoLote?'Guardando…':'Confirmar lote'}</Button>
                   </div>
                 </div>}
@@ -2764,7 +2776,7 @@ export function Sales() {
                   </p>
                 ) : condicionesVenta ? (
                   <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                    Condiciones contractuales verificadas · Versión {condicionesVenta.version}
+                    Condiciones contractuales verificadas
                   </p>
                 ) : null}
                 {errorPolitica && !consultandoPolitica && (
