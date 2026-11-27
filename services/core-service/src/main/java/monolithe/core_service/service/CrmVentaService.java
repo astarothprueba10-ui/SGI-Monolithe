@@ -180,7 +180,7 @@ public class CrmVentaService {
             || request.toString().length()>400000)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Revise las condiciones de los lotes.");
         return ejecutar("""
-            SELECT public.sp_crm_registrar_ventas_multiples_v1(
+            SELECT public.sp_crm_registrar_ventas_multiples_v2(
               CAST(? AS bigint),CAST(? AS jsonb))::text
             """,actor,request.toString());
     }
