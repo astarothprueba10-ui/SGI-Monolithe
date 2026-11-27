@@ -8,6 +8,7 @@ import type { ConfiguracionProyectoResponse } from '../../../types/projectConfig
 
 export function CommercialManagementPanel({ config, version }: { config: ConfiguracionProyectoResponse; version: number }) {
   const [seccion, setSeccion] = useState<'tarifas' | 'disponibilidad'>('disponibilidad');
+  if (config.version !== version) return <Card className="p-5"><h2 className="font-semibold text-brand-900">Gestión comercial</h2><p role="alert" className="mt-2 text-sm text-brand-700">La versión consultada no coincide con la configuración publicada. No se mostrarán tarifas de un borrador como si fueran vigentes.</p></Card>;
   return <Card className="p-5 space-y-5">
     <header><h2 className="text-lg font-semibold text-brand-900">Gestión comercial</h2>
       <p className="text-sm text-brand-600">Configuración inicial finalizada (v{version}). No es necesario volver a publicar.</p></header>

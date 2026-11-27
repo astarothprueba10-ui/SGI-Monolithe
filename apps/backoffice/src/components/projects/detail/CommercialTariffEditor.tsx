@@ -64,7 +64,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
     if (!window.confirm(`¿Quitar la tarifa de ${zona} en ${etapaActual?.nombre ?? etapa}? Si existen lotes asociados, la publicación quedará pendiente hasta que se configure otra tarifa vigente.`)) return;
     onChange({ ...datos, tarifas: tarifas.filter(t => !(
       t.codigoEtapa === etapa && t.moneda === moneda && t.codigoZona === zona)) });
-    setAviso('Tarifa retirada del borrador. No modifica precios vigentes hasta la publicación.');
+    setAviso('Tarifa retirada del borrador. Debe existir una tarifa válida para los lotes asociados antes de finalizar.');
   }
 
   function fechas(enTodas: boolean) {
@@ -107,7 +107,7 @@ export function CommercialTariffEditor({ datos, catalogos, onChange, readOnly = 
 
   if (readOnly) return <section className="space-y-4">
     <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>
-    <p className="text-sm text-brand-600">Consulta las tarifas de la configuración publicada. Los cambios de precios vigentes requieren una operación independiente, sin republicar.</p>
+    <p className="text-sm text-brand-600">Consulta las tarifas de la configuración inicial publicada. El precio vigente individual puede diferir; los cambios de precios requieren una operación independiente, sin republicar.</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <div><FieldLabel>Etapa comercial</FieldLabel><Select value={etapa} onChange={e => setEtapa(e.target.value)}>{datos.etapas.map(e => <option key={e.codigo} value={e.codigo}>{e.nombre}</option>)}</Select></div>
       <div><FieldLabel>Moneda</FieldLabel><Select value={moneda} onChange={e => setMoneda(e.target.value)}>{catalogos.monedas.map(m => <option key={m} value={m}>{m}</option>)}</Select></div>

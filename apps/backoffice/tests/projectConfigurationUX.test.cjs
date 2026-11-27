@@ -101,12 +101,12 @@ test('la carga masiva se bloquea desde diez lotes registrados', () => {
  assert.match(ui,/lotesRegistrados < 10 && !importadoSesion/);
 });
 
-test('mantiene cinco secciones y permite consultar matriz publicada', () => {
+test('mantiene la configuración inicial cerrada y permite consultar matriz publicada', () => {
  const ui = archivo('components/projects/detail/ProjectConfigurationTab.tsx');
  const matriz = archivo('components/projects/detail/CommercialTariffEditor.tsx');
  const pub = archivo('components/projects/detail/CommercialPublicationPanel.tsx');
- assert.match(ui,/esPublicado && \(id === 'etapas' \|\| id === 'asignaciones'\)/);
- assert.match(ui,/readOnly=\{esPublicado\}/);
+ assert.match(ui,/publicada > 0\) return <CommercialManagementPanel/);
+ assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/<CommercialTariffEditor[^>]*readOnly/);
  assert.match(matriz,/if \(readOnly\) return/);
  assert.match(pub,/Ver detalle por lote \(opcional\)/);
  assert.match(pub,/Revisar matriz de tarifas/);
