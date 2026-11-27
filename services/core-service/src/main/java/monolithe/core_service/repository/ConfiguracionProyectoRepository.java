@@ -172,6 +172,28 @@ public class ConfiguracionProyectoRepository {
             """, proyecto, version, json, actor) == 1;
     }
 
+    public record CatalogosDetalle(String manzanas,String lotes,String zonas,String monedas) {}
+    public CatalogosDetalle catalogosDetalle(Long proyecto){
+        return jdbc.queryForObject("""
+            WITH p AS (SELECT CAST(? AS bigint) id)
+            SELECT
+              (SELECT coalesce(jsonb_agg(jsonb_build_object('id',m.id_manzana,'codigo',m.codigo,'nombre',m.nombre)
+                ORDER BY m.codigo,m.id_manzana),'[]'::jsonb)::text FROM public.inm_manzanas m
+                JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa WHERE m.id_proyecto=p.id AND m.activo AND e.activo) manzanas,
+              (SELECT coalesce(jsonb_agg(jsonb_build_object('id',l.id_lote,'idManzana',l.id_manzana,'codigo',l.codigo,
+                'estadoInventario',el.codigo,'codigoZona',z.codigo) ORDER BY l.codigo,l.id_lote),'[]'::jsonb)::text
+                FROM public.inm_lotes l JOIN public.cfg_estados_lote el ON el.id_estado_lote=l.id_estado_lote
+                LEFT JOIN public.inm_zonas z ON z.id_zona=l.id_zona AND z.id_proyecto=l.id_proyecto
+                JOIN public.inm_manzanas m ON m.id_manzana=l.id_manzana JOIN public.inm_etapas e ON e.id_etapa=m.id_etapa
+                WHERE l.id_proyecto=p.id AND l.activo AND m.activo AND e.activo) lotes,
+              (SELECT coalesce(jsonb_agg(z.codigo ORDER BY z.codigo),'[]'::jsonb)::text
+                FROM public.inm_zonas z WHERE z.id_proyecto=p.id AND z.activo) zonas,
+              (SELECT coalesce(jsonb_agg(m.codigo ORDER BY m.codigo),'[]'::jsonb)::text
+                FROM public.cfg_monedas m WHERE m.activo) monedas
+            FROM p
+            """,(rs,n)->new CatalogosDetalle(rs.getString("manzanas"),rs.getString("lotes"),rs.getString("zonas"),rs.getString("monedas")),proyecto);
+    }
+
     public List<Etapa> etapas(Long proyecto) {
         return jdbc.query("""
             SELECT codigo, nombre FROM public.inm_etapas_comerciales
