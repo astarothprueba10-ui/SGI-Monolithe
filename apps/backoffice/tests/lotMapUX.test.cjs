@@ -38,12 +38,7 @@ test('no consulta el detalle manual si un proyecto no tiene plano vigente; manti
 });
 
 test('matriz conserva posiciones manuales y coloca nuevos lotes sin solaparlos',()=>{
-  const source=leer('pages/LotMap.tsx');
-  const ts=require('typescript');
-  const helpers=source.slice(source.indexOf('type Point ='),source.indexOf('const REAL_STATUSES'))
-    +source.slice(source.indexOf('function naturalCompare'),source.indexOf('export function LotMap'));
-  const js=ts.transpileModule(helpers,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
-  const {buildDisplayGeometries,overlaps,rectangle}=new Function(js+';return {buildDisplayGeometries,overlaps,rectangle};')();
+  const {buildDisplayGeometries,overlaps,rectangle}=require('../src/lib/lotMatrixGeometry.ts');
   const lot=(id,manzana,numero)=>({idLote:id,idProyecto:2,idManzana:manzana,codigoManzana:'MZ-'+manzana,
     codigo:'L-'+id,numero:String(numero),activo:true});
   const geometry=(id,x,y)=>({idLote:id,activo:true,puntos:rectangle(x,y,68,55),etiquetaX:x+34,etiquetaY:y+27.5});
@@ -122,11 +117,7 @@ test('la matriz tiene una sola vista y el redondeo no altera coordenadas',()=>{
   assert.doesNotMatch(pagina,/Vista general|Plano V\$\{/);
   assert.match(pagina,/\$\{persistedCount\} de \$\{lots.length\}/);
   assert.match(pagina,/isSelected&&!isEditingPlan\?'translateY/);
-  const ts=require('typescript');
-  const helpers=pagina.slice(pagina.indexOf('type Point ='),pagina.indexOf('const REAL_STATUSES'))
-    +pagina.slice(pagina.indexOf('function roundedLotPath'),pagina.indexOf('function naturalCompare'));
-  const js=ts.transpileModule(helpers,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
-  const {roundedLotPath,rectangle}=new Function(js+';return {roundedLotPath,rectangle};')();
+  const {roundedLotPath,rectangle}=require('../src/lib/lotMatrixGeometry.ts');
   const points=rectangle(10,20,68,55);
   const antes=JSON.stringify(points);
   assert.match(roundedLotPath(points),/ Q /);
