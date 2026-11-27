@@ -174,11 +174,11 @@ public class PublicacionComercialService {
     @Transactional(readOnly=true)
     public ConsultaDetalle consultarDetalle(Long proyecto) {
         long inicio=System.nanoTime();
-        int version=repository.versionPublicada(proyecto);
-        if(version>0)exigirIntegridadPublicacion();
-        var config=configuracion.obtener(proyecto);
+        var detalle=configuracion.obtenerDetalleConsulta(proyecto);
+        int version=detalle.publicada();
+        var config=detalle.configuracion();
         var gestion=version>0?gestionConConfiguracion(proyecto,version,config):null;
-        if(repository.versionPublicada(proyecto)!=version)
+        if((gestion!=null && gestion.revision()!=detalle.revision()) || repository.versionPublicada(proyecto)!=version)
             throw new ConflictoNegocioException("La publicación cambió durante la consulta. Reintenta.");
         org.slf4j.LoggerFactory.getLogger(getClass()).info("Detalle comercial proyecto={} totalMs={}",proyecto,(System.nanoTime()-inicio)/1_000_000);
         return new ConsultaDetalle(config,version,gestion);
