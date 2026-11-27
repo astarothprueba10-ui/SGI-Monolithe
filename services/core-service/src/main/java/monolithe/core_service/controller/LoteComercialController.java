@@ -14,6 +14,8 @@ public class LoteComercialController {
  private final LoteComercialService service;
  @GetMapping @PreAuthorize("hasAuthority('lots.view')")
  public Listado listar(@PathVariable Long idProyecto){return service.listar(idProyecto);}
+ @GetMapping("/mapa") @PreAuthorize("hasAuthority('lots.view')")
+ public java.util.List<Fila> listarMapa(@PathVariable Long idProyecto){return service.listarMapa(idProyecto);}
  @PostMapping("/revisar") @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
  public Vista revisar(@PathVariable Long idProyecto,@Valid @RequestBody Consulta q){return service.revisar(idProyecto,q);}
  @PutMapping @PreAuthorize("hasAuthority('ROLE_GERENCIA') and hasAuthority('projects.edit') and hasAuthority('lots.edit')")
