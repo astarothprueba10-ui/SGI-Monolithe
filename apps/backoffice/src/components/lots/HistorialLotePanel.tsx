@@ -45,14 +45,10 @@ function formatResponsable(
 ): string {
   const nombre = nombreResponsable?.trim();
 
-  if (nombre) {
-    return idUsuario != null
-      ? `${nombre} (Usuario #${idUsuario})`
-      : nombre;
-  }
+  if (nombre) return nombre;
 
   return idUsuario != null
-    ? `Usuario #${idUsuario}`
+    ? 'Responsable no identificado'
     : 'Sistema / No disponible';
 }
 

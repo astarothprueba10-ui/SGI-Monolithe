@@ -299,3 +299,17 @@ test('lotes usa etapas comerciales, zonas por manzana y precio calculado sin tip
  assert.match(form,/commercialLotService.revisar/);
  assert.doesNotMatch(form,/Tipo de lote|precioManual/);
 });
+
+test('historial de lotes muestra el nombre del responsable sin ID y la etapa comercial de la fila',()=>{
+ const panel=archivo('components/lots/HistorialLotePanel.tsx');
+ const tab=archivo('components/projects/detail/ProjectLotsTab.tsx');
+ const modal=archivo('components/projects/LotStatusModal.tsx');
+ assert.match(panel,/if \(nombre\) return nombre;/);
+ assert.doesNotMatch(panel,/Usuario #/);
+ assert.match(panel,/Responsable no identificado/);
+ assert.match(tab,/setHistorial\(f\)/);
+ assert.match(tab,/comercial=\{historial\}/);
+ assert.match(modal,/Etapa comercial: \{comercial\?\.nombreEtapa/);
+ assert.doesNotMatch(modal,/lot\.nombreEtapa|lot\.codigoEtapa/);
+ assert.match(modal,/estadoLote\(comercial.estado\)/);
+});

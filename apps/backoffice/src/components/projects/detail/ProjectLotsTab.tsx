@@ -11,14 +11,14 @@ import {commercialLotService,estadoLote,soles} from '../../../services/commercia
 import type {FilaLote,ListadoLotes} from '../../../services/commercialLotService';
 import {CommercialLotFormModal} from '../CommercialLotFormModal';
 import {LotStatusModal} from '../LotStatusModal';
-import type {ProyectoResponse,LoteResponse} from '../../../types/core';
+import type {ProyectoResponse} from '../../../types/core';
 const estados=['DISPONIBLE','NO_DISPONIBLE','BLOQUEADO_COMERCIALMENTE','BLOQUEADO','RESERVADO','VENDIDO'];
 const colores:Record<string,string>={DISPONIBLE:'border-emerald-300 bg-emerald-50 text-emerald-700',NO_DISPONIBLE:'border-slate-300 bg-slate-100 text-slate-700',BLOQUEADO_COMERCIALMENTE:'border-amber-200 bg-amber-50 text-amber-800',BLOQUEADO:'border-rose-300 bg-rose-50 text-rose-700',RESERVADO:'border-orange-300 bg-orange-50 text-orange-700',VENDIDO:'border-red-300 bg-red-50 text-red-700'};
 export function ProjectLotsTab({project}:{project:ProyectoResponse}){
  const {can,user}=useAuth();const canEdit=can('lots.edit')&&can('projects.edit')&&user.roles.includes('Gerencia');
  const [data,setData]=useState<ListadoLotes|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
  const [search,setSearch]=useState('');const [etapa,setEtapa]=useState('all');const [manzana,setManzana]=useState('all');const [zona,setZona]=useState('all');const [estado,setEstado]=useState('all');const [page,setPage]=useState(1);
- const [modal,setModal]=useState<{fila:FilaLote|null}|null>(null);const [historial,setHistorial]=useState<LoteResponse|null>(null);
+ const [modal,setModal]=useState<{fila:FilaLote|null}|null>(null);const [historial,setHistorial]=useState<FilaLote|null>(null);
  const cargar=useCallback(async()=>{setLoading(true);setError('');try{setData(await commercialLotService.listar(project.idProyecto));}catch(e){setData(null);setError(e instanceof Error?e.message:'No se pudieron consultar los lotes.');}finally{setLoading(false);}},[project.idProyecto]);
  useEffect(()=>{void cargar();},[cargar]);
  const bloques=data?.catalogo.manzanas.filter(m=>etapa==='all'||m.codigoEtapa===etapa||data.lotes.some(l=>l.lote.idManzana===m.id&&l.codigoEtapa===etapa))??[];
@@ -26,7 +26,7 @@ export function ProjectLotsTab({project}:{project:ProyectoResponse}){
  const pagina=Math.min(page,Math.max(1,Math.ceil(filtrados.length/12)));
  return <div className="space-y-4">
   {modal&&data&&<CommercialLotFormModal key={modal.fila?.lote.idLote??'nuevo'} project={project} data={data} fila={modal.fila} etapaInicial={etapa} onClose={()=>setModal(null)} onSuccess={setData}/>}
-  <LotStatusModal open={!!historial} onClose={()=>setHistorial(null)} lot={historial} statuses={[]} canEdit={false} onSuccess={cargar}/>
+  <LotStatusModal open={!!historial} onClose={()=>setHistorial(null)} lot={historial?.lote??null} comercial={historial} statuses={[]} canEdit={false} onSuccess={cargar}/>
   <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-base font-semibold text-brand-900">Lotes del proyecto</h3><p className="text-xs text-brand-500">Consulta y gestiona los lotes de {project.nombre}.</p></div>{canEdit&&<Button icon={PlusIcon} disabled={!data?.catalogo.etapas.length||!project.activo} onClick={()=>setModal({fila:null})} className="bg-brand-900 text-white">Nuevo lote</Button>}</div>
   {error&&<p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error} <Button size="sm" onClick={()=>void cargar()}>Reintentar</Button></p>}
   <Card className="overflow-hidden border border-brand-100 bg-white shadow-card">
@@ -39,7 +39,7 @@ export function ProjectLotsTab({project}:{project:ProyectoResponse}){
    </div>
    {loading?<p className="p-8 text-center text-sm text-brand-600">Cargando lotes…</p>:!filtrados.length?<EmptyState title="No se encontraron lotes." description="Ajusta los filtros o registra un lote."/>:<>
     <Table head={<>{['Lote','Manzana','Etapa comercial','Zona'].map(h=><TH key={h} className="bg-brand-50/80 font-bold">{h}</TH>)}<TH align="right" className="bg-brand-50/80 font-bold">Área</TH><TH align="right" className="bg-brand-50/80 font-bold">Precio</TH><TH className="bg-brand-50/80 font-bold">Estado</TH><TH align="right" className="bg-brand-50/80 font-bold">Acciones</TH></>}>
-     {filtrados.slice((pagina-1)*12,pagina*12).map(f=>{const l=f.lote;return <TR key={l.idLote}><TD><strong>{l.numero?'Lote '+l.numero:l.codigo}</strong><p className="text-xs text-brand-500">{l.codigo}</p></TD><TD>{l.codigoManzana??'—'}</TD><TD>{f.nombreEtapa??'Sin asignar'}{f.codigoEtapa&&<p className="text-xs text-brand-500">{f.codigoEtapa}</p>}</TD><TD>{l.nombreZona??'—'}{l.codigoZona&&<p className="text-xs text-brand-500">{l.codigoZona}</p>}</TD><TD align="right">{l.areaM2!=null?l.areaM2+' m²':'—'}</TD><TD align="right">{f.precio==null?'Sin precio':soles(f.precio)}</TD><TD><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${colores[f.estado]??'border-slate-200 text-slate-700'}`}>{estadoLote(f.estado)}</span></TD><TD align="right"><div className="flex justify-end gap-2"><Button size="sm" icon={History} onClick={()=>setHistorial(l)}>Historial</Button>{canEdit&&<Button size="sm" icon={PencilIcon} disabled={f.protegido} onClick={()=>setModal({fila:f})}>Editar</Button>}</div></TD></TR>;})}
+     {filtrados.slice((pagina-1)*12,pagina*12).map(f=>{const l=f.lote;return <TR key={l.idLote}><TD><strong>{l.numero?'Lote '+l.numero:l.codigo}</strong><p className="text-xs text-brand-500">{l.codigo}</p></TD><TD>{l.codigoManzana??'—'}</TD><TD>{f.nombreEtapa??'Sin asignar'}{f.codigoEtapa&&<p className="text-xs text-brand-500">{f.codigoEtapa}</p>}</TD><TD>{l.nombreZona??'—'}{l.codigoZona&&<p className="text-xs text-brand-500">{l.codigoZona}</p>}</TD><TD align="right">{l.areaM2!=null?l.areaM2+' m²':'—'}</TD><TD align="right">{f.precio==null?'Sin precio':soles(f.precio)}</TD><TD><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${colores[f.estado]??'border-slate-200 text-slate-700'}`}>{estadoLote(f.estado)}</span></TD><TD align="right"><div className="flex justify-end gap-2"><Button size="sm" icon={History} onClick={()=>setHistorial(f)}>Historial</Button>{canEdit&&<Button size="sm" icon={PencilIcon} disabled={f.protegido} onClick={()=>setModal({fila:f})}>Editar</Button>}</div></TD></TR>;})}
     </Table><Pagination page={pagina} pageSize={12} total={filtrados.length} onPageChange={setPage}/>
    </>}
   </Card>
