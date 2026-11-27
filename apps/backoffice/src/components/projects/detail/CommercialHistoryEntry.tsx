@@ -15,7 +15,7 @@ export function CommercialHistoryEntry({ evento:e, config }: { evento:EventoCome
       {e.tipo==='IMPORTACION'&&<p>Se confirmó la carga inicial{typeof r.filas==='number'?` de ${r.filas} filas`:''}.</p>}
       {e.tipo==='INICIAL'&&<><p>Etapas abiertas: {r.abiertas.map(nombre).join(', ')||'Ninguna'}.</p><p>{r.tarifas.length} tarifas configuradas · {r.lotes.length} lotes registrados en la política · {r.protegidos} operaciones protegidas · {r.bloqueados} lotes cerrados comercialmente.</p></>}
       {e.tipo==='DISPONIBILIDAD'&&<><p>Etapas abiertas: {r.abrieron.map(nombre).join(', ')||'Ninguna nueva'}.</p><p>Etapas cerradas: {r.cerraron.map(nombre).join(', ')||'Ninguna nueva'}.</p><p>{r.lotes.length} lotes con cambios de estado o política.</p></>}
-      {e.tipo==='REPARACION'&&<p>Se sincronizaron los códigos de zona sin modificar precios de lotes ni operaciones.</p>}
+      {e.tipo==='REPARACION'&&<p>{r.motivo??'Corrección técnica registrada; se conserva el historial anterior.'}</p>}
       {e.tipo==='ETAPAS'&&<p>Se actualizaron las etapas comerciales. Las etapas nuevas quedan cerradas.</p>}
       {e.tipo==='ASIGNACIONES'&&<p>{r.lotes.length} lotes con cambios de etapa, precio o disponibilidad. Las operaciones protegidas conservan sus condiciones.</p>}
       {e.tipo==='TARIFAS'&&<p>{r.tarifas.length} combinaciones modificadas · {r.lotes.length} lotes con cambios. Las operaciones protegidas se conservan.</p>}

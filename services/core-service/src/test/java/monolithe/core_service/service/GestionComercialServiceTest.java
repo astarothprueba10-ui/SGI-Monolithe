@@ -168,6 +168,19 @@ class GestionComercialServiceTest {
             new GestionComercialDto.CambioMatriz(10L,BigDecimal.valueOf(26000),Map.of("A",BigDecimal.ZERO),LocalDate.now(),null)));
     }
 
+    @Test void sincronizaEtapaYaSeleccionadaConLotePendienteDeLiberar() {
+        when(repo.reglas(proyecto,1)).thenReturn(List.of(
+            new PublicacionComercialRepository.Regla(1L,"E1","BLOQUEADA",11L,true),
+            new PublicacionComercialRepository.Regla(2L,"E1","PROTEGIDA",null,false),
+            new PublicacionComercialRepository.Regla(3L,"E2","BLOQUEADA",13L,true),
+            new PublicacionComercialRepository.Regla(4L,"E2","BLOQUEADA",14L,true)));
+        var r=service.guardarDisponibilidad(proyecto,actor,new GestionComercialDto.Disponibilidad(10L,List.of("E1")));
+        assertEquals(List.of("E1"),r.estado().etapasHabilitadas());
+        verify(repo).cambiarSituacion(proyecto,1,1L,"HABILITADA");
+        verify(repo,never()).registrarPrecio(any(),anyInt());
+        verify(repo,never()).publicar(anyLong(),anyInt(),anyLong());
+    }
+
     @Test void tarifaAnteriorNoConvierteSeleccionInferidaEnConfirmada() {
         when(repo.seleccionRegistrada(proyecto,1)).thenReturn(false);
         assertTrue(service.gestion(proyecto).inferida());

@@ -58,7 +58,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
   const cambiar = (codigo:string, marcada:boolean) => setSeleccion(prev=>marcada?[...prev.filter(c=>c!==codigo),codigo]:prev.filter(c=>c!==codigo));
 
   async function guardarDisponibilidad(confirmada=false) {
-    if (!actual || ocupado || !editable || (!cambios.length && !actual.inferida)) return;
+    if (!actual || ocupado || !editable) return;
     if (!confirmada) {setConfirmar('disponibilidad');return;}
     setConfirmar(null);
     setOcupado(true);setError('');setAviso('');
@@ -112,7 +112,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
     {aviso && <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{aviso}</p>}
     {seccion === 'disponibilidad' && <section className="space-y-3">
       <h3 className="font-semibold text-brand-900">Disponibilidad de etapas comerciales</h3>
-      <p className="text-sm text-brand-600">Marca las etapas que deseas mantener abiertas. Desmarca las que deseas cerrar. No se recalculan precios.</p>
+      <p className="text-sm text-brand-600">Marca las etapas que deseas mantener abiertas. Desmarca las que deseas cerrar. Si hay lotes pendientes de habilitar, configura sus tarifas y sincroniza la disponibilidad. No se recalculan precios.</p>
       {actual.inferida && <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Publicación anterior: la selección se propone a partir de sus reglas comerciales, no del inventario. Confirma el estado deseado para registrarlo. Si faltan precios preparados, revisa la matriz.</p>}
       <div className="grid gap-2 md:grid-cols-2">{config.datos.etapas.map(e => {
         const i=inventarioPorEtapa(inventario,e.codigo);const abierta=seleccion.includes(e.codigo);
@@ -124,7 +124,7 @@ export function CommercialManagementPanel({ config, version, project }: { config
       })}</div>
       {cambios.length>0 && <p className="text-sm text-brand-700">Cambios: {cambios.map(e=>`${seleccion.includes(e.codigo)?'Abrir':'Cerrar'} ${e.nombre}`).join(' · ')}</p>}
       <div className="flex flex-wrap gap-2 justify-end"><Button disabled={ocupado||!cambios.length} onClick={()=>setSeleccion([...originales])}>Restablecer</Button>
-        <Button variant="primary" disabled={!editable||ocupado||(!cambios.length&&!actual.inferida)} onClick={()=>void guardarDisponibilidad()}>{ocupado?'Guardando…':'Guardar disponibilidad'}</Button></div>
+        <Button variant="primary" disabled={!editable||ocupado} onClick={()=>void guardarDisponibilidad()}>{ocupado?'Guardando…':cambios.length||actual.inferida?'Guardar disponibilidad':'Sincronizar disponibilidad'}</Button></div>
     </section>}
     {seccion === 'tarifas' && <section className="space-y-4">
       <h3 className="font-semibold text-brand-900">Matriz de tarifas</h3>

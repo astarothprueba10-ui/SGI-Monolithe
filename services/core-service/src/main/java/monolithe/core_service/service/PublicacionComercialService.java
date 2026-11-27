@@ -183,7 +183,6 @@ public class PublicacionComercialService {
         var config = configuracion.obtener(proyecto);
         var seleccion = SeleccionEtapasPublicacion.validar(request.etapasHabilitadas(),config.datos().etapas());
         var nuevo = new Estado(List.copyOf(seleccion),anterior.estado().tarifas());
-        if (!anterior.inferida() && anterior.estado().etapasHabilitadas().equals(nuevo.etapasHabilitadas())) return anterior;
         var foto = repository.foto(proyecto,anterior.version());
         var protegidos = new HashSet<>(repository.protegidos(proyecto));
         var reglas = reglasPorLote(proyecto,anterior.version());
@@ -199,13 +198,15 @@ public class PublicacionComercialService {
             }
             boolean abrir = seleccion.contains(etapa);
             boolean estabaAbierta = anterior.estado().etapasHabilitadas().contains(etapa);
-            if (!anterior.inferida() && abrir==estabaAbierta) continue;
+            if (!anterior.inferida() && abrir==estabaAbierta && regla!=null && Objects.equals(etapa,regla.etapa())
+                && (abrir ? "HABILITADA".equals(regla.situacion()) : "BLOQUEADA".equals(regla.situacion()) && !"DISPONIBLE".equals(lote.estadoInventario()))) continue;
             if (regla==null || !Objects.equals(etapa,regla.etapa()))
                 throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene una regla publicada coherente. Revisa su asignación.");
             if (abrir && !regla.precioValido())
                 throw new ReglaNegocioException("El lote "+lote.codigo()+" no tiene un precio preparado vigente. Guarda su tarifa en la matriz antes de abrir la etapa "+etapa+".");
             cambios.add(lote);
         }
+        if(cambios.isEmpty() && !anterior.inferida() && anterior.estado().etapasHabilitadas().equals(nuevo.etapasHabilitadas())) return anterior;
         for (var lote: cambios) {
             var regla = reglas.get(lote.id());
             boolean abrir = seleccion.contains(regla.etapa());
