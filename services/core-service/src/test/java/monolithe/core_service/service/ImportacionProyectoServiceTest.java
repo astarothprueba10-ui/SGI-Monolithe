@@ -55,6 +55,18 @@ class ImportacionProyectoServiceTest {
     }
 
     @Test
+    void impideImportarProyectoPublicadoInclusoSinHojasComerciales() {
+        doThrow(new ConflictoNegocioException("Proyecto publicado"))
+            .when(configuracion).exigirSinPublicacion(2L, false);
+        doThrow(new ConflictoNegocioException("Proyecto publicado"))
+            .when(configuracion).exigirSinPublicacion(2L, true);
+        var request = solicitud(List.of(zona(2,"Z-A")), null);
+        assertThrows(ConflictoNegocioException.class, () -> service.previsualizar(2L, request));
+        assertThrows(ConflictoNegocioException.class, () -> service.confirmar(2L, request, 1L));
+        verifyNoInteractions(etapas, zonas, manzanas, lotes);
+    }
+
+    @Test
     void vistaPreviaNoRegistraYDetectaExistentes() {
         when(repo.zonas(2L)).thenReturn(List.of(new Referencia(9L, "Z-A", true)));
         var r = service.previsualizar(2L, solicitud(List.of(zona(2,"Z-A"),zona(3,"Z-B")), null));

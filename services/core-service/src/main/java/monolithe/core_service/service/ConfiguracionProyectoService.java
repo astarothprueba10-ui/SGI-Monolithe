@@ -35,6 +35,7 @@ public class ConfiguracionProyectoService {
 
     @Transactional
     public ConfiguracionProyectoResponse guardar(Long proyecto, Long actor, ConfiguracionProyectoRequest solicitud) {
+        exigirSinPublicacion(proyecto, true);
         if (!Boolean.TRUE.equals(obtenerProyecto(proyecto).getActivo())) {
             throw new ReglaNegocioException("El proyecto no está habilitado.");
         }
@@ -45,6 +46,18 @@ public class ConfiguracionProyectoService {
         int siguiente = actual.version() + 1;
         if (!repository.insertar(proyecto, siguiente, escribir(solicitud.datos()), actor)) conflicto();
         return new ConfiguracionProyectoResponse(siguiente, solicitud.datos(), actual.manzanas(), actual.lotes(), actual.zonas(), actual.monedas());
+    }
+
+    // Importar, guardar borrador y publicar comparten el bloqueo por proyecto.
+    public void exigirSinPublicacion(Long proyecto, boolean bloquear) {
+        if (bloquear) repository.bloquearConfiguracion(proyecto);
+        if (repository.versionPublicada(proyecto) > 0)
+            throw new ConflictoNegocioException("El proyecto ya fue publicado. Realiza los ajustes mediante los CRUD.");
+    }
+
+    public int versionPublicada(Long proyecto) {
+        obtenerProyecto(proyecto);
+        return repository.versionPublicada(proyecto);
     }
 
     private Proyecto obtenerProyecto(Long id) {

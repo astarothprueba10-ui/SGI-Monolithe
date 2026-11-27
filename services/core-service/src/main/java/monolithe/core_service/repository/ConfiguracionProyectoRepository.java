@@ -26,6 +26,23 @@ public class ConfiguracionProyectoRepository {
                 .stream().findFirst();
     }
 
+    public void bloquearConfiguracion(Long proyecto) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended('inm_publicacion:' || CAST(? AS text),0))",
+                (rs,n) -> true, proyecto);
+    }
+
+    public int versionPublicada(Long proyecto) {
+        Integer version = jdbc.queryForObject("""
+            SELECT CASE WHEN pg_catalog.row_security_active('public.inm_politicas_comerciales_publicadas'::regclass)
+                THEN NULL ELSE coalesce(max(version),0) END
+            FROM public.inm_politicas_comerciales_publicadas WHERE id_proyecto=?
+            """, Integer.class, proyecto);
+        if (version == null) throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+            "No se puede verificar si el proyecto ya fue publicado.");
+        return version;
+    }
+
     public boolean insertar(Long proyecto, int version, String json, Long actor) {
         return jdbc.update("""
             INSERT INTO public.inm_configuracion_comercial_borradores

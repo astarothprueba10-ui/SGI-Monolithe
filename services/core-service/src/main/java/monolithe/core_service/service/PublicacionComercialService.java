@@ -31,10 +31,11 @@ public class PublicacionComercialService {
     public PublicacionComercialResponse previsualizar(Long proyecto, PublicacionComercialRequest request) {
         exigirIntegridadPublicacion();
         if (!repository.proyectoHabilitado(proyecto)) throw new ReglaNegocioException("Proyecto no habilitado.");
-        var config = configuracion.obtener(proyecto);
         int publicada = repository.versionPublicada(proyecto);
+        if (publicada > 0) throw new ConflictoNegocioException("El proyecto ya fue publicado. No se admite otra publicación.");
+        var config = configuracion.obtener(proyecto);
         if (config.version()!=request.version() || config.version()<=publicada)
-            throw new ConflictoNegocioException("Guarda un borrador nuevo antes de publicar.");
+            throw new ConflictoNegocioException("Guarda el borrador inicial antes de publicar.");
         if (!config.monedas().contains("PEN") || config.lotes().isEmpty() || config.datos().etapas().isEmpty())
             throw new ReglaNegocioException("Se requieren lotes, etapas y moneda PEN para publicar.");
         var seleccion = SeleccionEtapasPublicacion.validar(request.etapasHabilitar(), config.datos().etapas());

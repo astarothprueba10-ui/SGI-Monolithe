@@ -12,7 +12,7 @@ type Props = {
   project: ProyectoResponse;
   config: ConfiguracionProyectoResponse;
   dirty: boolean;
-  onPrepareVersion: () => Promise<void>;
+  onPublished: () => void;
 };
 
 const moneda = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
@@ -82,7 +82,7 @@ function Resumen({ r }: { r: PublicacionComercialResponse }) {
   </div>;
 }
 
-export function CommercialPublicationPanel({ project, config, dirty, onPrepareVersion }: Props) {
+export function CommercialPublicationPanel({ project, config, dirty, onPublished }: Props) {
   const { can } = useAuth();
   const [publicada, setPublicada] = useState<number | null>(null);
   const [etapasHabilitar, setEtapasHabilitar] = useState<string[]>([]);
@@ -92,8 +92,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPrepareVe
   const [error, setError] = useState('');
   const [intento, setIntento] = useState(0);
   const puede = can('lots.edit') && project.activo && !dirty
-    && publicada !== null && config.version > publicada && !ocupado;
-  const necesitaNuevaVersion = publicada !== null && config.version <= publicada;
+    && publicada === 0 && config.version > 0 && !ocupado;
 
   useEffect(() => {
     let activo = true;
@@ -112,18 +111,6 @@ export function CommercialPublicationPanel({ project, config, dirty, onPrepareVe
       : prev.filter(x => x !== codigo));
     setResultado(null);
     setAceptado(false);
-  }
-
-  async function nuevaVersion() {
-    if (ocupado || dirty || !project.activo) return;
-    setOcupado(true);
-    setError('');
-    setResultado(null);
-    try {
-      await onPrepareVersion();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'No se pudo preparar la nueva versión.');
-    } finally { setOcupado(false); }
   }
 
   async function revisar() {
@@ -150,6 +137,7 @@ export function CommercialPublicationPanel({ project, config, dirty, onPrepareVe
         project.idProyecto, config.version, etapasHabilitar, resultado.huella);
       setResultado(r);
       setPublicada(r.versionPublicada);
+      onPublished();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo publicar.');
       setResultado(null);
@@ -174,26 +162,20 @@ export function CommercialPublicationPanel({ project, config, dirty, onPrepareVe
       Guarda los cambios pendientes antes de revisar una publicación.
     </p>}
 
-    {necesitaNuevaVersion && <div className="space-y-2 rounded-lg border border-brand-200 bg-brand-50 p-3">
-      <p className="text-sm text-brand-800">
-        La versión v{config.version} ya está publicada. Para cambiar las etapas que se liberarán
-        es necesario preparar una nueva versión del borrador, sin alterar aún la política vigente.
-      </p>
-      <Button size="sm" disabled={dirty || ocupado || !project.activo} onClick={nuevaVersion}>
-        Preparar nueva versión de publicación
-      </Button>
-    </div>}
+    {publicada !== null && publicada > 0 && <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
+      Proyecto publicado. No se permiten nuevas versiones ni importaciones masivas.
+    </p>}
 
-    <CommercialStageReleaseSelector config={config} seleccion={etapasHabilitar}
-      disabled={!puede} onChange={cambiarEtapa}/>
+    {publicada === 0 && <CommercialStageReleaseSelector config={config} seleccion={etapasHabilitar}
+      disabled={!puede} onChange={cambiarEtapa}/>}
 
     {error && <div role="alert" className="text-sm text-red-700">
       {error}{publicada === null && <Button size="sm" onClick={() => { setError(''); setIntento(n => n + 1); }}>Reintentar</Button>}
     </div>}
 
-    <Button disabled={!puede} icon={ShieldCheckIcon} onClick={() => void revisar()}>
+    {publicada === 0 && <Button disabled={!puede} icon={ShieldCheckIcon} onClick={() => void revisar()}>
       {ocupado ? 'Procesando…' : 'Revisar publicación'}
-    </Button>
+    </Button>}
 
     {resultado && !dirty && <>
       <Resumen r={resultado}/>
