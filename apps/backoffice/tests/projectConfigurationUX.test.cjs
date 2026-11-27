@@ -72,7 +72,8 @@ test('la pestaña Etapas usa el mismo catálogo comercial del borrador y un moda
   assert.match(detalle,/label: 'Etapas comerciales'/);
   assert.doesNotMatch(tab,/StageFormModal|getStagesByProject/);
   assert.match(tab,/useProjectConfiguration\(project.idProyecto\)/);
-  assert.match(tab,/onChange=\{model.guardar\}/);
+  assert.match(tab,/onChange=\{next => model.guardar\(next, true\)\}/);
+  assert.doesNotMatch(tab,/readOnly=\{[^}]*guardando/);
   assert.match(config,/<CommercialStageEditor/);
   assert.match(editor,/<Modal/);
   assert.match(editor,/Condición comercial/);

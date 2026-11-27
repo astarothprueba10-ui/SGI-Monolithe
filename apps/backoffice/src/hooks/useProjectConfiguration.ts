@@ -23,10 +23,10 @@ export function useProjectConfiguration(idProyecto: number) {
     return () => { vigente = false; };
   }, [idProyecto, intento]);
 
-  async function guardar(nuevosDatos: ConfiguracionComercial | null = datos): Promise<boolean> {
+  async function guardar(nuevosDatos: ConfiguracionComercial | null = datos, propagarError = false): Promise<boolean> {
     if (!datos || !respuesta || guardando || publicada !== 0 || !nuevosDatos) return false;
     const fallo = validarConfiguracion(nuevosDatos);
-    if (fallo) { setError(fallo); return false; }
+    if (fallo) { setError(fallo); if (propagarError) throw new Error(fallo); return false; }
     setGuardando(true); setError('');
     try {
       const r = await projectConfigurationService.guardar(idProyecto, respuesta.version, nuevosDatos);
@@ -35,6 +35,7 @@ export function useProjectConfiguration(idProyecto: number) {
       return true;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar el borrador.');
+      if (propagarError) throw e;
       return false;
     } finally { setGuardando(false); }
   }
