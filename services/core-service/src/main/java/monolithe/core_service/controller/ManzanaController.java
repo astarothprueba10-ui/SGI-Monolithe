@@ -18,6 +18,12 @@ import java.util.List;
 public class ManzanaController {
 
     private final ManzanaService manzanaService;
+    private final monolithe.core_service.service.ConfiguracionProyectoService configuracion;
+    private final monolithe.core_service.service.EtapaService etapas;
+
+    private void exigirCrudLegacy(Long proyecto) {
+        if(configuracion.versionPublicada(proyecto)>0)throw new monolithe.core_service.exception.ReglaNegocioException("Utiliza el CRUD de manzanas comerciales para modificar un proyecto publicado.");
+    }
 
     @GetMapping("/etapa/{idEtapa}")
     @PreAuthorize("hasAuthority('projects.view')")
@@ -40,6 +46,7 @@ public class ManzanaController {
     @PostMapping
     @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<ManzanaResponse> crear(@Valid @RequestBody ManzanaRequest request) {
+        exigirCrudLegacy(etapas.obtenerPorId(request.idEtapa()).idProyecto());
         ManzanaResponse creada = manzanaService.crear(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
@@ -50,12 +57,14 @@ public class ManzanaController {
             @PathVariable Long idManzana,
             @Valid @RequestBody ManzanaRequest request
     ) {
+        exigirCrudLegacy(manzanaService.obtenerPorId(idManzana).idProyecto());
         return ResponseEntity.ok(manzanaService.actualizar(idManzana, request));
     }
 
     @DeleteMapping("/{idManzana}")
     @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<Void> desactivar(@PathVariable Long idManzana) {
+        exigirCrudLegacy(manzanaService.obtenerPorId(idManzana).idProyecto());
         manzanaService.desactivar(idManzana);
         return ResponseEntity.noContent().build();
     }

@@ -155,7 +155,7 @@ test('estructura importada solo se consulta en asistente y las matrices muestran
  assert.match(archivo('components/projects/detail/CommercialManagementPanel.tsx'),/<CommercialZoneLegend/);
  assert.match(archivo('components/projects/detail/CommercialPublicationPanel.tsx'),/<CommercialZoneLegend/);
  assert.match(archivo('components/projects/detail/CommercialZoneLegend.tsx'),/coreService.getZonesByProject/);
- assert.match(archivo('components/projects/detail/ProjectBlocksTab.tsx'),/<CommercialAssignmentModal/);
+ assert.match(archivo('components/projects/detail/ProjectBlocksTab.tsx'),/<CommercialBlockFormModal/);
  assert.match(archivo('components/projects/detail/ProjectLotsTab.tsx'),/<CommercialAssignmentModal/);
 });
 test('historial presenta cambios y nombre, no JSON técnico',()=>{

@@ -74,7 +74,7 @@ public class ManzanaComercialService {
             """,(r,n)->new Vinculo(r.getLong(1),new Zona(r.getLong(2),r.getString(3),r.getString(4),r.getBoolean(5))),proyecto,proyecto);
         var bases=bases(proyecto);
         var filas=bases.stream().map(m->{
-            String codigo=config.datos().manzanas().stream().filter(x->x.id().equals(m.id())).map(Asignacion::codigoEtapa).findFirst().orElse(m.inactiva());
+            String codigo=!m.activa()&&m.inactiva()!=null?m.inactiva():config.datos().manzanas().stream().filter(x->x.id().equals(m.id())).map(Asignacion::codigoEtapa).findFirst().orElse(null);
             var etapa=etapas.stream().filter(x->x.codigo().equals(codigo)).findFirst().orElse(null);
             var c=conteos.stream().filter(x->x.id().equals(m.id())).findFirst().orElse(new Conteo(m.id(),0,0));
             return new Fila(m.id(),m.codigo(),m.nombre(),m.orden(),codigo,etapa==null?null:etapa.nombre(),
