@@ -31,12 +31,20 @@ public class ImportacionProyectoService {
         validarProyecto(id, solicitud);
         configuracion.exigirSinPublicacion(id, false);
         configuracion.exigirImportacionInicial(id);
-        var contexto = new ImportacionProyectoContexto(repo, id);
+        long inicio=System.nanoTime();
         var filas = ordenar(solicitud);
-        var base = baseComercial(id, filas);
+        return previsualizarDatos(id,solicitud,filas,baseComercial(id,filas),inicio);
+    }
+
+    private ImportacionProyectoResponse previsualizarDatos(Long id,ImportacionProyectoRequest solicitud,
+            List<ImportacionProyectoFila> filas,ConfiguracionProyectoResponse base,long inicio) {
+        var contexto = new ImportacionProyectoContexto(repo, id);
+        var existentes=repo.lotesPorCodigos(filas.stream().filter(f->f.hoja().equals("Lotes"))
+            .map(f->f.texto("codigo").toUpperCase(Locale.ROOT)).distinct().toList());
         var comercial = base == null ? null : new ImportacionComercialProyecto(base, validator);
-        var resultados = new ArrayList<>(filas.stream().map(f -> revisar(id, f, contexto, comercial)).toList());
+        var resultados = new ArrayList<>(filas.stream().map(f -> revisar(id, f, contexto, comercial, existentes)).toList());
         if (comercial != null) validarBorradorCompleto(comercial, contexto, resultados);
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Importacion proyecto={} filas={} validacionMs={}",id,filas.size(),(System.nanoTime()-inicio)/1_000_000);
         return new ImportacionProyectoResponse(huella(id, solicitud, resultados, base == null ? -1 : base.version()), resultados, false);
     }
 
@@ -46,18 +54,23 @@ public class ImportacionProyectoService {
         configuracion.exigirImportacionInicial(id);
         var filas = ordenar(solicitud);
         var base = baseComercial(id, filas);
-        var previo = previsualizar(id, solicitud);
+        long inicio=System.nanoTime();
+        validarProyecto(id,solicitud);
+        var previo = previsualizarDatos(id,solicitud,filas,base,inicio);
+        long validado=System.nanoTime();
         if (!previo.huella().equals(huella(id, solicitud, previo.filas(), base == null ? -1 : base.version())))
             throw new ConflictoNegocioException("El borrador comercial cambió. Valida otra vez.");
         if (!Objects.equals(previo.huella(), solicitud.huella())) throw new ConflictoNegocioException("La vista previa cambió. Valida nuevamente.");
         if (previo.filas().stream().anyMatch(r -> r.estado().equals("ERROR"))) throw new ReglaNegocioException("Corrige todas las filas con errores.");
         var contexto = new ImportacionProyectoContexto(repo, id);
         registrarEstructura(id, filas, previo, contexto);
+        long estructura=System.nanoTime();
         if (base != null) ejecutarGuardado("Borrador comercial del proyecto", () ->
             guardarComercial(id, actor, filas, base, contexto));
         if (previo.filas().stream().noneMatch(f -> f.estado().equals("NUEVO") || f.estado().equals("BORRADOR")))
             throw new ReglaNegocioException("La importación no contiene registros nuevos ni reglas comerciales.");
         configuracion.registrarImportacion(id,actor,previo.huella(),previo.filas().size());
+        org.slf4j.LoggerFactory.getLogger(getClass()).info("Importacion proyecto={} filas={} validacionMs={} estructuraMs={} borradorMs={} totalMs={}",id,filas.size(),(validado-inicio)/1_000_000,(estructura-validado)/1_000_000,(System.nanoTime()-estructura)/1_000_000,(System.nanoTime()-inicio)/1_000_000);
         return new ImportacionProyectoResponse(previo.huella(), previo.filas(), true);
     }
 
@@ -129,7 +142,7 @@ public class ImportacionProyectoService {
             .sorted(Comparator.comparingInt(f -> ORDEN.contains(f.hoja()) ? ORDEN.indexOf(f.hoja()) : ORDEN.size())).toList();
     }
 
-    private Resultado revisar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c, ImportacionComercialProyecto comercial) {
+    private Resultado revisar(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c, ImportacionComercialProyecto comercial, Map<String,ImportacionProyectoRepository.LoteExistente> existentes) {
         try {
             f.validarColumnas();
             if (ImportacionComercialProyecto.esComercial(f.hoja())) {
@@ -140,7 +153,7 @@ public class ImportacionProyectoService {
                 case "EtapasFisicas" -> revisarEtapa(id, f, c);
                 case "Zonas" -> revisarZona(id, f, c);
                 case "Manzanas" -> revisarManzana(f, c);
-                case "Lotes" -> revisarLote(id, f, c);
+                case "Lotes" -> revisarLote(id, f, c, existentes);
                 default -> throw new ReglaNegocioException("Hoja no admitida.");
             };
             return resultado(f, nuevo ? "NUEVO" : "EXISTENTE", nuevo ? "Se registrará al confirmar." : "Se conservará sin modificar ningún campo.");
@@ -180,7 +193,7 @@ public class ImportacionProyectoService {
         c.nueva(mapa, clave);
         return true;
     }
-    private boolean revisarLote(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c) {
+    private boolean revisarLote(Long id, ImportacionProyectoFila f, ImportacionProyectoContexto c, Map<String,ImportacionProyectoRepository.LoteExistente> existentes) {
         c.unica(f.hoja(), f.codigo("codigo"));
         if (!c.numerosArchivo.add(f.claveNumero())) ImportacionProyectoFila.error("Número de lote duplicado en la manzana.");
         var manzana = c.referencia(c.manzanas, f.claveManzana());
@@ -188,9 +201,8 @@ public class ImportacionProyectoService {
         c.catalogo(c.tiposLote, f.codigo("codigo_tipo_lote"));
         validar(f.lote(1L, 1L));
         String numero = f.codigo("numero");
-        var existentes = repo.lote(f.codigo("codigo"));
-        if (!existentes.isEmpty()) {
-            var lote = existentes.getFirst();
+        var lote = existentes.get(f.codigo("codigo"));
+        if (lote != null) {
             if (lote.proyecto().equals(id) && lote.manzana().equals(manzana.id()) && lote.numero().equals(numero)) {
                 c.referencia(c.lotes, f.codigo("codigo"));
                 return false;
