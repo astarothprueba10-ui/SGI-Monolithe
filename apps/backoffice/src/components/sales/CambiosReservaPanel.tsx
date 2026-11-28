@@ -46,7 +46,7 @@ function EfectoSolicitud({s}:{s:CrmCambioReserva}){
  return <section className="space-y-2 rounded-xl border border-brand-200 bg-brand-50/50 p-4 text-sm text-brand-700">
   <h4 className="flex items-center gap-2 font-semibold text-brand-900"><InfoIcon className="h-4 w-4" aria-hidden="true"/>{s.estado==='PENDIENTE'?'¿Qué sucede al aprobar?':'Resultado de la solicitud'}</h4>
   {s.estado==='PENDIENTE'?<>
-   <p>Se liberará la reserva del lote <strong>{s.loteAnterior}</strong> y se trasladará al lote <strong>{s.loteNuevo}</strong>, siempre que el destino siga disponible y sus condiciones comerciales no hayan cambiado.</p>
+   <p>La reserva pasará al lote <strong>{s.loteNuevo}</strong> y el lote <strong>{s.loteAnterior}</strong> volverá a quedar disponible en el inventario. El traslado solo se realiza si el destino sigue disponible y sus condiciones comerciales no han cambiado.</p>
    <p>Se conservarán el abono de <strong>{formatSoles(s.credito)}</strong> y el vencimiento original. La aprobación no registra una venta.</p>
   </>:s.estado==='APROBADA'?<p>La reserva se trasladó de <strong>{s.loteAnterior}</strong> a <strong>{s.loteNuevo}</strong> al aprobar el cambio. Se conservaron el abono y el vencimiento original.</p>:
   s.estado==='RECHAZADA'?<p>El cambio no se realizó. La decisión conservó la reserva de origen y sus condiciones.</p>:<p>Consulta el estado actualizado antes de continuar.</p>}
