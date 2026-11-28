@@ -315,9 +315,9 @@ export function Sales() {
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
   const [estadoCambiosVenta,setEstadoCambiosVenta]=useState<{id:number;estado:'consultando'|'verificado'|'error';pendientes:CambioReservaPendienteResumen[]}|null>(null);
-  const cambiosPendientesVenta=estadoCambiosVenta?.id===selectedProspectId?estadoCambiosVenta.pendientes:[];
-  const comprobandoCambiosVenta=opType==='Venta'&&!!selectedProspectId&&(estadoCambiosVenta?.id!==selectedProspectId||estadoCambiosVenta.estado==='consultando');
-  const errorCambiosVenta=opType==='Venta'&&!!selectedProspectId&&estadoCambiosVenta?.id===selectedProspectId&&estadoCambiosVenta.estado==='error';
+  const cambiosPendientesVenta=estadoCambiosVenta&&estadoCambiosVenta.id===selectedProspectId?estadoCambiosVenta.pendientes:[];
+  const comprobandoCambiosVenta=opType==='Venta'&&!!selectedProspectId&&(estadoCambiosVenta?.id!==selectedProspectId||estadoCambiosVenta?.estado==='consultando');
+  const errorCambiosVenta=opType==='Venta'&&!!selectedProspectId&&estadoCambiosVenta?.id===selectedProspectId&&estadoCambiosVenta?.estado==='error';
   const ventaBloqueadaPorCambio=opType==='Venta'&&!!selectedProspectId&&(comprobandoCambiosVenta||errorCambiosVenta||cambiosPendientesVenta.length>0);
   const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
   const [ventaDirectos,setVentaDirectos]=useState<LoteResponse[]>([]);
@@ -2607,7 +2607,7 @@ export function Sales() {
                   else setFormLotId(String(r.idLote));
                 }
               }}
-              onSolicitudPendiente={c=>{setEstadoCambiosVenta({id:Number(selectedProspectId),estado:'verificado',pendientes:[c]});setConfirmacionVenta(null);setEditandoComprador(false);}}
+              onSolicitudPendiente={c=>{setEstadoCambiosVenta({id:Number(selectedProspectId),estado:'verificado',pendientes:[c]});setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);setComprobantesVenta([]);setDatosVentaValidados(null);setConfirmacionVenta(null);setEditandoComprador(false);}}
               onActualizar={()=>void handleSelectProspect(selectedProspectId)}
             />}
             {opType==='Venta' && (!formalizacionMultiple||tieneReservasVenta) && <div>
