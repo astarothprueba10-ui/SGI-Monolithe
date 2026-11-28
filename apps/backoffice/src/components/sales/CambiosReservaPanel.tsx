@@ -61,9 +61,11 @@ export function CambiosReservaPanel(){
    </article>)}
  </Card>;
 }
-export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disabled,onSeleccionar,onActualizar}:{
+export type CambioReservaPendienteResumen=Pick<CrmCambioReserva,'idSolicitud'|'loteAnterior'|'loteNuevo'|'proyectoNuevo'>;
+export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disabled,onSeleccionar,onActualizar,onSolicitudPendiente}:{
  idProspecto:number;reservas:CrmReservaVigenteVenta[];idLoteSeleccionado:number;disabled:boolean;
- onSeleccionar:(r:CrmReservaVigenteVenta)=>void;onActualizar:()=>void
+ onSeleccionar:(r:CrmReservaVigenteVenta)=>void;onActualizar:()=>void;
+ onSolicitudPendiente:(solicitud:CambioReservaPendienteResumen)=>void;
 }){
  const [items,setItems]=useState<CrmCambioReserva[]>([]);
  const [proyectos,setProyectos]=useState<ProyectoResponse[]>([]);
@@ -91,7 +93,10 @@ export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disa
  const solicitar=async()=>{
   if(!editor||!lote||motivo.trim().length<5||busy)return;
   setBusy(true);setError('');
-  try{await crmBackend.solicitarCambioReserva({idProspecto,idReserva:editor.idReserva,idLote:Number(lote),motivo:motivo.trim()});
+  try{const respuesta=await crmBackend.solicitarCambioReserva({idProspecto,idReserva:editor.idReserva,idLote:Number(lote),motivo:motivo.trim()});
+   onSolicitudPendiente({idSolicitud:respuesta.idSolicitud,loteAnterior:editor.codigoLote,
+     loteNuevo:lotes.find(l=>l.idLote===Number(lote))?.codigo??'Lote seleccionado',
+     proyectoNuevo:proyectos.find(p=>p.idProyecto===Number(proyecto))?.nombre??'Proyecto seleccionado'});
    toast.success('Solicitud enviada a Gerencia y Supervisión');setEditor(null);setRev(n=>n+1);
    window.dispatchEvent(new Event('sgi:financiamiento-alertas-actualizadas'));
   }catch(e){setError(errorText(e));}finally{setBusy(false);}
