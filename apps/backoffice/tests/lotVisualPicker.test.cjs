@@ -211,3 +211,20 @@ test('solicitud aprobada recupera la reserva exacta y las preferencias sin reuti
  assert.match(multi,/metodo:guardada\?\.metodo\?\?'TRANSFERENCIA',referencia:'',archivo:null/);
  assert.match(multi,/politica.modoInicial==='FIJA'\?String\(inicial\):guardada\?\.inicial/);
 });
+
+test('detalle de cambio explica el traslado y conserva permisos y sustento de decisión',()=>{
+ const panel=fs.readFileSync(path.resolve(__dirname,'../src/components/sales/CambiosReservaPanel.tsx'),'utf8');
+ assert.match(panel,/title="Detalle de solicitud de cambio"/);
+ assert.match(panel,/onClick=\{\(\)=>abrirDetalle\(s\)\}>Ver detalle/);
+ assert.match(panel,/Lote de origen/);
+ assert.match(panel,/Lote solicitado/);
+ assert.match(panel,/Motivo registrado/);
+ assert.match(panel,/volverá a quedar disponible en el inventario/);
+ assert.match(panel,/vencimiento original\. La aprobación no registra una venta/);
+ assert.match(panel,/s.estado==='APROBADA'\?<p>La reserva se trasladó/);
+ assert.match(panel,/s.estado==='RECHAZADA'\?<p>El cambio no se realizó/);
+ assert.match(panel,/!detalle\?\.puedeDecidir\|\|detalle.estado!=='PENDIENTE'/);
+ assert.match(panel,/motivo\.trim\(\)\.length<5/);
+ assert.match(panel,/detalle\.puedeRecuperar&&onRecuperar/);
+ assert.match(panel,/timeZone:'America\/Lima'/);
+});
