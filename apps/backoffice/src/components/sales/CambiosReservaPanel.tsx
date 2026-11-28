@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { RefreshCwIcon, ArrowRightLeftIcon } from 'lucide-react';
-import { crmBackend, type CrmCambioReserva, type CrmReservaVigenteVenta } from '../../services/crmBackend';
+import { crmBackend, type CrmCambioReserva, type CrmReservaVigenteVenta, type CrmPreparacionVenta } from '../../services/crmBackend';
 import { coreService } from '../../services/coreService';
 import type { ProyectoResponse, LoteResponse } from '../../types/core';
 import { formatSoles } from '../../utils/financeMoney';
@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Select, Input } from '../ui/Field';
 import { Card } from '../ui/Card';
 const errorText=(e:unknown)=>e instanceof Error?e.message:'No se pudo completar la operación.';
-export function CambiosReservaPanel(){
+export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCambioReserva)=>void}){
  const [items,setItems]=useState<CrmCambioReserva[]>([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
@@ -47,6 +47,10 @@ export function CambiosReservaPanel(){
     <p className="text-xs text-brand-600">Motivo: {s.motivo} · Abono conservado: {formatSoles(s.credito)} · Precio destino: {formatSoles(s.precioDestino)}</p>
     {s.credito!==s.separacionDestino&&<p className="text-xs text-amber-800">Separación de referencia del destino: {formatSoles(s.separacionDestino)}. Se mantiene el abono original; la diferencia se contempla en el saldo de venta.</p>}
     {s.decision&&<p className="text-xs text-brand-600">Decisión: {s.decision}</p>}
+    {s.estado==='APROBADA'&&s.puedeRecuperar&&onRecuperar&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-emerald-50 p-3">
+      <p className="text-xs text-emerald-800">Cambio aprobado. Puedes recuperar la preparación de la venta.</p>
+      <Button type="button" variant="primary" size="sm" disabled={busy||loading} onClick={()=>onRecuperar(s)}>Recuperar proceso de venta</Button>
+    </div>}
     {s.puedeDecidir&&<div className="flex flex-wrap gap-2">
       <Button size="sm" variant="success" disabled={busy} onClick={()=>{setDecision({item:s,aprobar:true});setMotivo('');}}>Aprobar cambio</Button>
       <Button size="sm" variant="danger" disabled={busy} onClick={()=>{setDecision({item:s,aprobar:false});setMotivo('');}}>Rechazar</Button>
@@ -62,10 +66,11 @@ export function CambiosReservaPanel(){
  </Card>;
 }
 export type CambioReservaPendienteResumen=Pick<CrmCambioReserva,'idSolicitud'|'loteAnterior'|'loteNuevo'|'proyectoNuevo'>;
-export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disabled,onSeleccionar,onActualizar,onSolicitudPendiente}:{
+export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disabled,onSeleccionar,onActualizar,onSolicitudPendiente,obtenerPreparacion}:{
  idProspecto:number;reservas:CrmReservaVigenteVenta[];idLoteSeleccionado:number;disabled:boolean;
  onSeleccionar:(r:CrmReservaVigenteVenta)=>void;onActualizar:()=>void;
  onSolicitudPendiente:(solicitud:CambioReservaPendienteResumen)=>void;
+ obtenerPreparacion:()=>CrmPreparacionVenta;
 }){
  const [items,setItems]=useState<CrmCambioReserva[]>([]);
  const [proyectos,setProyectos]=useState<ProyectoResponse[]>([]);
@@ -93,7 +98,7 @@ export function ReservasVentaPanel({idProspecto,reservas,idLoteSeleccionado,disa
  const solicitar=async()=>{
   if(!editor||!lote||motivo.trim().length<5||busy)return;
   setBusy(true);setError('');
-  try{const respuesta=await crmBackend.solicitarCambioReserva({idProspecto,idReserva:editor.idReserva,idLote:Number(lote),motivo:motivo.trim()});
+  try{const respuesta=await crmBackend.solicitarCambioReserva({idProspecto,idReserva:editor.idReserva,idLote:Number(lote),motivo:motivo.trim(),preparacionVenta:obtenerPreparacion()});
    onSolicitudPendiente({idSolicitud:respuesta.idSolicitud,loteAnterior:editor.codigoLote,
      loteNuevo:lotes.find(l=>l.idLote===Number(lote))?.codigo??'Lote seleccionado',
      proyectoNuevo:proyectos.find(p=>p.idProyecto===Number(proyecto))?.nombre??'Proyecto seleccionado'});
