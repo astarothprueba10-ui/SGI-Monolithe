@@ -194,3 +194,20 @@ test('cambio de reserva pendiente bloquea preparación, permite consultar y no a
  assert.match(panel,/const respuesta=await crmBackend.solicitarCambioReserva/);
  assert.match(panel,/onSolicitudPendiente\(\{idSolicitud:respuesta.idSolicitud/);
 });
+
+test('solicitud aprobada recupera la reserva exacta y las preferencias sin reutilizar pagos',()=>{
+ const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+ const sales=read('pages/Sales.tsx'),panel=read('components/sales/CambiosReservaPanel.tsx'),multi=read('components/sales/FormalizacionMultiplePanel.tsx');
+ assert.match(panel,/s.estado==='APROBADA'&&s.puedeRecuperar&&onRecuperar/);
+ assert.match(panel,/Recuperar proceso de venta/);
+ assert.match(panel,/preparacionVenta:obtenerPreparacion\(\)/);
+ assert.match(sales,/handleSelectProspect\(solicitud.idProspecto,solicitud\)/);
+ assert.match(sales,/c.idSolicitud===recuperar.idSolicitud&&c.estado==='APROBADA'&&c.puedeRecuperar/);
+ assert.match(sales,/r.idReserva===vigente\?\.idReserva&&r.idLote===vigente\?\.idLoteNuevo/);
+ assert.match(sales,/l.codigoEstadoLote==='DISPONIBLE'&&permitidos.has\(l.idLote\)/);
+ assert.match(sales,/setPreferenciasRecuperadas\(preparacion\?\.lotes\?\?\[\]\)/);
+ assert.match(sales,/setFormObservations\(preparacion\?\.observaciones\?\?''\)/);
+ assert.match(multi,/a.idReserva===lote.reserva.idReserva/);
+ assert.match(multi,/metodo:guardada\?\.metodo\?\?'TRANSFERENCIA',referencia:'',archivo:null/);
+ assert.match(multi,/politica.modoInicial==='FIJA'\?String\(inicial\):guardada\?\.inicial/);
+});
