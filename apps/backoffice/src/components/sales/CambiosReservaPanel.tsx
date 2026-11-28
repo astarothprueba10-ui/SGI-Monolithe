@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { RefreshCwIcon, ArrowRightLeftIcon, ArrowRightIcon, EyeIcon, CalendarDaysIcon, MapPinIcon, CheckCircle2Icon, ClockIcon, XCircleIcon, InfoIcon } from 'lucide-react';
+import { RefreshCwIcon, ArrowRightLeftIcon, ArrowRightIcon, EyeIcon, CalendarDaysIcon, MapPinIcon, CheckCircle2Icon, ClockIcon, XCircleIcon, InfoIcon, Loader2Icon } from 'lucide-react';
 import { crmBackend, type CrmCambioReserva, type CrmReservaVigenteVenta, type CrmPreparacionVenta } from '../../services/crmBackend';
 import { coreService } from '../../services/coreService';
 import type { ProyectoResponse, LoteResponse } from '../../types/core';
@@ -62,6 +62,17 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
  const [decision,setDecision]=useState<{item:CrmCambioReserva;aprobar:boolean}|null>(null);
  const [motivo,setMotivo]=useState('');
  const [busy,setBusy]=useState(false);
+ const decisionEnCurso=useRef(false);
+ const sustentoRef=useRef<HTMLInputElement>(null);
+ const sustentoValido=motivo.trim().length>=5&&motivo.trim().length<=500;
+ useEffect(()=>{
+  if(!decision)return;
+  const frame=requestAnimationFrame(()=>{
+   sustentoRef.current?.focus({preventScroll:true});
+   sustentoRef.current?.scrollIntoView({block:'center',behavior:'auto'});
+  });
+  return()=>cancelAnimationFrame(frame);
+ },[decision]);
  const detalle=items.find(s=>s.idSolicitud===detalleId);
  const accionesBloqueadas=busy||loading||!!error;
  useEffect(()=>{let live=true;setLoading(true);setError('');
@@ -73,9 +84,10 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
   if(accionesBloqueadas||!s.puedeDecidir||s.estado!=='PENDIENTE')return;
   setDetalleId(s.idSolicitud);setDecision({item:s,aprobar});setMotivo('');
  };
- const cerrarDetalle=()=>{if(busy)return;setDetalleId(null);setDecision(null);setMotivo('');};
+ const cerrarDetalle=()=>{if(decisionEnCurso.current||busy)return;setDetalleId(null);setDecision(null);setMotivo('');};
  const resolver=async()=>{
-  if(!decision||accionesBloqueadas||motivo.trim().length<5||!detalle?.puedeDecidir||detalle.estado!=='PENDIENTE'||detalle.idSolicitud!==decision.item.idSolicitud)return;
+  if(!decision||decisionEnCurso.current||accionesBloqueadas||!sustentoValido||!detalle?.puedeDecidir||detalle.estado!=='PENDIENTE'||detalle.idSolicitud!==decision.item.idSolicitud)return;
+  decisionEnCurso.current=true;
   setBusy(true);
   try{
    await crmBackend.decidirCambioReserva(decision.item.idSolicitud,{aprobar:decision.aprobar,motivo:motivo.trim()});
@@ -83,7 +95,7 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
    setDetalleId(null);setDecision(null);setMotivo('');setLoading(true);setRev(n=>n+1);
    window.dispatchEvent(new Event('sgi:financiamiento-alertas-actualizadas'));
   }catch(e){toast.error('No se pudo resolver la solicitud',{description:errorText(e)});}
-  finally{setBusy(false);}
+  finally{decisionEnCurso.current=false;setBusy(false);}
  };
  return <Card className="space-y-4 p-4">
    <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,8 +134,10 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
       <Button type="button" variant="danger" disabled={accionesBloqueadas} onClick={()=>iniciarDecision(detalle,false)}>Rechazar</Button>
       <Button type="button" variant="success" disabled={accionesBloqueadas} onClick={()=>iniciarDecision(detalle,true)}>Aprobar cambio</Button>
      </>}
-     {decision&&<><Button type="button" disabled={busy} onClick={()=>{setDecision(null);setMotivo('');}}>Volver al detalle</Button>
-      <Button type="button" variant={decision.aprobar?'success':'danger'} disabled={accionesBloqueadas||motivo.trim().length<5||!detalle?.puedeDecidir||detalle.estado!=='PENDIENTE'} onClick={()=>void resolver()}>{busy?'Procesando…':decision.aprobar?'Confirmar aprobación':'Confirmar rechazo'}</Button></>}
+     {decision&&<>
+      <p className={'basis-full text-xs '+(busy?'text-brand-700':!sustentoValido?'text-amber-800':'text-brand-600')} role="status" aria-live="polite">{busy?'Registrando la decisión. No cierres el modal.':!sustentoValido?'Escribe el sustento de la decisión (mínimo 5 caracteres) para continuar.':accionesBloqueadas?'Actualiza la solicitud antes de continuar.':'Sustento registrado en el formulario. Puedes confirmar.'}</p>
+      <Button type="button" disabled={busy} onClick={()=>{setDecision(null);setMotivo('');}}>Volver al detalle</Button>
+      <Button type="button" variant={decision.aprobar?'success':'danger'} className={!busy&&!sustentoValido?'disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100 disabled:hover:bg-slate-200':''} disabled={accionesBloqueadas||!sustentoValido||!detalle?.puedeDecidir||detalle.estado!=='PENDIENTE'} aria-busy={busy} onClick={()=>void resolver()}>{busy?<span className="inline-flex items-center gap-2"><Loader2Icon className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true"/>Procesando…</span>:decision.aprobar?'Confirmar aprobación':'Confirmar rechazo'}</Button></>}
      {detalle&&detalle.estado==='APROBADA'&&detalle.puedeRecuperar&&onRecuperar&&<Button type="button" variant="primary" disabled={accionesBloqueadas} onClick={()=>{cerrarDetalle();onRecuperar(detalle);}}>Recuperar proceso de venta</Button>}
     </>}>
     {detalle&&<div className="space-y-4">
@@ -145,9 +159,9 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
      {decision&&<section className="space-y-2 rounded-xl border border-brand-200 p-4">
       <h4 className="text-sm font-semibold text-brand-900">{decision.aprobar?'Confirmar aprobación':'Confirmar rechazo'}</h4>
       <label className="block text-xs font-medium text-brand-700">Sustento de la decisión *
-       <Input value={motivo} onChange={e=>setMotivo(e.target.value)} maxLength={500} className="mt-1" disabled={busy}/>
+       <Input ref={sustentoRef} value={motivo} onChange={e=>setMotivo(e.target.value)} required minLength={5} maxLength={500} aria-describedby="sustento-decision-ayuda" placeholder={decision.aprobar?'Indica por qué apruebas el cambio':'Indica por qué rechazas el cambio'} className="mt-1" disabled={busy}/>
       </label>
-      <p className="text-xs text-brand-600">Escribe al menos 5 caracteres. El sustento se guardará en el historial de la solicitud.</p>
+      <p id="sustento-decision-ayuda" className="text-xs text-brand-600">Mínimo 5 caracteres ({motivo.trim().length}/500). El sustento se guardará en el historial de la solicitud.</p>
      </section>}
     </div>}
    </Modal>
