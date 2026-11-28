@@ -177,3 +177,20 @@ test('formalización conserva crédito y contrato por lote sin inventar reservas
  assert.match(sales,/onQuitarDirecto=/);
  assert.match(sales,/await crmBackend\.registrarVentaPendiente/);
 });
+
+test('cambio de reserva pendiente bloquea preparación, permite consultar y no afecta separaciones',()=>{
+ const read=p=>fs.readFileSync(path.resolve(__dirname,'../src',p),'utf8');
+ const sales=read('pages/Sales.tsx'),panel=read('components/sales/CambiosReservaPanel.tsx');
+ assert.match(sales,/opType==='Venta'\?crmBackend\.listarCambiosReserva\(id\)/);
+ assert.match(sales,/consultaCambios\.items\.filter\(c=>c.estado==='PENDIENTE'\)/);
+ assert.match(sales,/if\(pendientes.length\)return/);
+ assert.match(sales,/ventaBloqueadaPorCambio=opType==='Venta'/);
+ assert.match(sales,/!ventaBloqueadaPorCambio&&<\s*>/);
+ assert.match(sales,/!ventaBloqueadaPorCambio&&!formalizacionMultiple/);
+ assert.match(sales,/mostrarVisorOperacion=can\('lots.view'\)&&!ventaBloqueadaPorCambio/);
+ assert.match(sales,/cerrarModalOperacion\(\);setTab\('CambiosReserva'\)/);
+ assert.match(sales,/Actualizar estado/);
+ assert.match(sales,/onSolicitudPendiente=\{c=>/);
+ assert.match(panel,/const respuesta=await crmBackend.solicitarCambioReserva/);
+ assert.match(panel,/onSolicitudPendiente\(\{idSolicitud:respuesta.idSolicitud/);
+});
