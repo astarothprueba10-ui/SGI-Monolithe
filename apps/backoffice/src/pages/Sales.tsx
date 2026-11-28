@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
 import { FormalizacionMultiplePanel } from '../components/sales/FormalizacionMultiplePanel';
-import { CambiosReservaPanel, ReservasVentaPanel } from '../components/sales/CambiosReservaPanel';
+import { CambiosReservaPanel, ReservasVentaPanel, type CambioReservaPendienteResumen } from '../components/sales/CambiosReservaPanel';
 import { DownloadIcon, FileTextIcon, EyeIcon, PlusIcon, UserCheckIcon, AlertTriangleIcon, RotateCcwIcon, CreditCardIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
@@ -314,6 +314,11 @@ export function Sales() {
   const [formSaleDownPayment, setFormSaleDownPayment] = useState('');
   const [formSaleInstallments, setFormSaleInstallments] = useState('12');
   const [reservasVigentes, setReservasVigentes] = useState<CrmReservaVigenteVenta[]>([]);
+  const [estadoCambiosVenta,setEstadoCambiosVenta]=useState<{id:number;estado:'consultando'|'verificado'|'error';pendientes:CambioReservaPendienteResumen[]}|null>(null);
+  const cambiosPendientesVenta=estadoCambiosVenta?.id===selectedProspectId?estadoCambiosVenta.pendientes:[];
+  const comprobandoCambiosVenta=opType==='Venta'&&!!selectedProspectId&&(estadoCambiosVenta?.id!==selectedProspectId||estadoCambiosVenta.estado==='consultando');
+  const errorCambiosVenta=opType==='Venta'&&!!selectedProspectId&&estadoCambiosVenta?.id===selectedProspectId&&estadoCambiosVenta.estado==='error';
+  const ventaBloqueadaPorCambio=opType==='Venta'&&!!selectedProspectId&&(comprobandoCambiosVenta||errorCambiosVenta||cambiosPendientesVenta.length>0);
   const tieneReservasVenta=opType==='Venta' && reservasVigentes.length>0;
   const [ventaDirectos,setVentaDirectos]=useState<LoteResponse[]>([]);
   const [ventaCandidato,setVentaCandidato]=useState('');
@@ -551,6 +556,7 @@ export function Sales() {
     setAsesorOperacion('');
     setErrorAsesorOperacion('');
     setSelectedProspectId('');
+    setEstadoCambiosVenta(null);
     setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);
     setInteresesOperacion([]);
     setPreferenciasLote({});
@@ -593,6 +599,7 @@ export function Sales() {
   const handleSelectProspect = async (id: number | '') => {
     const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
+    setEstadoCambiosVenta(id!==''&&opType==='Venta'?{id,estado:'consultando',pendientes:[]}:null);
     if(id!==selectedProspectId)setVentaDirectos([]);
     setVentaCandidato('');setEditorVentaAdicional(false);
     setEditorAsesor(false);
@@ -619,14 +626,20 @@ export function Sales() {
 
     setLoadingProjects(true);
     try {
-      const [detalle, proyectos, consultaReservas] = await Promise.all([
+      const [detalle, proyectos, consultaReservas, consultaCambios] = await Promise.all([
         crmBackend.detalle(id),
         coreService.getActiveProjects(),
         opType === 'Venta'
           ? crmBackend.listarReservasVigentesParaVenta(id)
-          : Promise.resolve({ reservas: [] as CrmReservaVigenteVenta[], idLotes: [] as number[] })
+          : Promise.resolve({ reservas: [] as CrmReservaVigenteVenta[], idLotes: [] as number[] }),
+        opType==='Venta'?crmBackend.listarCambiosReserva(id):Promise.resolve({items:[]})
       ]);
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
+      if(opType==='Venta'){
+        const pendientes=consultaCambios.items.filter(c=>c.estado==='PENDIENTE');
+        setEstadoCambiosVenta({id,estado:'verificado',pendientes});
+        if(pendientes.length)return;
+      }
       const intereses = new Set((detalle.intereses ?? []).map(i=>Number(i.idProyecto)).filter(i=>Number.isSafeInteger(i)&&i>0));
       setInteresesOperacion([...intereses]);
       const preferencias:typeof preferenciasLote={};
@@ -678,6 +691,7 @@ export function Sales() {
       }
     } catch (err: unknown) {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
+      if(opType==='Venta')setEstadoCambiosVenta({id,estado:'error',pendientes:[]});
       toast.error('No se pudieron cargar los datos del prospecto', {
         description: err instanceof Error ? err.message : 'Error al consultar proyectos y reservas.'
       });
@@ -867,6 +881,7 @@ export function Sales() {
     ++seleccionProspectoPeticionRef.current;
     setEditorAsesor(false);
     setIsModalOpen(false);
+    setEstadoCambiosVenta(null);
     setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);
     setEditorLote(false);
     setPreseleccionAgrupada(null);
@@ -1040,7 +1055,7 @@ export function Sales() {
   };
 
   const validarVentaAntesDeRevisarComprador = async () => {
-    if (submitting || registroVentaEnCursoRef.current) return;
+    if (ventaBloqueadaPorCambio || submitting || registroVentaEnCursoRef.current) return;
 
     const idProspecto = Number(selectedProspectId);
     const idLote = Number(formLotId);
@@ -1210,7 +1225,7 @@ export function Sales() {
     if (submitting || registroSeparacionEnCursoRef.current || registrandoInteres || guardandoAsesorOperacion || editorAsesor || editorInteres || editorLote || guardandoLote || cargandoAdicional || editorAdicional) return;
 
     if (opType === 'Venta') {
-      if(formalizacionMultiple||editorVentaAdicional)return;
+      if(ventaBloqueadaPorCambio||formalizacionMultiple||editorVentaAdicional)return;
       if(reservaPendienteVenta){toast.error('Finanzas debe aprobar la separación antes de formalizar.');return;}
       setFormTouched(true);
       await validarVentaAntesDeRevisarComprador();
@@ -1230,6 +1245,7 @@ export function Sales() {
   const confirmarRegistroVentaPendiente = async () => {
     if (
       !confirmacionVenta ||
+      ventaBloqueadaPorCambio ||
       submitting ||
       registroVentaEnCursoRef.current
     ) return;
@@ -1381,7 +1397,7 @@ export function Sales() {
   const lotePrincipal = lotesDisponiblesProyecto.find(l=>l.idLote===Number(formLotId));
   const nombreEtapaLote = (id:number) => availableStages.find(e=>e.idLotes.includes(id))?.nombre;
   const mostrarVisorSeparacion=opType==='Separacion' && can('lots.view');
-  const mostrarVisorOperacion=can('lots.view');
+  const mostrarVisorOperacion=can('lots.view')&&!ventaBloqueadaPorCambio;
   const irASeccionOperacion=(id:string)=>{
     const destino=document.getElementById(id);
     if(destino){destino.focus({preventScroll:true});destino.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}
@@ -1392,7 +1408,7 @@ export function Sales() {
   const candidatosVenta=lotesDisponiblesProyecto.filter(l=>!idsVentaDirectos.includes(l.idLote)&&
     (formalizacionMultiple||l.idLote!==Number(formLotId))&&!reservasVigentes.some(r=>r.idLote===l.idLote));
   const cantidadVenta=reservasVigentes.length+ventaDirectos.length+(!formalizacionMultiple&&ventaPrincipalDisponible?1:0);
-  const puedeAgregarVenta=opType==='Venta'&&!asociacionAgrupadaPendiente&&
+  const puedeAgregarVenta=opType==='Venta'&&!ventaBloqueadaPorCambio&&!asociacionAgrupadaPendiente&&
     Boolean(tieneReservasVenta||ventaDirectos.length||ventaPrincipalDisponible)&&cantidadVenta<20;
   const agregarDirectoVenta=()=>{
     const candidato=candidatosVenta.find(l=>l.idLote===Number(ventaCandidato));
@@ -2370,9 +2386,9 @@ export function Sales() {
               disabled={submitting || registrandoInteres || guardandoAsesorOperacion || guardandoLote || cargandoAdicional}
               onClick={cerrarModalOperacion}
             >
-              Cancelar
+              {ventaBloqueadaPorCambio?'Cerrar modal':'Cancelar'}
             </Button>
-            {!formalizacionMultiple && <Button
+            {!ventaBloqueadaPorCambio&&!formalizacionMultiple && <Button
               variant="primary"
 
               disabled={
@@ -2427,6 +2443,25 @@ export function Sales() {
                   </option>
                 ))}
               </Select>
+              {ventaBloqueadaPorCambio ? (
+                <section className="mt-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950" role={comprobandoCambiosVenta?'status':'alert'}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangleIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-amber-700"/>
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="font-semibold">{comprobandoCambiosVenta?'Verificando solicitudes de cambio…':errorCambiosVenta?'No se pudo verificar el estado de las solicitudes':'Venta en espera de aprobación'}</h3>
+                      <p className="text-sm">{comprobandoCambiosVenta?'Espera a que se verifique si el cliente tiene solicitudes pendientes.':errorCambiosVenta?'Por seguridad no puedes continuar hasta verificar las solicitudes. Vuelve a consultar.':'Hasta que no se resuelva la solicitud de cambio, no podrás concretar la venta. Cierra el modal y espera la aprobación de Gerencia o Supervisión. Puedes consultar su estado en Solicitudes de cambio.'}</p>
+                    </div>
+                  </div>
+                  {cambiosPendientesVenta.map(c=><div key={c.idSolicitud} className="rounded-lg border border-amber-200 bg-white/80 p-3 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2"><strong>Solicitud #{c.idSolicitud}</strong><span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Pendiente de aprobación</span></div>
+                    <p className="mt-1">{c.loteAnterior} → {c.loteNuevo}</p><p className="text-xs">{c.proyectoNuevo}</p>
+                  </div>)}
+                  {!comprobandoCambiosVenta&&<div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="primary" onClick={()=>{cerrarModalOperacion();setTab('CambiosReserva');}}>Ir a Solicitudes de cambio</Button>
+                    <Button type="button" variant="secondary" onClick={()=>void handleSelectProspect(selectedProspectId)}>Actualizar estado</Button>
+                  </div>}
+                </section>
+              ):<>
               <ProspectAdvisorInfo prospect={clienteOperacion}
                 disabled={editorAsesor || registrandoInteres || guardandoAsesorOperacion || loadingProjects}
                 onAssign={puedeAsignarAsesorOperacion && !compradorOperacion ? () => void abrirEditorAsesorOperacion() : undefined}/>
@@ -2457,8 +2492,10 @@ export function Sales() {
                   {reservasVigentes.length} reserva(s) detectada(s). Se precarga el proyecto, etapa y lote; cualquier traslado requiere aprobación de Gerencia o Supervisión.
                 </p>
               )}
+              </>}
             </div>
 
+            {!ventaBloqueadaPorCambio&&<>
             <div>
               <label className="mb-1 block text-[12px] font-medium text-brand-700">
                 Proyecto inmobiliario *
@@ -2570,6 +2607,7 @@ export function Sales() {
                   else setFormLotId(String(r.idLote));
                 }
               }}
+              onSolicitudPendiente={c=>{setEstadoCambiosVenta({id:Number(selectedProspectId),estado:'verificado',pendientes:[c]});setConfirmacionVenta(null);setEditandoComprador(false);}}
               onActualizar={()=>void handleSelectProspect(selectedProspectId)}
             />}
             {opType==='Venta' && (!formalizacionMultiple||tieneReservasVenta) && <div>
@@ -3207,6 +3245,7 @@ export function Sales() {
                 onChange={(e) => setFormObservations(e.target.value)}
               />
             </div>
+            </>}
           </fieldset></form>
           {mostrarVisorOperacion&&<aside id="operacion-lotes-visor" tabIndex={-1} className="min-w-0 scroll-mt-2 focus:outline-none lg:sticky lg:top-0 lg:max-h-[max(280px,calc(100dvh-220px))] lg:overflow-y-auto lg:overscroll-contain">
             <button type="button" className="mb-2 w-full rounded-md border border-brand-200 px-3 py-2 text-xs font-medium text-brand-700 lg:hidden" onClick={()=>irASeccionOperacion('operacion-lotes-formulario')}>Volver a lotes seleccionados</button>
