@@ -1126,7 +1126,14 @@ export interface CrmOperacionesResponse extends CrmPage<CrmOperacionItem> {
 }
 
 
+export interface CrmPreferenciaVentaLote {
+  idLote:number; idProyecto:number; idReserva:number|null; incluir:boolean;
+  modalidad:'CONTADO'|'FINANCIADA'; inicial:string; cuotas:string;
+  metodo:'TRANSFERENCIA'|'DEPOSITO'|'YAPE_PLIN'|'EFECTIVO'|'OTRO';
+}
+export interface CrmPreparacionVenta {lotes:CrmPreferenciaVentaLote[];observaciones:string}
 export interface CrmCambioReserva {
+  puedeRecuperar?:boolean; preparacionVenta?:CrmPreparacionVenta|null;
   idSolicitud:number; idProspecto:number; idReserva:number; idLoteAnterior:number; idLoteNuevo:number;
   loteAnterior:string; loteNuevo:string; proyectoAnterior:string; proyectoNuevo:string; codigoReserva:string;
   cliente:string; motivo:string; estado:'PENDIENTE'|'APROBADA'|'RECHAZADA'; decision?:string|null;
@@ -2033,7 +2040,7 @@ export const crmBackend = {
   avisosComerciales: () => coreApi.get<{items:{id:string;titulo:string;mensaje:string;fecha:string;ruta?:string}[]}>('/crm/avisos-comerciales'),
   listarCambiosReserva: (idProspecto?:number) => coreApi.get<{items:CrmCambioReserva[]}>(
     `/crm/cambios-reserva${qs({idProspecto})}`),
-  solicitarCambioReserva: (data:{idProspecto:number;idReserva:number;idLote:number;motivo:string}) =>
+  solicitarCambioReserva: (data:{idProspecto:number;idReserva:number;idLote:number;motivo:string;preparacionVenta?:CrmPreparacionVenta}) =>
     coreApi.post<{idSolicitud:number;estado:string}>('/crm/cambios-reserva',data),
   decidirCambioReserva: (idSolicitud:number,data:{aprobar:boolean;motivo:string}) =>
     coreApi.post<{idSolicitud:number;estado:string}>(`/crm/cambios-reserva/${idSolicitud}/decision`,data),
