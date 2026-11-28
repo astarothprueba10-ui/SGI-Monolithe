@@ -102,17 +102,13 @@ export function CambiosReservaPanel({onRecuperar}:{onRecuperar?:(solicitud:CrmCa
      </div>
      <EstadoSolicitud estado={s.estado}/>
     </header>
-    <div className="space-y-3 p-4 sm:px-5">
-     <TrayectoReserva s={s}/>
-     <div className="min-w-0"><p className="text-xs font-medium text-brand-600">Motivo del cambio</p><p className="mt-1 line-clamp-2 break-words text-sm text-brand-900">{s.motivo}</p></div>
-     <ResumenImportes s={s}/>
-     {s.estado==='APROBADA'&&s.puedeRecuperar&&onRecuperar&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 p-3">
-      <p className="text-xs text-emerald-800">Cambio aprobado. Puedes recuperar la preparación de la venta.</p>
-      <Button type="button" variant="primary" size="sm" disabled={accionesBloqueadas} onClick={()=>onRecuperar(s)}>Recuperar proceso de venta</Button>
-     </div>}
+    <div className="px-4 py-3 sm:px-5">
+     <p className="text-xs font-medium text-brand-600">Motivo del cambio</p>
+     <p className="mt-1 line-clamp-2 break-words text-sm text-brand-900">{s.motivo}</p>
     </div>
     <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-100 px-4 py-3 sm:px-5">
      <Button type="button" size="sm" variant="secondary" icon={EyeIcon} disabled={accionesBloqueadas} onClick={()=>abrirDetalle(s)}>Ver detalle</Button>
+     {s.estado==='APROBADA'&&s.puedeRecuperar&&onRecuperar&&<Button type="button" variant="primary" size="sm" disabled={accionesBloqueadas} onClick={()=>onRecuperar(s)}>Recuperar proceso de venta</Button>}
      {s.puedeDecidir&&s.estado==='PENDIENTE'&&<div className="flex flex-wrap gap-2">
       <Button type="button" size="sm" variant="danger" disabled={accionesBloqueadas} onClick={()=>iniciarDecision(s,false)}>Rechazar</Button>
       <Button type="button" size="sm" variant="success" disabled={accionesBloqueadas} onClick={()=>iniciarDecision(s,true)}>Aprobar cambio</Button>
