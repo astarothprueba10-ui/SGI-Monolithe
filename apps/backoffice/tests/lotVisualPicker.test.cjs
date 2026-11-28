@@ -224,7 +224,29 @@ test('detalle de cambio explica el traslado y conserva permisos y sustento de de
  assert.match(panel,/s.estado==='APROBADA'\?<p>La reserva se trasladó/);
  assert.match(panel,/s.estado==='RECHAZADA'\?<p>El cambio no se realizó/);
  assert.match(panel,/!detalle\?\.puedeDecidir\|\|detalle.estado!=='PENDIENTE'/);
- assert.match(panel,/motivo\.trim\(\)\.length<5/);
+ assert.match(panel,/motivo\.trim\(\)\.length>=5&&motivo\.trim\(\)\.length<=500/);
  assert.match(panel,/detalle\.puedeRecuperar&&onRecuperar/);
  assert.match(panel,/timeZone:'America\/Lima'/);
+});
+
+test('decisión sin sustento no llama al backend y doble clic solo registra una vez',async()=>{
+ const panel=fs.readFileSync(path.resolve(__dirname,'../src/components/sales/CambiosReservaPanel.tsx'),'utf8');
+ const source=panel.slice(panel.indexOf(' const resolver=async()=>{'),panel.indexOf(' return <Card',panel.indexOf(' const resolver=async()=>{')));
+ const build=new Function('motivo','crmBackend','decisionEnCurso','setBusy', 'decision','detalle', 'toast','setDetalleId','setDecision','setMotivo','setLoading','setRev','window','errorText',
+ 'const accionesBloqueadas=false; const sustentoValido=motivo.trim().length>=5&&motivo.trim().length<=500;'+source+';return resolver;');
+ for(const aprobar of [true,false]){
+  let calls=0,states=[],release;
+  const pending=new Promise(r=>{release=r});
+  const api={decidirCambioReserva:async()=>{calls++;await pending;}};
+  const lock={current:false},noop=()=>{},item={idSolicitud:4,puedeDecidir:true,estado:'PENDIENTE'};
+  const make=motivo=>build(motivo,api,lock,v=>states.push(v),{item,aprobar},item,{success:noop,error:noop},noop,noop,noop,noop,noop,{dispatchEvent:noop},String);
+  for(const invalid of ['','   ','abcd','a'.repeat(501)])await make(invalid)();
+  assert.equal(calls,0);assert.deepEqual(states,[]);
+  const resolver=make('Sustento válido');
+  const first=resolver();await resolver();assert.equal(calls,1);assert.equal(lock.current,true);
+  release();await first;assert.equal(lock.current,false);assert.deepEqual(states,[true,false]);
+ }
+ assert.match(panel,/sustentoRef.current\?\.scrollIntoView/);
+ assert.match(panel,/disabled=\{accionesBloqueadas\|\|!sustentoValido/);
+ assert.match(panel,/aria-busy=\{busy\}/);
 });
