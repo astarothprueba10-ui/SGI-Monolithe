@@ -28,6 +28,9 @@ import {
   type CrmDatosCompradorVenta,
   type CrmVoucherVenta,
   type CrmReservaVigenteVenta,
+  type CrmCambioReserva,
+  type CrmPreferenciaVentaLote,
+  type CrmPreparacionVenta,
   type CrmContratoDocumentacion
 } from '../services/crmBackend';
 import { ContratosPendientesPanel } from '../components/sales/ContratosPendientesPanel';
@@ -222,6 +225,9 @@ export function Sales() {
   const [, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [recuperacionPendiente,setRecuperacionPendiente]=useState<CrmCambioReserva|null>(null);
+  const [preferenciasRecuperadas,setPreferenciasRecuperadas]=useState<CrmPreferenciaVentaLote[]>([]);
+  const preferenciasVentaRef=React.useRef<CrmPreferenciaVentaLote[]>([]);
   // Una solicitud desde el plano solo propone proyecto y lote; nunca omite seleccionar el prospecto.
   const [preseleccionAgrupada,setPreseleccionAgrupada] = useState<{
     idOperacion:number;idProspecto:number;idProyecto:number;idEtapa:number;idLote:number;
@@ -556,6 +562,8 @@ export function Sales() {
     setAsesorOperacion('');
     setErrorAsesorOperacion('');
     setSelectedProspectId('');
+    setPreferenciasRecuperadas([]);preferenciasVentaRef.current=[];
+    setReservasVigentes([]);
     setEstadoCambiosVenta(null);
     setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);
     setInteresesOperacion([]);
@@ -596,11 +604,11 @@ export function Sales() {
   };
 
 
-  const handleSelectProspect = async (id: number | '') => {
+  const handleSelectProspect = async (id: number | '', recuperar?:CrmCambioReserva) => {
     const solicitud = ++seleccionProspectoPeticionRef.current;
     setSelectedProspectId(id);
     setEstadoCambiosVenta(id!==''&&opType==='Venta'?{id,estado:'consultando',pendientes:[]}:null);
-    if(id!==selectedProspectId)setVentaDirectos([]);
+    if(id!==selectedProspectId||recuperar){setVentaDirectos([]);setPreferenciasRecuperadas([]);preferenciasVentaRef.current=[];}
     setVentaCandidato('');setEditorVentaAdicional(false);
     setEditorAsesor(false);
     setAsesorOperacion('');
@@ -660,6 +668,33 @@ export function Sales() {
       setReservasVigentes(consultaReservas.reservas ?? []);
 
       const reservasElegibles=(consultaReservas.reservas ?? []).filter(r=>elegibles.some(p=>p.idProyecto===r.idProyecto));
+      if(recuperar){
+        // No confiar en la tarjeta de la bandeja: verificar nuevamente solicitud, reserva y cartera.
+        const vigente=consultaCambios.items.find(c=>c.idSolicitud===recuperar.idSolicitud&&c.estado==='APROBADA'&&c.puedeRecuperar);
+        const reserva=reservasElegibles.find(r=>r.idReserva===vigente?.idReserva&&r.idLote===vigente?.idLoteNuevo);
+        if(!vigente||!reserva)throw new Error('La solicitud ya no corresponde a una reserva recuperable. Actualiza Solicitudes de cambio.');
+        const preparacion=vigente.preparacionVenta;
+        const directos=preparacion?.lotes.filter(l=>l.idReserva==null)??[];
+        const proyectosDirectos=[...new Set(directos.map(l=>l.idProyecto))];
+        const resultados=await Promise.all(proyectosDirectos.map(async proyecto=>{
+          if(!intereses.has(proyecto)||!elegibles.some(p=>p.idProyecto===proyecto))return [] as LoteResponse[];
+          try{
+            const [inventario,etapas]=await Promise.all([coreService.searchLots({idProyecto:proyecto,activo:true}),crmBackend.listarEtapasOperacion(id,proyecto,false)]);
+            const permitidos=new Set(etapas.flatMap(e=>e.idLotes));
+            return inventario.filter(l=>l.activo&&l.codigoEstadoLote==='DISPONIBLE'&&permitidos.has(l.idLote)&&directos.some(d=>d.idLote===l.idLote&&d.idProyecto===proyecto));
+          }catch{return [] as LoteResponse[];}
+        }));
+        if(solicitud!==seleccionProspectoPeticionRef.current)return;
+        const restaurados=resultados.flat().filter((l,i,a)=>a.findIndex(v=>v.idLote===l.idLote)===i);
+        setVentaDirectos(restaurados);
+        setPreferenciasRecuperadas(preparacion?.lotes??[]);
+        setFormObservations(preparacion?.observaciones??'');
+        setFormProjectId(String(reserva.idProyecto));
+        setAutoseleccionPendiente({idProyecto:reserva.idProyecto,idLote:reserva.idLote});
+        if(restaurados.length<directos.length)toast.warning('Algunos lotes adicionales ya no se pudieron recuperar',{description:'Revisa el inventario autorizado antes de continuar.'});
+        toast.success('Proceso de venta recuperado',{description:'Revisa las condiciones vigentes y vuelve a adjuntar los comprobantes si corresponde.'});
+        return;
+      }
       const reserva=reservasElegibles.find(r=>r.idLote===origenPlano?.idLote) ?? reservasElegibles[0];
       const destino = origenPlano && elegibles.some(p=>p.idProyecto===origenPlano.idProyecto)
         ? origenPlano : null;
@@ -871,6 +906,32 @@ export function Sales() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[preseleccionAgrupada,isModalOpen,loadingFormData,prospectsList,tab]);
 
+  const recuperarProcesoVenta=(solicitud:CrmCambioReserva)=>{
+    if(!can('sales.create')||solicitud.estado!=='APROBADA'||!solicitud.puedeRecuperar)return;
+    setOrigenPlano(null);setPreseleccionAgrupada(null);setAsociacionAgrupadaPendiente(null);
+    setRecuperacionPendiente(solicitud);setTab('Venta');handleOpenModal();
+  };
+
+  useEffect(()=>{
+    if(!recuperacionPendiente||!isModalOpen||loadingFormData||tab!=='Venta')return;
+    const solicitud=recuperacionPendiente;
+    setRecuperacionPendiente(null);
+    if(!prospectsList.some(p=>p.id_prospecto===solicitud.idProspecto)){
+      toast.error('No puedes recuperar esta venta',{description:'El prospecto no está disponible en tu cartera comercial.'});return;
+    }
+    void handleSelectProspect(solicitud.idProspecto,solicitud);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[recuperacionPendiente,isModalOpen,loadingFormData,prospectsList,tab]);
+
+  const obtenerPreparacionVenta=():CrmPreparacionVenta=>{
+    const entradas=[...reservasVigentes.map(r=>({idLote:r.idLote,idProyecto:r.idProyecto,idReserva:r.idReserva})),
+      ...ventaDirectos.filter(l=>!reservasVigentes.some(r=>r.idLote===l.idLote)).map(l=>({idLote:l.idLote,idProyecto:Number(l.idProyecto),idReserva:null}))];
+    return {observaciones:formObservations,lotes:entradas.map(l=>{
+      const guardada=preferenciasVentaRef.current.find(p=>l.idReserva!=null?p.idReserva===l.idReserva:p.idReserva==null&&p.idLote===l.idLote);
+      return guardada?{...guardada,...l}:{...l,incluir:true,modalidad:l.idReserva!=null?'FINANCIADA':'CONTADO',inicial:'',cuotas:'12',metodo:'TRANSFERENCIA'};
+    })};
+  };
+
   const cerrarModalOperacion = () => {
     if (
       registroSeparacionEnCursoRef.current ||
@@ -885,6 +946,8 @@ export function Sales() {
     setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);
     setEditorLote(false);
     setPreseleccionAgrupada(null);
+    setRecuperacionPendiente(null);
+    setPreferenciasRecuperadas([]);preferenciasVentaRef.current=[];
     setAsociacionAgrupadaPendiente(null);
     setOrigenPlano(null);
     setAutoseleccionPendiente(null);
@@ -1819,7 +1882,7 @@ export function Sales() {
         ]}
       />
 
-      {tab === 'CambiosReserva' && <CambiosReservaPanel />}
+      {tab === 'CambiosReserva' && <CambiosReservaPanel onRecuperar={can('sales.create')?recuperarProcesoVenta:undefined}/>}
 
       {tab === 'Agrupadas' && (
         <Gate permission="sales.view">
@@ -2607,6 +2670,7 @@ export function Sales() {
                   else setFormLotId(String(r.idLote));
                 }
               }}
+              obtenerPreparacion={obtenerPreparacionVenta}
               onSolicitudPendiente={c=>{setEstadoCambiosVenta({id:Number(selectedProspectId),estado:'verificado',pendientes:[c]});setVentaDirectos([]);setVentaCandidato('');setEditorVentaAdicional(false);setComprobantesVenta([]);setDatosVentaValidados(null);setConfirmacionVenta(null);setEditandoComprador(false);}}
               onActualizar={()=>void handleSelectProspect(selectedProspectId)}
             />}
@@ -2918,6 +2982,7 @@ export function Sales() {
 
             ) : formalizacionMultiple && selectedProspectId ? (
               <FormalizacionMultiplePanel key={selectedProspectId} idProspecto={Number(selectedProspectId)} reservas={reservasVigentes} directos={ventaDirectos}
+                preferenciasIniciales={preferenciasRecuperadas} onPreparacion={lotes=>{preferenciasVentaRef.current=lotes;}}
                 bloqueado={loadingProjects||loadingStages||loadingLots||editorInteres||editorAsesor||registrandoInteres||guardandoAsesorOperacion||editorVentaAdicional}
                 onConsultar={(id,proyecto)=>{
                   if(proyecto!==Number(formProjectId)){
@@ -3241,6 +3306,7 @@ export function Sales() {
               <Input
                 type="text"
                 placeholder="Detalle o nota interna..."
+                maxLength={500}
                 value={formObservations}
                 onChange={(e) => setFormObservations(e.target.value)}
               />
