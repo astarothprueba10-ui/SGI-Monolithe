@@ -64,8 +64,9 @@ BEGIN
         JOIN public.cfg_estados_reserva e USING(id_estado_reserva)
         WHERE p.id_prospecto=p_prospecto AND p.activo AND r.id_lote=p_lote AND e.codigo='PENDIENTE' AND r.fecha_vencimiento>now())
     THEN RAISE EXCEPTION 'RESERVA_PENDIENTE|Finanzas debe aprobar la separación antes de formalizar.'; END IF;
-    IF EXISTS(SELECT 1 FROM public.crm_solicitudes_cambio_reserva_v1 c WHERE c.id_prospecto=p_prospecto AND (c.id_lote_anterior=p_lote OR c.id_lote_nuevo=p_lote) AND c.estado='PENDIENTE')
-    THEN RAISE EXCEPTION 'OPERACION_INVALIDA|Existe una solicitud de cambio de este lote pendiente de resolución.'; END IF;
+    -- Una solicitud de traslado sin resolver detiene la venta de este prospecto, no la cartera completa.
+    IF EXISTS(SELECT 1 FROM public.crm_solicitudes_cambio_reserva_v1 c WHERE c.id_prospecto=p_prospecto AND c.estado='PENDIENTE')
+    THEN RAISE EXCEPTION 'OPERACION_INVALIDA|Existe una solicitud de cambio pendiente de resolución para este prospecto. Consulte Solicitudes de cambio antes de formalizar.'; END IF;
 
     -- 4. Validar modalidad y condiciones de pago.
     IF p_modalidad = 'FINANCIADA' THEN
