@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Field';
 import { Modal } from '../ui/Modal';
 import { EditarDatosCompradorModal } from './EditarDatosCompradorModal';
-import { crmBackend, type CrmReservaVigenteVenta, type CrmSaleValidationInput, type CrmDatosCompradorVenta } from '../../services/crmBackend';
+import { crmBackend, type CrmReservaVigenteVenta, type CrmSaleValidationInput, type CrmDatosCompradorVenta, type CrmPreferenciaVentaLote } from '../../services/crmBackend';
 import type { LoteResponse } from '../../types/core';
 import { coreService } from '../../services/coreService';
 import { calcularVenta, validarInicialTotal, type CondicionesFrancesas } from '../../utils/financiamientoFrances';
@@ -25,6 +25,7 @@ type Props = {
  onConsultar:(idLote:number,idProyecto:number)=>void; onQuitarDirecto:(idLote:number)=>void; bloqueado:boolean;
  proyectos:Array<{idProyecto:number;nombre:string}>;
  compradorExistente:boolean; puedeReasignar:boolean; asesorNombre:string;
+ preferenciasIniciales:readonly CrmPreferenciaVentaLote[]; onPreparacion:(lotes:CrmPreferenciaVentaLote[])=>void;
  observaciones:string; onBusy:(busy:boolean)=>void; onCompleted:()=>void;
 };
 const credito=(d:Draft)=>creditoLote(d.lote);
@@ -37,7 +38,7 @@ const resumen=(d:Draft)=>{
 const pago=(d:Draft)=>{const r=resumen(d);return r?d.modalidad==='FINANCIADA'?r.inicialAdicional:r.saldoContado:null;};
 const mensaje=(e:unknown)=>e instanceof Error?e.message:'No se pudo completar la operación.';
 
-export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyectos,compradorExistente,puedeReasignar,asesorNombre,observaciones,onBusy,onCompleted,onConsultar,onQuitarDirecto,bloqueado}:Props){
+export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyectos,compradorExistente,puedeReasignar,asesorNombre,observaciones,onBusy,onCompleted,onConsultar,onQuitarDirecto,bloqueado,preferenciasIniciales,onPreparacion}:Props){
  const [drafts,setDrafts]=useState<Draft[]>([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
@@ -59,14 +60,19 @@ export function FormalizacionMultiplePanel({idProspecto,reservas,directos,proyec
    if(!p||p.idLote!==lote.idLote||!p.activo||p.codigoMoneda!=='PEN'||!Number.isFinite(precio)||precio<=0||!politica?.idPolitica)
     throw new Error('No se verificaron las condiciones del lote '+lote.codigoLote);
    const inicial=politica.modoInicial==='FIJA'?Number(politica.inicialFija):Math.max(Number(politica.inicialMinima??0),creditoLote(lote));
-   return {lote,precio,politica,incluir:true,modalidad:lote.reserva?'FINANCIADA':'CONTADO',inicial:String(inicial),cuotas:String(Math.max(politica.cuotasMin,Math.min(12,politica.cuotasMax))),metodo:'TRANSFERENCIA',referencia:'',archivo:null} as Draft;
+   const guardada=preferenciasIniciales.find(a=>lote.reserva?a.idReserva===lote.reserva.idReserva:a.idReserva==null&&a.idLote===lote.idLote);
+   return {lote,precio,politica,incluir:guardada?.incluir??true,modalidad:guardada?.modalidad??(lote.reserva?'FINANCIADA':'CONTADO'),
+    inicial:politica.modoInicial==='FIJA'?String(inicial):guardada?.inicial??String(inicial),
+    cuotas:guardada?.cuotas??String(Math.max(politica.cuotasMin,Math.min(12,politica.cuotasMax))),
+    metodo:guardada?.metodo??'TRANSFERENCIA',referencia:'',archivo:null} as Draft;
    })).then(d=>{if(activo)setDrafts(prev=>d.map(n=>{
     const anterior=prev.find(a=>a.lote.idLote===n.lote.idLote);
     if(!anterior||anterior.precio!==n.precio||anterior.politica.idPolitica!==n.politica.idPolitica||credito(anterior)!==credito(n)||anterior.lote.reserva?.estado!==n.lote.reserva?.estado)return n;
     return {...anterior,lote:n.lote,politica:n.politica};
    }));}).catch(e=>{if(activo){setDrafts([]);setError(mensaje(e));}}).finally(()=>{if(activo)setLoading(false);});
   return()=>{activo=false;};
- },[idProspecto,reservas,directos,revision]);
+ },[idProspecto,reservas,directos,revision,preferenciasIniciales]);
+ useEffect(()=>{if(!loading)onPreparacion(drafts.map(d=>({idLote:d.lote.idLote,idProyecto:d.lote.idProyecto,idReserva:d.lote.reserva?.idReserva??null,incluir:d.incluir,modalidad:d.modalidad,inicial:d.inicial,cuotas:d.cuotas,metodo:d.metodo})));},[drafts,loading,onPreparacion]);
  const actualizar=(id:number,patch:Partial<Draft>)=>setDrafts(prev=>prev.map(d=>d.lote.idLote===id?{...d,...patch}:d));
  const seleccion=drafts.filter(d=>d.incluir);
  const total=seleccion.reduce((s,d)=>s+Math.round((pago(d)??0)*100),0)/100;
