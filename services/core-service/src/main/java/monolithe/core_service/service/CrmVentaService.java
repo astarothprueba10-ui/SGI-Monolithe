@@ -1263,12 +1263,12 @@ public class CrmVentaService {
     @Transactional(readOnly = true)
     public JsonNode listarCambiosReserva(Long actor,Long prospecto) {
         validarActor(actor);
-        return ejecutar("SELECT public.sp_crm_listar_cambios_reserva_v1(CAST(? AS bigint),CAST(? AS bigint))::text",actor,prospecto);
+        return ejecutar("SELECT public.sp_crm_listar_cambios_reserva_v2(CAST(? AS bigint),CAST(? AS bigint))::text",actor,prospecto);
     }
     @Transactional
     public JsonNode solicitarCambioReserva(Long actor,monolithe.core_service.dto.CambioReservaRequest req) {
         validarActor(actor);
-        return ejecutar("SELECT public.sp_crm_solicitar_cambio_reserva_v1(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text))::text",actor,req.idProspecto(),req.idReserva(),req.idLote(),req.motivo());
+        return ejecutar("SELECT public.sp_crm_solicitar_cambio_reserva_v2(CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS bigint),CAST(? AS text),CAST(? AS jsonb))::text",actor,req.idProspecto(),req.idReserva(),req.idLote(),req.motivo(),req.preparacionVenta()==null?null:req.preparacionVenta().toString());
     }
     @Transactional
     public JsonNode decidirCambioReserva(Long actor,Long solicitud,monolithe.core_service.dto.DecisionCambioReservaRequest req) {
