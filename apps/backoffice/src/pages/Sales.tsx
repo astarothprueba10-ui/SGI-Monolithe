@@ -645,7 +645,7 @@ export function Sales() {
       if (solicitud !== seleccionProspectoPeticionRef.current) return;
       if(opType==='Venta'){
         const pendientes=consultaCambios.items.filter(c=>c.estado==='PENDIENTE');
-        setEstadoCambiosVenta({id,estado:'verificado',pendientes});
+        if(pendientes.length||!recuperar)setEstadoCambiosVenta({id,estado:'verificado',pendientes});
         if(pendientes.length)return;
       }
       const intereses = new Set((detalle.intereses ?? []).map(i=>Number(i.idProyecto)).filter(i=>Number.isSafeInteger(i)&&i>0));
@@ -691,6 +691,7 @@ export function Sales() {
         setFormObservations(preparacion?.observaciones??'');
         setFormProjectId(String(reserva.idProyecto));
         setAutoseleccionPendiente({idProyecto:reserva.idProyecto,idLote:reserva.idLote});
+        setEstadoCambiosVenta({id,estado:'verificado',pendientes:[]});
         if(restaurados.length<directos.length)toast.warning('Algunos lotes adicionales ya no se pudieron recuperar',{description:'Revisa el inventario autorizado antes de continuar.'});
         toast.success('Proceso de venta recuperado',{description:'Revisa las condiciones vigentes y vuelve a adjuntar los comprobantes si corresponde.'});
         return;
